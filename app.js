@@ -413,6 +413,24 @@ function initDateTimeControls() {
     showToast('Fecha fijada en Mañana.');
   });
 
+  // Disparador al hacer clic en el badge de fecha amigable
+  const dateDisplayBadge = document.getElementById('trip-date-display');
+  if (dateDisplayBadge) {
+    dateDisplayBadge.addEventListener('click', () => {
+      try {
+        if (typeof dateInput.showPicker === 'function') {
+          dateInput.showPicker();
+        } else {
+          dateInput.focus();
+          dateInput.click();
+        }
+      } catch (err) {
+        dateInput.focus();
+        dateInput.click();
+      }
+    });
+  }
+
   // Stepper botones (-5 min / +5 min)
   document.getElementById('btn-time-minus').addEventListener('click', () => {
     adjustTimeByMinutes(-5);
@@ -487,7 +505,9 @@ function updateDateDisplay() {
   const displayEl = document.getElementById('trip-date-display');
   if (!displayEl) return;
   const formatted = formatDateWithWeekday(state.date);
-  displayEl.textContent = formatted ? `📅 ${formatted}` : '📅 Seleccionar fecha';
+  displayEl.innerHTML = formatted 
+    ? `<span class="badge-cal-icon">📅</span><span>${formatted}</span>` 
+    : `<span class="badge-cal-icon">📅</span><span>Seleccionar fecha</span>`;
 }
 
 // ==========================================
