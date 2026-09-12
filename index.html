@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RutaPrivada | Traslados Privados & Chofer Ejecutivo en Argentina</title>
+  <meta name="description" content="Calcula la tarifa exacta de tu viaje privado con chofer ejecutivo en tiempo real según origen, destino y horario en Argentina. Reserva directa por WhatsApp." />
+  <meta name="theme-color" content="#0a0d14" />
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS for Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Top Announcement Bar -->
+  <aside class="top-announcement" aria-label="Información de servicio">
+    <div class="container top-announcement-content">
+      <span>✨ <strong>Servicio Privado Puerta a Puerta en Argentina</strong> — Flota Ejecutiva, vehículos higienizados y puntualidad garantizada</span>
+      <div class="top-actions">
+        <label for="currency-select" class="currency-label">Moneda:</label>
+        <select id="currency-select" class="currency-select" title="Seleccionar moneda">
+          <option value="ARS">ARS ($)</option>
+          <option value="USD">USD ($)</option>
+          <option value="EUR">EUR (€)</option>
+          <option value="MXN">MXN ($)</option>
+          <option value="CLP">CLP ($)</option>
+        </select>
+        <!-- Protected Admin Access Button -->
+        <button id="open-config-btn" class="icon-btn admin-lock-btn" title="Panel exclusivo del administrador" aria-label="Administración">
+          🔒 Admin
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Navigation Header -->
+  <header class="main-header">
+    <div class="container header-container">
+      <div class="brand">
+        <div class="brand-icon">🚘</div>
+        <div>
+          <h1 class="brand-title">Ruta<span>Privada</span></h1>
+          <p class="brand-subtitle">Traslados Ejecutivos & Chofer Profesional</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge badge-trust">🛡️ Choferes Verificados</span>
+        <span class="badge badge-fair">⭐ Servicio 24 Horas</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Hero / Calculator Section -->
+  <main class="container main-layout">
+    
+    <!-- Left Column: Interactive Trip Form -->
+    <section class="calculator-panel">
+      <div class="section-title-wrap">
+        <h2>Cotiza tu Traslado</h2>
+        <p class="section-desc">Selecciona tu punto de origen y destino en el mapa o buscador para calcular la tarifa exacta en tiempo real.</p>
+      </div>
+
+      <!-- Route Inputs -->
+      <div class="card route-card">
+        <div class="card-header">
+          <span class="step-num">1</span>
+          <h3>Itinerario del Viaje</h3>
+        </div>
+
+        <div class="route-inputs-group">
+          <!-- Origin -->
+          <div class="input-field-wrap">
+            <div class="input-icon-pin origin-pin" title="Punto de Origen"></div>
+            <div class="field-body">
+              <label for="origin-input">Punto de Origen</label>
+              <input type="text" id="origin-input" placeholder="Ej: Aeropuerto Ezeiza, Obelisco o calle y número..." autocomplete="off" />
+              <div id="origin-suggestions" class="suggestions-list hidden"></div>
+            </div>
+            <button id="btn-use-location" class="location-btn" title="Usar mi ubicación actual" aria-label="Usar mi ubicación">
+              📍
+            </button>
+          </div>
+
+          <!-- Swap Button -->
+          <div class="swap-wrapper">
+            <button id="btn-swap-route" class="swap-btn" title="Invertir origen y destino" aria-label="Invertir origen y destino">
+              ⇅
+            </button>
+          </div>
+
+          <!-- Destination -->
+          <div class="input-field-wrap">
+            <div class="input-icon-pin destination-pin" title="Punto de Destino"></div>
+            <div class="field-body">
+              <label for="destination-input">Punto de Destino</label>
+              <input type="text" id="destination-input" placeholder="Ej: Hotel Hilton, Puerto Madero, Nordelta, Aeroparque..." autocomplete="off" />
+              <div id="destination-suggestions" class="suggestions-list hidden"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="route-instruction-note">
+          <span>💡 <strong>Cálculo Real:</strong> La distancia y duración se obtienen del trazado real en el mapa por calles transitables. También puedes hacer <strong>clic en el mapa</strong> para marcar origen y destino.</span>
+        </div>
+      </div>
+
+      <!-- Schedule & Time Inputs (5-Minute Oscillation & Executive Style) -->
+      <div class="card schedule-card">
+        <div class="card-header">
+          <span class="step-num">2</span>
+          <h3>Fecha y Horario de Recogida</h3>
+        </div>
+
+        <div class="schedule-stylish-wrapper">
+          <!-- Date Section -->
+          <div class="schedule-block">
+            <div class="block-header">
+              <span class="block-label">📅 Fecha del Traslado</span>
+              <div class="quick-preset-pills">
+                <button type="button" class="preset-pill active" id="btn-date-today">Hoy</button>
+                <button type="button" class="preset-pill" id="btn-date-tomorrow">Mañana</button>
+              </div>
+            </div>
+            <div class="styled-date-input-wrap">
+              <input type="date" id="trip-date" class="styled-date-picker" />
+            </div>
+          </div>
+
+          <!-- Time Section (Oscilación estricta cada 5 minutos) -->
+          <div class="schedule-block">
+            <div class="block-header">
+              <span class="block-label">🕒 Hora de Recogida (Cada 5 min)</span>
+              <div class="quick-preset-pills">
+                <button type="button" class="preset-pill" id="btn-time-now">⚡ Ahora</button>
+                <button type="button" class="preset-pill" id="btn-time-plus30">+30 min</button>
+                <button type="button" class="preset-pill" id="btn-time-plus60">+1 hora</button>
+              </div>
+            </div>
+
+            <div class="stepper-time-wrapper">
+              <button type="button" class="stepper-btn" id="btn-time-minus" title="Restar 5 minutos" aria-label="Restar 5 minutos">−5m</button>
+              
+              <div class="dual-time-selectors">
+                <div class="time-select-unit">
+                  <label for="select-hour">Hora</label>
+                  <select id="select-hour" class="time-select" aria-label="Hora"></select>
+                </div>
+                <span class="time-colon">:</span>
+                <div class="time-select-unit">
+                  <label for="select-minute">Minutos</label>
+                  <select id="select-minute" class="time-select" aria-label="Minutos"></select>
+                </div>
+              </div>
+
+              <button type="button" class="stepper-btn" id="btn-time-plus" title="Sumar 5 minutos" aria-label="Sumar 5 minutos">+5m</button>
+            </div>
+
+            <!-- Input time hidden for compatibility -->
+            <input type="time" id="trip-time" step="300" class="hidden" />
+          </div>
+        </div>
+
+        <div class="schedule-service-note">
+          <span class="note-icon">🕒</span>
+          <span>Horario programable en intervalos de 5 minutos. La reserva anticipada garantiza chofer puntual asignado.</span>
+        </div>
+      </div>
+
+      <!-- Vehicle Fleet Selection (Single Executive Fleet) -->
+      <div class="card vehicle-card">
+        <div class="card-header">
+          <span class="step-num">3</span>
+          <h3>Flota y Confort</h3>
+        </div>
+
+        <div class="single-fleet-card">
+          <div class="fleet-icon-wrapper">
+            <span class="fleet-icon">🚘</span>
+          </div>
+          <div class="fleet-info">
+            <div class="fleet-header-row">
+              <h4>Sedán Ejecutivo & Confort</h4>
+              <span class="fleet-badge">Flota Oficial</span>
+            </div>
+            <p class="fleet-desc">Vehículo moderno de categoría ejecutiva para traslados urbanos y viajes de media/larga distancia. Chofer profesional con vestimenta formal y trato cordial.</p>
+            <div class="fleet-specs">
+              <span class="spec-pill">👥 Hasta 4 Pasajeros</span>
+              <span class="spec-pill">🧳 3 Valijas Grandes</span>
+              <span class="spec-pill">❄️ Climatizador Bizona</span>
+              <span class="spec-pill">⚡ Cargador & Agua</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Extras & Preferences -->
+      <div class="card extras-card">
+        <div class="card-header">
+          <span class="step-num">4</span>
+          <h3>Opciones del Traslado & Peajes</h3>
+        </div>
+
+        <!-- Dynamic Toll Status Indicator (Automated, official government highway rates) -->
+        <div class="toll-status-box" id="toll-status-box">
+          <span class="toll-icon" id="toll-status-icon">🛣️</span>
+          <div class="toll-info">
+            <span class="toll-title" id="toll-status-title">Detección Inteligente de Peajes</span>
+            <span class="toll-desc" id="toll-status-desc">El peaje se calcula según las tarifas obligatorias oficiales de cada autopista (AUSA, Riccheri, Panamericana, Acceso Oeste, La Plata).</span>
+          </div>
+          <span class="toll-badge badge-no-toll" id="toll-status-badge">Sin peaje ($0)</span>
+        </div>
+
+        <div class="extras-grid">
+          <!-- Roundtrip -->
+          <label class="extra-item" id="item-extra-roundtrip">
+            <input type="checkbox" id="extra-roundtrip" />
+            <div class="extra-content">
+              <span class="extra-title">🔄 Viaje Ida y Vuelta</span>
+              <span class="extra-desc">Retorno programado con <strong>15% de descuento especial</strong> en el tramo de vuelta</span>
+            </div>
+            <span class="extra-benefit-tag">-15% Vuelta</span>
+          </label>
+
+          <!-- Intermediate stop (max 5 min) -->
+          <label class="extra-item">
+            <input type="checkbox" id="extra-stop" />
+            <div class="extra-content">
+              <span class="extra-title">🛑 Parada Intermedia en Camino (Máximo 5 minutos)</span>
+              <span class="extra-desc">Breve parada programada de hasta 5 minutos de espera incluida (+$2.500)</span>
+            </div>
+          </label>
+
+          <!-- Pet Friendly -->
+          <label class="extra-item">
+            <input type="checkbox" id="extra-pet" />
+            <div class="extra-content">
+              <span class="extra-title">🐾 Traslado de Mascota (Pet Friendly)</span>
+              <span class="extra-desc">Mascota con manta protectora o canil en asiento trasero (+$2.000)</span>
+            </div>
+          </label>
+
+          <!-- Child Seat -->
+          <label class="extra-item">
+            <input type="checkbox" id="extra-childseat" />
+            <div class="extra-content">
+              <span class="extra-title">👶 Asiento de Seguridad Infantil</span>
+              <span class="extra-desc">Silla homologada instalada en el vehículo (Sin cargo)</span>
+            </div>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Interactive Map & Live Fare Quotation -->
+    <section class="summary-panel">
+      <!-- Interactive Map Card -->
+      <div class="card map-card">
+        <div class="map-header">
+          <h3>Trazado de Ruta</h3>
+          <span id="route-calc-status" class="status-indicator">Listo para cotizar</span>
+        </div>
+        
+        <div id="map-container" class="map-container">
+          <!-- Leaflet Map attaches here -->
+        </div>
+
+        <div class="route-metrics-bar">
+          <div class="metric-box">
+            <span class="metric-label">Distancia</span>
+            <span class="metric-value" id="metric-distance">0.0 km</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-box">
+            <span class="metric-label">Duración</span>
+            <span class="metric-value" id="metric-duration">0 min</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-box">
+            <span class="metric-label">Llegada Estimada</span>
+            <span class="metric-value" id="metric-arrival">--:--</span>
+          </div>
+        </div>
+        <p class="map-hint">💡 Puedes hacer clic en el mapa para marcar el origen (1er clic) y el destino (2do clic).</p>
+      </div>
+
+      <!-- Live Fare Quotation Card -->
+      <div class="card fare-quote-card" id="fare-quote-box">
+        <div class="quote-header">
+          <span class="quote-badge">Cotización del Traslado</span>
+          <span class="live-pulse" title="Actualizado en tiempo real">● Tarifa en tiempo real</span>
+        </div>
+
+        <!-- Total Price -->
+        <div class="price-display-wrapper">
+          <span class="price-currency" id="quote-currency-symbol">$</span>
+          <span class="price-amount" id="quote-total-amount">3.500</span>
+          <span class="price-code" id="quote-currency-code">ARS</span>
+        </div>
+        <p class="price-guarantee" id="quote-guarantee-note">✓ Tarifa fija estimada, sin cargos ocultos.</p>
+
+        <!-- Detailed Breakdown -->
+        <div class="breakdown-container">
+          <button type="button" class="breakdown-toggle-btn" id="toggle-breakdown">
+            <span>Ver detalles de la tarifa</span>
+            <span class="arrow">▼</span>
+          </button>
+
+          <div class="breakdown-details" id="breakdown-content">
+            <div class="breakdown-row">
+              <span>Servicio Base & Despacho:</span>
+              <span id="row-base-fare">$3.500</span>
+            </div>
+            <div class="breakdown-row">
+              <span id="row-distance-label">Distancia de trayecto:</span>
+              <span id="row-distance-fare">$0</span>
+            </div>
+            <div class="breakdown-row">
+              <span id="row-duration-label">Tiempo estimado de viaje:</span>
+              <span id="row-duration-fare">$0</span>
+            </div>
+            <div class="breakdown-row" id="row-toll-line">
+              <span id="row-toll-label">Peajes Oficiales de Autopista:</span>
+              <span id="row-toll-fare">$0</span>
+            </div>
+            
+            <!-- Roundtrip Details (Visible when roundtrip active) -->
+            <div class="breakdown-row hidden" id="row-roundtrip-leg-line">
+              <span>Tramo de Regreso:</span>
+              <span id="row-roundtrip-leg-fare">$0</span>
+            </div>
+            <div class="breakdown-row discount-row hidden" id="row-roundtrip-discount-line">
+              <span>✨ Descuento Ida y Vuelta (-15% regreso):</span>
+              <strong id="row-roundtrip-discount-fare">-$0</strong>
+            </div>
+
+            <div class="breakdown-row" id="row-extras-line">
+              <span id="row-extras-label">Opciones adicionales:</span>
+              <span id="row-extras-fare">$0</span>
+            </div>
+            <div class="breakdown-divider"></div>
+            <div class="breakdown-row breakdown-total-row">
+              <strong>Total a Pagar:</strong>
+              <strong id="row-total-fare">$3.500</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Booking & Action Buttons -->
+        <div class="quote-actions">
+          <button id="btn-reserve-whatsapp" class="btn btn-whatsapp">
+            <span class="btn-icon">💬</span>
+            <span class="btn-text">
+              <strong>Confirmar y Reservar por WhatsApp</strong>
+              <small>Envía los datos de tu viaje con 1 clic</small>
+            </span>
+          </button>
+
+          <!-- WhatsApp Target Indicator and Multi-Format Diagnostic -->
+          <div class="whatsapp-target-display">
+            <div class="wa-display-header">
+              <span>📲 Enviando a: <strong id="display-wa-number">+54 9 11 2255-8226</strong></span>
+            </div>
+            
+            <div class="wa-format-pills">
+              <button type="button" class="wa-pill active" data-format="with-9" title="Formato estándar celular Argentina (+54 9 11...)">
+                Con 9 (Estándar)
+              </button>
+              <button type="button" class="wa-pill" data-format="without-9" title="Formato sin prefijo 9 (+54 11...)">
+                Sin 9
+              </button>
+              <button type="button" class="wa-pill" data-format="with-15" title="Formato con 15 (+54 9 11 15...)">
+                Con 15
+              </button>
+              <button type="button" class="wa-pill" id="btn-custom-wa-num" title="Cambiar a otro número para probar">
+                ✏️ Cambiar
+              </button>
+            </div>
+
+            <p class="wa-self-test-warning">
+              💡 <strong>¿Estás probando desde tu propio WhatsApp?</strong> Si estás en el mismo celular o PC donde tienes esa cuenta abierta, WhatsApp no permite chatear a uno mismo y muestra error. Puedes comprobarlo enviándole el enlace a otra persona o probando otro número.
+            </p>
+          </div>
+
+          <div class="secondary-actions">
+            <button id="btn-print-quote" class="btn btn-secondary" title="Imprimir o guardar comprobante en PDF">
+              🖨️ Imprimir / Guardar PDF
+            </button>
+            <button id="btn-copy-quote" class="btn btn-secondary" title="Copiar resumen al portapapeles">
+              📋 Copiar Resumen
+            </button>
+          </div>
+        </div>
+
+        <!-- Trust Features Footer -->
+        <div class="quote-footer-features">
+          <div class="feature-item">
+            <span>🛡️</span>
+            <span>Seguro de Pasajero</span>
+          </div>
+          <div class="feature-item">
+            <span>💳</span>
+            <span>Efectivo o Transferencia</span>
+          </div>
+          <div class="feature-item">
+            <span>⭐</span>
+            <span>Puntualidad 100%</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Post-Booking Confirmation & Rating Experience Modal -->
+  <div id="booking-success-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog success-experience-dialog">
+      <div class="modal-header success-header">
+        <div class="success-icon-badge">✨</div>
+        <div>
+          <h3>¡Solicitud Enviada a WhatsApp!</h3>
+          <p class="success-subtitle">Confirmación y espera cordial de tu chofer</p>
+        </div>
+        <button id="close-success-modal-btn" class="modal-close" aria-label="Cerrar ventana">&times;</button>
+      </div>
+
+      <div class="modal-body success-body">
+        <!-- Cordial Notice Card -->
+        <div class="cordial-notice-card">
+          <div class="driver-avatar-row">
+            <div class="driver-avatar">🚘</div>
+            <div class="driver-status">
+              <h4>Daniel • Chofer Ejecutivo</h4>
+              <span class="status-online"><span class="dot-pulse"></span> Atendiendo tu mensaje en WhatsApp</span>
+            </div>
+          </div>
+          <p class="cordial-text">
+            ¡Muchas gracias por elegir <strong>RutaPrivada</strong>! Los datos detallados de tu traslado acaban de ser enviados a nuestro WhatsApp. 
+            Te responderemos cordialmente a la brevedad para <strong>confirmar disponibilidad y dejar agendado tu viaje</strong>.
+          </p>
+        </div>
+
+        <!-- Quick Summary of what was booked -->
+        <div class="trip-quick-voucher" id="success-trip-summary">
+          <!-- Injected via JS with Origin, Dest, Date/Time and Total -->
+        </div>
+
+        <!-- Interactive 5-Star Rating Section -->
+        <div class="rating-experience-card">
+          <h4>⭐ ¿Cómo calificarías tu experiencia al cotizar?</h4>
+          <p class="rating-help-text">Tu valoración nos impulsa a seguir brindando un servicio premium.</p>
+          
+          <div class="star-rating-wrapper" id="star-rating-box">
+            <button type="button" class="star-btn active" data-star="1" aria-label="1 estrella">★</button>
+            <button type="button" class="star-btn active" data-star="2" aria-label="2 estrellas">★</button>
+            <button type="button" class="star-btn active" data-star="3" aria-label="3 estrellas">★</button>
+            <button type="button" class="star-btn active" data-star="4" aria-label="4 estrellas">★</button>
+            <button type="button" class="star-btn active" data-star="5" aria-label="5 estrellas">★</button>
+          </div>
+          <div class="rating-feedback-msg" id="rating-feedback-msg">
+            ✨ ¡Excelente experiencia! Calificado con 5 estrellas.
+          </div>
+        </div>
+
+        <div class="success-modal-footer">
+          <button type="button" id="btn-done-booking" class="btn btn-whatsapp full-width">
+            💬 Esperar confirmación en WhatsApp
+          </button>
+          <button type="button" id="btn-new-quote" class="btn btn-secondary full-width" style="margin-top: 8px;">
+            🔄 Realizar otra cotización
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reservation Assist Modal (Alternative fallback) -->
+  <div id="reservation-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>💬 Enlace Directo a WhatsApp</h3>
+        <button id="close-reservation-modal-btn" class="modal-close" aria-label="Cerrar ventana">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-note">Tu cotización está lista. Puedes abrir WhatsApp directamente o copiar el mensaje estructurado:</p>
+
+        <div class="res-modal-actions">
+          <a id="res-link-wame" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp full-width">
+            <span>🚀 Abrir en WhatsApp (Enlace Directo)</span>
+          </a>
+
+          <a id="res-link-web" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary full-width">
+            <span>💻 Abrir en WhatsApp Web Directo</span>
+          </a>
+
+          <button type="button" id="res-btn-copy-msg" class="btn btn-outline full-width">
+            <span>📋 Copiar Texto Completo para Pegar</span>
+          </button>
+        </div>
+
+        <div class="res-num-editor-box">
+          <label for="res-input-number">📱 Número de WhatsApp Destino:</label>
+          <div class="input-with-action">
+            <input type="text" id="res-input-number" value="5491122558226" />
+            <button type="button" id="res-btn-update-num" class="btn btn-primary">Actualizar y Probar</button>
+          </div>
+          <small class="field-hint">Si tu WhatsApp no tiene el 9, escribe <code>541122558226</code>. O prueba con el número de otro celular para verificar.</small>
+        </div>
+
+        <div class="res-info-alert">
+          <p>⚠️ <strong>¿Por qué WhatsApp dice "El número no está disponible"?</strong></p>
+          <ul>
+            <li><strong>Auto-envío en WhatsApp Web:</strong> Si estás haciendo la prueba en la misma PC o celular donde tienes abierto este mismo WhatsApp, WhatsApp Web rechaza iniciar chats a uno mismo y muestra ese cartel. Prueba con el número de un familiar o amigo para comprobarlo.</li>
+            <li><strong>Formato o cuenta activa:</strong> Verifica en tu celular (en WhatsApp &gt; Ajustes &gt; Tu perfil) que tu cuenta esté registrada exactamente con estos dígitos.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin PIN Authentication Modal (Protects settings from unauthorized users - PIN hidden) -->
+  <div id="admin-auth-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog auth-dialog">
+      <div class="modal-header">
+        <h3>🔒 Acceso Exclusivo del Administrador</h3>
+        <button id="close-auth-btn" class="modal-close" aria-label="Cerrar ventana">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-note">El panel de tarifas y WhatsApp está protegido para evitar modificaciones de clientes. Ingresa tu clave de administrador:</p>
+        <form id="admin-auth-form">
+          <div class="form-group">
+            <label for="admin-pin-input">Clave de Acceso</label>
+            <input type="password" id="admin-pin-input" placeholder="Ingresa tu clave..." required autofocus />
+          </div>
+          <div class="modal-actions">
+            <button type="button" id="btn-cancel-auth" class="btn btn-outline">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Desbloquear Panel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rate & Settings Modal (Only accessible after entering correct PIN) -->
+  <div id="config-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>⚙️ Panel de Tarifas & WhatsApp (Administrador)</h3>
+        <button id="close-config-btn" class="modal-close" aria-label="Cerrar ventana">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-note">Modifica las tarifas del servicio y tu número de WhatsApp. Los cambios son efectivos de inmediato.</p>
+        
+        <form id="config-form">
+          <div class="config-grid">
+            <div class="form-group full-width highlight-group">
+              <label for="cfg-whatsapp">📱 Tu Número de WhatsApp para Reservas</label>
+              <input type="text" id="cfg-whatsapp" placeholder="Ej: 5491122558226" value="5491122558226" required />
+              <small class="field-hint">Configurado para Argentina: <code>5491122558226</code> (sin + ni espacios)</small>
+            </div>
+
+            <div class="form-group">
+              <label for="cfg-base-fare">Tarifa Base / Despacho ($)</label>
+              <input type="number" id="cfg-base-fare" min="0" step="100" value="3500" required />
+            </div>
+            <div class="form-group">
+              <label for="cfg-km-rate">Precio por Kilómetro ($)</label>
+              <input type="number" id="cfg-km-rate" min="0" step="50" value="950" required />
+            </div>
+            <div class="form-group">
+              <label for="cfg-min-rate">Precio por Minuto ($)</label>
+              <input type="number" id="cfg-min-rate" min="0" step="10" value="180" required />
+            </div>
+            <div class="form-group">
+              <label for="cfg-toll-fee">Peaje Base por Cabina (Tarifa Oficial Gobierno) ($)</label>
+              <input type="number" id="cfg-toll-fee" min="0" step="100" value="2200" required />
+            </div>
+            <div class="form-group">
+              <label for="cfg-stop-fee">Parada Intermedia (hasta 5 min) ($)</label>
+              <input type="number" id="cfg-stop-fee" min="0" step="100" value="2500" required />
+            </div>
+            <div class="form-group">
+              <label for="cfg-pet-fee">Adicional Mascota ($)</label>
+              <input type="number" id="cfg-pet-fee" min="0" step="100" value="2000" required />
+            </div>
+            <div class="form-group">
+              <label for="cfg-night-surge">Ajuste Nocturno Interno (%) (22:00 a 06:00)</label>
+              <input type="number" id="cfg-night-surge" min="0" max="100" step="5" value="25" required />
+            </div>
+            <div class="form-group">
+              <label for="cfg-rush-surge">Ajuste Horario Pico Interno (%) (07:30-09:30 / 17:30-20:00)</label>
+              <input type="number" id="cfg-rush-surge" min="0" max="100" step="5" value="20" required />
+            </div>
+            <div class="form-group full-width">
+              <label for="cfg-admin-pin">Modificar Clave de Administrador</label>
+              <input type="text" id="cfg-admin-pin" value="1234" required />
+              <small class="field-hint">Esta es la clave para desbloquear este panel.</small>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="btn-reset-config" class="btn btn-outline">Restablecer Valores</button>
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Print Only Template -->
+  <div id="print-voucher" class="print-voucher-template">
+    <div class="print-header">
+      <h2>RutaPrivada | Comprobante de Cotización</h2>
+      <p>Servicio de Traslados Privados y Chofer Ejecutivo</p>
+    </div>
+    <div class="print-body" id="print-content-body">
+      <!-- Injected dynamically on print -->
+    </div>
+    <div class="print-footer">
+      <p>Cotización generada el <span id="print-date"></span>. Tarifa garantizada según ruta y horario seleccionado.</p>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- App JS -->
+  <script src="app.js"></script>
+</body>
+</html>
