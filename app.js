@@ -492,26 +492,11 @@ function initCustomCalendar() {
   const prevBtn = document.getElementById('cal-prev-month');
   const nextBtn = document.getElementById('cal-next-month');
   const closeBtn = document.getElementById('cal-close-dropdown');
-  const selectMonth = document.getElementById('cal-select-month');
-  const selectYear = document.getElementById('cal-select-year');
   const shortcutToday = document.getElementById('cal-shortcut-today');
   const shortcutTomorrow = document.getElementById('cal-shortcut-tomorrow');
   const shortcutWeekend = document.getElementById('cal-shortcut-weekend');
-  const shortcutNextWeek = document.getElementById('cal-shortcut-nextweek');
 
   if (!toggleBtn || !dropdown) return;
-
-  // Llenar selector de años (año actual + 5 años a futuro)
-  if (selectYear) {
-    const curYear = new Date().getFullYear();
-    selectYear.innerHTML = '';
-    for (let y = curYear; y <= curYear + 5; y++) {
-      const opt = document.createElement('option');
-      opt.value = String(y);
-      opt.textContent = String(y);
-      selectYear.appendChild(opt);
-    }
-  }
 
   if (state.date) {
     const p = state.date.split('-');
@@ -521,25 +506,7 @@ function initCustomCalendar() {
     }
   }
 
-  // Cambio directo de Mes desde el desplegable
-  if (selectMonth) {
-    selectMonth.addEventListener('change', (e) => {
-      e.stopPropagation();
-      calCurrentMonth = parseInt(selectMonth.value, 10);
-      renderCustomCalendar();
-    });
-  }
-
-  // Cambio directo de Año desde el desplegable
-  if (selectYear) {
-    selectYear.addEventListener('change', (e) => {
-      e.stopPropagation();
-      calCurrentYear = parseInt(selectYear.value, 10);
-      renderCustomCalendar();
-    });
-  }
-
-  // Abrir / Cerrar dropdown dinámico
+  // Abrir / Cerrar dropdown dinámico del calendario
   toggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     const isHidden = dropdown.classList.contains('hidden');
@@ -638,18 +605,6 @@ function initCustomCalendar() {
     });
   }
 
-  if (shortcutNextWeek) {
-    shortcutNextWeek.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const d = new Date();
-      d.setDate(d.getDate() + 7);
-      selectDateFromCalendar(formatDateToString(d));
-      dropdown.classList.add('hidden');
-      toggleBtn.setAttribute('aria-expanded', 'false');
-      showToast('Fecha fijada en +7 Días.');
-    });
-  }
-
   // Cerrar al hacer clic fuera del contenedor
   document.addEventListener('click', (e) => {
     const dateBlock = document.getElementById('schedule-date-block');
@@ -705,95 +660,19 @@ function selectDateFromCalendar(dateStr) {
     }
   }
 
-  renderDateStrip();
   updateDateDisplay();
   evaluateTimeRate(state.time, state.date);
   updateCalculation();
 }
 
-// Renderizar la tira horizontal táctil y didáctica de los próximos 10 días
-function renderDateStrip() {
-  const container = document.getElementById('date-strip-container');
-  if (!container) return;
-
-  container.innerHTML = '';
-  const now = new Date();
-  const todayStr = formatDateToString(now);
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = formatDateToString(tomorrow);
-
-  const daysShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  const monthsShort = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-  // Generar tarjetas para los próximos 10 días
-  for (let i = 0; i < 10; i++) {
-    const targetDate = new Date();
-    targetDate.setDate(now.getDate() + i);
-    const thisDateStr = formatDateToString(targetDate);
-    const dayOfWeek = targetDate.getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const isSelected = state.date === thisDateStr;
-
-    const card = document.createElement('div');
-    card.className = `date-strip-card ${isWeekend ? 'weekend' : ''} ${isSelected ? 'active' : ''}`;
-    card.setAttribute('data-date', thisDateStr);
-    card.setAttribute('role', 'button');
-    card.setAttribute('tabindex', '0');
-
-    let labelName = daysShort[dayOfWeek];
-    let badgeText = 'Estándar';
-    if (thisDateStr === todayStr) {
-      labelName = 'HOY';
-      badgeText = '⚡ Hoy';
-    } else if (thisDateStr === tomorrowStr) {
-      labelName = 'MAÑANA';
-      badgeText = '⭐ Mañana';
-    } else if (isWeekend) {
-      badgeText = '🌴 Finde';
-    }
-
-    card.innerHTML = `
-      <span class="strip-day-name">${labelName}</span>
-      <span class="strip-day-num">${targetDate.getDate()}</span>
-      <span class="strip-month-name">${monthsShort[targetDate.getMonth()]}</span>
-      <span class="strip-badge-pill">${badgeText}</span>
-    `;
-
-    card.addEventListener('click', () => {
-      selectDateFromCalendar(thisDateStr);
-      showToast(`Fecha fijada en ${formatDateWithWeekday(thisDateStr)}`);
-    });
-
-    card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        selectDateFromCalendar(thisDateStr);
-      }
-    });
-
-    container.appendChild(card);
-  }
-}
-
 function renderCustomCalendar() {
   const monthLabel = document.getElementById('cal-month-year-label');
-  const selectMonth = document.getElementById('cal-select-month');
-  const selectYear = document.getElementById('cal-select-year');
   const daysGrid = document.getElementById('cal-days-grid');
   const prevBtn = document.getElementById('cal-prev-month');
   if (!daysGrid) return;
 
   if (monthLabel) {
     monthLabel.textContent = `${MONTH_NAMES_ES[calCurrentMonth]} ${calCurrentYear}`;
-  }
-
-  // Sincronizar selectores desplegables
-  if (selectMonth) {
-    selectMonth.value = String(calCurrentMonth);
-  }
-  if (selectYear) {
-    selectYear.value = String(calCurrentYear);
   }
 
   const now = new Date();
