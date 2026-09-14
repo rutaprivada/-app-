@@ -223,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMap();
   initEventListeners();
   initRatingSystem();
+  setupModalDismissals();
   initLogoDownloadModal();
   loadConfigToModal();
   fetchRealtimeWeather();
@@ -2413,30 +2414,50 @@ function initRatingSystem() {
   const modal = document.getElementById('booking-success-modal');
   const closeBtn = document.getElementById('close-success-modal-btn');
   const doneBtn = document.getElementById('btn-done-booking');
+  const copyBtn = document.getElementById('btn-copy-booking-msg');
   const newQuoteBtn = document.getElementById('btn-new-quote');
   const starBtns = document.querySelectorAll('#star-rating-box .star-btn');
   const feedbackMsg = document.getElementById('rating-feedback-msg');
 
-  if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  if (closeBtn && modal) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  }
+
   if (doneBtn) {
     doneBtn.addEventListener('click', () => {
       setTimeout(() => {
-        modal.classList.add('hidden');
+        if (modal) modal.classList.add('hidden');
       }, 300);
       showToast('💬 Abriendo WhatsApp...');
     });
   }
 
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      const msg = buildReservationMessage();
+      navigator.clipboard.writeText(msg).then(() => {
+        showToast('📋 Datos del viaje copiados al portapapeles.');
+      }).catch(() => {
+        showToast('📋 Mensaje preparado para enviar.');
+      });
+    });
+  }
+
   if (newQuoteBtn) {
     newQuoteBtn.addEventListener('click', () => {
-      modal.classList.add('hidden');
-      document.getElementById('origin-input').value = '';
-      document.getElementById('destination-input').value = '';
+      if (modal) modal.classList.add('hidden');
+      const origInput = document.getElementById('origin-input');
+      const destInput = document.getElementById('destination-input');
+      if (origInput) origInput.value = '';
+      if (destInput) destInput.value = '';
       state.origin = null;
       state.destination = null;
-      if (originMarker) map.removeLayer(originMarker);
-      if (destinationMarker) map.removeLayer(destinationMarker);
-      if (routePolyline) map.removeLayer(routePolyline);
+      if (originMarker && map) map.removeLayer(originMarker);
+      if (destinationMarker && map) map.removeLayer(destinationMarker);
+      if (routePolyline && map) map.removeLayer(routePolyline);
       updateCalculation();
       showToast('Listo para una nueva cotización.');
     });
@@ -2469,6 +2490,24 @@ function initRatingSystem() {
         localStorage.setItem('rutaprivada_last_rating', String(starVal));
       } catch(e) {}
     });
+  });
+}
+
+function setupModalDismissals() {
+  document.querySelectorAll('.modal-backdrop').forEach(m => {
+    m.addEventListener('click', (e) => {
+      if (e.target === m) {
+        m.classList.add('hidden');
+      }
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.add('hidden'));
+      const calDropdown = document.getElementById('custom-calendar-dropdown');
+      if (calDropdown) calDropdown.classList.add('hidden');
+    }
   });
 }
 
@@ -3123,6 +3162,7 @@ function buildReservationMessage() {
 }
 
 async function sendWhatsAppReservation() {
+  const reserveBtn = document.getElementById('btn-reserve-whatsapp');
   const originInput = document.getElementById('origin-input');
   const destInput = document.getElementById('destination-input');
   const origVal = originInput ? originInput.value.trim() : '';
@@ -3130,42 +3170,74 @@ async function sendWhatsAppReservation() {
 
   // Verificación básica de que haya ingresado texto
   if (!origVal || !destVal) {
-    showToast('Ingresá origen y destino para cotizar y reservar tu viaje.');
+    showToast('⚠️ Ingresá origen y destino para cotizar y reservar tu viaje.');
     if (originInput && !origVal) originInput.focus();
     else if (destInput && !destVal) destInput.focus();
     return;
   }
 
-  // Auto-resolución si el usuario escribió texto en los inputs pero no seleccionó de la lista
-  if (!state.origin && origVal.length >= 3) {
-    try {
-      const origRes = await searchLocations(origVal);
-      if (origRes && origRes.length > 0) {
-        setOrigin(parseFloat(origRes[0].lat), parseFloat(origRes[0].lon), origVal);
-      }
-    } catch(e) {}
-  }
+  // Auto-resolución si el usuario escribió texto pero no seleccionó del desplegable
+  if (!state.origin || !state.destination || state.distanceKm <= 0) {
+    if (reserveBtn) {
+      reserveBtn.style.opacity = '0.7';
+      reserveBtn.style.pointerEvents = 'none';
+    }
+    showToast('⏳ Verificando trayecto y cotización...');
 
-  if (!state.destination && destVal.length >= 3) {
-    try {
-      const destRes = await searchLocations(destVal);
-      if (destRes && destRes.length > 0) {
-        setDestination(parseFloat(destRes[0].lat), parseFloat(destRes[0].lon), destVal);
-      }
-    } catch(e) {}
-  }
+    if (!state.origin && origVal.length >= 3) {
+      try {
+        const origRes = await searchLocations(origVal);
+        if (origRes && origRes.length > 0) {
+          const place = origRes[0];
+          state.origin = {
+            lat: parseFloat(place.lat),
+            lng: parseFloat(place.lon),
+            address: place.display_name || origVal
+          };
+        }
+      } catch(e) {}
+    }
 
-  // Si ambos campos tienen coordenadas pero la ruta no se calculó, reintentar cálculo
-  if (state.origin && state.destination && state.distanceKm <= 0) {
-    try {
-      await checkAndRoute();
-    } catch(e) {}
+    if (!state.destination && destVal.length >= 3) {
+      try {
+        const destRes = await searchLocations(destVal);
+        if (destRes && destRes.length > 0) {
+          const place = destRes[0];
+          state.destination = {
+            lat: parseFloat(place.lat),
+            lng: parseFloat(place.lon),
+            address: place.display_name || destVal
+          };
+        }
+      } catch(e) {}
+    }
+
+    // Si ambos campos tienen coordenadas pero la ruta no se calculó, calcular ruta
+    if (state.origin && state.destination && state.distanceKm <= 0) {
+      try {
+        await checkAndRoute();
+      } catch(e) {}
+    }
+
+    // Si el servicio de rutas no respondió, usar estimación geográfica para no trabar la reserva
+    if (state.origin && state.destination && state.distanceKm <= 0) {
+      const directKm = haversineDistance(state.origin.lat, state.origin.lng, state.destination.lat, state.destination.lng) * 1.35;
+      state.distanceKm = Math.max(1, Math.round(directKm * 10) / 10);
+      state.baseDurationMin = Math.max(5, Math.round(state.distanceKm * 2.2));
+      updateCalculation();
+    }
+
+    if (reserveBtn) {
+      reserveBtn.style.opacity = '1';
+      reserveBtn.style.pointerEvents = 'auto';
+    }
   }
 
   const message = buildReservationMessage();
   const phone = getFormattedWhatsAppNumber();
-  const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  const waUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
   const webUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
+  const deeplinkUrl = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
 
   // Actualizar enlaces en modal de respaldo y de éxito
   const doneBtn = document.getElementById('btn-done-booking');
@@ -3183,15 +3255,23 @@ async function sendWhatsAppReservation() {
   // 1. Mostrar la experiencia de confirmación cordial y calificación en pantalla
   showBookingSuccessModal();
 
-  // 2. Abrir WhatsApp de manera confiable (Mobile & Desktop sin bloqueo de popups)
+  // 2. Abrir WhatsApp de manera confiable (Mobile & Desktop)
   const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
   if (isMobile) {
-    window.location.href = waUrl;
+    window.location.href = deeplinkUrl;
+    setTimeout(() => {
+      if (!document.hidden) {
+        window.location.href = waUrl;
+      }
+    }, 900);
   } else {
-    const newWin = window.open(waUrl, '_blank');
-    if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
-      // Si el navegador bloqueó el popup en PC, redirigir directamente
-      window.location.href = waUrl;
+    try {
+      const newWin = window.open(waUrl, '_blank', 'noopener,noreferrer');
+      if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
+        showToast('👉 Toca "Continuar a WhatsApp" para enviar tu mensaje.');
+      }
+    } catch(err) {
+      console.warn('Popup WhatsApp:', err);
     }
   }
 }

@@ -1,32 +1,45 @@
-$port = 8080
-$path = $PSScriptRoot
+param(
+    [int]$Port = 8080
+)
 
-$listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add("http://localhost:$port/")
-$listener.Prefixes.Add("http://127.0.0.1:$port/")
+$path = $PSScriptRoot
+$ip = [System.Net.IPAddress]::Loopback
+$listener = New-Object System.Net.Sockets.TcpListener($ip, $Port)
 
 try {
     $listener.Start()
     Write-Host "====================================================" -ForegroundColor Cyan
     Write-Host "  RutaPrivada - Servidor Local PWA Activo" -ForegroundColor Green
     Write-Host "====================================================" -ForegroundColor Cyan
-    Write-Host "Abriendo en tu navegador: http://localhost:$port" -ForegroundColor Yellow
+    Write-Host "Abriendo en tu navegador: http://localhost:$Port" -ForegroundColor Yellow
     Write-Host "Presiona Ctrl + C en esta ventana para detener el servidor." -ForegroundColor Gray
     Write-Host ""
     
-    Start-Process "http://localhost:$port"
+    Start-Process "http://localhost:$Port"
 
-    while ($listener.IsListening) {
-        $context = $listener.GetContext()
-        $request = $context.Request
-        $response = $context.Response
-
-        $urlPath = $request.Url.LocalPath.TrimStart('/')
-        if ([string]::IsNullOrEmpty($urlPath)) {
-            $urlPath = "index.html"
+    while ($true) {
+        $client = $listener.AcceptTcpClient()
+        $stream = $client.GetStream()
+        $reader = New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::UTF8)
+        
+        $requestLine = $reader.ReadLine()
+        if ([string]::IsNullOrWhiteSpace($requestLine)) {
+            $client.Close()
+            continue
         }
 
-        $filePath = Join-Path $path $urlPath
+        $parts = $requestLine.Split(" ")
+        if ($parts.Length -lt 2) {
+            $client.Close()
+            continue
+        }
+
+        $rawPath = $parts[1].Split("?")[0].TrimStart('/')
+        if ([string]::IsNullOrEmpty($rawPath)) {
+            $rawPath = "index.html"
+        }
+
+        $filePath = Join-Path $path $rawPath
 
         if (Test-Path $filePath -PathType Leaf) {
             $extension = [System.IO.Path]::GetExtension($filePath).ToLower()
@@ -44,16 +57,22 @@ try {
             }
 
             $bytes = [System.IO.File]::ReadAllBytes($filePath)
-            $response.ContentType = $mime
-            $response.ContentLength64 = $bytes.Length
-            $response.AddHeader("Access-Control-Allow-Origin", "*")
-            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            $header = "HTTP/1.1 200 OK`r`nContent-Type: $mime`r`nContent-Length: $($bytes.Length)`r`nAccess-Control-Allow-Origin: *`r`nConnection: close`r`n`r`n"
+            $headerBytes = [System.Text.Encoding]::UTF8.GetBytes($header)
+            
+            $stream.Write($headerBytes, 0, $headerBytes.Length)
+            $stream.Write($bytes, 0, $bytes.Length)
         } else {
-            $response.StatusCode = 404
             $notFound = [System.Text.Encoding]::UTF8.GetBytes("404 - Archivo no encontrado")
-            $response.OutputStream.Write($notFound, 0, $notFound.Length)
+            $header = "HTTP/1.1 404 Not Found`r`nContent-Type: text/plain; charset=utf-8`r`nContent-Length: $($notFound.Length)`r`nConnection: close`r`n`r`n"
+            $headerBytes = [System.Text.Encoding]::UTF8.GetBytes($header)
+            
+            $stream.Write($headerBytes, 0, $headerBytes.Length)
+            $stream.Write($notFound, 0, $notFound.Length)
         }
-        $response.Close()
+
+        $stream.Flush()
+        $client.Close()
     }
 } catch {
     Write-Host "Error en el servidor: $_" -ForegroundColor Red
