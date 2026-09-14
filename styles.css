@@ -861,21 +861,101 @@ body {
   margin-bottom: 10px;
 }
 
+/* ---------------- Tira de Días Próximos (Acceso Rápido) ---------------- */
+.upcoming-days-scroll-wrap {
+  overflow-x: auto;
+  padding: 2px 0 6px 0;
+  margin-bottom: 10px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.upcoming-days-scroll-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.upcoming-days-strip {
+  display: flex;
+  gap: 8px;
+  min-width: max-content;
+}
+
+.day-card-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  min-width: 66px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 12px;
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  text-align: center;
+  gap: 2px;
+}
+
+.day-card-pill:hover {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(52, 211, 153, 0.5);
+  transform: translateY(-2px);
+  color: #34d399;
+}
+
+.day-card-pill.active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff !important;
+  border-color: #34d399;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.45);
+  transform: translateY(-2px) scale(1.02);
+}
+
+.day-card-pill .day-weekday {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  opacity: 0.9;
+}
+
+.day-card-pill .day-number {
+  font-size: 1.18rem;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.day-card-pill .day-month {
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.75;
+  text-transform: capitalize;
+}
+
+.day-card-pill.is-weekend .day-weekday {
+  color: #38bdf8;
+}
+
+.day-card-pill.active.is-weekend .day-weekday {
+  color: #ffffff;
+}
+
 /* Modal / Dropdown del Calendario Oscuro Glassmorphism */
 .custom-calendar-dropdown {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  width: 100%;
-  max-width: 360px;
-  background: rgba(13, 18, 30, 0.98);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1.5px solid rgba(52, 211, 153, 0.35);
+  right: 0;
+  max-width: 380px;
+  background: rgba(12, 17, 30, 0.98);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1.5px solid rgba(52, 211, 153, 0.4);
   border-radius: 18px;
   padding: 16px;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), 0 0 30px rgba(16, 185, 129, 0.25);
-  z-index: 1000;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 35px rgba(16, 185, 129, 0.2);
+  z-index: 1050;
   animation: calPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -891,7 +971,7 @@ body {
 }
 
 .custom-calendar-dropdown.hidden {
-  display: none;
+  display: none !important;
 }
 
 .cal-dropdown-header {
@@ -899,15 +979,43 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
-  padding: 0 4px;
+  padding: 0 2px;
+  gap: 8px;
 }
 
-.cal-month-year-label {
-  font-size: 1rem;
-  font-weight: 800;
+.cal-header-selectors {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-grow: 1;
+  justify-content: center;
+}
+
+.cal-header-select {
+  background: rgba(22, 31, 52, 0.95);
+  border: 1.5px solid rgba(52, 211, 153, 0.35);
+  border-radius: 8px;
   color: #ffffff;
-  text-transform: capitalize;
-  letter-spacing: -0.01em;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.cal-header-select:focus,
+.cal-header-select:hover {
+  border-color: #34d399;
+  background: rgba(28, 40, 68, 0.95);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
+}
+
+.cal-header-select option {
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .cal-nav-btn {

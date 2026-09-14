@@ -421,7 +421,8 @@ function initDateTimeControls() {
     });
   }
 
-  // Inicializar calendario dinámico
+  // Inicializar tira interactiva de días y calendario dinámico
+  renderUpcomingDaysStrip();
   initCustomCalendar();
 
   // Stepper botones (-5 min / +5 min)
@@ -489,6 +490,50 @@ const MONTH_NAMES_ES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
+const WEEKDAY_SHORT = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
+const MONTH_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+function renderUpcomingDaysStrip() {
+  const strip = document.getElementById('upcoming-days-strip');
+  if (!strip) return;
+
+  strip.innerHTML = '';
+  const now = new Date();
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(now.getDate() + i);
+
+    const dStr = formatDateToString(d);
+    const dayOfWeek = d.getDay();
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+    const isSelected = (dStr === state.date);
+
+    let weekdayLabel = WEEKDAY_SHORT[dayOfWeek];
+    if (i === 0) weekdayLabel = 'Hoy';
+    else if (i === 1) weekdayLabel = 'Mañana';
+
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = `day-card-pill ${isSelected ? 'active' : ''} ${isWeekend ? 'is-weekend' : ''}`;
+    pill.setAttribute('data-date', dStr);
+
+    pill.innerHTML = `
+      <span class="day-weekday">${weekdayLabel}</span>
+      <span class="day-number">${d.getDate()}</span>
+      <span class="day-month">${MONTH_SHORT[d.getMonth()]}</span>
+    `;
+
+    pill.addEventListener('click', (e) => {
+      e.preventDefault();
+      selectDateFromCalendar(dStr);
+      showToast(`Fecha fijada en ${formatDateWithWeekday(dStr)}`);
+    });
+
+    strip.appendChild(pill);
+  }
+}
+
 function initCustomCalendar() {
   const toggleBtn = document.getElementById('btn-toggle-custom-calendar');
   const dropdown = document.getElementById('custom-calendar-dropdown');
@@ -498,8 +543,41 @@ function initCustomCalendar() {
   const shortcutToday = document.getElementById('cal-shortcut-today');
   const shortcutTomorrow = document.getElementById('cal-shortcut-tomorrow');
   const shortcutWeekend = document.getElementById('cal-shortcut-weekend');
+  const monthSelect = document.getElementById('cal-select-month');
+  const yearSelect = document.getElementById('cal-select-year');
 
   if (!toggleBtn || !dropdown) return;
+
+  if (monthSelect) {
+    monthSelect.innerHTML = '';
+    MONTH_NAMES_ES.forEach((mName, idx) => {
+      const opt = document.createElement('option');
+      opt.value = idx;
+      opt.textContent = mName;
+      monthSelect.appendChild(opt);
+    });
+    monthSelect.addEventListener('change', (e) => {
+      e.stopPropagation();
+      calCurrentMonth = parseInt(e.target.value, 10);
+      renderCustomCalendar();
+    });
+  }
+
+  if (yearSelect) {
+    yearSelect.innerHTML = '';
+    const baseYear = new Date().getFullYear();
+    for (let y = baseYear; y <= baseYear + 3; y++) {
+      const opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y;
+      yearSelect.appendChild(opt);
+    }
+    yearSelect.addEventListener('change', (e) => {
+      e.stopPropagation();
+      calCurrentYear = parseInt(e.target.value, 10);
+      renderCustomCalendar();
+    });
+  }
 
   if (state.date) {
     const p = state.date.split('-');
@@ -597,8 +675,7 @@ function initCustomCalendar() {
       const d = new Date();
       const day = d.getDay();
       let addDays = 0;
-      if (day === 6) addDays = 0;
-      else if (day === 0) addDays = 0;
+      if (day === 6 || day === 0) addDays = 0;
       else addDays = 6 - day;
       d.setDate(d.getDate() + addDays);
       selectDateFromCalendar(formatDateToString(d));
@@ -664,19 +741,21 @@ function selectDateFromCalendar(dateStr) {
   }
 
   updateDateDisplay();
+  renderUpcomingDaysStrip();
+  renderCustomCalendar();
   evaluateTimeRate(state.time, state.date);
   updateCalculation();
 }
 
 function renderCustomCalendar() {
-  const monthLabel = document.getElementById('cal-month-year-label');
   const daysGrid = document.getElementById('cal-days-grid');
   const prevBtn = document.getElementById('cal-prev-month');
+  const monthSelect = document.getElementById('cal-select-month');
+  const yearSelect = document.getElementById('cal-select-year');
   if (!daysGrid) return;
 
-  if (monthLabel) {
-    monthLabel.textContent = `${MONTH_NAMES_ES[calCurrentMonth]} ${calCurrentYear}`;
-  }
+  if (monthSelect) monthSelect.value = calCurrentMonth;
+  if (yearSelect) yearSelect.value = calCurrentYear;
 
   const now = new Date();
   const curYear = now.getFullYear();
@@ -736,7 +815,6 @@ function renderCustomCalendar() {
       cellBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         selectDateFromCalendar(thisDateStr);
-        renderCustomCalendar();
         setTimeout(() => {
           const dropdown = document.getElementById('custom-calendar-dropdown');
           const toggleBtn = document.getElementById('btn-toggle-custom-calendar');
