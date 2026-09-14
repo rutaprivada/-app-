@@ -2420,8 +2420,10 @@ function initRatingSystem() {
   if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
   if (doneBtn) {
     doneBtn.addEventListener('click', () => {
-      modal.classList.add('hidden');
-      showToast('💬 Daniel te responderá a la brevedad por WhatsApp.');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 300);
+      showToast('💬 Abriendo WhatsApp...');
     });
   }
 
@@ -3126,34 +3128,38 @@ async function sendWhatsAppReservation() {
   const origVal = originInput ? originInput.value.trim() : '';
   const destVal = destInput ? destInput.value.trim() : '';
 
-  // Auto-resolución si el usuario escribió texto en los inputs pero no seleccionó de la lista
-  if (!state.origin && origVal.length >= 3) {
-    const origRes = await searchLocations(origVal);
-    if (origRes && origRes.length > 0) {
-      setOrigin(parseFloat(origRes[0].lat), parseFloat(origRes[0].lon), origVal);
-    }
-  }
-
-  if (!state.destination && destVal.length >= 3) {
-    const destRes = await searchLocations(destVal);
-    if (destRes && destRes.length > 0) {
-      setDestination(parseFloat(destRes[0].lat), parseFloat(destRes[0].lon), destVal);
-    }
-  }
-
-  // Si ambos campos tienen texto pero la ruta todavía está calculando, dar un pequeño margen
-  if (!(state.origin && state.destination && state.distanceKm > 0)) {
-    if (origVal.length >= 3 && destVal.length >= 3) {
-      await checkAndRoute();
-    }
-  }
-
-  // Verificación final con mensaje amigable
-  if (!(state.origin && state.destination && state.distanceKm > 0)) {
+  // Verificación básica de que haya ingresado texto
+  if (!origVal || !destVal) {
     showToast('Ingresá origen y destino para cotizar y reservar tu viaje.');
     if (originInput && !origVal) originInput.focus();
     else if (destInput && !destVal) destInput.focus();
     return;
+  }
+
+  // Auto-resolución si el usuario escribió texto en los inputs pero no seleccionó de la lista
+  if (!state.origin && origVal.length >= 3) {
+    try {
+      const origRes = await searchLocations(origVal);
+      if (origRes && origRes.length > 0) {
+        setOrigin(parseFloat(origRes[0].lat), parseFloat(origRes[0].lon), origVal);
+      }
+    } catch(e) {}
+  }
+
+  if (!state.destination && destVal.length >= 3) {
+    try {
+      const destRes = await searchLocations(destVal);
+      if (destRes && destRes.length > 0) {
+        setDestination(parseFloat(destRes[0].lat), parseFloat(destRes[0].lon), destVal);
+      }
+    } catch(e) {}
+  }
+
+  // Si ambos campos tienen coordenadas pero la ruta no se calculó, reintentar cálculo
+  if (state.origin && state.destination && state.distanceKm <= 0) {
+    try {
+      await checkAndRoute();
+    } catch(e) {}
   }
 
   const message = buildReservationMessage();
@@ -3161,7 +3167,10 @@ async function sendWhatsAppReservation() {
   const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   const webUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
 
-  // Actualizar enlaces en modal de respaldo
+  // Actualizar enlaces en modal de respaldo y de éxito
+  const doneBtn = document.getElementById('btn-done-booking');
+  if (doneBtn) doneBtn.href = waUrl;
+
   const resLinkWame = document.getElementById('res-link-wame');
   if (resLinkWame) resLinkWame.href = waUrl;
 
@@ -3174,11 +3183,16 @@ async function sendWhatsAppReservation() {
   // 1. Mostrar la experiencia de confirmación cordial y calificación en pantalla
   showBookingSuccessModal();
 
-  // 2. Abrir WhatsApp directamente
-  try {
-    window.open(waUrl, '_blank');
-  } catch (e) {
-    console.warn('Popup bloqueado:', e);
+  // 2. Abrir WhatsApp de manera confiable (Mobile & Desktop sin bloqueo de popups)
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  if (isMobile) {
+    window.location.href = waUrl;
+  } else {
+    const newWin = window.open(waUrl, '_blank');
+    if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
+      // Si el navegador bloqueó el popup en PC, redirigir directamente
+      window.location.href = waUrl;
+    }
   }
 }
 
