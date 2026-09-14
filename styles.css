@@ -783,72 +783,94 @@ body {
   justify-content: space-between;
   gap: 12px;
   background: linear-gradient(135deg, rgba(20, 27, 44, 0.95), rgba(15, 23, 42, 0.95));
-  border: 1.5px solid rgba(52, 211, 153, 0.4);
+  border: 1.5px solid rgba(52, 211, 153, 0.35);
   border-radius: var(--radius-md);
-  padding: 10px 14px;
+  padding: 12px 14px;
   color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   text-align: left;
 }
 
 .custom-calendar-trigger-btn:hover {
   border-color: #34d399;
-  background: linear-gradient(135deg, rgba(26, 36, 58, 0.95), rgba(18, 28, 52, 0.95));
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.35), inset 0 0 12px rgba(16, 185, 129, 0.12);
+  background: linear-gradient(135deg, rgba(26, 38, 62, 0.98), rgba(18, 28, 52, 0.98));
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.35), inset 0 0 14px rgba(16, 185, 129, 0.12);
   transform: translateY(-1px);
+}
+
+.custom-calendar-trigger-btn:active {
+  transform: scale(0.99);
 }
 
 .trigger-cal-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.trigger-cal-icon {
+.trigger-cal-icon-wrap {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  background: linear-gradient(135deg, #10b981, #059669);
-  border-radius: 9px;
-  font-size: 1.15rem;
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+  border: 1px solid rgba(52, 211, 153, 0.6);
+  border-radius: 11px;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.4);
   flex-shrink: 0;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.custom-calendar-trigger-btn:hover .trigger-cal-icon-wrap {
+  transform: scale(1.06);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.65), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+.trigger-cal-svg {
+  width: 22px;
+  height: 22px;
+  stroke: #ffffff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
 }
 
 .trigger-date-text {
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   font-weight: 800;
   color: #f8fafc;
   display: block;
   text-transform: capitalize;
+  letter-spacing: -0.2px;
 }
 
 .trigger-date-subtext {
-  font-size: 0.72rem;
+  font-size: 0.73rem;
   font-weight: 600;
   color: #34d399;
   display: block;
+  margin-top: 1px;
 }
 
 .trigger-change-pill {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(16, 185, 129, 0.14);
   border: 1px solid rgba(52, 211, 153, 0.35);
   color: #34d399;
   font-size: 0.76rem;
   font-weight: 700;
-  padding: 5px 10px;
+  padding: 6px 12px;
   border-radius: var(--radius-full);
   transition: var(--transition);
+  white-space: nowrap;
 }
 
 .custom-calendar-trigger-btn:hover .trigger-change-pill {
-  background: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.28);
   color: #a7f3d0;
   border-color: #34d399;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
 }
 
 .cal-info-notice {

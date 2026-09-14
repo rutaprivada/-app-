@@ -262,25 +262,31 @@
               </div>
             </div>
 
-            <!-- Tira interactiva de días próximos (Acceso rápido con 1 toque) -->
-            <div class="upcoming-days-scroll-wrap">
-              <div id="upcoming-days-strip" class="upcoming-days-strip">
-                <!-- Injected dynamically by JS: Hoy, Mañana, y días de la semana -->
-              </div>
-            </div>
-
-            <!-- Botón principal para abrir el calendario completo de fecha exacta -->
+            <!-- Botón principal para abrir el calendario completo de fecha exacta o lejana -->
             <div class="styled-date-input-wrap">
-              <button type="button" class="custom-calendar-trigger-btn" id="btn-toggle-custom-calendar" aria-expanded="false" aria-label="Abrir calendario interactivo para fecha exacta">
+              <button type="button" class="custom-calendar-trigger-btn" id="btn-toggle-custom-calendar" aria-expanded="false" aria-label="Abrir selector de fecha exacta o lejana">
                 <div class="trigger-cal-left">
-                  <span class="trigger-cal-icon">🗓️</span>
+                  <div class="trigger-cal-icon-wrap">
+                    <svg class="trigger-cal-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="3" ry="3" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                      <circle cx="8" cy="14" r="1.2" fill="currentColor" />
+                      <circle cx="12" cy="14" r="1.2" fill="currentColor" />
+                      <circle cx="16" cy="14" r="1.2" fill="currentColor" />
+                      <circle cx="8" cy="18" r="1.2" fill="currentColor" />
+                      <circle cx="12" cy="18" r="1.2" fill="currentColor" />
+                      <circle cx="16" cy="18" r="1.2" fill="currentColor" />
+                    </svg>
+                  </div>
                   <div>
                     <span id="trip-date-display" class="trigger-date-text">Hoy</span>
-                    <span id="trip-date-badge-info" class="trigger-date-subtext">Día hábil estándar</span>
+                    <span id="trip-date-badge-info" class="trigger-date-subtext">⚡ Viaje para hoy</span>
                   </div>
                 </div>
                 <div class="trigger-cal-right">
-                  <span class="trigger-change-pill">Elegir fecha exacta ▾</span>
+                  <span class="trigger-change-pill">Elegir fecha ▾</span>
                 </div>
               </button>
               <input type="hidden" id="trip-date" />
