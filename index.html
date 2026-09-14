@@ -112,7 +112,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=6" />
 </head>
 <body>
 
@@ -277,7 +277,7 @@
                   </div>
                 </div>
                 <div class="trigger-cal-right">
-                  <span class="trigger-change-pill">Ver Todo el Mes ▾</span>
+                  <span class="trigger-change-pill">Elegir Mes / Año ▾</span>
                 </div>
               </button>
               <input type="date" id="trip-date" class="hidden-date-input" tabindex="-1" aria-hidden="true" />
@@ -285,19 +285,41 @@
 
             <!-- Custom Dark-Mode Glassmorphism Interactive Calendar -->
             <div id="custom-calendar-dropdown" class="custom-calendar-dropdown hidden" role="dialog" aria-modal="true" aria-label="Selector interactivo de fecha">
+              <!-- Fast direct Month & Year Picker Header -->
               <div class="cal-dropdown-header">
                 <button type="button" id="cal-prev-month" class="cal-nav-btn" title="Mes anterior" aria-label="Mes anterior">‹</button>
-                <div id="cal-month-year-label" class="cal-month-year-label">Septiembre 2026</div>
+                
+                <div class="cal-month-year-selectors">
+                  <select id="cal-select-month" class="cal-header-select" aria-label="Seleccionar Mes">
+                    <option value="0">Enero</option>
+                    <option value="1">Febrero</option>
+                    <option value="2">Marzo</option>
+                    <option value="3">Abril</option>
+                    <option value="4">Mayo</option>
+                    <option value="5">Junio</option>
+                    <option value="6">Julio</option>
+                    <option value="7">Agosto</option>
+                    <option value="8">Septiembre</option>
+                    <option value="9">Octubre</option>
+                    <option value="10">Noviembre</option>
+                    <option value="11">Diciembre</option>
+                  </select>
+
+                  <select id="cal-select-year" class="cal-header-select" aria-label="Seleccionar Año">
+                    <!-- Populated dynamically via JS -->
+                  </select>
+                </div>
+
                 <button type="button" id="cal-next-month" class="cal-nav-btn" title="Mes siguiente" aria-label="Mes siguiente">›</button>
               </div>
 
               <!-- Info banner inside calendar -->
               <div class="cal-info-notice" id="cal-info-notice">
-                <span>💡 <strong>Tip:</strong> Los sábados y domingos (en verde) tienen tarifa plana especial sin recargo de hora pico.</span>
+                <span>💡 <strong>Tip:</strong> Podes elegir cualquier mes o año del menú desplegable superior.</span>
               </div>
 
               <div class="cal-weekdays-grid">
-                <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span class="we-label">Sá</span><span class="we-label">Do</span>
+                <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span class="we-label">Sáb</span><span class="we-label">Dom</span>
               </div>
 
               <div id="cal-days-grid" class="cal-days-grid">
@@ -309,8 +331,9 @@
                   <button type="button" class="cal-shortcut-pill" id="cal-shortcut-today">Hoy</button>
                   <button type="button" class="cal-shortcut-pill" id="cal-shortcut-tomorrow">Mañana</button>
                   <button type="button" class="cal-shortcut-pill" id="cal-shortcut-weekend">Fin de Semana</button>
+                  <button type="button" class="cal-shortcut-pill" id="cal-shortcut-nextweek">+7 Días</button>
                 </div>
-                <button type="button" class="cal-close-btn" id="cal-close-dropdown">Seleccionar Fecha ✓</button>
+                <button type="button" class="cal-close-btn" id="cal-close-dropdown">Listo ✓</button>
               </div>
             </div>
           </div>
@@ -938,6 +961,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- App JS -->
-  <script src="app.js"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

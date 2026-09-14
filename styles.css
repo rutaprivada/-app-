@@ -1007,8 +1007,50 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 12px;
-  padding: 0 4px;
+  padding: 0 2px;
+}
+
+.cal-month-year-selectors {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+
+.cal-header-select {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.cal-header-select:hover {
+  border-color: #34d399;
+  background: rgba(30, 41, 59, 0.95);
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
+}
+
+.cal-header-select:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35);
+}
+
+.cal-header-select option {
+  background: #0f172a;
+  color: #f8fafc;
+  font-weight: 600;
+  padding: 8px;
 }
 
 .cal-nav-btn {
@@ -1020,26 +1062,19 @@ body {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: #ffffff;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 1.25rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.cal-nav-btn:hover {
+.cal-nav-btn:hover:not(:disabled) {
   background: rgba(16, 185, 129, 0.25);
   border-color: #34d399;
   color: #34d399;
   transform: scale(1.08);
-}
-
-.cal-month-year-label {
-  font-size: 1rem;
-  font-weight: 800;
-  color: #ffffff;
-  text-transform: capitalize;
-  letter-spacing: -0.01em;
 }
 
 .cal-weekdays-grid {

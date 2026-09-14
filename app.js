@@ -492,11 +492,26 @@ function initCustomCalendar() {
   const prevBtn = document.getElementById('cal-prev-month');
   const nextBtn = document.getElementById('cal-next-month');
   const closeBtn = document.getElementById('cal-close-dropdown');
+  const selectMonth = document.getElementById('cal-select-month');
+  const selectYear = document.getElementById('cal-select-year');
   const shortcutToday = document.getElementById('cal-shortcut-today');
   const shortcutTomorrow = document.getElementById('cal-shortcut-tomorrow');
   const shortcutWeekend = document.getElementById('cal-shortcut-weekend');
+  const shortcutNextWeek = document.getElementById('cal-shortcut-nextweek');
 
   if (!toggleBtn || !dropdown) return;
+
+  // Llenar selector de años (año actual + 5 años a futuro)
+  if (selectYear) {
+    const curYear = new Date().getFullYear();
+    selectYear.innerHTML = '';
+    for (let y = curYear; y <= curYear + 5; y++) {
+      const opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      selectYear.appendChild(opt);
+    }
+  }
 
   if (state.date) {
     const p = state.date.split('-');
@@ -504,6 +519,24 @@ function initCustomCalendar() {
       calCurrentYear = parseInt(p[0], 10);
       calCurrentMonth = parseInt(p[1], 10) - 1;
     }
+  }
+
+  // Cambio directo de Mes desde el desplegable
+  if (selectMonth) {
+    selectMonth.addEventListener('change', (e) => {
+      e.stopPropagation();
+      calCurrentMonth = parseInt(selectMonth.value, 10);
+      renderCustomCalendar();
+    });
+  }
+
+  // Cambio directo de Año desde el desplegable
+  if (selectYear) {
+    selectYear.addEventListener('change', (e) => {
+      e.stopPropagation();
+      calCurrentYear = parseInt(selectYear.value, 10);
+      renderCustomCalendar();
+    });
   }
 
   // Abrir / Cerrar dropdown dinámico
@@ -602,6 +635,18 @@ function initCustomCalendar() {
       dropdown.classList.add('hidden');
       toggleBtn.setAttribute('aria-expanded', 'false');
       showToast('Fecha fijada en Fin de Semana.');
+    });
+  }
+
+  if (shortcutNextWeek) {
+    shortcutNextWeek.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      selectDateFromCalendar(formatDateToString(d));
+      dropdown.classList.add('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      showToast('Fecha fijada en +7 Días.');
     });
   }
 
@@ -733,11 +778,23 @@ function renderDateStrip() {
 
 function renderCustomCalendar() {
   const monthLabel = document.getElementById('cal-month-year-label');
+  const selectMonth = document.getElementById('cal-select-month');
+  const selectYear = document.getElementById('cal-select-year');
   const daysGrid = document.getElementById('cal-days-grid');
   const prevBtn = document.getElementById('cal-prev-month');
-  if (!monthLabel || !daysGrid) return;
+  if (!daysGrid) return;
 
-  monthLabel.textContent = `${MONTH_NAMES_ES[calCurrentMonth]} ${calCurrentYear}`;
+  if (monthLabel) {
+    monthLabel.textContent = `${MONTH_NAMES_ES[calCurrentMonth]} ${calCurrentYear}`;
+  }
+
+  // Sincronizar selectores desplegables
+  if (selectMonth) {
+    selectMonth.value = String(calCurrentMonth);
+  }
+  if (selectYear) {
+    selectYear.value = String(calCurrentYear);
+  }
 
   const now = new Date();
   const curYear = now.getFullYear();
@@ -3423,10 +3480,21 @@ function initPwa() {
       navigator.serviceWorker.register('./sw.js')
         .then((reg) => {
           console.log('Service Worker de RutaPrivada registrado con éxito:', reg.scope);
+          // Forzar verificación de nueva versión en cada recarga
+          reg.update();
         })
         .catch((err) => {
           console.warn('Error al registrar Service Worker:', err);
         });
+
+      // Recargar automáticamente cuando un nuevo Service Worker tome el control
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
     });
   }
 
