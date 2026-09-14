@@ -260,7 +260,9 @@ function loadConfig() {
       if (!parsed.stopFeeFar) parsed.stopFeeFar = DEFAULT_CONFIG.stopFeeFar;
       if (!parsed.stopFeeExtended) parsed.stopFeeExtended = DEFAULT_CONFIG.stopFeeExtended;
       const merged = { ...DEFAULT_CONFIG, ...parsed };
-      saveConfig(merged);
+      try {
+        localStorage.setItem('rutaprivada_config_v10', JSON.stringify(merged));
+      } catch(e) {}
       return merged;
     }
   } catch (e) {
@@ -270,7 +272,8 @@ function loadConfig() {
 }
 
 function saveConfig(newConfig) {
-  state.config = { ...state.config, ...newConfig };
+  if (typeof state === 'undefined' || !state) return;
+  state.config = { ...(state.config || DEFAULT_CONFIG), ...newConfig };
   state.config.currency = 'ARS';
   state.config.adminPin = '4824';
   try {
@@ -418,8 +421,7 @@ function initDateTimeControls() {
     });
   }
 
-  // Inicializar tira didáctica interactiva de días y calendario dinámico
-  renderDateStrip();
+  // Inicializar calendario dinámico
   initCustomCalendar();
 
   // Stepper botones (-5 min / +5 min)
