@@ -381,55 +381,45 @@ function initDateTimeControls() {
     updateCalculation();
   });
 
-  // Atajos de fecha: Hoy / Mañana
+  // Atajos de fecha: Hoy / Mañana / Fin de Semana
   const btnToday = document.getElementById('btn-date-today');
   const btnTomorrow = document.getElementById('btn-date-tomorrow');
+  const btnWeekend = document.getElementById('btn-date-weekend');
 
-  btnToday.addEventListener('click', () => {
-    btnToday.classList.add('active');
-    btnTomorrow.classList.remove('active');
-    dateInput.value = todayStr;
-    state.date = todayStr;
-    updateDateDisplay();
-    evaluateTimeRate(state.time, state.date);
-    updateCalculation();
-    showToast('Fecha fijada en Hoy.');
-  });
-
-  btnTomorrow.addEventListener('click', () => {
-    btnTomorrow.classList.add('active');
-    btnToday.classList.remove('active');
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tmY = tomorrow.getFullYear();
-    const tmM = String(tomorrow.getMonth() + 1).padStart(2, '0');
-    const tmD = String(tomorrow.getDate()).padStart(2, '0');
-    const tmStr = `${tmY}-${tmM}-${tmD}`;
-    dateInput.value = tmStr;
-    state.date = tmStr;
-    updateDateDisplay();
-    evaluateTimeRate(state.time, state.date);
-    updateCalculation();
-    showToast('Fecha fijada en Mañana.');
-  });
-
-  // Disparador al hacer clic en el badge de fecha amigable
-  const dateDisplayBadge = document.getElementById('trip-date-display');
-  if (dateDisplayBadge) {
-    dateDisplayBadge.addEventListener('click', () => {
-      try {
-        if (typeof dateInput.showPicker === 'function') {
-          dateInput.showPicker();
-        } else {
-          dateInput.focus();
-          dateInput.click();
-        }
-      } catch (err) {
-        dateInput.focus();
-        dateInput.click();
-      }
+  if (btnToday) {
+    btnToday.addEventListener('click', () => {
+      selectDateFromCalendar(todayStr);
+      showToast('Fecha fijada en Hoy.');
     });
   }
+
+  if (btnTomorrow) {
+    btnTomorrow.addEventListener('click', () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tmStr = formatDateToString(tomorrow);
+      selectDateFromCalendar(tmStr);
+      showToast('Fecha fijada en Mañana.');
+    });
+  }
+
+  if (btnWeekend) {
+    btnWeekend.addEventListener('click', () => {
+      const d = new Date();
+      const day = d.getDay();
+      let addDays = 0;
+      if (day === 6 || day === 0) addDays = 0;
+      else addDays = 6 - day;
+      d.setDate(d.getDate() + addDays);
+      const weStr = formatDateToString(d);
+      selectDateFromCalendar(weStr);
+      showToast('Fecha fijada en Fin de Semana (Tarifa Plana).');
+    });
+  }
+
+  // Inicializar tira didáctica interactiva de días y calendario dinámico
+  renderDateStrip();
+  initCustomCalendar();
 
   // Stepper botones (-5 min / +5 min)
   document.getElementById('btn-time-minus').addEventListener('click', () => {
@@ -484,6 +474,344 @@ function initDateTimeControls() {
   }
 }
 
+// ==========================================
+// 4.1 CALENDARIO DINÁMICO EJECUTIVO (MODO OSCURO GLASSMORPHISM)
+// ==========================================
+
+let calCurrentYear = new Date().getFullYear();
+let calCurrentMonth = new Date().getMonth();
+
+const MONTH_NAMES_ES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+function initCustomCalendar() {
+  const toggleBtn = document.getElementById('btn-toggle-custom-calendar');
+  const dropdown = document.getElementById('custom-calendar-dropdown');
+  const prevBtn = document.getElementById('cal-prev-month');
+  const nextBtn = document.getElementById('cal-next-month');
+  const closeBtn = document.getElementById('cal-close-dropdown');
+  const shortcutToday = document.getElementById('cal-shortcut-today');
+  const shortcutTomorrow = document.getElementById('cal-shortcut-tomorrow');
+  const shortcutWeekend = document.getElementById('cal-shortcut-weekend');
+
+  if (!toggleBtn || !dropdown) return;
+
+  if (state.date) {
+    const p = state.date.split('-');
+    if (p.length === 3) {
+      calCurrentYear = parseInt(p[0], 10);
+      calCurrentMonth = parseInt(p[1], 10) - 1;
+    }
+  }
+
+  // Abrir / Cerrar dropdown dinámico
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isHidden = dropdown.classList.contains('hidden');
+    if (isHidden) {
+      if (state.date) {
+        const p = state.date.split('-');
+        if (p.length === 3) {
+          calCurrentYear = parseInt(p[0], 10);
+          calCurrentMonth = parseInt(p[1], 10) - 1;
+        }
+      }
+      renderCustomCalendar();
+      dropdown.classList.remove('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+    } else {
+      dropdown.classList.add('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  // Navegación entre meses
+  if (prevBtn) {
+    prevBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const now = new Date();
+      const curYear = now.getFullYear();
+      const curMonth = now.getMonth();
+      if (calCurrentYear > curYear || (calCurrentYear === curYear && calCurrentMonth > curMonth)) {
+        calCurrentMonth--;
+        if (calCurrentMonth < 0) {
+          calCurrentMonth = 11;
+          calCurrentYear--;
+        }
+        renderCustomCalendar();
+      }
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      calCurrentMonth++;
+      if (calCurrentMonth > 11) {
+        calCurrentMonth = 0;
+        calCurrentYear++;
+      }
+      renderCustomCalendar();
+    });
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.add('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  // Atajos rápidos
+  if (shortcutToday) {
+    shortcutToday.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectDateFromCalendar(formatDateToString(new Date()));
+      dropdown.classList.add('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      showToast('Fecha fijada en Hoy.');
+    });
+  }
+
+  if (shortcutTomorrow) {
+    shortcutTomorrow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tm = new Date();
+      tm.setDate(tm.getDate() + 1);
+      selectDateFromCalendar(formatDateToString(tm));
+      dropdown.classList.add('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      showToast('Fecha fijada en Mañana.');
+    });
+  }
+
+  if (shortcutWeekend) {
+    shortcutWeekend.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const d = new Date();
+      const day = d.getDay();
+      let addDays = 0;
+      if (day === 6) addDays = 0;
+      else if (day === 0) addDays = 0;
+      else addDays = 6 - day;
+      d.setDate(d.getDate() + addDays);
+      selectDateFromCalendar(formatDateToString(d));
+      dropdown.classList.add('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      showToast('Fecha fijada en Fin de Semana.');
+    });
+  }
+
+  // Cerrar al hacer clic fuera del contenedor
+  document.addEventListener('click', (e) => {
+    const dateBlock = document.getElementById('schedule-date-block');
+    if (dateBlock && !dateBlock.contains(e.target)) {
+      dropdown.classList.add('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  // Cerrar con Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !dropdown.classList.contains('hidden')) {
+      dropdown.classList.add('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  renderCustomCalendar();
+}
+
+function formatDateToString(d) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function selectDateFromCalendar(dateStr) {
+  state.date = dateStr;
+  const dateInput = document.getElementById('trip-date');
+  if (dateInput) dateInput.value = dateStr;
+
+  const todayStr = formatDateToString(new Date());
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = formatDateToString(tomorrow);
+
+  const btnToday = document.getElementById('btn-date-today');
+  const btnTomorrow = document.getElementById('btn-date-tomorrow');
+  const btnWeekend = document.getElementById('btn-date-weekend');
+  if (btnToday && btnTomorrow) {
+    btnToday.classList.toggle('active', dateStr === todayStr);
+    btnTomorrow.classList.toggle('active', dateStr === tomorrowStr);
+  }
+
+  // Comprobar si es fin de semana para el botón de atajo
+  if (btnWeekend) {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      const day = d.getDay();
+      btnWeekend.classList.toggle('active', day === 0 || day === 6);
+    }
+  }
+
+  renderDateStrip();
+  updateDateDisplay();
+  evaluateTimeRate(state.time, state.date);
+  updateCalculation();
+}
+
+// Renderizar la tira horizontal táctil y didáctica de los próximos 10 días
+function renderDateStrip() {
+  const container = document.getElementById('date-strip-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+  const now = new Date();
+  const todayStr = formatDateToString(now);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = formatDateToString(tomorrow);
+
+  const daysShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const monthsShort = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  // Generar tarjetas para los próximos 10 días
+  for (let i = 0; i < 10; i++) {
+    const targetDate = new Date();
+    targetDate.setDate(now.getDate() + i);
+    const thisDateStr = formatDateToString(targetDate);
+    const dayOfWeek = targetDate.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isSelected = state.date === thisDateStr;
+
+    const card = document.createElement('div');
+    card.className = `date-strip-card ${isWeekend ? 'weekend' : ''} ${isSelected ? 'active' : ''}`;
+    card.setAttribute('data-date', thisDateStr);
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+
+    let labelName = daysShort[dayOfWeek];
+    let badgeText = 'Estándar';
+    if (thisDateStr === todayStr) {
+      labelName = 'HOY';
+      badgeText = '⚡ Hoy';
+    } else if (thisDateStr === tomorrowStr) {
+      labelName = 'MAÑANA';
+      badgeText = '⭐ Mañana';
+    } else if (isWeekend) {
+      badgeText = '🌴 Finde';
+    }
+
+    card.innerHTML = `
+      <span class="strip-day-name">${labelName}</span>
+      <span class="strip-day-num">${targetDate.getDate()}</span>
+      <span class="strip-month-name">${monthsShort[targetDate.getMonth()]}</span>
+      <span class="strip-badge-pill">${badgeText}</span>
+    `;
+
+    card.addEventListener('click', () => {
+      selectDateFromCalendar(thisDateStr);
+      showToast(`Fecha fijada en ${formatDateWithWeekday(thisDateStr)}`);
+    });
+
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectDateFromCalendar(thisDateStr);
+      }
+    });
+
+    container.appendChild(card);
+  }
+}
+
+function renderCustomCalendar() {
+  const monthLabel = document.getElementById('cal-month-year-label');
+  const daysGrid = document.getElementById('cal-days-grid');
+  const prevBtn = document.getElementById('cal-prev-month');
+  if (!monthLabel || !daysGrid) return;
+
+  monthLabel.textContent = `${MONTH_NAMES_ES[calCurrentMonth]} ${calCurrentYear}`;
+
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth();
+  if (prevBtn) {
+    const isAtMin = calCurrentYear === curYear && calCurrentMonth === curMonth;
+    prevBtn.disabled = isAtMin;
+    prevBtn.style.opacity = isAtMin ? '0.3' : '1';
+    prevBtn.style.cursor = isAtMin ? 'not-allowed' : 'pointer';
+  }
+
+  daysGrid.innerHTML = '';
+
+  const firstDayObj = new Date(calCurrentYear, calCurrentMonth, 1);
+  const rawFirstDay = firstDayObj.getDay();
+  const startingDayOffset = (rawFirstDay + 6) % 7; // Lun=0, Dom=6
+
+  const totalDaysInMonth = new Date(calCurrentYear, calCurrentMonth + 1, 0).getDate();
+  const todayStr = formatDateToString(now);
+
+  // Celdas vacías de alineación
+  for (let i = 0; i < startingDayOffset; i++) {
+    const blankCell = document.createElement('div');
+    blankCell.className = 'cal-day-cell other-month';
+    daysGrid.appendChild(blankCell);
+  }
+
+  // Días válidos
+  for (let dayNum = 1; dayNum <= totalDaysInMonth; dayNum++) {
+    const dayStr = String(dayNum).padStart(2, '0');
+    const monthStr = String(calCurrentMonth + 1).padStart(2, '0');
+    const thisDateStr = `${calCurrentYear}-${monthStr}-${dayStr}`;
+
+    const cellBtn = document.createElement('button');
+    cellBtn.type = 'button';
+    cellBtn.className = 'cal-day-cell';
+    cellBtn.textContent = String(dayNum);
+    cellBtn.setAttribute('data-date', thisDateStr);
+
+    const cellDateObj = new Date(calCurrentYear, calCurrentMonth, dayNum);
+    const dayOfWeek = cellDateObj.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      cellBtn.classList.add('weekend-day');
+    }
+
+    if (thisDateStr < todayStr) {
+      cellBtn.classList.add('disabled');
+      cellBtn.setAttribute('disabled', 'true');
+    } else {
+      if (thisDateStr === todayStr) {
+        cellBtn.classList.add('today');
+      }
+      if (thisDateStr === state.date) {
+        cellBtn.classList.add('selected');
+      }
+
+      cellBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectDateFromCalendar(thisDateStr);
+        renderCustomCalendar();
+        setTimeout(() => {
+          const dropdown = document.getElementById('custom-calendar-dropdown');
+          const toggleBtn = document.getElementById('btn-toggle-custom-calendar');
+          if (dropdown) dropdown.classList.add('hidden');
+          if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+        }, 120);
+        showToast(`Fecha fijada en ${formatDateWithWeekday(thisDateStr)}`);
+      });
+    }
+
+    daysGrid.appendChild(cellBtn);
+  }
+}
+
 // Formateo amigable de la fecha seleccionada con su día de la semana
 function formatDateWithWeekday(dateStr) {
   if (!dateStr) return '';
@@ -503,11 +831,30 @@ function formatDateWithWeekday(dateStr) {
 
 function updateDateDisplay() {
   const displayEl = document.getElementById('trip-date-display');
+  const subtextEl = document.getElementById('trip-date-badge-info');
   if (!displayEl) return;
+
   const formatted = formatDateWithWeekday(state.date);
-  displayEl.innerHTML = formatted 
-    ? `<span class="badge-cal-icon">📅</span><span>${formatted}</span>` 
-    : `<span class="badge-cal-icon">📅</span><span>Seleccionar fecha</span>`;
+  displayEl.textContent = formatted || 'Seleccionar fecha';
+
+  if (subtextEl && state.date) {
+    const parts = state.date.split('-');
+    if (parts.length === 3) {
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      const day = d.getDay();
+      const todayStr = formatDateToString(new Date());
+      if (day === 0 || day === 6) {
+        subtextEl.textContent = '🌴 Fin de semana (Tarifa plana sin hora pico)';
+        subtextEl.style.color = '#fbbf24';
+      } else if (state.date === todayStr) {
+        subtextEl.textContent = '⚡ Viaje para hoy';
+        subtextEl.style.color = '#34d399';
+      } else {
+        subtextEl.textContent = '💼 Día hábil estándar';
+        subtextEl.style.color = '#94a3b8';
+      }
+    }
+  }
 }
 
 // ==========================================
@@ -3083,34 +3430,86 @@ function initPwa() {
     });
   }
 
-  // 2. Manejo de instalación en pantalla de inicio (PWA)
-  const installBtn = document.getElementById('btn-install-pwa');
-  if (installBtn) {
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredInstallPrompt = e;
-      installBtn.classList.remove('hidden');
-    });
+  // 2. Elementos de la interfaz de descarga de App
+  const topInstallBtn = document.getElementById('btn-install-pwa');
+  const headerInstallBtn = document.getElementById('btn-download-app-header');
+  const modal = document.getElementById('app-install-modal');
+  const closeModalBtn = document.getElementById('close-install-modal-btn');
+  const triggerInstallBtn = document.getElementById('btn-trigger-pwa-install');
 
-    installBtn.addEventListener('click', async () => {
+  // Capturar evento de instalación nativa (Chrome, Edge, Android)
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (triggerInstallBtn) {
+      triggerInstallBtn.innerHTML = '<span>📥 Descargar e Instalar App Ahora</span>';
+    }
+  });
+
+  function openInstallModal() {
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+  }
+
+  function closeInstallModal() {
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
+
+  // Abrir modal desde botones de la cabecera
+  if (topInstallBtn) {
+    topInstallBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openInstallModal();
+    });
+  }
+
+  if (headerInstallBtn) {
+    headerInstallBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openInstallModal();
+    });
+  }
+
+  if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', closeInstallModal);
+  }
+
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeInstallModal();
+    });
+  }
+
+  // Botón principal de instalación dentro del modal
+  if (triggerInstallBtn) {
+    triggerInstallBtn.addEventListener('click', async () => {
       if (deferredInstallPrompt) {
         deferredInstallPrompt.prompt();
         const choice = await deferredInstallPrompt.userChoice;
         if (choice.outcome === 'accepted') {
           showToast('📲 ¡Instalando RutaPrivada en tu dispositivo!');
+          closeInstallModal();
         }
         deferredInstallPrompt = null;
-        installBtn.classList.add('hidden');
       } else {
-        showToast('Para instalar: presiona el menú de tu navegador y selecciona "Instalar aplicación" o "Agregar a la pantalla principal".');
+        // Detección iOS / Android / Desktop para guiar
+        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIos) {
+          showToast('En Safari: toca Compartir (📤) y luego "Agregar a pantalla de inicio".');
+        } else {
+          showToast('Toca el menú (⋮) de tu navegador y selecciona "Instalar aplicación" o "Agregar a inicio".');
+        }
       }
     });
-
-    window.addEventListener('appinstalled', () => {
-      installBtn.classList.add('hidden');
-      showToast('🎉 ¡RutaPrivada se instaló correctamente como App!');
-    });
   }
+
+  window.addEventListener('appinstalled', () => {
+    closeInstallModal();
+    showToast('🎉 ¡RutaPrivada se instaló con éxito como App!');
+  });
 }
 // ==========================================
 

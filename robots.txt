@@ -3,4 +3,4 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://danielfelipepeivon-crypto.github.io/rutaprivada/sitemap.xml
+Sitemap: https://rutaprivada.github.io/-app-/sitemap.xml

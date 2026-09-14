@@ -131,20 +131,77 @@ body {
   color: #fca5a5;
 }
 
+.pwa-top-btn,
 .pwa-install-btn {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  border: 1px solid #34d399;
-  color: #ffffff;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 1px solid #fbbf24;
+  color: #0c111a;
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
   animation: pulse-soft 2.5s infinite;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
+.pwa-top-btn:hover,
 .pwa-install-btn:hover {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  border-color: #6ee7b7;
-  color: #ffffff;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border-color: #fef08a;
+  color: #0c111a;
   transform: translateY(-1px);
+}
+
+.btn-download-app-header {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(217, 119, 6, 0.28));
+  border: 1.5px solid rgba(245, 158, 11, 0.6);
+  border-radius: var(--radius-md);
+  padding: 6px 14px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.btn-download-app-header:hover {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border-color: #fef08a;
+  color: #0a0d14;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+
+.btn-download-app-header:hover .dl-app-title,
+.btn-download-app-header:hover .dl-app-sub {
+  color: #0a0d14;
+}
+
+.dl-app-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.dl-app-label {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 1.15;
+}
+
+.dl-app-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fbbf24;
+  letter-spacing: 0.3px;
+}
+
+.dl-app-sub {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 /* ---------------- Navigation Header ---------------- */
@@ -701,97 +758,416 @@ body {
   color: #34d399;
 }
 
+#schedule-date-block {
+  position: relative;
+}
+
+/* ---------------- Tira Didáctica de Días Deslizable ---------------- */
+.date-strip-container {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 10px 2px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(16, 185, 129, 0.3) transparent;
+}
+
+.date-strip-container::-webkit-scrollbar {
+  height: 4px;
+}
+
+.date-strip-container::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.3);
+  border-radius: 4px;
+}
+
+.date-strip-card {
+  flex: 0 0 76px;
+  scroll-snap-align: start;
+  background: linear-gradient(180deg, rgba(26, 36, 56, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  position: relative;
+}
+
+.date-strip-card:hover {
+  border-color: rgba(52, 211, 153, 0.5);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, rgba(16, 24, 40, 0.95) 100%);
+  transform: translateY(-2px);
+}
+
+.date-strip-card.active {
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.35) 100%);
+  border: 2px solid #34d399;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.4), inset 0 0 10px rgba(52, 211, 153, 0.15);
+  transform: translateY(-2px) scale(1.03);
+}
+
+.date-strip-card.weekend {
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.date-strip-card.weekend .strip-day-name {
+  color: #fbbf24;
+}
+
+.date-strip-card.weekend.active {
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%);
+  border-color: #fbbf24;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.4);
+}
+
+.strip-day-name {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 0.3px;
+}
+
+.strip-day-num {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+.strip-month-name {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.strip-badge-pill {
+  font-size: 0.58rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.date-strip-card.active .strip-badge-pill {
+  background: #34d399;
+  color: #0c111a;
+}
+
+.date-strip-card.weekend.active .strip-badge-pill {
+  background: #fbbf24;
+  color: #0c111a;
+}
+
 .styled-date-input-wrap {
+  width: 100%;
+  position: relative;
+}
+
+.hidden-date-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+/* Botón disparador del calendario dinámico */
+.custom-calendar-trigger-btn {
   width: 100%;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
-}
-
-.styled-date-picker {
-  flex: 1 1 200px;
   background: linear-gradient(135deg, rgba(20, 27, 44, 0.95), rgba(15, 23, 42, 0.95));
   border: 1.5px solid rgba(52, 211, 153, 0.4);
   border-radius: var(--radius-md);
-  padding: 11px 16px;
+  padding: 10px 14px;
   color: #ffffff;
-  font-size: 1.05rem;
-  font-weight: 700;
-  font-family: inherit;
-  outline: none;
   cursor: pointer;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
 }
 
-.styled-date-picker:hover {
+.custom-calendar-trigger-btn:hover {
   border-color: #34d399;
-  box-shadow: 0 0 18px rgba(16, 185, 129, 0.35), inset 0 0 10px rgba(16, 185, 129, 0.1);
+  background: linear-gradient(135deg, rgba(26, 36, 58, 0.95), rgba(18, 28, 52, 0.95));
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.35), inset 0 0 12px rgba(16, 185, 129, 0.12);
   transform: translateY(-1px);
 }
 
-.styled-date-picker:focus {
-  border-color: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.35), 0 0 22px rgba(16, 185, 129, 0.45);
-}
-
-/* Ícono de calendario nativo - Ultra visible, vibrante verde esmeralda y animado */
-.styled-date-picker::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  background-color: #10b981;
-  padding: 7px;
-  border-radius: 8px;
-  box-shadow: 0 0 14px rgba(16, 185, 129, 0.7), 0 2px 6px rgba(0, 0, 0, 0.4);
-  filter: invert(0) brightness(1.15);
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.styled-date-picker::-webkit-calendar-picker-indicator:hover {
-  transform: scale(1.22) rotate(-6deg);
-  background-color: #34d399;
-  box-shadow: 0 0 20px rgba(52, 211, 153, 0.95), 0 4px 10px rgba(0, 0, 0, 0.5);
-}
-
-/* Badge amigable dinámico con animación pulsante y apertura al hacer clic */
-.date-friendly-badge {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 78, 59, 0.3));
-  border: 1.5px solid rgba(52, 211, 153, 0.45);
-  color: #6ee7b7;
-  font-size: 0.92rem;
-  font-weight: 700;
-  padding: 10px 16px;
-  border-radius: var(--radius-md);
-  display: inline-flex;
+.trigger-cal-left {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  text-transform: capitalize;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  cursor: pointer;
-  transition: all 0.25s ease;
-  user-select: none;
+  gap: 10px;
 }
 
-.date-friendly-badge:hover {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(6, 78, 59, 0.45));
-  border-color: #34d399;
-  color: #a7f3d0;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
-}
-
-.date-friendly-badge .badge-cal-icon {
+.trigger-cal-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: rgba(16, 185, 129, 0.25);
-  border: 1px solid rgba(52, 211, 153, 0.4);
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-radius: 9px;
+  font-size: 1.15rem;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+  flex-shrink: 0;
+}
+
+.trigger-date-text {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #f8fafc;
+  display: block;
+  text-transform: capitalize;
+}
+
+.trigger-date-subtext {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #34d399;
+  display: block;
+}
+
+.trigger-change-pill {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #34d399;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  transition: var(--transition);
+}
+
+.custom-calendar-trigger-btn:hover .trigger-change-pill {
+  background: rgba(16, 185, 129, 0.3);
+  color: #a7f3d0;
+  border-color: #34d399;
+}
+
+.cal-info-notice {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
   border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+  color: #cbd5e1;
+  margin-bottom: 10px;
+}
+
+/* Modal / Dropdown del Calendario Oscuro Glassmorphism */
+.custom-calendar-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  max-width: 360px;
+  background: rgba(13, 18, 30, 0.98);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1.5px solid rgba(52, 211, 153, 0.35);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), 0 0 30px rgba(16, 185, 129, 0.25);
+  z-index: 1000;
+  animation: calPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes calPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.custom-calendar-dropdown.hidden {
+  display: none;
+}
+
+.cal-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.cal-nav-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-radius: 10px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cal-nav-btn:hover {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #34d399;
+  color: #34d399;
+  transform: scale(1.08);
+}
+
+.cal-month-year-label {
   font-size: 1rem;
-  animation: calendarGlowPulse 2.8s infinite ease-in-out;
+  font-weight: 800;
+  color: #ffffff;
+  text-transform: capitalize;
+  letter-spacing: -0.01em;
+}
+
+.cal-weekdays-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.cal-weekdays-grid .we-label {
+  color: #34d399;
+}
+
+.cal-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.cal-day-cell {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  color: #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.cal-day-cell:hover:not(.disabled):not(.selected) {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #34d399;
+  transform: scale(1.08);
+}
+
+.cal-day-cell.today {
+  border-color: rgba(52, 211, 153, 0.7);
+  color: #6ee7b7;
+  font-weight: 800;
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.cal-day-cell.selected {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  font-weight: 800;
+  border-color: #34d399;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.85);
+  transform: scale(1.08);
+}
+
+.cal-day-cell.weekend-day:not(.selected):not(.disabled) {
+  color: #a7f3d0;
+}
+
+.cal-day-cell.disabled {
+  opacity: 0.22;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.cal-day-cell.other-month {
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.cal-dropdown-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+}
+
+.cal-footer-shortcuts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cal-shortcut-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: var(--radius-full);
+  padding: 4px 9px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cal-shortcut-pill:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: var(--accent-emerald);
+  color: #34d399;
+}
+
+.cal-close-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: none;
+  color: #ffffff;
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.cal-close-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.7);
 }
 
 @keyframes calendarGlowPulse {
@@ -801,7 +1177,7 @@ body {
   }
   50% {
     transform: scale(1.12) rotate(-3deg);
-    box-shadow: 0 0 12px rgba(52, 211, 153, 0.7);
+    box-shadow: 0 0 14px rgba(52, 211, 153, 0.8);
   }
 }
 
@@ -2019,6 +2395,20 @@ body {
   }
 
   .header-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .header-badges .badge {
+    display: none;
+  }
+
+  .btn-download-app-header {
+    padding: 5px 10px;
+  }
+
+  .btn-download-app-header .dl-app-sub {
     display: none;
   }
 
@@ -2422,4 +2812,197 @@ body {
 .logo-guide-box li {
   line-height: 1.4;
 }
+
+/* ---------------- App Download & Installation Modal ---------------- */
+.app-install-dialog {
+  max-width: 540px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8), 0 0 30px rgba(245, 158, 11, 0.15);
+}
+
+.app-install-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-install-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.app-install-sub {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.app-showcase-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(15, 23, 42, 0.8));
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.app-showcase-icon {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  background: #0a0d14;
+  border-radius: 16px;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  padding: 6px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+.app-showcase-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.app-showcase-info h4 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.app-showcase-info p {
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+  margin-top: 6px;
+}
+
+.app-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.app-tag-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fef08a;
+}
+
+.direct-install-action {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.btn-install-large {
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 14px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #0c111a;
+  border: 1px solid #fbbf24;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-install-large:hover {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(245, 158, 11, 0.5);
+}
+
+.install-action-hint {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.install-instructions-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.install-guide-heading {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.device-step-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.device-step-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.device-step-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  flex-shrink: 0;
+}
+
+.device-step-badge.badge-ios {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
+.device-step-content {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  line-height: 1.45;
+}
+
+.device-step-content strong {
+  color: #ffffff;
+}
+
+.app-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 500px) {
+  .app-benefits-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.benefit-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.benefit-chip span:first-child {
+  font-size: 1.1rem;
+}
+
 
