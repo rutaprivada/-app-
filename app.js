@@ -181,23 +181,23 @@ const TARIFF_SCHEDULES = {
       },
       {
         id: 'mon_thu_pico_tarde',
-        label: 'Hora Pico Tarde (16:00 a 20:00 hs)',
+        label: 'Hora Pico Tarde (16:00 a 19:00 hs)',
         shortLabel: 'Hora Pico Tarde',
         badge: 'Pico Tarde',
         icon: '🚦',
         startMin: 960,
-        endMin: 1200, // 20:00
+        endMin: 1140, // 19:00
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
         minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'mon_thu_nocturno_2',
-        label: 'Horario Nocturno (20:00 a 00:00 hs)',
+        label: 'Horario Nocturno (19:00 a 00:00 hs)',
         shortLabel: 'Horario Nocturno',
         badge: 'Nocturno',
         icon: '🌙',
-        startMin: 1200,
+        startMin: 1140, // 19:00
         endMin: 1440, // 24:00
         base: { short: 1500, medium: 2000, long: 3000 },
         kmRate: { short: 950, medium: 900, long: 870 },
@@ -2044,8 +2044,8 @@ function trafficFactorForTime(timeStr, dateStr) {
 
   // 1. DÍAS HÁBILES (Lunes a Jueves)
   if (!isWeekend && !isFriday) {
-    // Madrugada / Noche despejada (19:30 a 07:00)
-    if (totalMin >= 1170 || totalMin < 420) {
+    // Madrugada / Noche despejada (19:00 a 07:00)
+    if (totalMin >= 1140 || totalMin < 420) {
       factor = 1.0;
       label = 'Madrugada / Noche Despejada';
       shortLabel = 'Fluido (0% demoras)';
@@ -2099,8 +2099,8 @@ function trafficFactorForTime(timeStr, dateStr) {
       delayPercent = 10;
       description = `Movimiento comercial en zonas céntricas para las ${timeStr} hs (+10% duración).`;
     }
-    // Valle Diurno Tarde (14:30 a 16:30)
-    else if (totalMin >= 870 && totalMin < 990) {
+    // Valle Diurno Tarde (14:30 a 16:00)
+    else if (totalMin >= 870 && totalMin < 960) {
       factor = 1.05;
       label = 'Tránsito Diurno Regular';
       shortLabel = 'Habitual (+5% tiempo)';
@@ -2110,8 +2110,8 @@ function trafficFactorForTime(timeStr, dateStr) {
       delayPercent = 5;
       description = `Circulación constante y fluida para las ${timeStr} hs (+5% duración).`;
     }
-    // HORA PICO TARDE (16:30 a 19:30) - Salidas de CABA hacia GBA
-    else if (totalMin >= 990 && totalMin <= 1170) {
+    // HORA PICO TARDE (16:00 a 19:00) - Salidas de CABA hacia GBA
+    else if (totalMin >= 960 && totalMin < 1140) {
       factor = 1.25;
       label = 'Hora Pico Tarde (Salidas de CABA)';
       shortLabel = 'Pico Tarde (+25% tiempo)';
@@ -3859,9 +3859,6 @@ function buildReservationMessage() {
   msg += `🏁 *Destino:* ${destStr}\n\n`;
   msg += `📅 *Fecha:* ${dateFormatted}\n`;
   msg += `⏰ *Hora:* ${state.time || 'A convenir'} hs\n`;
-  if (b.scheduleDayLabel) {
-    msg += `🕒 *Horario:* ${b.scheduleDayLabel} — ${b.slotName || 'Estándar'}\n`;
-  }
   msg += `🚘 *Vehículo:* Sedán Ejecutivo & Confort\n`;
   msg += `🛣️ *Recorrido:* ${state.distanceKm.toFixed(1)} km (~${state.durationMin} min)\n`;
 
@@ -3881,7 +3878,7 @@ function buildReservationMessage() {
     msg += `🐾 *Mascota:* Incluida (+${formatMoney(state.config.petFee || 4000)})\n`;
   }
   if (b.timeSurgePercent > 0) {
-    msg += `⏱️ *Ajuste Clima/Horario:* +${b.timeSurgePercent}% (${b.timeSurgeReason})\n`;
+    msg += `⏱️ *Ajuste Clima:* +${b.timeSurgePercent}% (${b.timeSurgeReason})\n`;
   }
   if (state.weather && state.weather.isRaining) {
     msg += `🌧️ *Clima:* ${state.weather.label}\n`;
@@ -3891,7 +3888,7 @@ function buildReservationMessage() {
   msg += `💳 *TARIFA FINAL:* *${formatMoney(state.totalPrice)} ${state.config.currency}*\n`;
   msg += `_✓ Tarifa fija garantizada sin cargos ocultos_\n`;
   msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
-  msg += `_¡Hola Daniel! Deseo reservar este traslado privado. ¿Tenés disponibilidad para ese horario? Muchas gracias._`;
+  msg += `_¡Hola! Deseo coordinar este traslado privado. ¿Tienen disponibilidad para ese horario? Muchas gracias._`;
 
   return msg;
 }
