@@ -2508,7 +2508,10 @@ function renderEmptyQuote() {
   setText('quote-currency-code', 'ARS');
 
   const guaranteeNote = document.getElementById('quote-guarantee-note');
-  if (guaranteeNote) guaranteeNote.textContent = 'Ingresá origen y destino y presioná "Calcular" para ver tu tarifa.';
+  if (guaranteeNote) {
+    guaranteeNote.textContent = '';
+    guaranteeNote.classList.add('hidden');
+  }
 
   // Ocultamos filas de desglose que no aplican todavía
   ['row-surge-line', 'row-roundtrip-leg-line', 'row-roundtrip-discount-line', 'row-long-distance-discount-line', 'row-toll-line']
@@ -2674,19 +2677,21 @@ function renderQuote() {
     }
   }
 
-  // Nota de garantía dinámica
+  // Anuncio especial o bonificación debajo del precio total (solo cuando aplique un beneficio o bonificación)
   const guaranteeNote = document.getElementById('quote-guarantee-note');
   if (guaranteeNote) {
-    if (b.holiday) {
-      guaranteeNote.textContent = `✓ Feriado Nacional (${b.holiday}): Rige matriz dominical con base $${formatNumber(b.baseFare)}, $${b.kmRate}/km y $${b.minRate}/min.`;
+    if (b.baseFare === 0) {
+      guaranteeNote.textContent = '✓ Beneficio Ezeiza: Tarifa base $0 bonificada por recorrido >30 km.';
+      guaranteeNote.classList.remove('hidden');
     } else if (b.isLongDistance && b.longDistanceDiscount > 0) {
       guaranteeNote.textContent = '✓ Bonificación especial Larga Distancia (>200 km): 40% de descuento aplicado.';
-    } else if (b.baseFare === 0) {
-      guaranteeNote.textContent = '✓ Beneficio Ezeiza: Tarifa base $0 bonificada por recorrido >30 km.';
-    } else if (b.timeSurgePercent > 0) {
-      guaranteeNote.textContent = `✓ Incluye ${b.timeSurgeReason}. Sin costos ocultos.`;
+      guaranteeNote.classList.remove('hidden');
+    } else if (b.isRoundtrip && b.roundtripDiscount > 0) {
+      guaranteeNote.textContent = `✓ Beneficio Ida y Vuelta: -${b.roundtripDiscountPercent || 15}% de descuento en el regreso.`;
+      guaranteeNote.classList.remove('hidden');
     } else {
-      guaranteeNote.textContent = `✓ ${b.scheduleDayLabel} (${b.slotName}): Base $${formatNumber(b.baseFare)}, $${b.kmRate}/km y $${b.minRate}/min. Tarifa fija.`;
+      guaranteeNote.textContent = '';
+      guaranteeNote.classList.add('hidden');
     }
   }
 
