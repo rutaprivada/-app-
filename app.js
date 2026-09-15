@@ -48,6 +48,522 @@ const DEFAULT_CONFIG = {
   currency: 'ARS'
 };
 
+// ==========================================
+// 1.1 FERIADOS NACIONALES Y DÍAS FESTIVOS (ARGENTINA)
+// ==========================================
+const ARGENTINA_FIXED_HOLIDAYS = {
+  '01-01': 'Año Nuevo',
+  '03-24': 'Día Nacional de la Memoria por la Verdad y la Justicia',
+  '04-02': 'Día del Veterano y de los Caídos en la Guerra de Malvinas',
+  '05-01': 'Día del Trabajador',
+  '05-25': 'Día de la Revolución de Mayo',
+  '06-20': 'Paso a la Inmortalidad del Gral. Manuel Belgrano',
+  '07-09': 'Día de la Independencia',
+  '12-08': 'Inmaculada Concepción de María',
+  '12-25': 'Navidad'
+};
+
+// Feriados trasladables, puentes turísticos y carnavales/Semana Santa oficiales por año
+const ARGENTINA_YEARLY_HOLIDAYS = {
+  // 2024
+  '2024-02-12': 'Carnaval',
+  '2024-02-13': 'Carnaval',
+  '2024-03-28': 'Jueves Santo',
+  '2024-03-29': 'Viernes Santo',
+  '2024-04-01': 'Feriado Puente Turístico',
+  '2024-06-17': 'Paso a la Inmortalidad del Gral. Don Martín Miguel de Güemes',
+  '2024-06-21': 'Feriado Puente Turístico',
+  '2024-10-11': 'Feriado Puente Turístico',
+  '2024-10-12': 'Día del Respeto a la Diversidad Cultural',
+  '2024-11-18': 'Día de la Soberanía Nacional',
+  // 2025
+  '2025-03-03': 'Carnaval',
+  '2025-03-04': 'Carnaval',
+  '2025-04-17': 'Jueves Santo',
+  '2025-04-18': 'Viernes Santo',
+  '2025-05-02': 'Feriado Puente Turístico',
+  '2025-06-16': 'Paso a la Inmortalidad del Gral. Don Martín Miguel de Güemes',
+  '2025-08-15': 'Feriado Puente Turístico',
+  '2025-08-17': 'Paso a la Inmortalidad del Gral. José de San Martín',
+  '2025-10-12': 'Día del Respeto a la Diversidad Cultural',
+  '2025-11-21': 'Feriado Puente Turístico',
+  '2025-11-24': 'Día de la Soberanía Nacional',
+  // 2026
+  '2026-02-16': 'Carnaval',
+  '2026-02-17': 'Carnaval',
+  '2026-04-02': 'Jueves Santo / Día del Veterano',
+  '2026-04-03': 'Viernes Santo',
+  '2026-06-15': 'Paso a la Inmortalidad del Gral. Don Martín Miguel de Güemes',
+  '2026-07-10': 'Feriado Puente Turístico',
+  '2026-08-17': 'Paso a la Inmortalidad del Gral. José de San Martín',
+  '2026-10-12': 'Día del Respeto a la Diversidad Cultural',
+  '2026-11-23': 'Día de la Soberanía Nacional',
+  // 2027
+  '2027-02-08': 'Carnaval',
+  '2027-02-09': 'Carnaval',
+  '2027-03-25': 'Jueves Santo',
+  '2027-03-26': 'Viernes Santo',
+  '2027-06-21': 'Paso a la Inmortalidad del Gral. Don Martín Miguel de Güemes',
+  '2027-08-16': 'Paso a la Inmortalidad del Gral. José de San Martín',
+  '2027-10-11': 'Día del Respeto a la Diversidad Cultural',
+  '2027-11-22': 'Día de la Soberanía Nacional',
+  // 2028
+  '2028-02-28': 'Carnaval',
+  '2028-02-29': 'Carnaval',
+  '2028-04-13': 'Jueves Santo',
+  '2028-04-14': 'Viernes Santo',
+  '2028-06-19': 'Paso a la Inmortalidad del Gral. Don Martín Miguel de Güemes',
+  '2028-08-21': 'Paso a la Inmortalidad del Gral. José de San Martín',
+  '2028-10-16': 'Día del Respeto a la Diversidad Cultural',
+  '2028-11-20': 'Día de la Soberanía Nacional'
+};
+
+function getArgentinaHoliday(dateStr) {
+  if (!dateStr) return null;
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return null;
+  const fullDate = `${parts[0]}-${parts[1]}-${parts[2]}`;
+  const monthDay = `${parts[1]}-${parts[2]}`;
+
+  if (ARGENTINA_YEARLY_HOLIDAYS[fullDate]) {
+    return ARGENTINA_YEARLY_HOLIDAYS[fullDate];
+  }
+  if (ARGENTINA_FIXED_HOLIDAYS[monthDay]) {
+    return ARGENTINA_FIXED_HOLIDAYS[monthDay];
+  }
+  return null;
+}
+
+// ==========================================
+// 1.2 MATRICES COMPLETAS DE TARIFAS POR DÍA Y HORARIO
+// ==========================================
+const TARIFF_SCHEDULES = {
+  // Lunes a Jueves
+  weekday: {
+    key: 'weekday',
+    name: 'Días Hábiles (Lunes a Jueves)',
+    slots: [
+      {
+        id: 'mon_thu_nocturno_1',
+        label: 'Horario Nocturno (00:00 a 07:00 hs)',
+        shortLabel: 'Horario Nocturno',
+        badge: 'Nocturno',
+        icon: '🌙',
+        startMin: 0,
+        endMin: 420, // 07:00
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      },
+      {
+        id: 'mon_thu_pico_manana',
+        label: 'Hora Pico Mañana (07:00 a 10:00 hs)',
+        shortLabel: 'Hora Pico Mañana',
+        badge: 'Pico Mañana',
+        icon: '🚦',
+        startMin: 420,
+        endMin: 600, // 10:00
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'mon_thu_valle',
+        label: 'Horario Valle (10:00 a 16:00 hs)',
+        shortLabel: 'Horario Valle',
+        badge: 'Valle Diurno',
+        icon: '🟢',
+        startMin: 600,
+        endMin: 960, // 16:00
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      },
+      {
+        id: 'mon_thu_pico_tarde',
+        label: 'Hora Pico Tarde (16:00 a 20:00 hs)',
+        shortLabel: 'Hora Pico Tarde',
+        badge: 'Pico Tarde',
+        icon: '🚦',
+        startMin: 960,
+        endMin: 1200, // 20:00
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'mon_thu_nocturno_2',
+        label: 'Horario Nocturno (20:00 a 00:00 hs)',
+        shortLabel: 'Horario Nocturno',
+        badge: 'Nocturno',
+        icon: '🌙',
+        startMin: 1200,
+        endMin: 1440, // 24:00
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      }
+    ]
+  },
+
+  // Viernes
+  friday: {
+    key: 'friday',
+    name: 'Viernes',
+    slots: [
+      {
+        id: 'fri_nocturno_1',
+        label: 'Horario Nocturno (00:00 a 07:00 hs)',
+        shortLabel: 'Horario Nocturno',
+        badge: 'Nocturno',
+        icon: '🌙',
+        startMin: 0,
+        endMin: 420,
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      },
+      {
+        id: 'fri_pico_manana',
+        label: 'Hora Pico Mañana (07:00 a 10:00 hs)',
+        shortLabel: 'Hora Pico Mañana',
+        badge: 'Pico Mañana',
+        icon: '🚦',
+        startMin: 420,
+        endMin: 600,
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'fri_valle',
+        label: 'Horario Valle (10:00 a 16:00 hs)',
+        shortLabel: 'Horario Valle',
+        badge: 'Valle Diurno',
+        icon: '🟢',
+        startMin: 600,
+        endMin: 960,
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      },
+      {
+        id: 'fri_pico_tarde',
+        label: 'Hora Pico Tarde (16:00 a 20:00 hs)',
+        shortLabel: 'Hora Pico Tarde',
+        badge: 'Pico Tarde',
+        icon: '🚦',
+        startMin: 960,
+        endMin: 1200,
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'fri_nocturno_finde',
+        label: 'Horario Nocturno Finde (20:00 a 22:00 hs)',
+        shortLabel: 'Horario Nocturno Finde',
+        badge: 'Nocturno Finde',
+        icon: '✨',
+        startMin: 1200,
+        endMin: 1320, // 22:00
+        base: { short: 2300, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'fri_noche_finde',
+        label: 'Noche Finde (22:00 a 00:00 hs)',
+        shortLabel: 'Noche Finde',
+        badge: 'Noche Finde',
+        icon: '🌙',
+        startMin: 1320,
+        endMin: 1440,
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      }
+    ]
+  },
+
+  // Sábado
+  saturday: {
+    key: 'saturday',
+    name: 'Sábado',
+    slots: [
+      {
+        id: 'sat_pico_madrugada',
+        label: 'Horario Pico Finde Madrugada (00:00 a 02:00 hs)',
+        shortLabel: 'Pico Finde Madrugada',
+        badge: 'Pico Madrugada',
+        icon: '🌃',
+        startMin: 0,
+        endMin: 120, // 02:00
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'sat_valle_madrugada',
+        label: 'Horario Valle Madrugada (02:00 a 04:00 hs)',
+        shortLabel: 'Horario Valle Madrugada',
+        badge: 'Valle Madrugada',
+        icon: '🌙',
+        startMin: 120,
+        endMin: 240, // 04:00
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      },
+      {
+        id: 'sat_pico_manana',
+        label: 'Horario Pico Finde Mañana (04:00 a 07:00 hs)',
+        shortLabel: 'Pico Finde Mañana',
+        badge: 'Pico Mañana',
+        icon: '🌅',
+        startMin: 240,
+        endMin: 420, // 07:00
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'sat_valle_dia',
+        label: 'Horario Valle Día (07:00 a 16:00 hs)',
+        shortLabel: 'Horario Valle Día',
+        badge: 'Valle Día',
+        icon: '☀️',
+        startMin: 420,
+        endMin: 960, // 16:00
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      },
+      {
+        id: 'sat_valle_tarde',
+        label: 'Horario Valle Tarde (16:00 a 20:00 hs)',
+        shortLabel: 'Horario Valle Tarde',
+        badge: 'Valle Tarde',
+        icon: '🚗',
+        startMin: 960,
+        endMin: 1200, // 20:00
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      },
+      {
+        id: 'sat_pico_noche',
+        label: 'Horario Pico Noche (20:00 a 22:00 hs)',
+        shortLabel: 'Horario Pico Noche',
+        badge: 'Pico Noche',
+        icon: '🍷',
+        startMin: 1200,
+        endMin: 1320, // 22:00
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'sat_nocturno',
+        label: 'Horario Nocturno (22:00 a 00:00 hs)',
+        shortLabel: 'Horario Nocturno',
+        badge: 'Nocturno',
+        icon: '🌙',
+        startMin: 1320,
+        endMin: 1440,
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      }
+    ]
+  },
+
+  // Domingo y Días Festivos
+  sunday: {
+    key: 'sunday',
+    name: 'Domingo y Días Festivos',
+    slots: [
+      {
+        id: 'sun_pico_madrugada',
+        label: 'Horario Pico Finde Madrugada (00:00 a 02:00 hs)',
+        shortLabel: 'Pico Finde Madrugada',
+        badge: 'Pico Madrugada',
+        icon: '🌃',
+        startMin: 0,
+        endMin: 120,
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'sun_valle_madrugada',
+        label: 'Horario Valle Madrugada (02:00 a 04:00 hs)',
+        shortLabel: 'Horario Valle Madrugada',
+        badge: 'Valle Madrugada',
+        icon: '🌙',
+        startMin: 120,
+        endMin: 240,
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      },
+      {
+        id: 'sun_pico_manana',
+        label: 'Horario Pico Finde Mañana (04:00 a 07:00 hs)',
+        shortLabel: 'Pico Finde Mañana',
+        badge: 'Pico Mañana',
+        icon: '🌅',
+        startMin: 240,
+        endMin: 420,
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'sun_valle_dia',
+        label: 'Horario Valle Día (07:00 a 16:00 hs)',
+        shortLabel: 'Horario Valle Día',
+        badge: 'Valle Día',
+        icon: '☀️',
+        startMin: 420,
+        endMin: 960,
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      },
+      {
+        id: 'sun_valle_tarde',
+        label: 'Horario Valle Tarde / Retorno (16:00 a 20:00 hs)',
+        shortLabel: 'Horario Retorno Finde',
+        badge: 'Retorno Finde',
+        icon: '🚦',
+        startMin: 960,
+        endMin: 1200,
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'sun_pico_noche',
+        label: 'Horario Pico Noche (20:00 a 22:00 hs)',
+        shortLabel: 'Horario Pico Noche',
+        badge: 'Pico Noche',
+        icon: '🍷',
+        startMin: 1200,
+        endMin: 1320,
+        base: { short: 2000, medium: 3000, long: 3500 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 120, long: 80 }
+      },
+      {
+        id: 'sun_nocturno',
+        label: 'Horario Nocturno (22:00 a 00:00 hs)',
+        shortLabel: 'Horario Nocturno',
+        badge: 'Nocturno',
+        icon: '🌙',
+        startMin: 1320,
+        endMin: 1440,
+        base: { short: 1500, medium: 2000, long: 3000 },
+        kmRate: { short: 950, medium: 900, long: 870 },
+        minRate: { short: 150, medium: 110, long: 70 }
+      }
+    ]
+  }
+};
+
+// Resolver tarifario activo según fecha, hora, distancia y duración
+function resolveTariffRates(dateStr, timeStr, distanceKm, durationMin) {
+  const holiday = getArgentinaHoliday(dateStr);
+  let dayOfWeek = 1;
+  if (dateStr) {
+    const parts = dateStr.split('-');
+    dayOfWeek = new Date(parts[0], parts[1] - 1, parts[2]).getDay();
+  } else {
+    dayOfWeek = new Date().getDay();
+  }
+
+  let scheduleKey = 'weekday';
+  let dayLabel = 'Lunes a Jueves';
+
+  if (holiday) {
+    scheduleKey = 'sunday';
+    dayLabel = `Día Festivo / Feriado (${holiday})`;
+  } else if (dayOfWeek === 0) {
+    scheduleKey = 'sunday';
+    dayLabel = 'Domingo';
+  } else if (dayOfWeek === 6) {
+    scheduleKey = 'saturday';
+    dayLabel = 'Sábado';
+  } else if (dayOfWeek === 5) {
+    scheduleKey = 'friday';
+    dayLabel = 'Viernes';
+  } else {
+    scheduleKey = 'weekday';
+    dayLabel = 'Día Hábil (Lunes a Jueves)';
+  }
+
+  const schedule = TARIFF_SCHEDULES[scheduleKey] || TARIFF_SCHEDULES.weekday;
+  let totalMin = 840; // 14:00 por defecto
+  if (timeStr) {
+    const [hh, mm] = timeStr.split(':').map(Number);
+    totalMin = hh * 60 + (mm || 0);
+  }
+
+  let slot = schedule.slots.find(s => totalMin >= s.startMin && totalMin < s.endMin);
+  if (!slot) {
+    slot = schedule.slots[schedule.slots.length - 1];
+  }
+
+  const km = Math.max(0, distanceKm || 0);
+  const min = Math.max(0, durationMin || 0);
+
+  // Bracket de Distancia (0-5 km, 5-10 km, 10-100 km)
+  let distBracket = 'long';
+  let distBracketLabel = '>10 km';
+  if (km <= 5) {
+    distBracket = 'short';
+    distBracketLabel = '0 a 5 km';
+  } else if (km <= 10) {
+    distBracket = 'medium';
+    distBracketLabel = '5 a 10 km';
+  } else {
+    distBracket = 'long';
+    distBracketLabel = '10 a 100 km';
+  }
+
+  // Bracket de Duración (0-10 min, 10-20 min, 20-80 min)
+  let durBracket = 'long';
+  let durBracketLabel = '20 a 80 min';
+  if (min <= 10) {
+    durBracket = 'short';
+    durBracketLabel = '0 a 10 min';
+  } else if (min <= 20) {
+    durBracket = 'medium';
+    durBracketLabel = '10 a 20 min';
+  } else {
+    durBracket = 'long';
+    durBracketLabel = '20 a 80 min';
+  }
+
+  const baseFare = slot.base[distBracket];
+  const kmRate = slot.kmRate[distBracket];
+  const minRate = slot.minRate[durBracket];
+
+  return {
+    holiday,
+    scheduleKey,
+    dayLabel,
+    slot,
+    distBracket,
+    distBracketLabel,
+    durBracket,
+    durBracketLabel,
+    baseFare,
+    kmRate,
+    minRate
+  };
+}
+
 // Tarifas oficiales y cabinas troncales vigentes para autopistas en Argentina (Categoría 2)
 const OFFICIAL_ARGENTINA_TOLLS = {
   panamericana_pilar: {
@@ -241,11 +757,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function loadConfig() {
   try {
-    ['rutaprivada_config', 'rutaprivada_config_v2', 'rutaprivada_config_v3', 'rutaprivada_config_v4', 'rutaprivada_config_v5', 'rutaprivada_config_v6', 'rutaprivada_config_v7', 'rutaprivada_config_v8', 'rutaprivada_config_v9'].forEach(k => {
+    ['rutaprivada_config', 'rutaprivada_config_v2', 'rutaprivada_config_v3', 'rutaprivada_config_v4', 'rutaprivada_config_v5', 'rutaprivada_config_v6', 'rutaprivada_config_v7', 'rutaprivada_config_v8', 'rutaprivada_config_v9', 'rutaprivada_config_v10'].forEach(k => {
       try { localStorage.removeItem(k); } catch(e) {}
     });
 
-    const saved = localStorage.getItem('rutaprivada_config_v10');
+    const saved = localStorage.getItem('rutaprivada_config_v11');
     if (saved) {
       const parsed = JSON.parse(saved);
       if (!parsed.whatsappNumber || parsed.whatsappNumber.includes('8225') || parsed.whatsappNumber.includes('4455')) {
@@ -253,23 +769,10 @@ function loadConfig() {
       }
       parsed.currency = 'ARS';
       parsed.adminPin = '4824';
-      if (!parsed.weekendBaseShort) parsed.weekendBaseShort = DEFAULT_CONFIG.weekendBaseShort;
-      if (!parsed.weekendBaseLong) parsed.weekendBaseLong = DEFAULT_CONFIG.weekendBaseLong;
-      if (!parsed.weekendKmShort) parsed.weekendKmShort = DEFAULT_CONFIG.weekendKmShort;
-      if (!parsed.weekendKmLong) parsed.weekendKmLong = DEFAULT_CONFIG.weekendKmLong;
-      if (!parsed.weekendMinRate) parsed.weekendMinRate = DEFAULT_CONFIG.weekendMinRate;
-      if (!parsed.baseFareStopUnder15) parsed.baseFareStopUnder15 = DEFAULT_CONFIG.baseFareStopUnder15;
-      if (!parsed.kmRateOver35) parsed.kmRateOver35 = DEFAULT_CONFIG.kmRateOver35;
-      if (!parsed.minRateOver30) parsed.minRateOver30 = DEFAULT_CONFIG.minRateOver30;
       if (!parsed.petFee || parsed.petFee < 4000) parsed.petFee = 4000;
-      if (!parsed.stopFeeEnCamino) parsed.stopFeeEnCamino = DEFAULT_CONFIG.stopFeeEnCamino;
-      if (!parsed.stopFeeNear) parsed.stopFeeNear = DEFAULT_CONFIG.stopFeeNear;
-      if (!parsed.stopFeeMedium) parsed.stopFeeMedium = DEFAULT_CONFIG.stopFeeMedium;
-      if (!parsed.stopFeeFar) parsed.stopFeeFar = DEFAULT_CONFIG.stopFeeFar;
-      if (!parsed.stopFeeExtended) parsed.stopFeeExtended = DEFAULT_CONFIG.stopFeeExtended;
       const merged = { ...DEFAULT_CONFIG, ...parsed };
       try {
-        localStorage.setItem('rutaprivada_config_v10', JSON.stringify(merged));
+        localStorage.setItem('rutaprivada_config_v11', JSON.stringify(merged));
       } catch(e) {}
       return merged;
     }
@@ -285,7 +788,7 @@ function saveConfig(newConfig) {
   state.config.currency = 'ARS';
   state.config.adminPin = '4824';
   try {
-    localStorage.setItem('rutaprivada_config_v10', JSON.stringify(state.config));
+    localStorage.setItem('rutaprivada_config_v11', JSON.stringify(state.config));
   } catch (e) {
     console.error('Error guardando configuración:', e);
   }
@@ -1525,130 +2028,22 @@ function isTripToEzeiza() {
   return false;
 }
 
-function evaluateTimeRate(timeStr, dateStr) {
-  state.timeMultiplier = 1.0;
-  state.timeSurgeReason = 'Tarifa Estándar (Sin recargo)';
-  state.timeSurgePercent = 0;
-  if (!timeStr) return;
+function evaluateTimeRate(timeStr, dateStr, distanceKm, durationMin) {
+  const resolved = resolveTariffRates(dateStr, timeStr, distanceKm !== undefined ? distanceKm : state.distanceKm, durationMin !== undefined ? durationMin : state.durationMin);
+  state.tariffResolved = resolved;
 
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const totalMinutes = hours * 60 + minutes;
+  // Factor de clima si hay lluvia
+  let weatherSurge = (state.weather && state.weather.surgePercent > 0) ? state.weather.surgePercent : 0;
+  state.timeMultiplier = 1.0 + (weatherSurge / 100);
+  state.timeSurgePercent = weatherSurge;
 
-  let dayOfWeek = 1;
-  if (dateStr) {
-    const parts = dateStr.split('-');
-    dayOfWeek = new Date(parts[0], parts[1] - 1, parts[2]).getDay();
+  if (weatherSurge > 0) {
+    state.timeSurgeReason = `${resolved.slot.shortLabel} + ${state.weather.icon} ${state.weather.label}`;
+  } else if (resolved.holiday) {
+    state.timeSurgeReason = `Día Festivo: ${resolved.holiday} (${resolved.slot.shortLabel})`;
   } else {
-    dayOfWeek = new Date().getDay();
+    state.timeSurgeReason = `${resolved.dayLabel} (${resolved.slot.shortLabel})`;
   }
-
-  const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-  const isThursday = (dayOfWeek === 4);
-  const isFriday = (dayOfWeek === 5);
-  const isSaturday = (dayOfWeek === 6);
-  const isSunday = (dayOfWeek === 0);
-
-  const nightPercent = state.config.nightSurgePercent !== undefined ? state.config.nightSurgePercent : 20;
-  const nightShortPercent = state.config.nightSurgeShortPercent !== undefined ? state.config.nightSurgeShortPercent : 25;
-  const rushPercent = state.config.rushSurgePercent !== undefined ? state.config.rushSurgePercent : 10;
-  const km = state.distanceKm || 0;
-
-  let baseSurge = 0;
-  let baseReason = '';
-
-  // 1. SALIDAS NOCTURNAS VIERNES Y SÁBADOS (Boliches, bares, cenas y eventos):
-  // - Viernes noche: 20:00 a 22:00 hs (+20%) y 22:00 a 24:00 hs (+20%/+25%)
-  // - Sábado madrugada: 00:00 a 06:30 hs (+20%/+25%)
-  // - Sábado noche: 20:00 a 22:00 hs (+20%) y 22:00 a 24:00 hs (+20%/+25%)
-  // - Domingo madrugada: 00:00 a 06:30 hs (+20%/+25%)
-  // - Jueves noche / madrugada: 23:00 a 05:00 hs (+20%)
-
-  const isFridayNightEarly = isFriday && (totalMinutes >= 1200 && totalMinutes < 1320); // 20:00 a 22:00 hs
-  const isFridayNightLate = isFriday && (totalMinutes >= 1320); // 22:00 a 24:00 hs
-  const isSaturdayDawn = isSaturday && (totalMinutes < 390); // 00:00 a 06:30 hs
-  const isSaturdayNightEarly = isSaturday && (totalMinutes >= 1200 && totalMinutes < 1320); // 20:00 a 22:00 hs
-  const isSaturdayNightLate = isSaturday && (totalMinutes >= 1320); // 22:00 a 24:00 hs
-  const isSundayDawn = isSunday && (totalMinutes < 390); // 00:00 a 06:30 hs
-  const isThursdayNight = isThursday && (totalMinutes >= 1380 || totalMinutes < 300); // 23:00 a 05:00 hs
-
-  if (isFridayNightEarly || isSaturdayNightEarly) {
-    baseSurge = nightPercent;
-    baseReason = 'Salida Nocturna (Viernes/Sábado 20:00 a 22:00 hs: +20%)';
-  } else if (isFridayNightLate || isSaturdayDawn) {
-    if (km <= 30) {
-      baseSurge = nightShortPercent;
-      baseReason = `Salida Nocturna Viernes/Sábado (Alta Demanda ≤30 km: +${nightShortPercent}%)`;
-    } else {
-      baseSurge = nightPercent;
-      baseReason = `Salida Nocturna Viernes/Sábado (>30 km: +${nightPercent}%)`;
-    }
-  } else if (isSaturdayNightLate || isSundayDawn) {
-    if (km <= 30) {
-      baseSurge = nightShortPercent;
-      baseReason = `Salida Nocturna Sábado/Domingo (Alta Demanda ≤30 km: +${nightShortPercent}%)`;
-    } else {
-      baseSurge = nightPercent;
-      baseReason = `Salida Nocturna Sábado/Domingo (>30 km: +${nightPercent}%)`;
-    }
-  } else if (isThursdayNight) {
-    baseSurge = nightPercent;
-    baseReason = `Salida Nocturna Jueves (Pre-Fin de Semana: +${nightPercent}%)`;
-  }
-  // 2. NOCTURNO GENERAL RESTO DE DÍAS (22:00 a 06:00 hs):
-  else if (totalMinutes >= 1320 || totalMinutes < 360) {
-    if (km > 30) {
-      baseSurge = nightPercent;
-      baseReason = `Horario Nocturno 22 a 06 hs (>30 km: +${nightPercent}%)`;
-    } else {
-      baseSurge = nightShortPercent;
-      baseReason = `Horario Nocturno 22 a 06 hs (≤30 km: +${nightShortPercent}%)`;
-    }
-  }
-  // 3. FINES DE SEMANA DIURNOS (Sábados 06:30 a 20:00 y Domingos 06:30 a 22:00):
-  else if (isWeekend) {
-    baseSurge = 0;
-    baseReason = 'Tarifa Única Fin de Semana (Sin recargos)';
-  }
-  // 4. DÍAS HÁBILES (Lunes a Jueves):
-  else {
-    // Franja 20:00 a 22:00 en días hábiles:
-    if (totalMinutes >= 1200 && totalMinutes < 1320) {
-      baseSurge = nightPercent;
-      baseReason = `Horario Nocturno 20 a 22 hs (+${nightPercent}%)`;
-    }
-    // Hora Pico Mañana: 07:00 a 10:00 (420 a 600 min)
-    else if (totalMinutes >= 420 && totalMinutes < 600) {
-      baseSurge = rushPercent;
-      baseReason = `Alta Demanda Mañana (+${rushPercent}%)`;
-    }
-    // Hora Pico Tarde: 17:00 a 20:00 (1020 a 1200 min)
-    else if (totalMinutes >= 1020 && totalMinutes < 1200) {
-      baseSurge = rushPercent;
-      baseReason = `Alta Demanda Tarde (+${rushPercent}%)`;
-    }
-    // Horarios Valle Diurnos (10:00 a 17:00): 0% sin recargo
-    else {
-      baseSurge = 0;
-      baseReason = 'Tarifa Estándar Diurna (Sin recargo)';
-    }
-  }
-
-  // 6. FACTOR CLIMÁTICO EN TIEMPO REAL (Lluvia o Tormenta detectada automáticamente):
-  let totalSurge = baseSurge;
-  let finalReason = baseReason;
-
-  if (state.weather && state.weather.surgePercent > 0) {
-    totalSurge += state.weather.surgePercent;
-    if (baseSurge > 0) {
-      finalReason = `${baseReason} + ${state.weather.icon} ${state.weather.label}`;
-    } else {
-      finalReason = `${state.weather.icon} ${state.weather.label}`;
-    }
-  }
-
-  state.timeMultiplier = 1.0 + (totalSurge / 100);
-  state.timeSurgePercent = totalSurge;
-  state.timeSurgeReason = finalReason;
 }
 
 // Factor de tráfico estadístico y predictivo según el día y horario programado de reserva (CABA y AMBA).
@@ -1669,6 +2064,7 @@ function trafficFactorForTime(timeStr, dateStr) {
   const [hh, mm] = timeStr.split(':').map(Number);
   const totalMin = hh * 60 + mm;
 
+  const holiday = getArgentinaHoliday(dateStr);
   let dayOfWeek = 1;
   if (dateStr) {
     const parts = dateStr.split('-');
@@ -1676,10 +2072,10 @@ function trafficFactorForTime(timeStr, dateStr) {
   } else {
     dayOfWeek = new Date().getDay();
   }
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  const isFriday = dayOfWeek === 5;
-  const isSunday = dayOfWeek === 0;
-  const isSaturday = dayOfWeek === 6;
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6 || Boolean(holiday);
+  const isFriday = !holiday && dayOfWeek === 5;
+  const isSunday = dayOfWeek === 0 || Boolean(holiday);
+  const isSaturday = !holiday && dayOfWeek === 6;
 
   let factor = 1.0;
   let label = 'Tránsito Fluido';
@@ -1983,8 +2379,6 @@ function updateCalculation() {
     return;
   }
 
-  evaluateTimeRate(state.time, state.date);
-
   const cfg = state.config;
   const km = Math.max(0, state.distanceKm);
 
@@ -1997,83 +2391,33 @@ function updateCalculation() {
     : 0;
   const min = Math.max(0, state.durationMin);
 
-  const isWeekendSpecial = isDaytimeWeekend(state.time, state.date);
+  // Resolver matriz de tarifas exacta por día, franja, distancia y duración
+  const resolved = resolveTariffRates(state.date, state.time, km, min);
+  state.tariffResolved = resolved;
+
+  // Factor de horario / clima
+  evaluateTimeRate(state.time, state.date, km, min);
 
   // 1. Tarifa Base
   const isEzeiza = isTripToEzeiza();
-  let baseFare = 0;
-  let baseFareLabel = '';
+  let baseFare = resolved.baseFare;
+  let baseFareLabel = `${resolved.slot.shortLabel} (${resolved.distBracketLabel})`;
 
-  if (isWeekendSpecial) {
-    // REGLAS ESPECIALES FIN DE SEMANA (Sábados y Domingos de 06:00 a 22:00):
-    // Tarifa base única: >8 km: $2.200 / <=8 km: $1.500
-    // En fin de semana NO se elimina la tarifa base si supera los 36 km
-    const wBaseShort = cfg.weekendBaseShort !== undefined ? cfg.weekendBaseShort : 1500;
-    const wBaseLong = cfg.weekendBaseLong !== undefined ? cfg.weekendBaseLong : 2200;
-
-    if (km > 8) {
-      baseFare = wBaseLong;
-      baseFareLabel = `Tarifa base fin de semana (>8 km: $${formatNumber(wBaseLong)})`;
-    } else {
-      baseFare = wBaseShort;
-      baseFareLabel = `Tarifa base fin de semana (≤8 km: $${formatNumber(wBaseShort)})`;
-    }
-  } else {
-    // REGLAS DÍAS HÁBILES:
-    const shortBase = cfg.baseFareShort !== undefined ? cfg.baseFareShort : 2000;
-    const longBase = cfg.baseFareLong !== undefined ? cfg.baseFareLong : 3500;
-    const stopBaseUnder15 = cfg.baseFareStopUnder15 !== undefined ? cfg.baseFareStopUnder15 : 2500;
-
-    if (isEzeiza && km > 36) {
-      baseFare = 0;
-      baseFareLabel = 'Bonificada $0 (Viaje a Ezeiza >36 km)';
-    } else if (state.hasIntermediateStop && km <= 15) {
-      baseFare = stopBaseUnder15;
-      baseFareLabel = 'Tarifa base con parada intermedia (≤15 km)';
-    } else if (km <= 10) {
-      baseFare = shortBase;
-      baseFareLabel = 'Tarifa base viaje corto (≤10 km)';
-    } else {
-      baseFare = longBase;
-      baseFareLabel = 'Tarifa base viaje regular (>10 km)';
-    }
+  if (isEzeiza && km > 36) {
+    baseFare = 0;
+    baseFareLabel = 'Bonificada $0 (Viaje a Ezeiza >36 km)';
+  } else if (state.hasIntermediateStop && km <= 15) {
+    const stopBase = cfg.baseFareStopUnder15 !== undefined ? cfg.baseFareStopUnder15 : 2500;
+    baseFare = stopBase;
+    baseFareLabel = 'Tarifa base con parada intermedia (≤15 km)';
   }
 
   // 2. Precio por Kilómetro
-  let kmRate = 900;
-  if (isWeekendSpecial) {
-    // FIN DE SEMANA (06:00 a 22:00):
-    // >8 km: $850 / km | <=8 km: $800 / km
-    const wKmShort = cfg.weekendKmShort !== undefined ? cfg.weekendKmShort : 800;
-    const wKmLong = cfg.weekendKmLong !== undefined ? cfg.weekendKmLong : 850;
-    kmRate = km > 8 ? wKmLong : wKmShort;
-  } else {
-    // DÍAS HÁBILES:
-    if (km <= 10) {
-      kmRate = cfg.kmRateShort !== undefined ? cfg.kmRateShort : 950;
-    } else if (km > 35) {
-      kmRate = cfg.kmRateOver35 !== undefined ? cfg.kmRateOver35 : 800;
-    } else {
-      kmRate = cfg.kmRateLong !== undefined ? cfg.kmRateLong : 900;
-    }
-  }
+  const kmRate = resolved.kmRate;
   const distanceCost = Math.round(km * kmRate);
 
   // 3. Precio por Minuto
-  let minRate = 150;
-  if (isWeekendSpecial) {
-    // FIN DE SEMANA (06:00 a 22:00): $100 el minuto
-    minRate = cfg.weekendMinRate !== undefined ? cfg.weekendMinRate : 100;
-  } else {
-    // DÍAS HÁBILES:
-    if (min <= 15) {
-      minRate = cfg.minRateShort !== undefined ? cfg.minRateShort : 100;
-    } else if (min > 30) {
-      minRate = cfg.minRateOver30 !== undefined ? cfg.minRateOver30 : 70;
-    } else {
-      minRate = cfg.minRateLong !== undefined ? cfg.minRateLong : 150;
-    }
-  }
+  const minRate = resolved.minRate;
   const durationCost = Math.round(min * minRate);
 
   // 4. Peajes oficiales calculados
@@ -2090,7 +2434,7 @@ function updateCalculation() {
   if (state.hasIntermediateStop) extrasCost += (state.stopFee || 1000);
   if (state.extras.pet) extrasCost += (cfg.petFee || 4000);
 
-  // 6. Subtotal de ida con factor de horario aplicado
+  // 6. Subtotal de ida con factor de clima aplicado si corresponde
   let oneWaySubtotal = (baseFare + distanceCost + durationCost) * VEHICLE.factor;
   oneWaySubtotal = Math.round(oneWaySubtotal * state.timeMultiplier);
   let oneWayFull = oneWaySubtotal + tollCost + extrasCost;
@@ -2123,7 +2467,17 @@ function updateCalculation() {
 
   state.totalPrice = finalTotal;
   state.breakdown = {
-    isWeekendSpecial,
+    scheduleKey: resolved.scheduleKey,
+    scheduleDayLabel: resolved.dayLabel,
+    slotName: resolved.slot.label,
+    slotShortLabel: resolved.slot.shortLabel,
+    slotBadge: resolved.slot.badge,
+    slotIcon: resolved.slot.icon,
+    holiday: resolved.holiday,
+    distBracket: resolved.distBracket,
+    distBracketLabel: resolved.distBracketLabel,
+    durBracket: resolved.durBracket,
+    durBracketLabel: resolved.durBracketLabel,
     baseFare,
     baseFareLabel,
     isEzeiza,
@@ -2296,44 +2650,39 @@ function renderQuote() {
     }
   }
   if (baseLabelEl) {
-    if (b.isWeekendSpecial) {
-      baseLabelEl.textContent = `Servicio Base (Fin de Semana ${state.distanceKm > 8 ? '>8 km' : '≤8 km'}):`;
-    } else if (b.baseFare === 0) {
+    if (b.baseFare === 0) {
       baseLabelEl.textContent = 'Servicio Base (Bonificada >36 km Ezeiza):';
     } else {
-      baseLabelEl.textContent = `Servicio Base (${state.distanceKm <= 10 ? '0-10 km' : '>10 km'}):`;
+      const scheduleTag = b.slotShortLabel || 'Estándar';
+      baseLabelEl.textContent = `Servicio Base (${scheduleTag} • ${b.distBracketLabel || '0-5 km'}):`;
     }
   }
 
   // Desglose: Distancia
   const distRateLabel = formatMoney(b.kmRate);
-  const distLabelText = b.isWeekendSpecial
-    ? `Distancia Fin de Semana (${state.distanceKm.toFixed(1)} km x ${distRateLabel}/km):`
-    : `Distancia (${state.distanceKm.toFixed(1)} km x ${distRateLabel}/km):`;
+  const distLabelText = `Distancia (${state.distanceKm.toFixed(1)} km x ${distRateLabel}/km • ${b.distBracketLabel}):`;
   document.getElementById('row-distance-label').textContent = distLabelText;
   document.getElementById('row-distance-fare').textContent = formatMoney(b.distanceCost);
 
   // Desglose: Tiempo
   const durationRateLabel = formatMoney(b.minRate);
-  const durLabelText = b.isWeekendSpecial
-    ? `Tiempo Fin de Semana (${state.durationMin} min x ${durationRateLabel}/min):`
-    : `Tiempo de viaje (${state.durationMin} min x ${durationRateLabel}/min):`;
+  const durLabelText = `Tiempo de viaje (${state.durationMin} min x ${durationRateLabel}/min • ${b.durBracketLabel}):`;
   document.getElementById('row-duration-label').textContent = durLabelText;
   document.getElementById('row-duration-fare').textContent = formatMoney(b.durationCost);
 
-  // Recargo por horario
+  // Recargo por horario / clima
   const surgeRow = document.getElementById('row-surge-line');
   const surgeLabel = document.getElementById('row-surge-label');
   const surgeFare = document.getElementById('row-surge-fare');
   if (surgeRow && surgeFare) {
     if (b.timeSurgePercent > 0) {
-      if (surgeLabel) surgeLabel.textContent = `Ajuste Horario (${b.timeSurgeReason}):`;
+      if (surgeLabel) surgeLabel.textContent = `Ajuste (${b.timeSurgeReason}):`;
       surgeFare.textContent = `+${b.timeSurgePercent}%`;
       surgeFare.style.color = '#f59e0b';
       surgeFare.style.fontWeight = '700';
     } else {
-      if (surgeLabel) surgeLabel.textContent = `Ajuste Horario (${b.timeSurgeReason}):`;
-      surgeFare.textContent = '0% (Sin recargo)';
+      if (surgeLabel) surgeLabel.textContent = `Esquema (${b.scheduleDayLabel || 'Día Hábil'} • ${b.slotShortLabel || 'Estándar'}):`;
+      surgeFare.textContent = '0% (Tarifa de tabla)';
       surgeFare.style.color = '#10b981';
       surgeFare.style.fontWeight = '500';
     }
@@ -2342,8 +2691,8 @@ function renderQuote() {
   // Nota de garantía dinámica
   const guaranteeNote = document.getElementById('quote-guarantee-note');
   if (guaranteeNote) {
-    if (b.isWeekendSpecial) {
-      guaranteeNote.textContent = '✓ Tarifa especial de Fin de Semana (06 a 22 hs): Base única, $800/$850 km y $100/min.';
+    if (b.holiday) {
+      guaranteeNote.textContent = `✓ Feriado Nacional (${b.holiday}): Rige matriz dominical con base $${formatNumber(b.baseFare)}, $${b.kmRate}/km y $${b.minRate}/min.`;
     } else if (b.isLongDistance && b.longDistanceDiscount > 0) {
       guaranteeNote.textContent = '✓ Bonificación especial Larga Distancia (>200 km): 40% de descuento aplicado.';
     } else if (b.baseFare === 0) {
@@ -2351,7 +2700,7 @@ function renderQuote() {
     } else if (b.timeSurgePercent > 0) {
       guaranteeNote.textContent = `✓ Incluye ${b.timeSurgeReason}. Sin costos ocultos.`;
     } else {
-      guaranteeNote.textContent = '✓ Tarifa fija estimada, sin cargos ocultos ni recargos.';
+      guaranteeNote.textContent = `✓ ${b.scheduleDayLabel} (${b.slotName}): Base $${formatNumber(b.baseFare)}, $${b.kmRate}/km y $${b.minRate}/min. Tarifa fija.`;
     }
   }
 
@@ -3560,6 +3909,9 @@ function buildReservationMessage() {
   msg += `🏁 *Destino:* ${destStr}\n\n`;
   msg += `📅 *Fecha:* ${dateFormatted}\n`;
   msg += `⏰ *Hora:* ${state.time || 'A convenir'} hs\n`;
+  if (b.scheduleDayLabel) {
+    msg += `🕒 *Horario:* ${b.scheduleDayLabel} — ${b.slotName || 'Estándar'}\n`;
+  }
   msg += `🚘 *Vehículo:* Sedán Ejecutivo & Confort\n`;
   msg += `🛣️ *Recorrido:* ${state.distanceKm.toFixed(1)} km (~${state.durationMin} min)\n`;
 
@@ -3579,7 +3931,7 @@ function buildReservationMessage() {
     msg += `🐾 *Mascota:* Incluida (+${formatMoney(state.config.petFee || 4000)})\n`;
   }
   if (b.timeSurgePercent > 0) {
-    msg += `⏱️ *Ajuste:* +${b.timeSurgePercent}% (${b.timeSurgeReason})\n`;
+    msg += `⏱️ *Ajuste Clima/Horario:* +${b.timeSurgePercent}% (${b.timeSurgeReason})\n`;
   }
   if (state.weather && state.weather.isRaining) {
     msg += `🌧️ *Clima:* ${state.weather.label}\n`;
@@ -3719,20 +4071,18 @@ function prepareAndPrintQuote() {
   document.getElementById('print-date').textContent = new Date().toLocaleString('es-AR');
 
   let baseFareText = '';
-  if (b.isWeekendSpecial) {
-    baseFareText = `${formatMoney(b.baseFare)} (Fin de Semana ${state.distanceKm > 8 ? '>8 km' : '≤8 km'})`;
-  } else if (b.baseFare === 0) {
+  if (b.baseFare === 0) {
     baseFareText = '$0 (Bonificada Ezeiza >36 km)';
   } else {
-    baseFareText = `${formatMoney(b.baseFare)} (${state.distanceKm <= 10 ? '0-10 km' : '>10 km'})`;
+    baseFareText = `${formatMoney(b.baseFare)} (${b.slotShortLabel || 'Estándar'} • ${b.distBracketLabel || '0-5 km'})`;
   }
 
   const surgeText = b.timeSurgePercent > 0
     ? `+${b.timeSurgePercent}% (${b.timeSurgeReason})`
-    : `0% (${b.timeSurgeReason || 'Sin recargo'})`;
+    : `0% (${b.scheduleDayLabel || 'Día Hábil'} • ${b.slotShortLabel || 'Estándar'})`;
 
-  const kmLabel = b.isWeekendSpecial ? 'Trayecto Kilómetros Fin de Semana' : 'Trayecto Kilómetros';
-  const minLabel = b.isWeekendSpecial ? 'Tiempo de Viaje Fin de Semana' : 'Tiempo de Viaje';
+  const kmLabel = `Trayecto Distancia (${b.distBracketLabel || 'Km'})`;
+  const minLabel = `Tiempo Estimado (${b.durBracketLabel || 'Min'})`;
 
   const printBody = document.getElementById('print-content-body');
   printBody.innerHTML = `
@@ -3740,13 +4090,14 @@ function prepareAndPrintQuote() {
     ${stopStr ? `<div class="print-row"><span>Parada Intermedia:</span><strong>${stopStr}</strong></div>` : ''}
     <div class="print-row"><span>Destino:</span><strong>${destStr}</strong></div>
     <div class="print-row"><span>Fecha y Hora de Recogida:</span><strong>${dateFriendly} a las ${state.time} hs</strong></div>
+    <div class="print-row"><span>Esquema Tarifario:</span><strong>${b.scheduleDayLabel || 'Día Hábil'} — ${b.slotName || 'Tarifa Estándar'}</strong></div>
     <div class="print-row"><span>Distancia Estimada:</span><strong>${state.distanceKm.toFixed(1)} km</strong></div>
     <div class="print-row"><span>Duración Estimada:</span><strong>${state.durationMin} minutos</strong></div>
     <div class="print-row"><span>Servicio:</span><strong>${VEHICLE.name}</strong></div>
     <div class="print-row"><span>Tarifa Base / Despacho:</span><span>${baseFareText}</span></div>
     <div class="print-row"><span>${kmLabel} (${state.distanceKm.toFixed(1)} km x ${formatMoney(b.kmRate)}/km):</span><span>${formatMoney(b.distanceCost)}</span></div>
     <div class="print-row"><span>${minLabel} (${state.durationMin} min x ${formatMoney(b.minRate)}/min):</span><span>${formatMoney(b.durationCost)}</span></div>
-    <div class="print-row"><span>Ajuste por Horario:</span><span>${surgeText}</span></div>
+    <div class="print-row"><span>Ajuste / Clima:</span><span>${surgeText}</span></div>
     <div class="print-row"><span>Peajes Oficiales de Autopista:</span><span>${b.tollCost > 0 ? formatMoney(b.tollCost) : '$0 (Sin peajes)'}</span></div>
     ${b.isRoundtrip ? `
       <div class="print-row"><span>Tramo de Regreso:</span><span>+${formatMoney(b.returnLegFullPrice)}</span></div>
@@ -3771,14 +4122,12 @@ function copyQuoteToClipboard() {
 
   let details = `⭐️⭐️⭐️ *RutaPrivada — Resumen de Traslado*\n• Origen: ${originStr}`;
   if (stopStr) details += `\n• Parada Intermedia: ${stopStr}`;
-  details += `\n• Destino: ${destStr}\n• Fecha/Hora: ${dateFriendly} a las ${state.time} hs\n• Recorrido: ${state.distanceKm.toFixed(1)} km (~${state.durationMin} min)\n• Vehículo: ${VEHICLE.name}\n• Total: ${formatMoney(state.totalPrice)} ${state.config.currency}`;
+  details += `\n• Destino: ${destStr}\n• Fecha/Hora: ${dateFriendly} a las ${state.time} hs\n• Esquema: ${b.scheduleDayLabel || 'Día Hábil'} (${b.slotName || 'Estándar'})\n• Recorrido: ${state.distanceKm.toFixed(1)} km (~${state.durationMin} min)\n• Base: $${formatNumber(b.baseFare)} | Km: $${formatNumber(b.kmRate)}/km | Min: $${formatNumber(b.minRate)}/min\n• Vehículo: ${VEHICLE.name}\n• Total: ${formatMoney(state.totalPrice)} ${state.config.currency}`;
 
-  if (b.isWeekendSpecial) {
-    details += `\n• Tarifa especial Fin de Semana (06 a 22 hs): Base $${formatNumber(b.baseFare)}, $${b.kmRate}/km, $${b.minRate}/min`;
-  } else if (b.baseFare === 0) {
+  if (b.baseFare === 0) {
     details += `\n• Tarifa base: Bonificada $0 (Ezeiza >36 km)`;
   }
-  if (b.timeSurgePercent > 0) details += `\n• Recargo horario: +${b.timeSurgePercent}% (${b.timeSurgeReason})`;
+  if (b.timeSurgePercent > 0) details += `\n• Ajuste adicional: +${b.timeSurgePercent}% (${b.timeSurgeReason})`;
   if (state.hasIntermediateStop) details += `\n• Incluye parada intermedia (+${formatMoney(state.stopFee)})`;
   if (b.isRoundtrip) details += `\n• Incluye Ida y Vuelta (${b.roundtripDiscountPercent || 15}% bonificación en regreso)`;
   if (state.routeHasTolls) details += `\n• Incluye peaje oficial (${formatMoney(b.tollCost)})`;
