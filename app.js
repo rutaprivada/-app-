@@ -165,7 +165,7 @@ const TARIFF_SCHEDULES = {
         endMin: 600, // 10:00
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'mon_thu_valle',
@@ -189,7 +189,7 @@ const TARIFF_SCHEDULES = {
         endMin: 1200, // 20:00
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'mon_thu_nocturno_2',
@@ -233,7 +233,7 @@ const TARIFF_SCHEDULES = {
         endMin: 600,
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'fri_valle',
@@ -257,7 +257,7 @@ const TARIFF_SCHEDULES = {
         endMin: 1200,
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'fri_nocturno_finde',
@@ -269,7 +269,7 @@ const TARIFF_SCHEDULES = {
         endMin: 1320, // 22:00
         base: { short: 2300, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'fri_noche_finde',
@@ -301,7 +301,7 @@ const TARIFF_SCHEDULES = {
         endMin: 120, // 02:00
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'sat_valle_madrugada',
@@ -325,7 +325,7 @@ const TARIFF_SCHEDULES = {
         endMin: 420, // 07:00
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'sat_valle_dia',
@@ -361,7 +361,7 @@ const TARIFF_SCHEDULES = {
         endMin: 1320, // 22:00
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'sat_nocturno',
@@ -393,7 +393,7 @@ const TARIFF_SCHEDULES = {
         endMin: 120,
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'sun_valle_madrugada',
@@ -417,7 +417,7 @@ const TARIFF_SCHEDULES = {
         endMin: 420,
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'sun_valle_dia',
@@ -441,7 +441,7 @@ const TARIFF_SCHEDULES = {
         endMin: 1200,
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'sun_pico_noche',
@@ -453,7 +453,7 @@ const TARIFF_SCHEDULES = {
         endMin: 1320,
         base: { short: 2000, medium: 3000, long: 3500 },
         kmRate: { short: 950, medium: 900, long: 870 },
-        minRate: { short: 150, medium: 120, long: 80 }
+        minRate: { short: 150, medium: 120, long: 90 }
       },
       {
         id: 'sun_nocturno',
