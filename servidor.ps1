@@ -57,7 +57,7 @@ try {
             }
 
             $bytes = [System.IO.File]::ReadAllBytes($filePath)
-            $header = "HTTP/1.1 200 OK`r`nContent-Type: $mime`r`nContent-Length: $($bytes.Length)`r`nAccess-Control-Allow-Origin: *`r`nConnection: close`r`n`r`n"
+            $header = "HTTP/1.1 200 OK`r`nContent-Type: $mime`r`nContent-Length: $($bytes.Length)`r`nAccess-Control-Allow-Origin: *`r`nCache-Control: no-store, no-cache, must-revalidate`r`nPragma: no-cache`r`nConnection: close`r`n`r`n"
             $headerBytes = [System.Text.Encoding]::UTF8.GetBytes($header)
             
             $stream.Write($headerBytes, 0, $headerBytes.Length)

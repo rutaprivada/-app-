@@ -52,97 +52,105 @@ const DEFAULT_CONFIG = {
 const OFFICIAL_ARGENTINA_TOLLS = {
   panamericana_pilar: {
     id: 'panamericana_pilar',
-    name: 'Autopistas del Sol (Ramal Pilar km 35)',
-    peakFee: 3100,
-    offPeakFee: 2400,
+    name: 'Autopistas del Sol (Panamericana Ramal Pilar)',
+    peakFee: 1192.99,
+    offPeakFee: 994.15,
     gantry: { lat: -34.4533, lng: -58.8248, radiusKm: 0.5 },
     regex: /(peaje.*pilar|ramal pilar.*peaje)/i
   },
   panamericana_campana: {
     id: 'panamericana_campana',
-    name: 'Autopistas del Sol (Ramal Campana km 34)',
-    peakFee: 3100,
-    offPeakFee: 2400,
+    name: 'Autopistas del Sol (Panamericana Ramal Campana)',
+    peakFee: 1192.99,
+    offPeakFee: 994.15,
     gantry: { lat: -34.3414, lng: -58.7752, radiusKm: 0.5 },
     regex: /(peaje.*campana|ramal campana.*peaje)/i
   },
   panamericana_tigre: {
     id: 'panamericana_tigre',
-    name: 'Autopistas del Sol (Ramal Tigre km 26.5)',
-    peakFee: 3100,
-    offPeakFee: 2400,
+    name: 'Autopistas del Sol (Panamericana Ramal Tigre)',
+    peakFee: 1192.99,
+    offPeakFee: 994.15,
     gantry: { lat: -34.4371, lng: -58.5833, radiusKm: 0.5 },
     regex: /(peaje.*tigre|ramal tigre.*peaje)/i
   },
   ausa_25mayo: {
     id: 'ausa_25mayo',
     name: 'AUSA Au. 25 de Mayo (Peaje Dellepiane)',
-    peakFee: 3350,
-    offPeakFee: 2350,
+    peakFee: 6671.74,
+    offPeakFee: 4707.81,
     gantry: { lat: -34.6405, lng: -58.4552, radiusKm: 0.35 },
     regex: /(autopista 25 de mayo.*peaje|peaje.*25 de mayo.*ausa)/i
   },
   ausa_perito_moreno: {
     id: 'ausa_perito_moreno',
-    name: 'AUSA Au. Perito Moreno (Peaje Parque Avellaneda)',
-    peakFee: 3350,
-    offPeakFee: 2350,
+    name: 'AUSA Au. Perito Moreno (Parque Avellaneda)',
+    peakFee: 3379.98,
+    offPeakFee: 2385.03,
     gantry: { lat: -34.6515, lng: -58.4785, radiusKm: 0.35 },
     regex: /(autopista perito moreno.*peaje|peaje.*perito moreno)/i
   },
   ausa_illia: {
     id: 'ausa_illia',
-    name: 'AUSA Au. Illia (Peaje Retiro / Salguero)',
-    peakFee: 1450,
-    offPeakFee: 1000,
+    name: 'AUSA Au. Illia (Retiro / Salguero)',
+    peakFee: 2773.68,
+    offPeakFee: 1961.39,
     gantry: { lat: -34.5824, lng: -58.3842, radiusKm: 0.45 },
     regex: /(peaje.*illia|au.*illia.*peaje)/i
   },
   riccheri: {
     id: 'riccheri',
-    name: 'Corredores Viales Au. Riccheri (Ezeiza km 15)',
-    peakFee: 2200,
-    offPeakFee: 1600,
+    name: 'Au. Riccheri (Ezeiza km 15)',
+    peakFee: 1787.10,
+    offPeakFee: 1548.82,
     gantry: { lat: -34.7103, lng: -58.5022, radiusKm: 0.5 },
     regex: /(peaje.*riccheri|peaje.*ezeiza|au.*riccheri.*peaje)/i
   },
   acceso_oeste: {
     id: 'acceso_oeste',
-    name: 'Autopistas del Oeste (Peaje Ituzaingó km 26)',
-    peakFee: 3100,
-    offPeakFee: 2400,
+    name: 'Autopistas del Oeste (Ituzaingó / Morón)',
+    peakFee: 1192.99,
+    offPeakFee: 994.15,
     gantry: { lat: -34.6362, lng: -58.6854, radiusKm: 0.5 },
     regex: /(peaje.*ituzaing[oó]|peaje.*oeste)/i
   },
   acceso_oeste_lujan: {
     id: 'acceso_oeste_lujan',
-    name: 'Autopistas del Oeste (Peaje Luján)',
-    peakFee: 3100,
-    offPeakFee: 2400,
+    name: 'Autopistas del Oeste (Luján)',
+    peakFee: 1192.99,
+    offPeakFee: 994.15,
     gantry: { lat: -34.5732, lng: -59.0801, radiusKm: 0.5 },
     regex: /(peaje.*luj[aá]n)/i
   },
   aubasa_docksud: {
     id: 'aubasa_docksud',
-    name: 'AUBASA (Peaje Dock Sud - Au. Bs.As. - La Plata)',
-    peakFee: 3400,
-    offPeakFee: 2600,
+    name: 'AUBASA (Peaje Dock Sud - Hacia La Plata)',
+    peakFee: 2700,
+    offPeakFee: 2200,
     gantry: { lat: -34.6465, lng: -58.3492, radiusKm: 0.45 },
     regex: /(peaje.*dock sud|aubasa.*dock sud)/i
   },
   aubasa_hudson: {
     id: 'aubasa_hudson',
-    name: 'AUBASA (Peaje Hudson - Au. Bs.As. - La Plata)',
-    peakFee: 3400,
-    offPeakFee: 2600,
+    name: 'AUBASA (Peaje Hudson - Hacia La Plata)',
+    peakFee: 3000,
+    offPeakFee: 2400,
+    gantry: { lat: -34.7831, lng: -58.1724, radiusKm: 0.5 },
+    regex: /(peaje.*hudson|aubasa.*hudson)/i
+  },
+  aubasa_hudson_unificado: {
+    id: 'aubasa_hudson_unificado',
+    name: 'AUBASA (Peaje Hudson Unificado - Hacia CABA)',
+    peakFee: 5800,
+    offPeakFee: 4600,
     gantry: { lat: -34.7831, lng: -58.1724, radiusKm: 0.5 },
     regex: /(peaje.*hudson|aubasa.*hudson)/i
   },
   buen_ayre: {
     id: 'buen_ayre',
     name: 'Camino del Buen Ayre (CEAMSE)',
-    peakFee: 2500,
-    offPeakFee: 2500,
+    peakFee: 3500,
+    offPeakFee: 3500,
     gantry: { lat: -34.5455, lng: -58.6471, radiusKm: 0.5 },
     regex: /(peaje.*buen ayre|peaje.*ceamse)/i
   }
@@ -1367,6 +1375,47 @@ function detectOfficialTollsInRoute(route) {
     }
   }
 
+  // Manejo inteligente de AUBASA según el sentido de circulación:
+  // Hacia La Plata (Norte a Sur): Peaje Dock Sud (Pico $2.700 / No Pico $2.200) + Peaje Hudson (Pico $3.000 / No Pico $2.400)
+  // Desde La Plata hacia CABA (Sur a Norte): Peaje Hudson Unificado (Pico $5.800 / No Pico $4.600)
+  const isAubasaTraversed = matchedConcessions.has('aubasa_docksud') || matchedConcessions.has('aubasa_hudson') || matchedConcessions.has('aubasa_hudson_unificado');
+  if (isAubasaTraversed) {
+    matchedConcessions.delete('aubasa_docksud');
+    matchedConcessions.delete('aubasa_hudson');
+    matchedConcessions.delete('aubasa_hudson_unificado');
+    roadNames.delete('AUBASA (Peaje Dock Sud - Hacia La Plata)');
+    roadNames.delete('AUBASA (Peaje Hudson - Hacia La Plata)');
+    roadNames.delete('AUBASA (Peaje Hudson Unificado - Hacia CABA)');
+
+    // Determinar sentido según latitud de origen y destino (CABA ~ -34.60, La Plata ~ -34.92)
+    const isGoingToLaPlata = (state.origin && state.destination && state.destination.lat < state.origin.lat);
+
+    if (isGoingToLaPlata) {
+      const feeDock = isPeak ? 2700 : 2200;
+      const feeHudson = isPeak ? 3000 : 2400;
+      matchedConcessions.set('aubasa_docksud', {
+        name: 'AUBASA Peaje Dock Sud',
+        fee: feeDock,
+        isPeak
+      });
+      matchedConcessions.set('aubasa_hudson', {
+        name: 'AUBASA Peaje Hudson',
+        fee: feeHudson,
+        isPeak
+      });
+      roadNames.add('AUBASA Dock Sud');
+      roadNames.add('AUBASA Hudson');
+    } else {
+      const feeHudsonUni = isPeak ? 5800 : 4600;
+      matchedConcessions.set('aubasa_hudson_unificado', {
+        name: 'AUBASA Peaje Hudson Unificado',
+        fee: feeHudsonUni,
+        isPeak
+      });
+      roadNames.add('AUBASA Hudson Unificado');
+    }
+  }
+
   // Si la ruta transita por General Paz y conecta con Riccheri, descartar peajes urbanos de 25 de Mayo e Illia
   const usesGeneralPaz = combinedLower.includes('general paz') || combinedLower.includes('gral. paz') || combinedLower.includes('rn a001') || combinedLower.includes('cantilo') || combinedLower.includes('lugones');
   if (usesGeneralPaz && matchedConcessions.has('riccheri')) {
@@ -1374,8 +1423,8 @@ function detectOfficialTollsInRoute(route) {
     matchedConcessions.delete('ausa_perito_moreno');
     matchedConcessions.delete('ausa_illia');
     roadNames.delete('AUSA Au. 25 de Mayo (Peaje Dellepiane)');
-    roadNames.delete('AUSA Au. Perito Moreno (Peaje Parque Avellaneda)');
-    roadNames.delete('AUSA Au. Illia (Peaje Retiro / Salguero)');
+    roadNames.delete('AUSA Au. Perito Moreno (Parque Avellaneda)');
+    roadNames.delete('AUSA Au. Illia (Retiro / Salguero)');
   }
 
   const details = Array.from(matchedConcessions.values());
