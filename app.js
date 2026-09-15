@@ -1474,41 +1474,21 @@ function setDestination(lat, lng, address) {
   checkAndRoute();
 }
 
-// Selección de la ruta óptima (más rápida, expedita por autopistas y libre de peajes innecesarios de ciudad)
+// Selección de la ruta óptima (más rápida, expedita y directa según trazado vehicular real)
 function selectOptimalRoute(routes) {
   if (!routes || routes.length === 0) return null;
   if (routes.length === 1) return routes[0];
 
-  const isEzeizaOrSouth = isTripToEzeiza() || (state.destination && state.destination.lat < -34.70);
-
-  // Para viajes hacia Ezeiza o corredor Sur desde zona Norte/Oeste de CABA:
-  // Si OSRM o Mapbox provee una alternativa por General Paz / Riccheri, priorizarla para evitar peajes urbanos de ciudad
-  if (isEzeizaOrSouth && routes.length > 1) {
-    for (const r of routes) {
-      let usesPerimeterCorridor = false;
-      if (r.legs) {
-        for (const leg of r.legs) {
-          if (leg.steps) {
-            for (const step of leg.steps) {
-              const name = (step.name || '').toLowerCase();
-              const ref = (step.ref || '').toLowerCase();
-              if (name.includes('general paz') || name.includes('gral. paz') || ref.includes('rn a001') || name.includes('cantilo') || name.includes('lugones')) {
-                usesPerimeterCorridor = true;
-                break;
-              }
-            }
-          }
-          if (usesPerimeterCorridor) break;
-        }
-      }
-      if (usesPerimeterCorridor) {
-        return r;
-      }
+  // Elegir la ruta con menor duración y óptimo kilometraje
+  const sorted = [...routes].sort((a, b) => {
+    const durDiff = (a.duration || 0) - (b.duration || 0);
+    if (Math.abs(durDiff) > 120) {
+      // Si una alternativa es considerablemente más rápida (>2 min), priorizarla
+      return durDiff;
     }
-  }
-
-  // Ordenar por menor duración para priorizar salidas rápidas
-  const sorted = [...routes].sort((a, b) => (a.duration || 0) - (b.duration || 0));
+    // Si la duración es similar, priorizar la de menor kilometraje
+    return (a.distance || 0) - (b.distance || 0);
+  });
   return sorted[0];
 }
 
@@ -1527,7 +1507,7 @@ async function checkAndRoute() {
   const d = state.destination;
   const s = (state.hasIntermediateStop && state.intermediateStop) ? state.intermediateStop : null;
 
-  // Construir waypoints: 2 puntos o 3 puntos si hay parada intermedia
+  // Construir waypoints directos: Origen -> (Parada Intermedia) -> Destino
   let waypoints = `${o.lng},${o.lat};`;
   if (s) {
     waypoints += `${s.lng},${s.lat};`;
@@ -1538,7 +1518,7 @@ async function checkAndRoute() {
   let isMapboxSuccess = false;
   const token = (state.config.mapboxToken || '').trim();
 
-  // 1. Intentar con Mapbox Traffic en tiempo real con alternativas si hay token configurado
+  // 1. Intentar con Mapbox Traffic en tiempo real si hay token configurado
   if (token) {
     try {
       const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${waypoints}?overview=full&geometries=geojson&steps=true&annotations=congestion,duration&alternatives=true&access_token=${encodeURIComponent(token)}`;
@@ -1594,7 +1574,7 @@ async function checkAndRoute() {
     }
   }
 
-  // 2. Si no se usó Mapbox o falló, recurrir a OSRM con alternativas
+  // 2. Si no se usó Mapbox o falló, recurrir a OSRM directo y limpio
   if (!isMapboxSuccess) {
     state.trafficEngine = 'osrm';
     state.trafficCongestion = 'normal';
@@ -1608,27 +1588,6 @@ async function checkAndRoute() {
         route = selectOptimalRoute(osrmData.routes);
       } else {
         throw new Error('Sin ruta de OSRM');
-      }
-
-      // Para trayectos entre Zona Norte/Belgrano/Palermo/Cañitas y Ezeiza: evaluar corredor perimetral General Paz -> Riccheri
-      const isNorthToEzeiza = (o.lat > -34.60 && d.lat < -34.72) || (d.lat > -34.60 && o.lat < -34.72);
-      if (isNorthToEzeiza && !s) {
-        try {
-          const perimWaypoints = `${o.lng},${o.lat};-58.508,-34.685;${d.lng},${d.lat}`;
-          const perimUrl = `https://router.project-osrm.org/route/v1/driving/${perimWaypoints}?overview=full&geometries=geojson&steps=true`;
-          const perimRes = await fetch(perimUrl);
-          if (perimRes.ok) {
-            const perimData = await perimRes.json();
-            if (perimData.code === 'Ok' && perimData.routes && perimData.routes.length > 0) {
-              const perimRoute = perimData.routes[0];
-              if (perimRoute && perimRoute.distance) {
-                route = perimRoute;
-              }
-            }
-          }
-        } catch (perimErr) {
-          console.warn('Fallback ruta perimetral:', perimErr);
-        }
       }
     } catch (osrmErr) {
       console.warn('Fallo OSRM, recurriendo a estimación geográfica:', osrmErr);
@@ -1916,8 +1875,8 @@ function detectOfficialTollsInRoute(route) {
     }
   }
 
-  // Si la ruta transita por General Paz y conecta con Riccheri, descartar peajes urbanos de 25 de Mayo e Illia
-  const usesGeneralPaz = combinedLower.includes('general paz') || combinedLower.includes('gral. paz') || combinedLower.includes('rn a001') || combinedLower.includes('cantilo') || combinedLower.includes('lugones');
+  // Si la ruta transita efectivamente por General Paz y conecta con Riccheri, descartar peajes urbanos de 25 de Mayo e Illia
+  const usesGeneralPaz = combinedLower.includes('general paz') || combinedLower.includes('gral. paz') || combinedLower.includes('rn a001');
   if (usesGeneralPaz && matchedConcessions.has('riccheri')) {
     matchedConcessions.delete('ausa_25mayo');
     matchedConcessions.delete('ausa_perito_moreno');
