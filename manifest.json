@@ -22,9 +22,21 @@
       "purpose": "any"
     },
     {
-      "src": "favicon.svg",
-      "sizes": "192x192 512x512",
-      "type": "image/svg+xml",
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ],
@@ -34,14 +46,14 @@
       "short_name": "Cotizar",
       "description": "Calcular viaje ejecutivo al instante",
       "url": "./index.html",
-      "icons": [{ "src": "favicon.svg", "sizes": "any" }]
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Contacto WhatsApp",
       "short_name": "WhatsApp",
       "description": "Chatear con el chofer",
       "url": "https://wa.me/5491122558226",
-      "icons": [{ "src": "favicon.svg", "sizes": "any" }]
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

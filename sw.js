@@ -3,7 +3,7 @@
  * Soporta instalación en Android, iOS y PC con carga instantánea y caché local
  */
 
-const CACHE_NAME = 'rutaprivada-pwa-v18';
+const CACHE_NAME = 'rutaprivada-pwa-v19';
 
 const STATIC_ASSETS = [
   './',
@@ -11,6 +11,8 @@ const STATIC_ASSETS = [
   './styles.css',
   './app.js',
   './favicon.svg',
+  './icon-192.png',
+  './icon-512.png',
   './logo_rutaprivada.svg',
   './logo_tarjeta.svg',
   './manifest.json',
