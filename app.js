@@ -1129,7 +1129,34 @@ async function checkAndRoute() {
     const durSecs = route.duration;
 
     state.distanceKm = Math.round((distMeters / 1000) * 10) / 10;
-    state.baseDurationMin = Math.max(5, Math.round(durSecs / 60));
+    
+    // Calibración de tiempo base según la fricción urbana real en CABA / AMBA
+    let calibratedBaseDurMin = Math.round(durSecs / 60);
+    if (state.trafficEngine === 'osrm') {
+      // OSRM asume velocidades teóricas de flujo libre sin semáforos ni demoras urbanas.
+      // Calibramos con la velocidad real de circulación de Buenos Aires:
+      if (state.distanceKm <= 10) {
+        // Trayectos netamente urbanos en CABA (semáforos frecuentes, esquinas, giros, velocidad media ~18-22 km/h):
+        // Mínimo de 2.6 a 3.0 min/km
+        calibratedBaseDurMin = Math.max(Math.round(durSecs / 60 * 1.45), Math.round(state.distanceKm * 2.8));
+      } else if (state.distanceKm <= 25) {
+        // Trayectos mixtos avenidas/autopistas (velocidad media ~28-38 km/h):
+        calibratedBaseDurMin = Math.max(Math.round(durSecs / 60 * 1.35), Math.round(state.distanceKm * 2.0));
+      } else if (state.distanceKm <= 50) {
+        // Trayectos hacia Ezeiza / Tigre / Pilar por autopistas (velocidad media ~55-65 km/h):
+        calibratedBaseDurMin = Math.max(Math.round(durSecs / 60 * 1.20), Math.round(state.distanceKm * 1.25));
+      } else {
+        // Larga distancia (>50 km):
+        calibratedBaseDurMin = Math.max(Math.round(durSecs / 60 * 1.10), Math.round(state.distanceKm * 0.95));
+      }
+    }
+    
+    // Si hay parada intermedia, agregar tiempo de maniobra y detención (+6 min)
+    if (s) {
+      calibratedBaseDurMin += 6;
+    }
+
+    state.baseDurationMin = Math.max(5, calibratedBaseDurMin);
 
     // Evaluar si la parada genera un incremento considerable en el recorrido
     if (s) {
@@ -1575,13 +1602,13 @@ function evaluateTimeRate(timeStr, dateStr) {
   state.timeSurgeReason = finalReason;
 }
 
-// Factor de tráfico inteligente según el horario programado de reserva (fecha y hora del viaje).
+// Factor de tráfico estadístico y predictivo según el día y horario programado de reserva (CABA y AMBA).
 function trafficFactorForTime(timeStr, dateStr) {
   if (!timeStr) {
     return {
       factor: 1.0,
-      label: 'Tránsito normal',
-      shortLabel: 'Normal',
+      label: 'Tránsito regular',
+      shortLabel: 'Regular',
       condition: 'fluid',
       badgeText: 'Programado',
       icon: '🟢',
@@ -1601,101 +1628,290 @@ function trafficFactorForTime(timeStr, dateStr) {
     dayOfWeek = new Date().getDay();
   }
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const isFriday = dayOfWeek === 5;
+  const isSunday = dayOfWeek === 0;
+  const isSaturday = dayOfWeek === 6;
 
-  // 1. Madrugada / noche (22:00 a 06:00): Tránsito fluido sin demoras
-  if (totalMin >= 1320 || totalMin < 360) {
-    return {
-      factor: 0.92,
-      label: 'Madrugada / Noche (Tránsito fluido)',
-      shortLabel: 'Fluido (Sin demoras)',
-      condition: 'fluid',
-      badgeText: 'Tránsito Rápido',
-      icon: '🟢',
-      delayPercent: -8,
-      description: `Calles y autopistas despejadas para las ${timeStr} hs (0% demoras por congestión).`
-    };
+  let factor = 1.0;
+  let label = 'Tránsito Fluido';
+  let shortLabel = 'Fluido';
+  let condition = 'fluid';
+  let badgeText = 'Tránsito Rápido';
+  let icon = '🟢';
+  let delayPercent = 0;
+  let description = `Circulación ágil estimada para las ${timeStr} hs.`;
+
+  // 1. DÍAS HÁBILES (Lunes a Jueves)
+  if (!isWeekend && !isFriday) {
+    // Madrugada / Noche despejada (22:30 a 06:30)
+    if (totalMin >= 1350 || totalMin < 390) {
+      factor = 1.0;
+      label = 'Madrugada / Noche Despejada';
+      shortLabel = 'Fluido (0% demoras)';
+      condition = 'fluid';
+      badgeText = 'Madrugada Despejada';
+      icon = '🟢';
+      delayPercent = 0;
+      description = `Calles y autopistas despejadas para las ${timeStr} hs (sin demoras por congestión).`;
+    }
+    // Pre-pico mañana (06:30 a 07:30)
+    else if (totalMin >= 390 && totalMin < 450) {
+      factor = 1.25;
+      label = 'Inicio de Hora Pico Mañana';
+      shortLabel = 'Moderado (+25% tiempo)';
+      condition = 'moderate';
+      badgeText = 'Pre-Pico Mañana';
+      icon = '🚗';
+      delayPercent = 25;
+      description = `Incremento de caudal vehicular en accesos a CABA para las ${timeStr} hs (+25% duración estimada).`;
+    }
+    // HORA PICO MAÑANA (07:30 a 10:30) - Congestión máxima en ingresos a CABA
+    else if (totalMin >= 450 && totalMin <= 630) {
+      factor = 1.65;
+      label = 'Hora Pico Mañana (Tránsito Muy Pesado)';
+      shortLabel = 'Pico Pesado (+65% tiempo)';
+      condition = 'heavy';
+      badgeText = 'Hora Pico Mañana';
+      icon = '🚦';
+      delayPercent = 65;
+      description = `Alta congestión en ingresos a CABA (Panamericana, Gral. Paz, Riccheri, 9 de Julio, Lugones, Santa Fe, Córdoba) para las ${timeStr} hs (+65% duración estimada).`;
+    }
+    // Valle Diurno / Mañana (10:30 a 12:30)
+    else if (totalMin > 630 && totalMin < 750) {
+      factor = 1.22;
+      label = 'Tránsito Diurno Habitual';
+      shortLabel = 'Habitual (+22% tiempo)';
+      condition = 'moderate';
+      badgeText = 'Tránsito Habitual';
+      icon = '🚗';
+      delayPercent = 22;
+      description = `Circulación urbana regular de media mañana para las ${timeStr} hs (+22% duración estimada).`;
+    }
+    // Mediodía / Almuerzo Comercial (12:30 a 14:30)
+    else if (totalMin >= 750 && totalMin < 870) {
+      factor = 1.30;
+      label = 'Mediodía Comercial / Tránsito Moderado-Alto';
+      shortLabel = 'Moderado (+30% tiempo)';
+      condition = 'moderate';
+      badgeText = 'Mediodía Comercial';
+      icon = '🚗';
+      delayPercent = 30;
+      description = `Mayor afluencia vehicular en zonas céntricas y polos gastronómicos para las ${timeStr} hs (+30% duración estimada).`;
+    }
+    // Valle Diurno Tarde (14:30 a 16:30)
+    else if (totalMin >= 870 && totalMin < 990) {
+      factor = 1.25;
+      label = 'Tránsito Diurno Regular';
+      shortLabel = 'Habitual (+25% tiempo)';
+      condition = 'moderate';
+      badgeText = 'Tránsito Habitual';
+      icon = '🚗';
+      delayPercent = 25;
+      description = `Circulación constante en avenidas y autopistas para las ${timeStr} hs (+25% duración estimada).`;
+    }
+    // Pre-pico Tarde (16:30 a 17:30)
+    else if (totalMin >= 990 && totalMin < 1050) {
+      factor = 1.40;
+      label = 'Inicio de Hora Pico Tarde';
+      shortLabel = 'Cargado (+40% tiempo)';
+      condition = 'moderate';
+      badgeText = 'Pre-Pico Tarde';
+      icon = '🚗';
+      delayPercent = 40;
+      description = `Comienzo del flujo de retorno hacia GBA y autopistas de egreso para las ${timeStr} hs (+40% duración).`;
+    }
+    // HORA PICO TARDE (17:30 a 20:30) - Salidas de CABA y autopistas colapsadas
+    else if (totalMin >= 1050 && totalMin <= 1230) {
+      factor = 1.70;
+      label = 'Hora Pico Tarde (Tránsito Muy Pesado)';
+      shortLabel = 'Pico Intenso (+70% tiempo)';
+      condition = 'heavy';
+      badgeText = 'Hora Pico Tarde';
+      icon = '🚦';
+      delayPercent = 70;
+      description = `Congestión severa en salidas de CABA (Illia, Cantilo, Panamericana, 25 de Mayo, Perito Moreno, Riccheri, Gral. Paz) para las ${timeStr} hs (+70% duración estimada).`;
+    }
+    // Noche Temprana (20:30 a 22:30)
+    else {
+      factor = 1.15;
+      label = 'Tránsito Nocturno Ligero';
+      shortLabel = 'Ligero (+15% tiempo)';
+      condition = 'fluid';
+      badgeText = 'Descongestión';
+      icon = '🟢';
+      delayPercent = 15;
+      description = `Descongestión progresiva en autopistas y avenidas principales para las ${timeStr} hs (+15% duración).`;
+    }
   }
 
-  // 2. Horas pico entre semana (Lunes a Viernes):
-  // - Mañana: 07:00 a 10:30 (420 a 630 min)
-  if (!isWeekend && (totalMin >= 420 && totalMin <= 630)) {
-    return {
-      factor: 1.45,
-      label: 'Hora Pico Mañana (Tránsito Intenso)',
-      shortLabel: 'Intenso (+45% tiempo)',
-      condition: 'heavy',
-      badgeText: 'Hora Pico Mañana',
-      icon: '🚦',
-      delayPercent: 45,
-      description: `Alta congestión estimada en accesos a CABA y autopistas para las ${timeStr} hs (+45% duración estimada).`
-    };
+  // 2. VIERNES (Éxodo de Fin de Semana & Salidas)
+  else if (isFriday) {
+    if (totalMin >= 1380 || totalMin < 390) {
+      factor = 1.0;
+      label = 'Madrugada Despejada';
+      shortLabel = 'Fluido (0% demoras)';
+      condition = 'fluid';
+      badgeText = 'Madrugada';
+      icon = '🟢';
+      delayPercent = 0;
+      description = `Calles y autopistas despejadas para las ${timeStr} hs.`;
+    }
+    // Pico mañana viernes (07:30 a 10:30)
+    else if (totalMin >= 450 && totalMin <= 630) {
+      factor = 1.65;
+      label = 'Hora Pico Mañana Viernes';
+      shortLabel = 'Pico Pesado (+65% tiempo)';
+      condition = 'heavy';
+      badgeText = 'Hora Pico Mañana';
+      icon = '🚦';
+      delayPercent = 65;
+      description = `Intensa afluencia de ingreso a la ciudad para las ${timeStr} hs (+65% duración estimada).`;
+    }
+    // PICO VESPERTINO EXTENDIDO VIERNES (15:30 a 21:30 - Éxodo de fin de semana)
+    else if (totalMin >= 930 && totalMin <= 1290) {
+      factor = 1.75;
+      label = 'Éxodo Fin de Semana (Tránsito Máximo)';
+      shortLabel = 'Éxodo Pesado (+75% tiempo)';
+      condition = 'heavy';
+      badgeText = 'Éxodo Viernes';
+      icon = '🚦';
+      delayPercent = 75;
+      description = `Máxima congestión en autopistas hacia Zona Norte, Oeste, Sur y accesos a Ezeiza por éxodo de fin de semana para las ${timeStr} hs (+75% duración).`;
+    }
+    // Noche de Viernes / Gastronomía y Salidas (21:30 a 23:30)
+    else if (totalMin > 1290 && totalMin <= 1410) {
+      factor = 1.25;
+      label = 'Noche de Viernes (Polos Gastronómicos)';
+      shortLabel = 'Moderado (+25% tiempo)';
+      condition = 'moderate';
+      badgeText = 'Polo Nocturno';
+      icon = '🚗';
+      delayPercent = 25;
+      description = `Alta circulación en zonas de restaurantes y bares (Palermo, Recoleta, Las Cañitas, Puerto Madero) para las ${timeStr} hs.`;
+    }
+    else {
+      factor = 1.30;
+      label = 'Tránsito Diurno de Viernes';
+      shortLabel = 'Moderado (+30% tiempo)';
+      condition = 'moderate';
+      badgeText = 'Día Viernes';
+      icon = '🚗';
+      delayPercent = 30;
+      description = `Circulación activa previa al fin de semana para las ${timeStr} hs (+30% duración).`;
+    }
   }
 
-  // - Tarde: 16:30 a 20:30 (990 a 1230 min)
-  if (!isWeekend && (totalMin >= 990 && totalMin <= 1230)) {
-    return {
-      factor: 1.45,
-      label: 'Hora Pico Tarde (Tránsito Intenso)',
-      shortLabel: 'Intenso (+45% tiempo)',
-      condition: 'heavy',
-      badgeText: 'Hora Pico Tarde',
-      icon: '🚦',
-      delayPercent: 45,
-      description: `Alta congestión estimada en salidas de CABA y autopistas para las ${timeStr} hs (+45% duración estimada).`
-    };
+  // 3. SÁBADOS
+  else if (isSaturday) {
+    // Madrugada / Mañana temprana (00:00 a 09:30)
+    if (totalMin < 570) {
+      factor = 1.0;
+      label = 'Sábado Temprano (Tránsito Despejado)';
+      shortLabel = 'Fluido (0% demoras)';
+      condition = 'fluid';
+      badgeText = 'Tránsito Rápido';
+      icon = '🟢';
+      delayPercent = 0;
+      description = `Calles y autopistas muy ágiles para las ${timeStr} hs.`;
+    }
+    // Mañana comercial y shoppings (09:30 a 14:00)
+    else if (totalMin >= 570 && totalMin < 840) {
+      factor = 1.20;
+      label = 'Sábado Comercial y Avenidas';
+      shortLabel = 'Comercial (+20% tiempo)';
+      condition = 'moderate';
+      badgeText = 'Sábado Comercial';
+      icon = '🚗';
+      delayPercent = 20;
+      description = `Movimiento comercial en centros urbanos, shoppings y avenidas para las ${timeStr} hs (+20% duración).`;
+    }
+    // Tarde recreativa (14:00 a 19:30)
+    else if (totalMin >= 840 && totalMin < 1170) {
+      factor = 1.15;
+      label = 'Sábado Tarde (Tránsito Moderado)';
+      shortLabel = 'Moderado (+15% tiempo)';
+      condition = 'moderate';
+      badgeText = 'Paseo / Fin de Semana';
+      icon = '🚗';
+      delayPercent = 15;
+      description = `Circulación habitual de fin de semana en corredores urbanos para las ${timeStr} hs.`;
+    }
+    // Noche Sábado / Gastronomía y Salidas (19:30 a 23:30)
+    else if (totalMin >= 1170 && totalMin <= 1410) {
+      factor = 1.30;
+      label = 'Sábado Noche (Polo Gastronómico y Ocio)';
+      shortLabel = 'Cargado (+30% tiempo)';
+      condition = 'heavy';
+      badgeText = 'Polo Gastronómico';
+      icon = '🍷';
+      delayPercent = 30;
+      description = `Demoras y saturación en zonas de bares y restaurantes (Palermo Soho/Hollywood, Las Cañitas, San Telmo, Costanera) para las ${timeStr} hs (+30% duración).`;
+    }
+    else {
+      factor = 1.08;
+      label = 'Sábado Noche Tardía';
+      shortLabel = 'Fluido (+8% tiempo)';
+      condition = 'fluid';
+      badgeText = 'Fluido';
+      icon = '🟢';
+      delayPercent = 8;
+      description = `Circulación nocturna ágil para las ${timeStr} hs.`;
+    }
   }
 
-  // 3. Franja media diurna días hábiles (10:30 a 16:30): Tránsito moderado regular
-  if (!isWeekend && (totalMin > 630 && totalMin < 990)) {
-    return {
-      factor: 1.15,
-      label: 'Tránsito Diurno Moderado',
-      shortLabel: 'Moderado (+15% tiempo)',
-      condition: 'moderate',
-      badgeText: 'Tránsito Habitual',
-      icon: '🚗',
-      delayPercent: 15,
-      description: `Circulación normal de media jornada para las ${timeStr} hs (+15% duración habitual).`
-    };
+  // 4. DOMINGOS Y FERIADOS
+  else if (isSunday) {
+    // Madrugada a media tarde (00:00 a 17:00)
+    if (totalMin < 1020) {
+      factor = 1.0;
+      label = 'Domingo Ágil (Tránsito Fluido)';
+      shortLabel = 'Fluido (0% demoras)';
+      condition = 'fluid';
+      badgeText = 'Domingo Despejado';
+      icon = '🟢';
+      delayPercent = 0;
+      description = `Tránsito libre y expedito en toda la red vial para las ${timeStr} hs.`;
+    }
+    // RETORNO DOMINICAL A CABA (17:00 a 21:30)
+    else if (totalMin >= 1020 && totalMin <= 1290) {
+      factor = 1.40;
+      label = 'Retorno Dominical a CABA (Autopistas Cargadas)';
+      shortLabel = 'Retorno Pesado (+40% tiempo)';
+      condition = 'heavy';
+      badgeText = 'Retorno a CABA';
+      icon = '🚦';
+      delayPercent = 40;
+      description = `Congestión en accesos de retorno a la ciudad (Panamericana, Riccheri, Autopista Bs.As.-La Plata, Gral. Paz) para las ${timeStr} hs (+40% duración).`;
+    }
+    else {
+      factor = 1.05;
+      label = 'Domingo Noche (Tránsito Despejado)';
+      shortLabel = 'Fluido (+5% tiempo)';
+      condition = 'fluid';
+      badgeText = 'Domingo Noche';
+      icon = '🟢';
+      delayPercent = 5;
+      description = `Circulación despejada de cierre de fin de semana para las ${timeStr} hs.`;
+    }
   }
 
-  // 4. Franja nocturna intermedia (20:30 a 22:00): Tránsito ligero
-  if (totalMin > 1230 && totalMin < 1320) {
-    return {
-      factor: 1.05,
-      label: 'Tránsito Ligero',
-      shortLabel: 'Ligero (+5% tiempo)',
-      condition: 'fluid',
-      badgeText: 'Fluido',
-      icon: '🟢',
-      delayPercent: 5,
-      description: `Circulación ágil en avenidas y autopistas para las ${timeStr} hs.`
-    };
-  }
-
-  // 5. Fines de semana diurnos
-  if (isWeekend) {
-    return {
-      factor: 1.05,
-      label: 'Fin de Semana (Tránsito Fluido)',
-      shortLabel: 'Fluido Fin de Semana',
-      condition: 'fluid',
-      badgeText: 'Fin de Semana',
-      icon: '🚗',
-      delayPercent: 5,
-      description: `Tránsito ágil de fin de semana para las ${timeStr} hs.`
-    };
+  // RECARGO DE TIEMPO POR CLIMA ADVERSO (Lluvia o Tormenta)
+  if (state.weather && state.weather.surgePercent > 0) {
+    factor = Math.round((factor + 0.20) * 100) / 100;
+    delayPercent += 20;
+    label += ` + 🌧️ Lluvia (+20% tiempo extra)`;
+    description += ` Se incluye +20% de tiempo adicional por reducción preventiva de velocidad y calzada mojada.`;
   }
 
   return {
-    factor: 1.05,
-    label: 'Tránsito Ligero',
-    shortLabel: 'Ligero',
-    condition: 'fluid',
-    badgeText: 'Fluido',
-    icon: '🟢',
-    delayPercent: 5,
-    description: `Circulación regular estimada para las ${timeStr} hs.`
+    factor,
+    label,
+    shortLabel,
+    condition,
+    badgeText,
+    icon,
+    delayPercent,
+    description
   };
 }
 
@@ -2803,7 +3019,7 @@ const STRATEGIC_LANDMARKS = [
 ];
 
 // Helper con timeout para evitar demoras en redes móviles
-async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 2800) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -2816,15 +3032,44 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
   }
 }
 
-// Motor inteligente de geocodificación ultra veloz (Landmarks 0ms + Photon + Nominatim + USIG)
+// Normalizador y extractor de barrios/localidades para consulta precisa a USIG
+function prepareAddressForUsig(rawQuery) {
+  let text = (rawQuery || '').trim();
+  
+  // Extraer mención de barrio o localidad si fue escrita por el usuario
+  const neighborhoodMatch = text.match(/\b(palermo|recoleta|belgrano|caballito|villa\s+urquiza|nuñez|almagro|san\s+telmo|puerto\s+madero|monserrat|balvanera|villa\s+crespo|chacarita|colegiales|barracas|flores|floresta|liniers|villa\s+devoto|saavedra|caba|buenos\s+aires|capital\s+federal|san\s+isidro|vicente\s+lopez|olivos|martinez|tigre|pilar|san\s+martin|moron|avellaneda|lanus|quilmes|ramos\s+mejia)\b/i);
+  const neighborhood = neighborhoodMatch ? capitalizeWords(neighborhoodMatch[0]) : '';
+
+  // Limpiar prefijos comunes como "esquina", "esq.", "cruce"
+  let cleaned = text
+    .replace(/^(esquina|esq\.?|cruce\s+de|cruce|intersecci[oó]n\s+de)\s+/i, '')
+    .trim();
+
+  // Limpiar sufijos de barrio o ciudad para que la API de USIG no falle en el cruce de calles
+  if (neighborhoodMatch) {
+    cleaned = cleaned
+      .replace(new RegExp(`[,\\s]+${neighborhoodMatch[0]}\\b.*$`, 'i'), '')
+      .replace(new RegExp(`^${neighborhoodMatch[0]}[,\\s]+`, 'i'), '')
+      .trim();
+  }
+
+  // Normalizar conectores de esquinas (&, /, con, e, cruce con -> y)
+  cleaned = cleaned.replace(/\s+(?:y|e|con|cruce(?:\s+con)?|e\/|\/|&)\s+/i, ' y ');
+
+  return {
+    cleanedAddress: cleaned.trim() || text,
+    neighborhood: neighborhood
+  };
+}
+
+// Motor inteligente de geocodificación de alta precisión (Landmarks 0ms + USIG Oficial CABA/AMBA + Photon + Nominatim)
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
   if (query.length < 3) return [];
 
   // Detectar si el usuario escribió una esquina / intersección
   const cornerPattern = /^(.+?)\s+(?:y|e|esquina|esq\.?|con|cruce(?:\s+con)?|e\/|\/|&)\s+(.+)$/i;
-  const match = query.match(cornerPattern);
-  const isCorner = !!match;
+  const isCorner = cornerPattern.test(query) || /^(esquina|esq\.?|cruce)\s+/i.test(query);
 
   const results = [];
   const seenCoords = new Set();
@@ -2858,7 +3103,68 @@ async function searchLocations(rawQuery, signal) {
     }
   });
 
-  // 2. Geocodificación Photon (Komoot OpenStreetMap) - ultra veloz (<150ms)
+  // 2. API Oficial del Gobierno de la Ciudad (USIG) - Especializada en esquinas y numeraciones exactas en CABA y AMBA
+  const { cleanedAddress, neighborhood } = prepareAddressForUsig(query);
+  try {
+    const usigUrl = `https://servicios.usig.buenosaires.gob.ar/normalizar/?direccion=${encodeURIComponent(cleanedAddress)}&geocodificar=TRUE`;
+    const usigRes = await fetchWithTimeout(usigUrl, {}, 2500);
+    if (usigRes.ok) {
+      const usigData = await usigRes.json();
+      if (usigData && Array.isArray(usigData.direccionesNormalizadas) && usigData.direccionesNormalizadas.length > 0) {
+        usigData.direccionesNormalizadas.forEach(dir => {
+          const coords = dir.coordenadas;
+          if (coords && (coords.x || coords.lon) && (coords.y || coords.lat)) {
+            const lon = String(coords.x || coords.lon);
+            const lat = String(coords.y || coords.lat);
+            
+            const isUsigCorner = dir.tipo === 'cruce' || Boolean(dir.nombre_calle_cruce);
+            const street1 = capitalizeWords(dir.nombre_calle || '');
+            const street2 = capitalizeWords(dir.nombre_calle_cruce || '');
+            const partido = dir.nombre_partido === 'caba' || dir.nombre_partido === 'CABA' ? 'CABA' : capitalizeWords(dir.nombre_partido || 'CABA');
+            const locName = dir.nombre_localidad ? capitalizeWords(dir.nombre_localidad) : '';
+
+            let mainTitle = '';
+            let subTitle = '';
+            let fullDisplay = '';
+
+            if (isUsigCorner && street1 && street2) {
+              mainTitle = `Esquina: ${street1} y ${street2}`;
+              const subParts = [neighborhood || locName, partido, 'Buenos Aires'].filter(Boolean);
+              subTitle = subParts.join(', ');
+              fullDisplay = `${street1} y ${street2}, ${subTitle}`;
+            } else if (dir.altura) {
+              mainTitle = `${street1} ${dir.altura}`;
+              const subParts = [neighborhood || locName, partido, 'Buenos Aires'].filter(Boolean);
+              subTitle = subParts.join(', ');
+              fullDisplay = `${street1} ${dir.altura}, ${subTitle}`;
+            } else {
+              mainTitle = street1 || dir.direccion || cleanedAddress;
+              const subParts = [neighborhood || locName, partido, 'Buenos Aires'].filter(Boolean);
+              subTitle = subParts.join(', ');
+              fullDisplay = `${mainTitle}, ${subTitle}`;
+            }
+
+            addResult({
+              lat: lat,
+              lon: lon,
+              display_name: fullDisplay,
+              _isIntersection: isUsigCorner || isCorner,
+              _isPoi: false,
+              _poiBadge: isUsigCorner ? 'Esquina Oficial CABA/GBA' : 'Dirección Oficial CABA/GBA',
+              _icon: isUsigCorner ? '🚦' : '📍',
+              _cornerTitle: isUsigCorner ? `${street1} y ${street2}` : null,
+              _mainTitle: mainTitle,
+              _subTitle: subTitle
+            });
+          }
+        });
+      }
+    }
+  } catch (usigErr) {
+    // Continúa con Photon si USIG no responde
+  }
+
+  // 3. Geocodificación Photon (Komoot OpenStreetMap) - para POIs, Hoteles, Shoppings, Aeropuertos y ciudades
   try {
     const pUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=-34.6037&lon=-58.3816&limit=6`;
     const pRes = await fetchWithTimeout(pUrl, {}, 2500);
@@ -2939,10 +3245,10 @@ async function searchLocations(rawQuery, signal) {
     // Continúa con los siguientes resolvers
   }
 
-  // 3. Fallback Nominatim OpenStreetMap
+  // 4. Fallback Nominatim OpenStreetMap (para búsquedas provinciales o nacionales)
   if (results.length === 0 || isCorner) {
     try {
-      const nomQuery = isCorner && match ? `${match[1]} and ${match[2]}, Buenos Aires` : `${query}, Argentina`;
+      const nomQuery = isCorner ? `${cleanedAddress}, Buenos Aires` : `${query}, Argentina`;
       const nomGenUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nomQuery)}&countrycodes=ar&limit=5&addressdetails=1`;
       const res = await fetchWithTimeout(nomGenUrl, {}, 2500);
       if (res.ok) {
@@ -2963,7 +3269,7 @@ async function searchLocations(rawQuery, signal) {
     }
   }
 
-  // 4. Fallback de emergencia si no se encontraron coordenadas: Asignar coordenadas base de CABA/GBA
+  // 5. Fallback de emergencia si no se encontraron coordenadas: Asignar coordenadas base de CABA/GBA
   if (results.length === 0 && query.length >= 3) {
     let fallbackLat = '-34.6037';
     let fallbackLon = '-58.3816';
@@ -3056,16 +3362,14 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     const cleanSub = place._subTitle || cleanAddressDisplay(place.display_name);
     const mainTitle = place._mainTitle || (place.display_name ? place.display_name.split(',')[0] : '');
     
-    // Al seleccionar, colocamos el nombre claro del lugar en el campo de texto
-    let cleanName = '';
-    if (place._isPoi) {
+    // Al seleccionar, colocamos el nombre claro y profesional del lugar en el campo de texto
+    let cleanName = place.display_name || mainTitle;
+    if (place._isPoi && mainTitle) {
       cleanName = mainTitle;
     } else if (isCorner && place._cornerTitle) {
-      cleanName = `${place._cornerTitle} (${cleanSub})`;
+      cleanName = cleanSub ? `${place._cornerTitle}, ${cleanSub}` : place._cornerTitle;
     } else if (mainTitle && cleanSub && !cleanSub.toLowerCase().includes(mainTitle.toLowerCase())) {
       cleanName = `${mainTitle}, ${cleanSub}`;
-    } else {
-      cleanName = place.display_name || mainTitle;
     }
 
     input.value = cleanName;
