@@ -4,7 +4,7 @@
  * - Detección inteligente de peajes según tarifas obligatorias oficiales del gobierno (AUSA, Riccheri, Panamericana, etc.)
  * - Selector estilizado de fecha y hora con oscilación estricta de 5 minutos y atajos rápidos
  * - Descuento transparente de ida y vuelta (-15% regreso)
- * - Confirmación directa a WhatsApp (+54 9 11 2255-8226)
+ * - Confirmación directa a WhatsApp (+54 9 11 7373-8790)
  * - Modal de experiencia post-reserva con aviso cordial de espera y calificación de 5 estrellas
  * - Acceso a panel de administración protegido con PIN
  */
@@ -14,7 +14,7 @@
 // ==========================================
 
 const DEFAULT_CONFIG = {
-  whatsappNumber: '5491122558226', // Número oficial Argentina (1122558226)
+  whatsappNumber: '5491173738790', // Número oficial Argentina (1173738790)
   adminPin: '4824',                // Clave de administrador (definitiva)
   weekendBaseShort: 1500,          // Tarifa base fin de semana viajes ≤8 km ($ ARS)
   weekendBaseLong: 2200,           // Tarifa base fin de semana viajes >8 km ($ ARS)
@@ -798,13 +798,13 @@ function saveConfig(newConfig) {
 function getFormattedWhatsAppNumber() {
   let raw = (state.config.whatsappNumber || DEFAULT_CONFIG.whatsappNumber).replace(/\D/g, '');
 
-  if (raw.includes('1122558226') || raw === '1122558226') {
+  if (raw.includes('1173738790') || raw === '1173738790') {
     if (state.selectedWaFormat === 'without-9') {
-      return '541122558226';
+      return '541173738790';
     } else if (state.selectedWaFormat === 'with-15') {
-      return '549111522558226';
+      return '549111573738790';
     } else {
-      return '5491122558226';
+      return '5491173738790';
     }
   }
 
@@ -2722,12 +2722,12 @@ function renderQuote() {
   const displayPhoneEl = document.getElementById('display-wa-number');
   if (displayPhoneEl) {
     const formatted = getFormattedWhatsAppNumber();
-    if (formatted === '5491122558226') {
-      displayPhoneEl.textContent = '+54 9 11 2255-8226';
-    } else if (formatted === '541122558226') {
-      displayPhoneEl.textContent = '+54 11 2255-8226';
-    } else if (formatted === '549111522558226') {
-      displayPhoneEl.textContent = '+54 9 11 15-2255-8226';
+    if (formatted === '5491173738790') {
+      displayPhoneEl.textContent = '+54 9 11 7373-8790';
+    } else if (formatted === '541173738790') {
+      displayPhoneEl.textContent = '+54 11 7373-8790';
+    } else if (formatted === '549111573738790') {
+      displayPhoneEl.textContent = '+54 9 11 15-7373-8790';
     } else {
       displayPhoneEl.textContent = `+${formatted}`;
     }
@@ -4138,7 +4138,7 @@ function saveModalConfig() {
   };
 
   const newConfig = {
-    whatsappNumber: getStr('cfg-whatsapp', '5491122558226').replace(/\D/g, ''),
+    whatsappNumber: getStr('cfg-whatsapp', '5491173738790').replace(/\D/g, ''),
     mapboxToken: getStr('cfg-mapbox-token', ''),
     baseFareShort: getNum('cfg-base-fare-short', 2000),
     baseFareLong: getNum('cfg-base-fare-long', 3500),

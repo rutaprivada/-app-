@@ -41,7 +41,7 @@ Plataforma web de alta conversión y cálculo de tarifas en tiempo real diseñad
    - Navegación con flechas del teclado y selección inmediata con la tecla `Enter`.
 
 4. **Cierre de Ventas Directo por WhatsApp:**
-   - **Número Oficial Configurado:** `+54 9 11 2255-8226` (Formato internacional: `5491122558226`).
+   - **Número Oficial Configurado:** `+54 9 11 7373-8790` (Formato internacional: `5491173738790`).
    - El cliente presiona **"Confirmar y Reservar por WhatsApp"** y se abre automáticamente WhatsApp con los datos completos del viaje ya redactados: origen, parada intermedia (si existe), destino, día con fecha amigable, horario, km, vehículo y tarifa estimada.
    - Modal de experiencia post-reserva con aviso cordial de atención y sistema de calificación de 5 estrellas.
 
@@ -90,5 +90,5 @@ rutaprivada/
 ### Paso 3: Salir en Google Maps y Búsquedas Locales (Google Perfil de Negocio)
 1. Ingresa a [Google Mi Negocio](https://www.google.com/business/) (100% gratuito).
 2. Crea la ficha de negocio: *"RutaPrivada - Traslados Ejecutivos & Chofer Privado"*.
-3. Agrega tu número de WhatsApp (`+54 9 11 2255-8226`), tu zona de cobertura (Buenos Aires, Ezeiza, Aeroparque, Pilar) y el enlace a tu página web.
+3. Agrega tu número de WhatsApp (`+54 9 11 7373-8790`), tu zona de cobertura (Buenos Aires, Ezeiza, Aeroparque, Pilar) y el enlace a tu página web.
 4. Con esto, cualquier usuario que busque remises o traslados en tu zona verá tu negocio destacado en los mapas y en el buscador de Google.
