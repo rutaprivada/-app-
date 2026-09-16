@@ -17,7 +17,8 @@ const STATIC_ASSETS = [
   './logo_tarjeta.svg',
   './manifest.json',
   './robots.txt',
-  './sitemap.xml'
+  './sitemap.xml',
+  './privacidad.html'
 ];
 
 // Instalación: Precargar recursos estáticos fundamentales
