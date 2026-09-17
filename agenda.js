@@ -31,6 +31,9 @@ const state = {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js?v=22').catch(() => {});
+  }
   initAuth();
   initTabs();
   initDateFilters();
@@ -218,26 +221,46 @@ function initSound() {
 
 function triggerSystemNotification(b) {
   try {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
-      const title = '🔔 ¡Nueva Reserva RutaPrivada!';
-      const body = b 
-        ? `${b.customerName || 'Pasajero'} • $${Number(b.totalFare || 0).toLocaleString('es-AR')}\n📍 ${b.origin} ➔ ${b.destination}`
-        : 'Se ha recibido una nueva reserva de traslado.';
-      
-      const notif = new Notification(title, {
-        body: body,
-        icon: 'favicon.svg',
-        badge: 'favicon.svg',
-        vibrate: [200, 100, 200]
-      });
+    const title = '🔔 ¡Nueva Reserva RutaPrivada!';
+    const bodyText = b 
+      ? `👤 ${b.customerName || 'Pasajero'} • $${Number(b.totalFare || 0).toLocaleString('es-AR')}\n📍 ${b.origin} ➔ ${b.destination}`
+      : 'Se ha recibido una nueva reserva de traslado.';
 
-      notif.onclick = () => {
-        window.focus();
-      };
+    // 1. Notificación vía Service Worker (100% compatible con Celulares Android y PWA)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(registration => {
+        if (registration && registration.showNotification) {
+          registration.showNotification(title, {
+            body: bodyText,
+            icon: 'favicon.svg',
+            badge: 'favicon.svg',
+            vibrate: [300, 100, 300, 100, 300],
+            tag: 'booking-' + (b ? b.id : Date.now()),
+            renotify: true,
+            data: { url: './agenda.html' }
+          });
+          return;
+        }
+        fallbackBrowserNotification(title, bodyText);
+      }).catch(() => fallbackBrowserNotification(title, bodyText));
+    } else {
+      fallbackBrowserNotification(title, bodyText);
     }
   } catch(e) {
     console.warn('System notification error:', e);
+  }
+}
+
+function fallbackBrowserNotification(title, bodyText) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    const notif = new Notification(title, {
+      body: bodyText,
+      icon: 'favicon.svg',
+      badge: 'favicon.svg',
+      vibrate: [300, 100, 300]
+    });
+    notif.onclick = () => { window.focus(); };
   }
 }
 
@@ -485,13 +508,43 @@ function connectFirebase(configInput) {
           cloudBookings.push(data);
         });
 
-        if (cloudBookings.length > 0) {
-          state.bookings = cloudBookings;
-          saveBookingsLocal();
-          renderActiveTab();
+        // 1. Unificar reservas locales y remotas por ID único sin perder ninguna
+        const bookingsMap = new Map();
+        
+        // Cargar primero las que ya estaban en memoria / localStorage
+        loadBookings();
+        state.bookings.forEach(b => {
+          if (b && b.id) bookingsMap.set(b.id, b);
+        });
+
+        // Combinar/actualizar con las que vienen de la nube
+        cloudBookings.forEach(b => {
+          if (b && b.id) bookingsMap.set(b.id, b);
+        });
+
+        // Ordenar cronológicamente (más recientes primero)
+        state.bookings = Array.from(bookingsMap.values()).sort((a, b) => {
+          const dateA = a.date || '';
+          const dateB = b.date || '';
+          if (dateA !== dateB) return dateB.localeCompare(dateA);
+          return (b.time || '').localeCompare(a.time || '');
+        });
+
+        // Guardar la lista completa unificada
+        saveBookingsLocal();
+        renderActiveTab();
+
+        // 2. Si hay reservas locales que aún no estaban en Firestore, subirlas para respaldarlas
+        if (state.firestoreDb && initialLoad) {
+          state.bookings.forEach(localB => {
+            if (localB && localB.id && !cloudBookings.some(cb => cb.id === localB.id)) {
+              state.firestoreDb.collection('bookings').doc(localB.id).set(localB, { merge: true })
+                .catch(err => console.warn('Error subiendo respaldo local a Firestore:', err));
+            }
+          });
         }
 
-        if (hasNew) {
+        if (hasNew && cloudBookings.length > 0) {
           playExecutiveChime();
           triggerSystemNotification(cloudBookings[0]);
           showToast('🔔 ¡Nueva reserva de pasajero recibida en tiempo real!');
