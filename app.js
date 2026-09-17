@@ -1473,22 +1473,40 @@ function setDestination(lat, lng, address) {
   checkAndRoute();
 }
 
-// Selección de la ruta óptima (más rápida, expedita y directa según trazado vehicular real)
+// Selección de la ruta óptima (priorizando autopistas y accesos rápidos sobre avenidas lentas con semáforos)
 function selectOptimalRoute(routes) {
   if (!routes || routes.length === 0) return null;
   if (routes.length === 1) return routes[0];
 
-  // Elegir la ruta con menor duración y óptimo kilometraje
-  const sorted = [...routes].sort((a, b) => {
-    const durDiff = (a.duration || 0) - (b.duration || 0);
-    if (Math.abs(durDiff) > 120) {
-      // Si una alternativa es considerablemente más rápida (>2 min), priorizarla
-      return durDiff;
+  const highwayRegex = /(autopista|gral\.?\s*paz|general\s*paz|riccheri|dellepiane|lugones|cantilo|25\s*de\s*mayo|perito\s*moreno|panamericana|acceso\s*norte|acceso\s*oeste|acceso\s*sur|illia|paseo\s*del\s*bajo|ramal|au\b)/i;
+
+  const scored = routes.map((r) => {
+    let highwayStepsCount = 0;
+    let totalSteps = 0;
+
+    if (r.legs) {
+      r.legs.forEach(leg => {
+        if (leg.steps) {
+          leg.steps.forEach(step => {
+            totalSteps++;
+            if (highwayRegex.test(step.name || '') || highwayRegex.test(step.ref || '')) {
+              highwayStepsCount++;
+            }
+          });
+        }
+      });
     }
-    // Si la duración es similar, priorizar la de menor kilometraje
-    return (a.distance || 0) - (b.distance || 0);
+
+    const hasHighway = highwayStepsCount > 0;
+    // Bonificación para autopistas y vías rápidas para evitar cruzar el centro con semáforos
+    const highwayBonusSecs = hasHighway ? 240 : 0; 
+    const score = (r.duration || 0) - highwayBonusSecs;
+
+    return { route: r, score, duration: r.duration || 0, distance: r.distance || 0, hasHighway };
   });
-  return sorted[0];
+
+  scored.sort((a, b) => a.score - b.score);
+  return scored[0].route;
 }
 
 // Cálculo de ruta con Tráfico en Tiempo Real (Mapbox driving-traffic) o Fallback OSRM

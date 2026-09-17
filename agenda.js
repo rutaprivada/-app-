@@ -1022,8 +1022,8 @@ function openWhatsAppChat(phone, message) {
     }, 1000);
   } else {
     const desktopUrl = cleanPhone
-      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encoded}`
-      : `https://api.whatsapp.com/send?text=${encoded}`;
+      ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encoded}`
+      : `https://web.whatsapp.com/send?text=${encoded}`;
     window.open(desktopUrl, '_blank', 'noopener,noreferrer');
   }
 }
