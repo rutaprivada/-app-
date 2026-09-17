@@ -1969,6 +1969,38 @@ body {
   opacity: 0.9;
 }
 
+/* Privacy Guarantee Note under WhatsApp button */
+.privacy-guarantee-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  margin-top: -2px;
+  margin-bottom: 6px;
+  font-size: 0.76rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.privacy-guarantee-note .privacy-lock-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  color: #f59e0b;
+}
+
+.privacy-guarantee-note p {
+  margin: 0;
+}
+
+.privacy-guarantee-note strong {
+  color: #fef08a;
+  font-weight: 700;
+}
+
 .whatsapp-target-display {
   display: flex;
   flex-direction: column;

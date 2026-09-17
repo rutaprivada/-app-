@@ -125,7 +125,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=12" />
+  <link rel="stylesheet" href="styles.css?v=13" />
 </head>
 <body>
 
@@ -574,6 +574,12 @@
             </span>
           </button>
 
+          <!-- Mensaje de Privacidad y Confidencialidad de Número -->
+          <div class="privacy-guarantee-note">
+            <span class="privacy-lock-icon">🔒</span>
+            <p><strong>Tu número es privado:</strong> No se comparte con los conductores. Tu contacto es gestionado de forma confidencial exclusivamente por el WhatsApp oficial de la empresa.</p>
+          </div>
+
           <div class="secondary-actions">
             <button id="btn-print-quote" class="btn btn-secondary" title="Imprimir o guardar comprobante en PDF">
               🖨️ Imprimir / Guardar PDF
@@ -672,8 +678,9 @@
   <!-- Footer Legal & Privacy Policy Link -->
   <footer class="app-legal-footer" style="text-align: center; padding: 20px 10px 30px; color: #64748b; font-size: 0.82rem;">
     <p>© 2026 RutaPrivada · Traslados Ejecutivos en Argentina</p>
-    <p style="margin-top: 6px;">
+    <p style="margin-top: 6px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
       <a href="privacidad.html" style="color: #f59e0b; text-decoration: none; border-bottom: 1px dashed rgba(245, 158, 11, 0.4);">Política de Privacidad y Términos de Servicio</a>
+      <a href="logo_rutaprivada.svg" download="logo_rutaprivada.svg" style="color: #38bdf8; text-decoration: none; border-bottom: 1px dashed rgba(56, 189, 248, 0.4);">🎨 Descargar Logo Oficial</a>
     </p>
   </footer>
 
@@ -971,6 +978,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- App JS -->
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>
