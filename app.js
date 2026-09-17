@@ -3983,6 +3983,9 @@ async function sendWhatsAppReservation() {
   const resInput = document.getElementById('res-input-number');
   if (resInput) resInput.value = phone;
 
+  // 0. Registrar automáticamente la reserva en la Agenda Ejecutiva privada
+  recordConfirmedReservation();
+
   // 1. Mostrar la experiencia de confirmación cordial y calificación en pantalla
   showBookingSuccessModal();
 
@@ -4004,6 +4007,59 @@ async function sendWhatsAppReservation() {
     } catch(err) {
       console.warn('Popup WhatsApp:', err);
     }
+  }
+}
+
+function recordConfirmedReservation() {
+  try {
+    const originStr = document.getElementById('origin-input')?.value?.trim() || (state.origin ? state.origin.address : 'Punto de partida');
+    const destStr = document.getElementById('destination-input')?.value?.trim() || (state.destination ? state.destination.address : 'Destino acordado');
+    const stopStr = (state.hasIntermediateStop && state.intermediateStop) ? state.intermediateStop.address : '';
+    const b = state.breakdown || {};
+    
+    const newBooking = {
+      id: 'res_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      createdAt: new Date().toISOString(),
+      date: state.date || new Date().toISOString().split('T')[0],
+      time: state.time || '12:00',
+      origin: originStr,
+      destination: destStr,
+      stop: stopStr,
+      distanceKm: state.distanceKm || 0,
+      durationMin: state.baseDurationMin || 0,
+      totalFare: state.totalFare || 0,
+      isRoundtrip: !!state.isRoundtrip,
+      isPet: !!state.hasPet,
+      tollFare: b.tollFare || 0,
+      status: 'Pendiente',
+      notes: '',
+      customerName: '',
+      customerPhone: ''
+    };
+
+    const BOOKINGS_KEY = 'rutaprivada_bookings_v1';
+    let bookings = [];
+    try {
+      const stored = localStorage.getItem(BOOKINGS_KEY);
+      if (stored) bookings = JSON.parse(stored);
+    } catch(e) {}
+
+    // Evitar duplicados inmediatos en menos de 5 segundos con misma ruta y hora
+    const isRecentDup = bookings.some(b => 
+      b.origin === newBooking.origin &&
+      b.destination === newBooking.destination &&
+      b.date === newBooking.date &&
+      b.time === newBooking.time &&
+      (Date.now() - new Date(b.createdAt).getTime()) < 10000
+    );
+
+    if (!isRecentDup) {
+      bookings.unshift(newBooking);
+      if (bookings.length > 300) bookings = bookings.slice(0, 300);
+      localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings));
+    }
+  } catch (err) {
+    console.warn('No se pudo registrar la reserva en la agenda:', err);
   }
 }
 

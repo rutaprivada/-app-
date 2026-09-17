@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agenda Ejecutiva de Reservas | RutaPrivada</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="agenda.css?v=1" />
+</head>
+<body>
+
+  <!-- PIN Authentication Screen (Secret Protected Access) -->
+  <div id="pin-login-modal" class="pin-login-backdrop hidden">
+    <div class="pin-login-box">
+      <div class="pin-shield-icon">🔒</div>
+      <h2>Agenda Ejecutiva</h2>
+      <p>Ingresa tu clave de administrador para desbloquear la hoja de ruta y reservas.</p>
+      
+      <form id="agenda-pin-form">
+        <input 
+          type="password" 
+          id="agenda-pin-input" 
+          class="pin-input-field" 
+          placeholder="••••" 
+          maxlength="8" 
+          required 
+          autocomplete="off" 
+          autofocus 
+        />
+        <button type="submit" class="btn btn-primary full-width" style="width:100%; justify-content:center; padding: 12px;">
+          Desbloquear Agenda
+        </button>
+      </form>
+      <div style="margin-top: 18px;">
+        <a href="index.html" style="color: #94a3b8; font-size: 0.82rem; text-decoration: none;">⬅ Volver al Cotizador</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="agenda-header">
+    <div class="container header-inner">
+      <div class="brand-section">
+        <img src="favicon.svg" alt="RutaPrivada Logo" class="brand-logo" />
+        <div>
+          <div class="brand-title">
+            Ruta<span>Privada</span>
+            <span class="brand-badge">Agenda Chofer</span>
+          </div>
+          <p class="brand-subtitle">Control de Viajes Confirmados & Hoja de Ruta Diaria</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <a href="index.html" class="btn btn-secondary btn-sm" title="Ir a la página del cotizador">
+          🚖 Cotizador Principal
+        </a>
+        <button id="btn-open-manual-modal" class="btn btn-primary btn-sm" title="Cargar un viaje solicitado por teléfono o WhatsApp">
+          ➕ Nueva Reserva
+        </button>
+        <button id="btn-logout" class="btn btn-outline btn-sm" title="Cerrar sesión de administrador">
+          🔒 Salir
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    
+    <!-- KPI Statistics of the Day -->
+    <section class="agenda-stats-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon">🚖</div>
+        <div class="kpi-info">
+          <span class="kpi-label">Viajes en Pantalla</span>
+          <span id="kpi-total-trips" class="kpi-value">0</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-info">
+          <span class="kpi-label">Facturación Estimada</span>
+          <span id="kpi-total-revenue" class="kpi-value gold">$0</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon">⏳</div>
+        <div class="kpi-info">
+          <span class="kpi-label">Pendientes</span>
+          <span id="kpi-pending-trips" class="kpi-value">0</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon">✅</div>
+        <div class="kpi-info">
+          <span class="kpi-label">Confirmados / En Curso</span>
+          <span id="kpi-confirmed-trips" class="kpi-value">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Controls Bar (Date Filters, Export, Print) -->
+    <section class="agenda-controls-bar">
+      <div class="date-preset-group">
+        <button type="button" id="btn-filter-today" class="date-pill-btn active">⚡ Hoy</button>
+        <button type="button" id="btn-filter-tomorrow" class="date-pill-btn">📅 Mañana</button>
+        <button type="button" id="btn-filter-week" class="date-pill-btn">🗓️ Esta Semana</button>
+        <button type="button" id="btn-filter-all" class="date-pill-btn">📂 Todas</button>
+      </div>
+
+      <div class="custom-date-picker-wrap">
+        <label for="custom-filter-date" style="font-size: 0.8rem; color: #94a3b8; font-weight: 700;">Fecha:</label>
+        <input type="date" id="custom-filter-date" class="custom-date-input" />
+      </div>
+
+      <div class="section-actions">
+        <button type="button" id="btn-print-agenda" class="btn btn-secondary btn-sm" title="Imprimir hoja de ruta del día">
+          🖨️ Imprimir Hoja
+        </button>
+        <button type="button" id="btn-export-csv" class="btn btn-outline btn-sm" title="Descargar planilla Excel CSV">
+          📥 Exportar Excel
+        </button>
+      </div>
+    </section>
+
+    <!-- Bookings List -->
+    <section class="agenda-list-section">
+      <div class="section-heading-row">
+        <h2 class="section-heading-title">
+          <span>Itinerario de Viajes</span>
+          <span id="list-count-badge" class="badge-count">0 viajes</span>
+        </h2>
+      </div>
+
+      <!-- Bookings Cards Container -->
+      <div id="bookings-container" class="bookings-grid">
+        <!-- Injected via agenda.js -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="agenda-empty-state" class="agenda-empty-state hidden">
+        <div class="empty-icon">📅</div>
+        <h3>No hay viajes agendados para este período</h3>
+        <p>Las reservas cotizadas por los clientes en la web se registrarán aquí automáticamente, o puedes cargar un viaje manualmente.</p>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('btn-open-manual-modal').click()">
+          ➕ Cargar Reserva Manual
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal: Editar Notas y Datos de Pasajero -->
+  <div id="notes-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>📝 Datos del Pasajero & Notas</h3>
+        <button type="button" id="close-notes-modal" class="modal-close">&times;</button>
+      </div>
+      <form id="notes-form">
+        <div class="form-grid">
+          <div class="form-group full-width">
+            <label for="edit-customer-name">Nombre del Pasajero</label>
+            <input type="text" id="edit-customer-name" placeholder="Ej: Dr. Roberto Gómez" />
+          </div>
+          <div class="form-group full-width">
+            <label for="edit-customer-phone">Teléfono / WhatsApp de Contacto</label>
+            <input type="text" id="edit-customer-phone" placeholder="Ej: 11 5544 3322" />
+          </div>
+          <div class="form-group full-width">
+            <label for="edit-booking-notes">Notas Especiales del Viaje</label>
+            <textarea id="edit-booking-notes" rows="3" placeholder="Ej: Lleva 2 valijas grandes, vuelo AR1234, cobrar en efectivo..."></textarea>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel-notes" class="btn btn-outline">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Notas</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Nueva Reserva Manual -->
+  <div id="manual-booking-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>➕ Cargar Nueva Reserva Directa</h3>
+        <button type="button" id="close-manual-modal" class="modal-close">&times;</button>
+      </div>
+      <form id="manual-booking-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="mb-date">Fecha del Viaje</label>
+            <input type="date" id="mb-date" required />
+          </div>
+          <div class="form-group">
+            <label for="mb-time">Hora de Recogida</label>
+            <input type="time" id="mb-time" value="12:00" required />
+          </div>
+          <div class="form-group full-width">
+            <label for="mb-origin">Punto de Partida (Origen)</label>
+            <input type="text" id="mb-origin" placeholder="Ej: Aeroparque Jorge Newbery" required />
+          </div>
+          <div class="form-group full-width">
+            <label for="mb-destination">Punto de Destino</label>
+            <input type="text" id="mb-destination" placeholder="Ej: Hotel Hilton Puerto Madero" required />
+          </div>
+          <div class="form-group">
+            <label for="mb-fare">Tarifa Acordada ($ ARS)</label>
+            <input type="number" id="mb-fare" placeholder="35000" min="0" step="500" required />
+          </div>
+          <div class="form-group">
+            <label for="mb-status">Estado Inicial</label>
+            <select id="mb-status">
+              <option value="Confirmada">🟢 Confirmada</option>
+              <option value="Pendiente">🟡 Pendiente</option>
+              <option value="En Curso">🔵 En Curso</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="mb-name">Nombre Pasajero (Opcional)</label>
+            <input type="text" id="mb-name" placeholder="Ej: Carlos Méndez" />
+          </div>
+          <div class="form-group">
+            <label for="mb-phone">WhatsApp Pasajero (Opcional)</label>
+            <input type="text" id="mb-phone" placeholder="Ej: 54911..." />
+          </div>
+          <div class="form-group full-width">
+            <label for="mb-notes">Notas / Observaciones</label>
+            <input type="text" id="mb-notes" placeholder="Ej: Espera con cartel en arribos internacionales..." />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel-manual" class="btn btn-outline">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Agendar Viaje</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Agenda Script -->
+  <script src="agenda.js?v=1"></script>
+</body>
+</html>

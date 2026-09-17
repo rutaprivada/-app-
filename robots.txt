@@ -1,6 +1,7 @@
 # robots.txt para RutaPrivada - Traslados Ejecutivos
 User-agent: *
 Allow: /
+Disallow: /agenda.html
 
 # Sitemap
 Sitemap: https://rutaprivada.github.io/-app-/sitemap.xml
