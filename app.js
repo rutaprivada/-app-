@@ -4108,14 +4108,28 @@ function recordConfirmedReservation() {
   }
 }
 
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
+  authDomain: "rutaprivada-app.firebaseapp.com",
+  projectId: "rutaprivada-app",
+  storageBucket: "rutaprivada-app.firebasestorage.app",
+  messagingSenderId: "349256222860",
+  appId: "1:349256222860:web:6bdac96975582de57093a9",
+  measurementId: "G-EXXS3VHD14"
+};
+
 function syncBookingToCloudREST(booking) {
   try {
-    const rawCfg = localStorage.getItem('rutaprivada_firebase_config');
-    if (!rawCfg) return;
-    const cfg = JSON.parse(rawCfg);
-    if (!cfg || !cfg.projectId) return;
+    let cfg = DEFAULT_FIREBASE_CONFIG;
+    try {
+      const rawCfg = localStorage.getItem('rutaprivada_firebase_config');
+      if (rawCfg) {
+        const parsed = JSON.parse(rawCfg);
+        if (parsed && parsed.projectId) cfg = parsed;
+      }
+    } catch(e) {}
 
-    const projectId = cfg.projectId;
+    const projectId = cfg.projectId || 'rutaprivada-app';
     const apiKey = cfg.apiKey;
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/bookings?documentId=${booking.id}${apiKey ? `&key=${apiKey}` : ''}`;
 

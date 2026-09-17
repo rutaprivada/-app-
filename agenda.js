@@ -191,18 +191,53 @@ function initSound() {
   const btnSound = document.getElementById('btn-sound-toggle');
   updateSoundButtonUI();
 
+  // Solicitar permiso de notificaciones del sistema en el navegador/celular
+  if ('Notification' in window && Notification.permission === 'default') {
+    try {
+      Notification.requestPermission();
+    } catch(e) {}
+  }
+
   if (btnSound) {
     btnSound.addEventListener('click', () => {
       state.soundEnabled = !state.soundEnabled;
       localStorage.setItem(SOUND_SETTING_KEY, state.soundEnabled ? 'true' : 'false');
       updateSoundButtonUI();
       if (state.soundEnabled) {
+        if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission();
+        }
         playExecutiveChime();
-        showToast('🔔 Sonido de nuevas reservas activado.');
+        showToast('🔔 Sonido y notificaciones activadas.');
       } else {
         showToast('🔕 Sonido silenciado.');
       }
     });
+  }
+}
+
+function triggerSystemNotification(b) {
+  try {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      const title = '🔔 ¡Nueva Reserva RutaPrivada!';
+      const body = b 
+        ? `${b.customerName || 'Pasajero'} • $${Number(b.totalFare || 0).toLocaleString('es-AR')}\n📍 ${b.origin} ➔ ${b.destination}`
+        : 'Se ha recibido una nueva reserva de traslado.';
+      
+      const notif = new Notification(title, {
+        body: body,
+        icon: 'favicon.svg',
+        badge: 'favicon.svg',
+        vibrate: [200, 100, 200]
+      });
+
+      notif.onclick = () => {
+        window.focus();
+      };
+    }
+  } catch(e) {
+    console.warn('System notification error:', e);
   }
 }
 
@@ -283,12 +318,68 @@ function initCloudSync() {
     configTextarea.value = savedCfg;
   }
 
-  // Intentar conectar con Firebase
-  if (savedCfg) {
-    connectFirebase(savedCfg);
-  } else {
-    updateSyncBadgeUI('local');
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
+  authDomain: "rutaprivada-app.firebaseapp.com",
+  projectId: "rutaprivada-app",
+  storageBucket: "rutaprivada-app.firebasestorage.app",
+  messagingSenderId: "349256222860",
+  appId: "1:349256222860:web:6bdac96975582de57093a9",
+  measurementId: "G-EXXS3VHD14"
+};
+
+function parseFirebaseConfig(input) {
+  if (!input) return DEFAULT_FIREBASE_CONFIG;
+  if (typeof input === 'object') return input;
+
+  const trimmed = input.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch (e) {}
+
+  try {
+    const apiKeyMatch = trimmed.match(/apiKey\s*:\s*["']([^"']+)["']/);
+    const authDomainMatch = trimmed.match(/authDomain\s*:\s*["']([^"']+)["']/);
+    const projectIdMatch = trimmed.match(/projectId\s*:\s*["']([^"']+)["']/);
+    const storageBucketMatch = trimmed.match(/storageBucket\s*:\s*["']([^"']+)["']/);
+    const messagingSenderIdMatch = trimmed.match(/messagingSenderId\s*:\s*["']([^"']+)["']/);
+    const appIdMatch = trimmed.match(/appId\s*:\s*["']([^"']+)["']/);
+    const measurementIdMatch = trimmed.match(/measurementId\s*:\s*["']([^"']+)["']/);
+
+    if (apiKeyMatch && projectIdMatch) {
+      return {
+        apiKey: apiKeyMatch[1],
+        authDomain: authDomainMatch ? authDomainMatch[1] : `${projectIdMatch[1]}.firebaseapp.com`,
+        projectId: projectIdMatch[1],
+        storageBucket: storageBucketMatch ? storageBucketMatch[1] : `${projectIdMatch[1]}.firebasestorage.app`,
+        messagingSenderId: messagingSenderIdMatch ? messagingSenderIdMatch[1] : '',
+        appId: appIdMatch ? appIdMatch[1] : '',
+        measurementId: measurementIdMatch ? measurementIdMatch[1] : ''
+      };
+    }
+  } catch (err) {}
+
+  return DEFAULT_FIREBASE_CONFIG;
+}
+
+function initCloudSync() {
+  const syncBadge = document.getElementById('sync-status-badge');
+  const btnCloudConfig = document.getElementById('btn-cloud-config');
+  const cloudModal = document.getElementById('cloud-sync-modal');
+  const closeCloudModal = document.getElementById('close-cloud-modal');
+  const btnCancelCloud = document.getElementById('btn-cancel-cloud');
+  const cloudForm = document.getElementById('cloud-sync-form');
+  const configTextarea = document.getElementById('firebase-config-json');
+  const btnClearCloud = document.getElementById('btn-clear-cloud');
+
+  // Cargar configuración guardada si existe o precargar la oficial
+  const savedCfg = localStorage.getItem(FIREBASE_CONFIG_KEY);
+  if (configTextarea) {
+    configTextarea.value = savedCfg || JSON.stringify(DEFAULT_FIREBASE_CONFIG, null, 2);
   }
+
+  // Conectar con Firebase
+  connectFirebase(savedCfg || DEFAULT_FIREBASE_CONFIG);
 
   if (btnCloudConfig) {
     btnCloudConfig.addEventListener('click', () => {
@@ -312,12 +403,15 @@ function initCloudSync() {
     cloudForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const raw = configTextarea.value.trim();
-      if (!raw) {
-        showToast('⚠️ Pega la configuración de Firebase.');
+      const parsed = parseFirebaseConfig(raw);
+      if (!parsed) {
+        showToast('⚠️ Formato de Firebase no reconocido.');
         return;
       }
-      localStorage.setItem(FIREBASE_CONFIG_KEY, raw);
-      connectFirebase(raw);
+      const jsonStr = JSON.stringify(parsed, null, 2);
+      localStorage.setItem(FIREBASE_CONFIG_KEY, jsonStr);
+      if (configTextarea) configTextarea.value = jsonStr;
+      connectFirebase(parsed);
       closeCloud();
     });
   }
@@ -364,11 +458,9 @@ function connectFirebase(configInput) {
 
     updateSyncBadgeUI('connecting');
 
-    let firebaseConfig;
-    try {
-      firebaseConfig = JSON.parse(configInput);
-    } catch(err) {
-      showToast('❌ JSON de Firebase inválido.');
+    const firebaseConfig = parseFirebaseConfig(configInput);
+    if (!firebaseConfig || !firebaseConfig.projectId) {
+      showToast('❌ Configuración de Firebase inválida.');
       updateSyncBadgeUI('local');
       return;
     }
@@ -417,6 +509,7 @@ function connectFirebase(configInput) {
 
         if (hasNew) {
           playExecutiveChime();
+          triggerSystemNotification(cloudBookings[0]);
           showToast('🔔 ¡Nueva reserva de pasajero recibida en tiempo real!');
         }
 
