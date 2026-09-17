@@ -13,7 +13,7 @@ const SOUND_SETTING_KEY = 'rutaprivada_sound_enabled';
 
 const state = {
   activeTab: 'tab-agenda',
-  activeFilter: 'today', // 'today', 'tomorrow', 'week', 'all', 'custom'
+  activeFilter: 'all', // 'all', 'today', 'tomorrow', 'week', 'custom'
   selectedDate: getTodayString(),
   bookings: [],
   editingBookingId: null,
@@ -825,13 +825,16 @@ function createBookingCardHTML(b) {
           <button type="button" class="btn btn-primary btn-sm btn-pay-booking" title="Registrar Cobro, Seña o emitir Comprobante">
             💳 Cobrar
           </button>
-          <button type="button" class="btn btn-secondary btn-sm btn-maps-route" title="Abrir recorrido en Google Maps GPS">
-            📍 GPS Maps
+          <button type="button" class="btn btn-secondary btn-sm btn-maps-route" title="Abrir recorrido con paradas en Google Maps">
+            📍 Maps GPS
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm btn-waze-route" title="Abrir recorrido en Waze GPS">
+            🚗 Waze
           </button>
           <button type="button" class="btn btn-secondary btn-sm btn-google-cal" title="Agendar en Google Calendar">
             📅 Calendario
           </button>
-          <button type="button" class="btn btn-secondary btn-sm btn-wa-reply" title="Enviar respuesta rápida por WhatsApp">
+          <button type="button" class="btn btn-secondary btn-sm btn-wa-reply" title="Enviar confirmación y detalles por WhatsApp">
             💬 WhatsApp
           </button>
           <button type="button" class="btn btn-secondary btn-sm btn-edit-notes" title="Editar notas y pasajero">
@@ -865,13 +868,23 @@ function attachBookingCardListeners() {
     });
   });
 
-  // Botón GPS Google Maps
+  // Botón GPS Google Maps (con paradas intermedias)
   document.querySelectorAll('.btn-maps-route').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const card = e.target.closest('.booking-card');
       const id = card.getAttribute('data-id');
       const b = state.bookings.find(item => item.id === id);
       if (b) openGoogleMaps(b);
+    });
+  });
+
+  // Botón Waze GPS
+  document.querySelectorAll('.btn-waze-route').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const card = e.target.closest('.booking-card');
+      const id = card.getAttribute('data-id');
+      const b = state.bookings.find(item => item.id === id);
+      if (b) openWaze(b);
     });
   });
 
@@ -935,8 +948,16 @@ function deleteBooking(id) {
 function openGoogleMaps(b) {
   const origin = encodeURIComponent(b.origin || '');
   const dest = encodeURIComponent(b.destination || '');
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+  const stopParam = b.stop ? `&waypoints=${encodeURIComponent(b.stop)}` : '';
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${stopParam}&travelmode=driving`;
   window.open(mapsUrl, '_blank');
+}
+
+function openWaze(b) {
+  // En Waze: si hay parada intermedia, navegar a la parada primero o al destino
+  const targetAddress = b.stop ? b.stop : (b.destination || b.origin || '');
+  const wazeUrl = `https://waze.com/ul?q=${encodeURIComponent(targetAddress)}&navigate=yes`;
+  window.open(wazeUrl, '_blank');
 }
 
 function openGoogleCalendar(b) {
@@ -982,11 +1003,36 @@ function cleanWhatsAppPhone(phoneStr) {
 
 function sendWhatsAppQuickReply(b) {
   const phone = cleanWhatsAppPhone(b.customerPhone);
-  const text = encodeURIComponent(
-    `¡Hola ${b.customerName || ''}! Te confirmamos desde *RutaPrivada* tu traslado para el día *${formatDatePretty(b.date)}* a las *${b.time} hs*.\n\n📍 *Origen:* ${b.origin}\n🏁 *Destino:* ${b.destination}\n💵 *Tarifa acordada:* $${Number(b.totalFare).toLocaleString('es-AR')}\n\nQuedamos a tu entera disposición ante cualquier duda o requerimiento especial. ¡Buen viaje!`
-  );
+  const fare = Number(b.totalFare || 0).toLocaleString('es-AR');
+  const dateStr = formatDatePretty(b.date);
+  const isRound = b.isRoundtrip ? '🔁 Traslado Ida y Vuelta' : '🚗 Traslado de Ida';
+  const petStr = b.isPet ? '🐾 Acompañante Mascota (Pet Friendly)\n' : '';
+  const stopStr = b.stop ? `🛑 *Parada Intermedia:* ${b.stop}\n` : '';
+  const payStr = b.paymentStatus === 'Pagado' 
+    ? '✅ *Estado de Pago:* Abonado al 100%' 
+    : (b.paymentStatus === 'Señado' ? `🔵 *Estado de Pago:* Seña Abonada ($${Number(b.depositAmount || 0).toLocaleString('es-AR')})` : '💳 *Estado de Pago:* A convenir / Pendiente');
 
-  const waUrl = phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+  const text = 
+`✨ *RUTAPRIVADA | Confirmación de Traslado Ejecutivo* 🚘
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+¡Hola *${b.customerName || 'Estimado/a'}*! 👋 Es un placer saludarte.
+
+Te confirmamos con gusto la reserva de tu traslado:
+
+📅 *Fecha:* ${dateStr}
+⏰ *Hora de Recogida:* ${b.time} hs
+🟢 *Origen:* ${b.origin}
+${stopStr}🏁 *Destino:* ${b.destination}
+🔖 *Modalidad:* ${isRound}
+${petStr}💵 *Tarifa Acordada:* $${fare}
+${payStr}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎩 *Chofer Asignado:* Daniel • *RutaPrivada*
+⭐ *Compromiso:* Puntualidad garantizada, vehículo higienizado y máximo confort.
+
+Quedamos a tu entera disposición ante cualquier duda o requerimiento especial. ¡Muchas gracias por elegirnos y buen viaje! 🌟`;
+
+  const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
   window.open(waUrl, '_blank');
 }
 
@@ -1138,10 +1184,17 @@ function renderFinancesTab() {
   let validTripsCount = 0;
 
   state.bookings.forEach(b => {
-    if (b.status === 'Cancelada') return;
+    // REGLA: Solo evaluar y tomar en cuenta reservas que ya estén COMPLETADAS y con PAGO REGISTRADO en Control de Pagos
+    if (b.status !== 'Completada') return;
+    if (b.paymentStatus !== 'Pagado' && b.paymentStatus !== 'Señado') return;
 
     validTripsCount++;
     const fare = Number(b.totalFare) || 0;
+    const deposit = Number(b.depositAmount) || 0;
+    const isPaid = b.paymentStatus === 'Pagado';
+    // Dinero efectivamente cobrado
+    const collectedFare = isPaid ? fare : deposit;
+
     const toll = Number(b.tollActual !== undefined && b.tollActual !== null && b.tollActual !== '' ? b.tollActual : (b.tollFare || 0));
     const km = Number(b.distanceKm) || 0;
     const durMin = Number(b.durationMin) || 0;
@@ -1150,7 +1203,7 @@ function renderFinancesTab() {
     // Combustible automático basado en kilómetros recorridos a $2.100/litro
     const calculatedFuel = b.fuelCostEst ? Number(b.fuelCostEst) : Math.round(km * FUEL_COST_PER_KM);
 
-    grossTotal += (fare + tip);
+    grossTotal += (collectedFare + tip);
     tollsTotal += toll;
     fuelTotal += calculatedFuel;
     kmTotal += km;
@@ -1179,7 +1232,11 @@ function renderFinancesTab() {
   if (finGross) finGross.textContent = `$${grossTotal.toLocaleString('es-AR')}`;
   if (finExpenses) finExpenses.textContent = `-$${expensesTotal.toLocaleString('es-AR')}`;
   if (finNet) finNet.textContent = `$${netTotal.toLocaleString('es-AR')}`;
-  if (finMargin) finMargin.textContent = `Margen operativo: ${marginPct}% (Nafta a $2.100/L)`;
+  if (finMargin) {
+    finMargin.textContent = validTripsCount > 0 
+      ? `Margen operativo: ${marginPct}% (${validTripsCount} ${validTripsCount === 1 ? 'viaje liquidado' : 'viajes liquidados'})`
+      : 'Evaluando solo viajes Completados con cobro registrado';
+  }
 
   if (finTolls) finTolls.textContent = `$${tollsTotal.toLocaleString('es-AR')}`;
   if (finFuel) finFuel.textContent = `$${fuelTotal.toLocaleString('es-AR')}`;
