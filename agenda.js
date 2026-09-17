@@ -302,22 +302,6 @@ function playExecutiveChime() {
 // 5. SINCRONIZACIÓN EN LA NUBE (FIREBASE CLOUD FIRESTORE)
 // ==========================================
 
-function initCloudSync() {
-  const syncBadge = document.getElementById('sync-status-badge');
-  const btnCloudConfig = document.getElementById('btn-cloud-config');
-  const cloudModal = document.getElementById('cloud-sync-modal');
-  const closeCloudModal = document.getElementById('close-cloud-modal');
-  const btnCancelCloud = document.getElementById('btn-cancel-cloud');
-  const cloudForm = document.getElementById('cloud-sync-form');
-  const configTextarea = document.getElementById('firebase-config-json');
-  const btnClearCloud = document.getElementById('btn-clear-cloud');
-
-  // Cargar configuración guardada si existe
-  const savedCfg = localStorage.getItem(FIREBASE_CONFIG_KEY);
-  if (savedCfg && configTextarea) {
-    configTextarea.value = savedCfg;
-  }
-
 const DEFAULT_FIREBASE_CONFIG = {
   apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
   authDomain: "rutaprivada-app.firebaseapp.com",
