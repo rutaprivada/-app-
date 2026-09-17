@@ -67,10 +67,16 @@ function initAuth() {
   const btnLogout = document.getElementById('btn-logout');
 
   if (isAuth) {
-    if (loginModal) loginModal.classList.add('hidden');
+    if (loginModal) {
+      loginModal.classList.add('hidden');
+      loginModal.style.display = 'none';
+    }
     loadAndRender();
   } else {
-    if (loginModal) loginModal.classList.remove('hidden');
+    if (loginModal) {
+      loginModal.classList.remove('hidden');
+      loginModal.style.display = 'flex';
+    }
     if (pinInput) pinInput.focus();
   }
 
@@ -82,7 +88,10 @@ function initAuth() {
 
       if (entered === expected) {
         sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
-        if (loginModal) loginModal.classList.add('hidden');
+        if (loginModal) {
+          loginModal.classList.add('hidden');
+          loginModal.style.display = 'none';
+        }
         pinInput.value = '';
         showToast('🔓 Acceso concedido a tu Agenda Ejecutiva.');
         loadAndRender();

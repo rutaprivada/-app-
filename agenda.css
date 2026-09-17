@@ -69,6 +69,15 @@ body {
   padding: 0 20px;
 }
 
+/* Utilities */
+.hidden {
+  display: none !important;
+}
+
+.pin-login-backdrop.hidden {
+  display: none !important;
+}
+
 /* =========================================================
    Top Bar & Header
    ========================================================= */
