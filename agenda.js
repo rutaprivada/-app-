@@ -1001,31 +1001,53 @@ function cleanWhatsAppPhone(phoneStr) {
   return clean;
 }
 
+function openWhatsAppChat(phone, message) {
+  const encoded = encodeURIComponent(message);
+  const cleanPhone = cleanWhatsAppPhone(phone);
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    const appUrl = cleanPhone 
+      ? `whatsapp://send?phone=${cleanPhone}&text=${encoded}`
+      : `whatsapp://send?text=${encoded}`;
+    const webFallback = cleanPhone 
+      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encoded}`
+      : `https://api.whatsapp.com/send?text=${encoded}`;
+
+    window.location.href = appUrl;
+    setTimeout(() => {
+      if (!document.hidden) {
+        window.location.href = webFallback;
+      }
+    }, 1000);
+  } else {
+    const desktopUrl = cleanPhone
+      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encoded}`
+      : `https://api.whatsapp.com/send?text=${encoded}`;
+    window.open(desktopUrl, '_blank', 'noopener,noreferrer');
+  }
+}
+
 function sendWhatsAppQuickReply(b) {
-  const phone = cleanWhatsAppPhone(b.customerPhone);
   const fare = Number(b.totalFare || 0).toLocaleString('es-AR');
   const dateStr = formatDatePretty(b.date);
-  const stopStr = b.stop ? `🛑 *Parada:* ${b.stop}\n` : '';
   const payStatus = b.paymentStatus === 'Pagado' 
     ? '🟢 Pagado 100%' 
     : (b.paymentStatus === 'Señado' ? `🔵 Seña $${Number(b.depositAmount || 0).toLocaleString('es-AR')}` : '💳 Pendiente a abonar');
 
   const text = 
-`✨ *RUTAPRIVADA | Traslado Confirmado* 🚘
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-¡Hola *${b.customerName || 'Estimado/a'}*! Te confirmamos tu traslado:
+`✨ *¡Traslado Confirmado con Éxito!* 🚘
+--------------------------------
+¡Hola *${b.customerName || 'Estimado/a'}*! Con gusto te confirmamos el servicio para el día *${dateStr} a las ${b.time} hs*.
 
-📅 *Fecha:* ${dateStr}
-⏰ *Hora:* ${b.time} hs
-🟢 *Origen:* ${b.origin}
-${stopStr}🏁 *Destino:* ${b.destination}
-💵 *Tarifa:* $${fare} (${payStatus})
+💵 *Tarifa acordada:* $${fare} (${payStatus})
+🚘 *Vehículo:* Fiat Cronos Negro
+🔢 *Patente:* AE927CN
+🎩 *Chofer:* Daniel Pabon • *RutaPrivada*
 
-🎩 *Chofer:* Daniel • *RutaPrivada*
-Quedamos a tu entera disposición ante cualquier duda. ¡Buen viaje! 🌟`;
+Estaremos puntuales en el lugar de recogida. ¡Muchas gracias por tu confianza y buen viaje! 🌟`;
 
-  const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
-  window.open(waUrl, '_blank');
+  openWhatsAppChat(b.customerPhone, text);
 }
 
 // ==========================================
@@ -1414,9 +1436,7 @@ ${b.stop ? `🛑 *Parada intermedia:* ${b.stop}\n` : ''}
 ${balance > 0 ? `⚠️ *Saldo Pendiente a Cobrar en Destino:* $${balance.toLocaleString('es-AR')}\n` : '✨ *Saldo Pendiente:* $0 (Cancelado)\n'}------------------------------------------------
 ¡Muchas gracias por confiar en *RutaPrivada - Traslados Ejecutivos*!`;
 
-  const encoded = encodeURIComponent(receiptText);
-  const waUrl = phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
-  window.open(waUrl, '_blank');
+  openWhatsAppChat(b.customerPhone, receiptText);
 }
 
 // ==========================================

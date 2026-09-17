@@ -3845,14 +3845,12 @@ function buildReservationMessage() {
   const stopStr = (state.hasIntermediateStop && state.intermediateStop) ? cleanAddressDisplay(state.intermediateStop.address) : null;
   const dateFormatted = state.date ? formatDateWithWeekday(state.date) : 'A convenir';
   const passName = document.getElementById('passenger-name-input')?.value?.trim() || '';
-  const passPhone = document.getElementById('passenger-phone-input')?.value?.trim() || '';
   const passNotes = document.getElementById('passenger-notes-input')?.value?.trim() || '';
   const isRound = state.extras.roundtrip ? ' • 🔁 Ida y Vuelta' : '';
   const isPet = state.extras.pet ? ' • 🐾 Mascota' : '';
 
   let msg = `👋 ¡Hola! Solicito reserva de traslado en *RutaPrivada*:\n\n`;
   if (passName) msg += `👤 *Pasajero:* ${passName}\n`;
-  if (passPhone) msg += `📱 *WhatsApp:* ${passPhone}\n`;
   msg += `📅 *Fecha:* ${dateFormatted}\n`;
   msg += `⏰ *Hora:* ${state.time || 'A convenir'} hs\n`;
   msg += `📍 *Origen:* ${originStr}\n`;
