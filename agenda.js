@@ -835,8 +835,23 @@ function openGoogleCalendar(b) {
   window.open(calUrl, '_blank');
 }
 
+function cleanWhatsAppPhone(phoneStr) {
+  if (!phoneStr) return '';
+  let clean = phoneStr.replace(/\D/g, '');
+  if (!clean) return '';
+  // Formateo para números de Argentina si no traen el código de país
+  if (clean.startsWith('15') && clean.length === 10) {
+    clean = '54911' + clean.substring(2);
+  } else if (clean.startsWith('11') && clean.length === 10) {
+    clean = '549' + clean;
+  } else if (clean.length === 10 && !clean.startsWith('54')) {
+    clean = '549' + clean;
+  }
+  return clean;
+}
+
 function sendWhatsAppQuickReply(b) {
-  const phone = b.customerPhone ? b.customerPhone.replace(/\D/g, '') : '';
+  const phone = cleanWhatsAppPhone(b.customerPhone);
   const text = encodeURIComponent(
     `¡Hola ${b.customerName || ''}! Te confirmamos desde *RutaPrivada* tu traslado para el día *${formatDatePretty(b.date)}* a las *${b.time} hs*.\n\n📍 *Origen:* ${b.origin}\n🏁 *Destino:* ${b.destination}\n💵 *Tarifa acordada:* $${Number(b.totalFare).toLocaleString('es-AR')}\n\nQuedamos a tu entera disposición ante cualquier duda o requerimiento especial. ¡Buen viaje!`
   );
@@ -980,6 +995,10 @@ function renderPaymentsTab() {
 // ==========================================
 
 function renderFinancesTab() {
+  const FUEL_PRICE_PER_LITER = 2100; // $2.100 ARS por litro de nafta
+  const KM_PER_LITER = 10; // Rendimiento estimado promedio 10 km por litro ($210 / km)
+  const FUEL_COST_PER_KM = FUEL_PRICE_PER_LITER / KM_PER_LITER; // 210 pesos/km
+
   let grossTotal = 0;
   let tollsTotal = 0;
   let fuelTotal = 0;
@@ -993,15 +1012,17 @@ function renderFinancesTab() {
 
     validTripsCount++;
     const fare = Number(b.totalFare) || 0;
-    const toll = Number(b.tollActual || b.tollFare) || 0;
-    const fuel = Number(b.fuelCostEst) || 0;
-    const tip = Number(b.tipAmount) || 0;
+    const toll = Number(b.tollActual !== undefined && b.tollActual !== null && b.tollActual !== '' ? b.tollActual : (b.tollFare || 0));
     const km = Number(b.distanceKm) || 0;
     const durMin = Number(b.durationMin) || 0;
+    const tip = Number(b.tipAmount) || 0;
+
+    // Combustible automático basado en kilómetros recorridos a $2.100/litro
+    const calculatedFuel = b.fuelCostEst ? Number(b.fuelCostEst) : Math.round(km * FUEL_COST_PER_KM);
 
     grossTotal += (fare + tip);
     tollsTotal += toll;
-    fuelTotal += fuel;
+    fuelTotal += calculatedFuel;
     kmTotal += km;
     tipsTotal += tip;
     totalHours += (durMin / 60);
@@ -1028,7 +1049,7 @@ function renderFinancesTab() {
   if (finGross) finGross.textContent = `$${grossTotal.toLocaleString('es-AR')}`;
   if (finExpenses) finExpenses.textContent = `-$${expensesTotal.toLocaleString('es-AR')}`;
   if (finNet) finNet.textContent = `$${netTotal.toLocaleString('es-AR')}`;
-  if (finMargin) finMargin.textContent = `Margen operativo: ${marginPct}%`;
+  if (finMargin) finMargin.textContent = `Margen operativo: ${marginPct}% (Nafta a $2.100/L)`;
 
   if (finTolls) finTolls.textContent = `$${tollsTotal.toLocaleString('es-AR')}`;
   if (finFuel) finFuel.textContent = `$${fuelTotal.toLocaleString('es-AR')}`;
@@ -1193,7 +1214,7 @@ function initLiveCalculations() {
 }
 
 function sendWhatsAppReceipt(b) {
-  const phone = b.customerPhone ? b.customerPhone.replace(/\D/g, '') : '';
+  const phone = cleanWhatsAppPhone(b.customerPhone);
   const fare = Number(b.totalFare) || 0;
   const deposit = Number(b.depositAmount) || 0;
   const isPaid = b.paymentStatus === 'Pagado';
@@ -1412,7 +1433,13 @@ function formatDatePretty(dateStr) {
   if (!dateStr) return '';
   const parts = dateStr.split('-');
   if (parts.length !== 3) return dateStr;
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  const yyyy = parseInt(parts[0], 10);
+  const mm = parseInt(parts[1], 10) - 1;
+  const dd = parseInt(parts[2], 10);
+  const d = new Date(yyyy, mm, dd);
+  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const dayName = days[d.getDay()] || '';
+  return `${dayName} ${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
 function escapeHTML(str) {

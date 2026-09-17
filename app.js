@@ -3843,9 +3843,26 @@ function buildReservationMessage() {
   const stopStr = (state.hasIntermediateStop && state.intermediateStop) ? state.intermediateStop.address : null;
   const dateFormatted = state.date ? formatDateWithWeekday(state.date) : 'A convenir';
   const b = state.breakdown;
+  const passName = document.getElementById('passenger-name-input')?.value?.trim() || '';
+  const passPhone = document.getElementById('passenger-phone-input')?.value?.trim() || '';
+  const passNotes = document.getElementById('passenger-notes-input')?.value?.trim() || '';
 
   let msg = `🚘 *RUTAPRIVADA* | _Reserva de Traslado_\n`;
   msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  if (passName) {
+    msg += `👤 *Pasajero:* ${passName}\n`;
+  }
+  if (passPhone) {
+    msg += `📱 *WhatsApp:* ${passPhone}\n`;
+  }
+  if (passNotes) {
+    msg += `📝 *Detalles:* ${passNotes}\n`;
+  }
+  if (passName || passPhone || passNotes) {
+    msg += `\n`;
+  }
+
   msg += `📍 *Origen:* ${originStr}\n`;
   if (stopStr) {
     let stopNote = '+$500';
@@ -3899,11 +3916,28 @@ async function sendWhatsAppReservation() {
   const origVal = originInput ? originInput.value.trim() : '';
   const destVal = destInput ? destInput.value.trim() : '';
 
-  // Verificación básica de que haya ingresado texto
+  // Verificación básica de que haya ingresado trayecto
   if (!origVal || !destVal) {
     showToast('⚠️ Ingresá origen y destino para cotizar y reservar tu viaje.');
     if (originInput && !origVal) originInput.focus();
     else if (destInput && !destVal) destInput.focus();
+    return;
+  }
+
+  // Validación de datos del pasajero
+  const passNameInput = document.getElementById('passenger-name-input');
+  const passPhoneInput = document.getElementById('passenger-phone-input');
+  const passName = passNameInput ? passNameInput.value.trim() : '';
+  const passPhone = passPhoneInput ? passPhoneInput.value.trim() : '';
+
+  if (!passName) {
+    showToast('⚠️ Por favor ingresá el nombre y apellido del pasajero.');
+    if (passNameInput) passNameInput.focus();
+    return;
+  }
+  if (!passPhone) {
+    showToast('⚠️ Por favor ingresá el número de WhatsApp de contacto.');
+    if (passPhoneInput) passPhoneInput.focus();
     return;
   }
 
@@ -4017,6 +4051,11 @@ function recordConfirmedReservation() {
     const stopStr = (state.hasIntermediateStop && state.intermediateStop) ? state.intermediateStop.address : '';
     const b = state.breakdown || {};
     
+    const passName = document.getElementById('passenger-name-input')?.value?.trim() || '';
+    const passPhone = document.getElementById('passenger-phone-input')?.value?.trim() || '';
+    const passNotes = document.getElementById('passenger-notes-input')?.value?.trim() || '';
+    const finalFare = Number(state.totalPrice) || Number(state.totalFare) || Number(b.totalFare) || 0;
+    
     const newBooking = {
       id: 'res_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       createdAt: new Date().toISOString(),
@@ -4025,16 +4064,19 @@ function recordConfirmedReservation() {
       origin: originStr,
       destination: destStr,
       stop: stopStr,
-      distanceKm: state.distanceKm || 0,
-      durationMin: state.baseDurationMin || 0,
-      totalFare: state.totalFare || 0,
-      isRoundtrip: !!state.isRoundtrip,
-      isPet: !!state.hasPet,
-      tollFare: b.tollFare || 0,
+      distanceKm: Number(state.distanceKm) || 0,
+      durationMin: Number(state.durationMin || state.baseDurationMin) || 0,
+      totalFare: finalFare,
+      isRoundtrip: !!state.extras?.roundtrip,
+      isPet: !!state.extras?.pet,
+      tollFare: Number(b.tollCost || b.tollFare || 0),
       status: 'Pendiente',
-      notes: '',
-      customerName: '',
-      customerPhone: ''
+      notes: passNotes,
+      customerName: passName,
+      customerPhone: passPhone,
+      paymentStatus: 'Pendiente',
+      paymentMethod: 'Efectivo',
+      depositAmount: 0
     };
 
     const BOOKINGS_KEY = 'rutaprivada_bookings_v1';
