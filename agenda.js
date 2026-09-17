@@ -1,19 +1,29 @@
 /**
  * =========================================================
- * RutaPrivada | Agenda Ejecutiva de Reservas (agenda.js)
- * Panel de Gestión y Control de Viajes del Chofer / Administrador
+ * RutaPrivada | Portal Partner & Agenda Ejecutiva (agenda.js)
+ * Centro de Mando: Reservas, Cobranzas, Finanzas & Nube en Vivo
  * =========================================================
  */
 
 const STORAGE_KEY = 'rutaprivada_bookings_v1';
 const CONFIG_KEY = 'rutaprivada_config_v11';
+const FIREBASE_CONFIG_KEY = 'rutaprivada_firebase_config';
 const AUTH_SESSION_KEY = 'rutaprivada_agenda_authenticated';
+const SOUND_SETTING_KEY = 'rutaprivada_sound_enabled';
 
 const state = {
+  activeTab: 'tab-agenda',
   activeFilter: 'today', // 'today', 'tomorrow', 'week', 'all', 'custom'
   selectedDate: getTodayString(),
   bookings: [],
-  editingBookingId: null
+  editingBookingId: null,
+  payingBookingId: null,
+  soundEnabled: localStorage.getItem(SOUND_SETTING_KEY) !== 'false',
+  firebaseApp: null,
+  firestoreDb: null,
+  unsubscribeSnapshot: null,
+  isCloudConnected: false,
+  audioCtx: null
 };
 
 // ==========================================
@@ -22,9 +32,12 @@ const state = {
 
 document.addEventListener('DOMContentLoaded', () => {
   initAuth();
+  initTabs();
   initDateFilters();
   initModals();
-  initActions();
+  initSound();
+  initCloudSync();
+  initLiveCalculations();
 });
 
 function getTodayString() {
@@ -71,7 +84,7 @@ function initAuth() {
       loginModal.classList.add('hidden');
       loginModal.style.display = 'none';
     }
-    loadAndRender();
+    loadAndRenderAll();
   } else {
     if (loginModal) {
       loginModal.classList.remove('hidden');
@@ -93,8 +106,8 @@ function initAuth() {
           loginModal.style.display = 'none';
         }
         pinInput.value = '';
-        showToast('🔓 Acceso concedido a tu Agenda Ejecutiva.');
-        loadAndRender();
+        showToast('🔓 Acceso concedido al Portal Partner.');
+        loadAndRenderAll();
       } else {
         showToast('❌ Clave incorrecta. Inténtalo de nuevo.');
         pinInput.value = '';
@@ -112,7 +125,321 @@ function initAuth() {
 }
 
 // ==========================================
-// 3. CARGA Y GESTIÓN DE DATOS
+// 3. NAVEGACIÓN POR PESTAÑAS (TABS)
+// ==========================================
+
+function initTabs() {
+  const tabButtons = document.querySelectorAll('.partner-tab-btn');
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetTab = btn.getAttribute('data-tab');
+      switchTab(targetTab);
+    });
+  });
+}
+
+function switchTab(tabId) {
+  state.activeTab = tabId;
+
+  // Actualizar botones de tabs
+  document.querySelectorAll('.partner-tab-btn').forEach(btn => {
+    if (btn.getAttribute('data-tab') === tabId) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  // Mostrar pane correspondiente
+  document.querySelectorAll('.tab-pane').forEach(pane => {
+    if (pane.id === tabId) {
+      pane.classList.remove('hidden');
+    } else {
+      pane.classList.add('hidden');
+    }
+  });
+
+  // Renderizar contenido de la pestaña seleccionada
+  renderActiveTab();
+}
+
+function renderActiveTab() {
+  if (state.activeTab === 'tab-agenda') {
+    renderDashboard();
+  } else if (state.activeTab === 'tab-payments') {
+    renderPaymentsTab();
+  } else if (state.activeTab === 'tab-finances') {
+    renderFinancesTab();
+  } else if (state.activeTab === 'tab-clients') {
+    renderClientsTab();
+  }
+}
+
+function loadAndRenderAll() {
+  loadBookings();
+  renderDashboard();
+  renderPaymentsTab();
+  renderFinancesTab();
+  renderClientsTab();
+}
+
+// ==========================================
+// 4. SONIDO & SÍNTESIS WEB AUDIO API
+// ==========================================
+
+function initSound() {
+  const btnSound = document.getElementById('btn-sound-toggle');
+  updateSoundButtonUI();
+
+  if (btnSound) {
+    btnSound.addEventListener('click', () => {
+      state.soundEnabled = !state.soundEnabled;
+      localStorage.setItem(SOUND_SETTING_KEY, state.soundEnabled ? 'true' : 'false');
+      updateSoundButtonUI();
+      if (state.soundEnabled) {
+        playExecutiveChime();
+        showToast('🔔 Sonido de nuevas reservas activado.');
+      } else {
+        showToast('🔕 Sonido silenciado.');
+      }
+    });
+  }
+}
+
+function updateSoundButtonUI() {
+  const btnSound = document.getElementById('btn-sound-toggle');
+  if (!btnSound) return;
+  if (state.soundEnabled) {
+    btnSound.innerHTML = '🔔 Audio ON';
+    btnSound.classList.remove('btn-danger-subtle');
+  } else {
+    btnSound.innerHTML = '🔕 Audio OFF';
+    btnSound.classList.add('btn-danger-subtle');
+  }
+}
+
+function playExecutiveChime() {
+  if (!state.soundEnabled) return;
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    
+    if (!state.audioCtx) {
+      state.audioCtx = new AudioContext();
+    }
+    if (state.audioCtx.state === 'suspended') {
+      state.audioCtx.resume();
+    }
+
+    const now = state.audioCtx.currentTime;
+
+    // Tono 1: Campana suave (D5 - 587.33 Hz)
+    const osc1 = state.audioCtx.createOscillator();
+    const gain1 = state.audioCtx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, now);
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(0.35, now + 0.04);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    osc1.connect(gain1);
+    gain1.connect(state.audioCtx.destination);
+    osc1.start(now);
+    osc1.stop(now + 1.2);
+
+    // Tono 2: Armónico dorado (A5 - 880 Hz) con ligero retraso
+    const osc2 = state.audioCtx.createOscillator();
+    const gain2 = state.audioCtx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(880, now + 0.12);
+    gain2.gain.setValueAtTime(0, now + 0.12);
+    gain2.gain.linearRampToValueAtTime(0.4, now + 0.16);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+    osc2.connect(gain2);
+    gain2.connect(state.audioCtx.destination);
+    osc2.start(now + 0.12);
+    osc2.stop(now + 1.5);
+  } catch (err) {
+    console.warn('Web Audio error:', err);
+  }
+}
+
+// ==========================================
+// 5. SINCRONIZACIÓN EN LA NUBE (FIREBASE CLOUD FIRESTORE)
+// ==========================================
+
+function initCloudSync() {
+  const syncBadge = document.getElementById('sync-status-badge');
+  const btnCloudConfig = document.getElementById('btn-cloud-config');
+  const cloudModal = document.getElementById('cloud-sync-modal');
+  const closeCloudModal = document.getElementById('close-cloud-modal');
+  const btnCancelCloud = document.getElementById('btn-cancel-cloud');
+  const cloudForm = document.getElementById('cloud-sync-form');
+  const configTextarea = document.getElementById('firebase-config-json');
+  const btnClearCloud = document.getElementById('btn-clear-cloud');
+
+  // Cargar configuración guardada si existe
+  const savedCfg = localStorage.getItem(FIREBASE_CONFIG_KEY);
+  if (savedCfg && configTextarea) {
+    configTextarea.value = savedCfg;
+  }
+
+  // Intentar conectar con Firebase
+  if (savedCfg) {
+    connectFirebase(savedCfg);
+  } else {
+    updateSyncBadgeUI('local');
+  }
+
+  if (btnCloudConfig) {
+    btnCloudConfig.addEventListener('click', () => {
+      if (cloudModal) cloudModal.classList.remove('hidden');
+    });
+  }
+
+  if (syncBadge) {
+    syncBadge.addEventListener('click', () => {
+      if (cloudModal) cloudModal.classList.remove('hidden');
+    });
+  }
+
+  const closeCloud = () => {
+    if (cloudModal) cloudModal.classList.add('hidden');
+  };
+  if (closeCloudModal) closeCloudModal.addEventListener('click', closeCloud);
+  if (btnCancelCloud) btnCancelCloud.addEventListener('click', closeCloud);
+
+  if (cloudForm) {
+    cloudForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const raw = configTextarea.value.trim();
+      if (!raw) {
+        showToast('⚠️ Pega la configuración de Firebase.');
+        return;
+      }
+      localStorage.setItem(FIREBASE_CONFIG_KEY, raw);
+      connectFirebase(raw);
+      closeCloud();
+    });
+  }
+
+  if (btnClearCloud) {
+    btnClearCloud.addEventListener('click', () => {
+      if (confirm('¿Deseas desconectar Firebase y volver a modo Local?')) {
+        localStorage.removeItem(FIREBASE_CONFIG_KEY);
+        if (configTextarea) configTextarea.value = '';
+        if (state.unsubscribeSnapshot) state.unsubscribeSnapshot();
+        state.isCloudConnected = false;
+        updateSyncBadgeUI('local');
+        closeCloud();
+        showToast('ℹ️ Modo local activado.');
+      }
+    });
+  }
+}
+
+function updateSyncBadgeUI(status) {
+  const syncBadge = document.getElementById('sync-status-badge');
+  const syncText = document.getElementById('sync-status-text');
+  if (!syncBadge || !syncText) return;
+
+  if (status === 'connected') {
+    syncBadge.className = 'sync-badge connected';
+    syncText.textContent = '🟢 Nube en Vivo';
+  } else if (status === 'connecting') {
+    syncBadge.className = 'sync-badge local';
+    syncText.textContent = '🟡 Conectando...';
+  } else {
+    syncBadge.className = 'sync-badge local';
+    syncText.textContent = 'Modo Local';
+  }
+}
+
+function connectFirebase(configInput) {
+  try {
+    if (typeof firebase === 'undefined') {
+      console.warn('Firebase SDK no disponible');
+      updateSyncBadgeUI('local');
+      return;
+    }
+
+    updateSyncBadgeUI('connecting');
+
+    let firebaseConfig;
+    try {
+      firebaseConfig = JSON.parse(configInput);
+    } catch(err) {
+      showToast('❌ JSON de Firebase inválido.');
+      updateSyncBadgeUI('local');
+      return;
+    }
+
+    // Inicializar app de Firebase si no está creada
+    if (!firebase.apps.length) {
+      state.firebaseApp = firebase.initializeApp(firebaseConfig);
+    } else {
+      state.firebaseApp = firebase.app();
+    }
+
+    state.firestoreDb = firebase.firestore();
+
+    // Desuscribir listener previo si existía
+    if (state.unsubscribeSnapshot) {
+      state.unsubscribeSnapshot();
+    }
+
+    let initialLoad = true;
+
+    // Escuchar cambios en la colección 'bookings' en tiempo real
+    state.unsubscribeSnapshot = state.firestoreDb.collection('bookings')
+      .orderBy('createdAt', 'desc')
+      .limit(100)
+      .onSnapshot((snapshot) => {
+        let hasNew = false;
+        const cloudBookings = [];
+
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added' && !initialLoad) {
+            hasNew = true;
+          }
+        });
+
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          data.id = doc.id;
+          cloudBookings.push(data);
+        });
+
+        if (cloudBookings.length > 0) {
+          state.bookings = cloudBookings;
+          saveBookingsLocal();
+          renderActiveTab();
+        }
+
+        if (hasNew) {
+          playExecutiveChime();
+          showToast('🔔 ¡Nueva reserva de pasajero recibida en tiempo real!');
+        }
+
+        initialLoad = false;
+        state.isCloudConnected = true;
+        updateSyncBadgeUI('connected');
+      }, (error) => {
+        console.error('Error Firestore Snapshot:', error);
+        state.isCloudConnected = false;
+        updateSyncBadgeUI('local');
+      });
+
+    showToast('☁️ Conectado a Firebase Cloud Firestore.');
+  } catch (err) {
+    console.error('Error al inicializar Firebase:', err);
+    state.isCloudConnected = false;
+    updateSyncBadgeUI('local');
+    showToast('❌ Error de conexión a Firebase.');
+  }
+}
+
+// ==========================================
+// 6. CARGA Y PERSISTENCIA DE DATOS
 // ==========================================
 
 function loadBookings() {
@@ -129,21 +456,37 @@ function loadBookings() {
   }
 }
 
-function saveBookings() {
+function saveBookingsLocal() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.bookings));
   } catch (err) {
-    console.error('Error al guardar reservas:', err);
+    console.error('Error al guardar reservas localmente:', err);
   }
 }
 
-function loadAndRender() {
-  loadBookings();
-  renderDashboard();
+function saveBookingSync(booking) {
+  // 1. Guardar localmente
+  saveBookingsLocal();
+
+  // 2. Si hay Firebase conectado, sincronizar en la nube
+  if (state.firestoreDb && booking && booking.id) {
+    state.firestoreDb.collection('bookings').doc(booking.id).set(booking, { merge: true })
+      .catch(err => console.warn('Error syncing booking to cloud:', err));
+  }
+}
+
+function deleteBookingSync(bookingId) {
+  state.bookings = state.bookings.filter(b => b.id !== bookingId);
+  saveBookingsLocal();
+
+  if (state.firestoreDb && bookingId) {
+    state.firestoreDb.collection('bookings').doc(bookingId).delete()
+      .catch(err => console.warn('Error deleting booking from cloud:', err));
+  }
 }
 
 // ==========================================
-// 4. FILTRADO Y RENDERIZADO
+// 7. FILTROS Y RENDERIZADO: HOJA DE RUTA (TAB 1)
 // ==========================================
 
 function initDateFilters() {
@@ -160,7 +503,7 @@ function initDateFilters() {
         state.activeFilter = 'custom';
         state.selectedDate = e.target.value;
         setActivePill(null);
-        renderDashboard();
+        renderActiveTab();
       }
     });
   }
@@ -171,7 +514,7 @@ function initDateFilters() {
       state.selectedDate = getTodayString();
       if (customInput) customInput.value = state.selectedDate;
       setActivePill(btnToday);
-      renderDashboard();
+      renderActiveTab();
     });
   }
 
@@ -181,7 +524,7 @@ function initDateFilters() {
       state.selectedDate = getTomorrowString();
       if (customInput) customInput.value = state.selectedDate;
       setActivePill(btnTomorrow);
-      renderDashboard();
+      renderActiveTab();
     });
   }
 
@@ -189,7 +532,7 @@ function initDateFilters() {
     btnWeek.addEventListener('click', () => {
       state.activeFilter = 'week';
       setActivePill(btnWeek);
-      renderDashboard();
+      renderActiveTab();
     });
   }
 
@@ -197,7 +540,7 @@ function initDateFilters() {
     btnAll.addEventListener('click', () => {
       state.activeFilter = 'all';
       setActivePill(btnAll);
-      renderDashboard();
+      renderActiveTab();
     });
   }
 }
@@ -230,7 +573,6 @@ function getFilteredBookings() {
     }
     return true;
   }).sort((a, b) => {
-    // Ordenar primero por fecha y luego por hora
     if (a.date !== b.date) {
       return a.date.localeCompare(b.date);
     }
@@ -258,11 +600,8 @@ function renderStats(list) {
     if (b.status !== 'Cancelada') {
       totalRevenue += (Number(b.totalFare) || 0);
     }
-    if (b.status === 'Pendiente') {
-      pendingCount++;
-    } else if (b.status === 'Confirmada' || b.status === 'En Curso' || b.status === 'Completada') {
-      confirmedCount++;
-    }
+    if (b.status === 'Pendiente') pendingCount++;
+    if (b.status === 'Confirmada' || b.status === 'En Curso') confirmedCount++;
   });
 
   if (totalTripsEl) totalTripsEl.textContent = list.length;
@@ -274,9 +613,11 @@ function renderStats(list) {
 function renderBookingsList(list) {
   const container = document.getElementById('bookings-container');
   const emptyState = document.getElementById('agenda-empty-state');
-  const listCountBadge = document.getElementById('list-count-badge');
+  const countBadge = document.getElementById('list-count-badge');
 
-  if (listCountBadge) listCountBadge.textContent = `${list.length} viajes`;
+  if (countBadge) {
+    countBadge.textContent = `${list.length} ${list.length === 1 ? 'viaje' : 'viajes'}`;
+  }
 
   if (!container) return;
 
@@ -288,124 +629,60 @@ function renderBookingsList(list) {
 
   if (emptyState) emptyState.classList.add('hidden');
 
-  container.innerHTML = list.map(b => createBookingCardHtml(b)).join('');
-
-  // Vincular eventos de cada tarjeta
-  list.forEach(b => {
-    const card = document.getElementById(`card-${b.id}`);
-    if (!card) return;
-
-    // Selector de estado
-    const statusSelect = card.querySelector('.status-changer-select');
-    if (statusSelect) {
-      statusSelect.addEventListener('change', (e) => {
-        updateBookingStatus(b.id, e.target.value);
-      });
-    }
-
-    // Botón Google Calendar
-    const btnCal = card.querySelector('.btn-gcal');
-    if (btnCal) {
-      btnCal.addEventListener('click', () => openGoogleCalendar(b));
-    }
-
-    // Botón WhatsApp Confirmación
-    const btnWa = card.querySelector('.btn-wa-confirm');
-    if (btnWa) {
-      btnWa.addEventListener('click', () => openWhatsAppConfirmation(b));
-    }
-
-    // Botón Notas
-    const btnNotes = card.querySelector('.btn-edit-notes');
-    if (btnNotes) {
-      btnNotes.addEventListener('click', () => openNotesModal(b.id));
-    }
-
-    // Botón Eliminar
-    const btnDel = card.querySelector('.btn-delete-booking');
-    if (btnDel) {
-      btnDel.addEventListener('click', () => confirmDeleteBooking(b.id));
-    }
-  });
+  container.innerHTML = list.map(b => createBookingCardHTML(b)).join('');
+  attachBookingCardListeners();
 }
 
-function createBookingCardHtml(b) {
-  const statusClass = (b.status || 'Pendiente').toLowerCase().replace(/\s+/g, '');
-  const dateFormatted = formatDateDisplay(b.date);
-  const fareFormatted = (Number(b.totalFare) || 0).toLocaleString('es-AR');
+function createBookingCardHTML(b) {
+  const isRoundtrip = b.isRoundtrip ? '<span class="meta-chip gold">🔁 Ida y Vuelta</span>' : '';
+  const isPet = b.isPet ? '<span class="meta-chip">🐾 Mascota Pet Friendly</span>' : '';
+  const hasStop = b.stop ? `<div class="route-point"><span class="route-point-icon">🛑</span><span class="route-stop-text">Parada: ${escapeHTML(b.stop)}</span></div>` : '';
+  const formattedFare = `$${Number(b.totalFare || 0).toLocaleString('es-AR')}`;
+  const customerInfo = b.customerName ? `👤 ${escapeHTML(b.customerName)} ${b.customerPhone ? '• ' + escapeHTML(b.customerPhone) : ''}` : '';
+  const notesSnippet = b.notes ? `📝 "${escapeHTML(b.notes)}"` : '';
+
+  // Estado del pago para el itinerario
+  const paymentBadge = b.paymentStatus === 'Pagado' 
+    ? '<span class="payment-badge pagado">🟢 Pagado</span>'
+    : (b.paymentStatus === 'Señado' ? '<span class="payment-badge señado">🔵 Seña Abonada</span>' : '<span class="payment-badge pendiente">🔴 Pago Pendiente</span>');
 
   return `
-    <div id="card-${b.id}" class="booking-card status-border-${statusClass}">
-      <div class="booking-header-row">
-        <div class="booking-time-wrap">
-          <span class="time-pill-badge">
-            <span>🕒</span>
-            <span>${b.time || '--:--'} hs</span>
-          </span>
-          <span class="date-friendly-label">${dateFormatted}</span>
+    <article class="booking-card" data-id="${b.id}">
+      <div class="booking-card-header">
+        <div class="booking-time-badge">
+          <span class="time-pill-badge">⏰ ${b.time || '12:00'} hs</span>
+          <span class="booking-date-badge">📅 ${formatDatePretty(b.date)}</span>
+          ${paymentBadge}
         </div>
-        <div>
-          <span class="booking-status-badge status-badge-${statusClass}">
-            ${getStatusIcon(b.status)} ${b.status || 'Pendiente'}
-          </span>
-        </div>
+        <div class="booking-fare-highlight">${formattedFare}</div>
       </div>
 
       <div class="booking-route-timeline">
-        <div class="route-stop-point">
+        <div class="route-point">
           <span class="route-point-icon">🟢</span>
-          <div class="route-point-text">
-            <small>Punto de Partida (Origen)</small>
-            ${escapeHtml(b.origin || 'No especificado')}
-          </div>
+          <span class="route-point-text"><strong>Origen:</strong> ${escapeHTML(b.origin || 'No especificado')}</span>
         </div>
-
-        ${b.stop ? `
-        <div class="route-stop-point">
-          <span class="route-point-icon">🟡</span>
-          <div class="route-point-text">
-            <small>Parada Intermedia</small>
-            ${escapeHtml(b.stop)}
-          </div>
-        </div>
-        ` : ''}
-
-        <div class="route-stop-point">
+        ${hasStop}
+        <div class="route-point">
           <span class="route-point-icon">🏁</span>
-          <div class="route-point-text">
-            <small>Destino Final</small>
-            ${escapeHtml(b.destination || 'No especificado')}
-          </div>
+          <span class="route-point-text"><strong>Destino:</strong> ${escapeHTML(b.destination || 'No especificado')}</span>
         </div>
       </div>
 
-      ${b.notes || b.customerName || b.customerPhone ? `
-      <div class="booking-notes-box">
-        <span>📝</span>
-        <div>
-          ${b.customerName ? `<strong>Pasajero:</strong> ${escapeHtml(b.customerName)} ` : ''}
-          ${b.customerPhone ? `(📱 ${escapeHtml(b.customerPhone)}) ` : ''}
-          ${b.notes ? `— <em>${escapeHtml(b.notes)}</em>` : ''}
-        </div>
-      </div>
-      ` : ''}
-
-      <div class="booking-metrics-row">
-        <div class="metrics-pills-group">
-          ${b.distanceKm > 0 ? `<span class="metric-pill">📍 ${b.distanceKm} km</span>` : ''}
-          ${b.durationMin > 0 ? `<span class="metric-pill">⏱️ ${b.durationMin} min aprox</span>` : ''}
-          ${b.isRoundtrip ? `<span class="metric-pill extra-pill">🔄 Ida y Vuelta</span>` : ''}
-          ${b.isPet ? `<span class="metric-pill extra-pill">🐾 Mascota</span>` : ''}
-          ${b.tollFare > 0 ? `<span class="metric-pill">🛣️ Peaje $${b.tollFare.toLocaleString('es-AR')}</span>` : ''}
-        </div>
-        <div class="booking-fare-highlight">
-          $${fareFormatted} <span>ARS</span>
-        </div>
+      <div class="booking-meta-chips">
+        ${b.distanceKm ? `<span class="meta-chip">🛣️ ${b.distanceKm} km</span>` : ''}
+        ${b.durationMin ? `<span class="meta-chip">⏱️ ${b.durationMin} min</span>` : ''}
+        ${b.tollFare ? `<span class="meta-chip">Peajes: $${Number(b.tollFare).toLocaleString('es-AR')}</span>` : ''}
+        ${isRoundtrip}
+        ${isPet}
+        ${customerInfo ? `<span class="meta-chip gold">${customerInfo}</span>` : ''}
+        ${notesSnippet ? `<span class="meta-chip">${notesSnippet}</span>` : ''}
       </div>
 
       <div class="booking-actions-row">
-        <div class="status-selector-wrap">
-          <select class="status-changer-select" aria-label="Cambiar estado de reserva">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label style="font-size: 0.78rem; font-weight: 700; color: #94a3b8;">Estado:</label>
+          <select class="status-changer-select" data-id="${b.id}">
             <option value="Pendiente" ${b.status === 'Pendiente' ? 'selected' : ''}>🟡 Pendiente</option>
             <option value="Confirmada" ${b.status === 'Confirmada' ? 'selected' : ''}>🟢 Confirmada</option>
             <option value="En Curso" ${b.status === 'En Curso' ? 'selected' : ''}>🔵 En Curso</option>
@@ -415,327 +692,749 @@ function createBookingCardHtml(b) {
         </div>
 
         <div class="action-buttons-group">
-          <button type="button" class="btn btn-secondary btn-sm btn-gcal" title="Agregar evento a Google Calendar">
-            📅 Google Calendar
+          <button type="button" class="btn btn-primary btn-sm btn-pay-booking" title="Registrar Cobro, Seña o emitir Comprobante">
+            💳 Cobrar
           </button>
-          <button type="button" class="btn btn-outline btn-sm btn-wa-confirm" title="Enviar mensaje de confirmación por WhatsApp">
-            💬 Confirmar WhatsApp
+          <button type="button" class="btn btn-secondary btn-sm btn-maps-route" title="Abrir recorrido en Google Maps GPS">
+            📍 GPS Maps
           </button>
-          <button type="button" class="btn btn-secondary btn-sm btn-edit-notes" title="Editar datos del pasajero o notas">
-            ✏️ Notas
+          <button type="button" class="btn btn-secondary btn-sm btn-google-cal" title="Agendar en Google Calendar">
+            📅 Calendario
           </button>
-          <button type="button" class="btn btn-danger btn-sm btn-delete-booking" title="Eliminar viaje de la agenda">
+          <button type="button" class="btn btn-secondary btn-sm btn-wa-reply" title="Enviar respuesta rápida por WhatsApp">
+            💬 WhatsApp
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm btn-edit-notes" title="Editar notas y pasajero">
+            📝 Notas
+          </button>
+          <button type="button" class="btn btn-danger-subtle btn-sm btn-delete-booking" title="Eliminar viaje">
             🗑️
           </button>
         </div>
       </div>
-    </div>
+    </article>
   `;
 }
 
-function getStatusIcon(status) {
-  switch (status) {
-    case 'Confirmada': return '🟢';
-    case 'En Curso': return '🔵';
-    case 'Completada': return '✅';
-    case 'Cancelada': return '🔴';
-    default: return '🟡';
+function attachBookingCardListeners() {
+  // Cambio de estado
+  document.querySelectorAll('.status-changer-select').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      const id = e.target.getAttribute('data-id');
+      const newStatus = e.target.value;
+      updateBookingStatus(id, newStatus);
+    });
+  });
+
+  // Botón Cobrar / Liquidar
+  document.querySelectorAll('.btn-pay-booking').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const card = e.target.closest('.booking-card');
+      const id = card.getAttribute('data-id');
+      openPaymentModal(id);
+    });
+  });
+
+  // Botón GPS Google Maps
+  document.querySelectorAll('.btn-maps-route').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const card = e.target.closest('.booking-card');
+      const id = card.getAttribute('data-id');
+      const b = state.bookings.find(item => item.id === id);
+      if (b) openGoogleMaps(b);
+    });
+  });
+
+  // Botón Google Calendar
+  document.querySelectorAll('.btn-google-cal').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const card = e.target.closest('.booking-card');
+      const id = card.getAttribute('data-id');
+      const b = state.bookings.find(item => item.id === id);
+      if (b) openGoogleCalendar(b);
+    });
+  });
+
+  // Botón WhatsApp
+  document.querySelectorAll('.btn-wa-reply').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const card = e.target.closest('.booking-card');
+      const id = card.getAttribute('data-id');
+      const b = state.bookings.find(item => item.id === id);
+      if (b) sendWhatsAppQuickReply(b);
+    });
+  });
+
+  // Botón Notas
+  document.querySelectorAll('.btn-edit-notes').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const card = e.target.closest('.booking-card');
+      const id = card.getAttribute('data-id');
+      openNotesModal(id);
+    });
+  });
+
+  // Botón Eliminar
+  document.querySelectorAll('.btn-delete-booking').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const card = e.target.closest('.booking-card');
+      const id = card.getAttribute('data-id');
+      deleteBooking(id);
+    });
+  });
+}
+
+function updateBookingStatus(id, newStatus) {
+  const b = state.bookings.find(item => item.id === id);
+  if (b) {
+    b.status = newStatus;
+    saveBookingSync(b);
+    renderDashboard();
+    showToast(`Estado actualizado: ${newStatus}`);
   }
 }
 
-function formatDateDisplay(dateStr) {
-  if (!dateStr) return '';
-  const today = getTodayString();
-  const tomorrow = getTomorrowString();
-
-  if (dateStr === today) return '⚡ Hoy';
-  if (dateStr === tomorrow) return '📅 Mañana';
-
-  try {
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-      return `${days[d.getDay()]} ${parts[2]} de ${months[d.getMonth()]}`;
-    }
-  } catch(e) {}
-  return dateStr;
+function deleteBooking(id) {
+  if (confirm('¿Estás seguro de que deseas eliminar este viaje?')) {
+    deleteBookingSync(id);
+    renderActiveTab();
+    showToast('🗑️ Viaje eliminado.');
+  }
 }
 
-function escapeHtml(str) {
+function openGoogleMaps(b) {
+  const origin = encodeURIComponent(b.origin || '');
+  const dest = encodeURIComponent(b.destination || '');
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+  window.open(mapsUrl, '_blank');
+}
+
+function openGoogleCalendar(b) {
+  const title = encodeURIComponent(`Viaje RutaPrivada: ${b.origin} ➔ ${b.destination}`);
+  const details = encodeURIComponent(
+    `Traslado Ejecutivo RutaPrivada\nTarifa: $${b.totalFare}\nOrigen: ${b.origin}\nDestino: ${b.destination}\nPasajero: ${b.customerName || 'N/A'}\nTeléfono: ${b.customerPhone || 'N/A'}\nNotas: ${b.notes || 'Ninguna'}`
+  );
+  const location = encodeURIComponent(b.origin);
+
+  let startIso = '';
+  let endIso = '';
+  try {
+    const startDt = new Date(`${b.date}T${b.time || '12:00'}:00`);
+    const durationMs = (Number(b.durationMin) || 60) * 60 * 1000;
+    const endDt = new Date(startDt.getTime() + durationMs);
+
+    startIso = startDt.toISOString().replace(/-|:|\.\d\d\d/g, '');
+    endIso = endDt.toISOString().replace(/-|:|\.\d\d\d/g, '');
+  } catch(e) {
+    const todayStr = getTodayString().replace(/-/g, '');
+    startIso = `${todayStr}T120000Z`;
+    endIso = `${todayStr}T130000Z`;
+  }
+
+  const calUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startIso}/${endIso}&details=${details}&location=${location}`;
+  window.open(calUrl, '_blank');
+}
+
+function sendWhatsAppQuickReply(b) {
+  const phone = b.customerPhone ? b.customerPhone.replace(/\D/g, '') : '';
+  const text = encodeURIComponent(
+    `¡Hola ${b.customerName || ''}! Te confirmamos desde *RutaPrivada* tu traslado para el día *${formatDatePretty(b.date)}* a las *${b.time} hs*.\n\n📍 *Origen:* ${b.origin}\n🏁 *Destino:* ${b.destination}\n💵 *Tarifa acordada:* $${Number(b.totalFare).toLocaleString('es-AR')}\n\nQuedamos a tu entera disposición ante cualquier duda o requerimiento especial. ¡Buen viaje!`
+  );
+
+  const waUrl = phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+  window.open(waUrl, '_blank');
+}
+
+// ==========================================
+// 8. RENDERIZADO: CONTROL DE PAGOS (TAB 2)
+// ==========================================
+
+function renderPaymentsTab() {
+  const container = document.getElementById('payments-container');
+  const kpiCollected = document.getElementById('kpi-pay-collected');
+  const kpiPending = document.getElementById('kpi-pay-pending');
+  const kpiDigital = document.getElementById('kpi-pay-digital');
+  const kpiCash = document.getElementById('kpi-pay-cash');
+
+  let totalCollected = 0;
+  let totalPending = 0;
+  let totalDigital = 0;
+  let totalCash = 0;
+
+  state.bookings.forEach(b => {
+    if (b.status === 'Cancelada') return;
+
+    const fare = Number(b.totalFare) || 0;
+    const deposit = Number(b.depositAmount) || 0;
+    const isPaid = b.paymentStatus === 'Pagado';
+    const isDeposit = b.paymentStatus === 'Señado';
+
+    let collectedForThis = isPaid ? fare : (isDeposit ? deposit : 0);
+    let pendingForThis = isPaid ? 0 : (isDeposit ? (fare - deposit) : fare);
+
+    totalCollected += collectedForThis;
+    totalPending += pendingForThis;
+
+    const method = b.paymentMethod || 'Efectivo';
+    if (method === 'Efectivo') {
+      totalCash += collectedForThis;
+    } else {
+      totalDigital += collectedForThis;
+    }
+  });
+
+  if (kpiCollected) kpiCollected.textContent = `$${totalCollected.toLocaleString('es-AR')}`;
+  if (kpiPending) kpiPending.textContent = `$${totalPending.toLocaleString('es-AR')}`;
+  if (kpiDigital) kpiDigital.textContent = `$${totalDigital.toLocaleString('es-AR')}`;
+  if (kpiCash) kpiCash.textContent = `$${totalCash.toLocaleString('es-AR')}`;
+
+  if (!container) return;
+
+  if (state.bookings.length === 0) {
+    container.innerHTML = `
+      <div class="agenda-empty-state">
+        <div class="empty-icon">💳</div>
+        <h3>No hay cobros registrados todavía</h3>
+        <p>A medida que ingresen reservas, podrás gestionar el estado de pago, señas y generar comprobantes.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = state.bookings.map(b => {
+    const fare = Number(b.totalFare) || 0;
+    const deposit = Number(b.depositAmount) || 0;
+    const isPaid = b.paymentStatus === 'Pagado';
+    const isDeposit = b.paymentStatus === 'Señado';
+    const pendingBalance = isPaid ? 0 : Math.max(0, fare - deposit);
+
+    const badgeClass = isPaid ? 'pagado' : (isDeposit ? 'señado' : 'pendiente');
+    const badgeText = isPaid ? '🟢 Pagado 100%' : (isDeposit ? '🔵 Seña Recibida' : '🔴 Pendiente');
+
+    return `
+      <div class="payment-card" data-id="${b.id}">
+        <div class="payment-card-top">
+          <div>
+            <div style="font-weight: 800; color: #fff; font-size: 1.05rem;">
+              ${escapeHTML(b.origin)} ➔ ${escapeHTML(b.destination)}
+            </div>
+            <div style="font-size: 0.8rem; color: #94a3b8;">
+              📅 ${formatDatePretty(b.date)} • ⏰ ${b.time} hs • Pasajero: ${escapeHTML(b.customerName || 'No indicado')}
+            </div>
+          </div>
+          <span class="payment-badge ${badgeClass}">${badgeText}</span>
+        </div>
+
+        <div class="payment-grid-info">
+          <div class="payment-info-item">
+            <span class="payment-info-label">Tarifa Total</span>
+            <span class="payment-info-val">$${fare.toLocaleString('es-AR')}</span>
+          </div>
+          <div class="payment-info-item">
+            <span class="payment-info-label">Seña / Anticipo</span>
+            <span class="payment-info-val">$${deposit.toLocaleString('es-AR')}</span>
+          </div>
+          <div class="payment-info-item">
+            <span class="payment-info-label">Saldo a Cobrar</span>
+            <span class="payment-info-val" style="color: ${pendingBalance > 0 ? '#f87171' : '#34d399'}">
+              $${pendingBalance.toLocaleString('es-AR')}
+            </span>
+          </div>
+          <div class="payment-info-item">
+            <span class="payment-info-label">Método</span>
+            <span class="payment-info-val" style="font-size: 0.88rem;">${escapeHTML(b.paymentMethod || 'Efectivo')}</span>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn btn-secondary btn-sm btn-quick-receipt" data-id="${b.id}">
+            🧾 Recibo WhatsApp
+          </button>
+          <button type="button" class="btn btn-primary btn-sm btn-open-pay-modal" data-id="${b.id}">
+            💳 Registrar Pago / Liquidar
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Listeners de la pestaña de pagos
+  container.querySelectorAll('.btn-open-pay-modal').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-id');
+      openPaymentModal(id);
+    });
+  });
+
+  container.querySelectorAll('.btn-quick-receipt').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-id');
+      const b = state.bookings.find(item => item.id === id);
+      if (b) sendWhatsAppReceipt(b);
+    });
+  });
+}
+
+// ==========================================
+// 9. RENDERIZADO: FINANZAS & GANANCIA NETA (TAB 3)
+// ==========================================
+
+function renderFinancesTab() {
+  let grossTotal = 0;
+  let tollsTotal = 0;
+  let fuelTotal = 0;
+  let kmTotal = 0;
+  let tipsTotal = 0;
+  let totalHours = 0;
+  let validTripsCount = 0;
+
+  state.bookings.forEach(b => {
+    if (b.status === 'Cancelada') return;
+
+    validTripsCount++;
+    const fare = Number(b.totalFare) || 0;
+    const toll = Number(b.tollActual || b.tollFare) || 0;
+    const fuel = Number(b.fuelCostEst) || 0;
+    const tip = Number(b.tipAmount) || 0;
+    const km = Number(b.distanceKm) || 0;
+    const durMin = Number(b.durationMin) || 0;
+
+    grossTotal += (fare + tip);
+    tollsTotal += toll;
+    fuelTotal += fuel;
+    kmTotal += km;
+    tipsTotal += tip;
+    totalHours += (durMin / 60);
+  });
+
+  const expensesTotal = tollsTotal + fuelTotal;
+  const netTotal = Math.max(0, grossTotal - expensesTotal);
+  const marginPct = grossTotal > 0 ? Math.round((netTotal / grossTotal) * 100) : 100;
+  const avgTicket = validTripsCount > 0 ? Math.round(grossTotal / validTripsCount) : 0;
+  const avgHourly = totalHours > 0 ? Math.round(netTotal / totalHours) : 0;
+
+  const finGross = document.getElementById('fin-gross-total');
+  const finExpenses = document.getElementById('fin-expenses-total');
+  const finNet = document.getElementById('fin-net-total');
+  const finMargin = document.getElementById('fin-margin-pct');
+
+  const finTolls = document.getElementById('fin-tolls-total');
+  const finFuel = document.getElementById('fin-fuel-total');
+  const finKm = document.getElementById('fin-km-total');
+  const finAvgTicket = document.getElementById('fin-avg-ticket');
+  const finAvgHourly = document.getElementById('fin-avg-hourly');
+  const finTips = document.getElementById('fin-tips-total');
+
+  if (finGross) finGross.textContent = `$${grossTotal.toLocaleString('es-AR')}`;
+  if (finExpenses) finExpenses.textContent = `-$${expensesTotal.toLocaleString('es-AR')}`;
+  if (finNet) finNet.textContent = `$${netTotal.toLocaleString('es-AR')}`;
+  if (finMargin) finMargin.textContent = `Margen operativo: ${marginPct}%`;
+
+  if (finTolls) finTolls.textContent = `$${tollsTotal.toLocaleString('es-AR')}`;
+  if (finFuel) finFuel.textContent = `$${fuelTotal.toLocaleString('es-AR')}`;
+  if (finKm) finKm.textContent = `${kmTotal.toFixed(1)} km`;
+  if (finAvgTicket) finAvgTicket.textContent = `$${avgTicket.toLocaleString('es-AR')}`;
+  if (finAvgHourly) finAvgHourly.textContent = `$${avgHourly.toLocaleString('es-AR')} / hs`;
+  if (finTips) finTips.textContent = `$${tipsTotal.toLocaleString('es-AR')}`;
+}
+
+// ==========================================
+// 10. RENDERIZADO: PASAJEROS VIP (TAB 4)
+// ==========================================
+
+function renderClientsTab() {
+  const container = document.getElementById('clients-container');
+  const countBadge = document.getElementById('clients-count-badge');
+  if (!container) return;
+
+  // Agrupar reservas por cliente
+  const clientsMap = {};
+
+  state.bookings.forEach(b => {
+    const key = (b.customerPhone || b.customerName || 'Sin Identificar').trim();
+    if (!clientsMap[key]) {
+      clientsMap[key] = {
+        name: b.customerName || 'Pasajero Ejecutivo',
+        phone: b.customerPhone || '',
+        tripsCount: 0,
+        totalSpent: 0,
+        lastTripDate: b.date,
+        routes: []
+      };
+    }
+
+    const c = clientsMap[key];
+    c.tripsCount++;
+    c.totalSpent += (Number(b.totalFare) || 0);
+    if (b.date > c.lastTripDate) c.lastTripDate = b.date;
+    if (b.origin && !c.routes.includes(b.origin)) c.routes.push(b.origin);
+  });
+
+  const clientsList = Object.values(clientsMap).sort((a, b) => b.totalSpent - a.totalSpent);
+
+  if (countBadge) {
+    countBadge.textContent = `${clientsList.length} pasajeros`;
+  }
+
+  if (clientsList.length === 0) {
+    container.innerHTML = `
+      <div class="agenda-empty-state">
+        <div class="empty-icon">👥</div>
+        <h3>No hay clientes en la libreta</h3>
+        <p>A medida que agendes viajes con nombre o teléfono del pasajero, se crearán sus fichas automáticamente.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = clientsList.map(c => {
+    const initials = c.name ? c.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : 'VIP';
+    const cleanPhone = c.phone ? c.phone.replace(/\D/g, '') : '';
+    const waLink = cleanPhone ? `https://wa.me/${cleanPhone}` : '';
+
+    return `
+      <div class="client-card">
+        <div class="client-header">
+          <div class="client-avatar">${initials}</div>
+          <div>
+            <div class="client-name">${escapeHTML(c.name)}</div>
+            <div class="client-phone">${c.phone ? '📱 ' + escapeHTML(c.phone) : 'Sin teléfono registrado'}</div>
+          </div>
+        </div>
+
+        <div class="client-stats">
+          <div><strong>${c.tripsCount}</strong> viajes realizados</div>
+          <div>Total: <strong style="color: #fbbf24;">$${c.totalSpent.toLocaleString('es-AR')}</strong></div>
+        </div>
+
+        <div style="font-size: 0.78rem; color: #94a3b8;">
+          Último viaje: <strong>${formatDatePretty(c.lastTripDate)}</strong>
+        </div>
+
+        ${waLink ? `
+          <a href="${waLink}" target="_blank" class="btn btn-outline btn-sm" style="text-align:center; justify-content:center;">
+            💬 Abrir WhatsApp con Pasajero
+          </a>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// ==========================================
+// 11. MODAL DE PAGOS & RECIBOS DIGITALES
+// ==========================================
+
+function openPaymentModal(id) {
+  const b = state.bookings.find(item => item.id === id);
+  if (!b) return;
+
+  state.payingBookingId = id;
+  const modal = document.getElementById('payment-modal');
+  const routeEl = document.getElementById('pay-modal-route');
+  const dateEl = document.getElementById('pay-modal-date-time');
+  const fareEl = document.getElementById('pay-modal-total-fare');
+
+  const statusSel = document.getElementById('pay-status-select');
+  const methodSel = document.getElementById('pay-method-select');
+  const depositInput = document.getElementById('pay-deposit-input');
+  const tipInput = document.getElementById('pay-tip-input');
+  const tollInput = document.getElementById('pay-toll-actual');
+  const fuelInput = document.getElementById('pay-fuel-est');
+
+  if (routeEl) routeEl.textContent = `${b.origin} ➔ ${b.destination}`;
+  if (dateEl) dateEl.textContent = `📅 ${formatDatePretty(b.date)} a las ⏰ ${b.time} hs`;
+  if (fareEl) fareEl.textContent = `$${Number(b.totalFare || 0).toLocaleString('es-AR')}`;
+
+  if (statusSel) statusSel.value = b.paymentStatus || 'Pendiente';
+  if (methodSel) methodSel.value = b.paymentMethod || 'Efectivo';
+  if (depositInput) depositInput.value = b.depositAmount || '';
+  if (tipInput) tipInput.value = b.tipAmount || '';
+  if (tollInput) tollInput.value = b.tollActual !== undefined ? b.tollActual : (b.tollFare || '');
+  if (fuelInput) fuelInput.value = b.fuelCostEst || '';
+
+  updatePaymentModalLiveCalculations();
+  if (modal) modal.classList.remove('hidden');
+}
+
+function updatePaymentModalLiveCalculations() {
+  const b = state.bookings.find(item => item.id === state.payingBookingId);
+  if (!b) return;
+
+  const fare = Number(b.totalFare) || 0;
+  const deposit = Number(document.getElementById('pay-deposit-input')?.value) || 0;
+  const status = document.getElementById('pay-status-select')?.value || 'Pendiente';
+  const toll = Number(document.getElementById('pay-toll-actual')?.value) || 0;
+  const fuel = Number(document.getElementById('pay-fuel-est')?.value) || 0;
+
+  const liveBalEl = document.getElementById('pay-live-balance');
+  const liveNetEl = document.getElementById('pay-live-net');
+
+  let remaining = status === 'Pagado' ? 0 : Math.max(0, fare - deposit);
+  let net = Math.max(0, fare - toll - fuel);
+
+  if (liveBalEl) {
+    liveBalEl.textContent = `$${remaining.toLocaleString('es-AR')}`;
+    liveBalEl.style.color = remaining > 0 ? '#f87171' : '#34d399';
+  }
+  if (liveNetEl) {
+    liveNetEl.textContent = `$${net.toLocaleString('es-AR')}`;
+  }
+}
+
+function initLiveCalculations() {
+  ['pay-deposit-input', 'pay-status-select', 'pay-toll-actual', 'pay-fuel-est'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', updatePaymentModalLiveCalculations);
+      el.addEventListener('change', updatePaymentModalLiveCalculations);
+    }
+  });
+}
+
+function sendWhatsAppReceipt(b) {
+  const phone = b.customerPhone ? b.customerPhone.replace(/\D/g, '') : '';
+  const fare = Number(b.totalFare) || 0;
+  const deposit = Number(b.depositAmount) || 0;
+  const isPaid = b.paymentStatus === 'Pagado';
+  const balance = isPaid ? 0 : Math.max(0, fare - deposit);
+
+  const receiptText = 
+`🧾 *RUTAPRIVADA | COMPROBANTE DE PAGO & RESERVA*
+------------------------------------------------
+👤 *Pasajero:* ${b.customerName || 'Cliente VIP'}
+📅 *Fecha del Viaje:* ${formatDatePretty(b.date)}
+⏰ *Hora de Recogida:* ${b.time} hs
+🟢 *Origen:* ${b.origin}
+🏁 *Destino:* ${b.destination}
+${b.stop ? `🛑 *Parada intermedia:* ${b.stop}\n` : ''}
+💵 *Tarifa Total Acordada:* $${fare.toLocaleString('es-AR')}
+💳 *Estado del Pago:* ${isPaid ? '✅ PAGADO AL 100%' : `🔵 SEÑA ABONADA ($${deposit.toLocaleString('es-AR')})`}
+📱 *Método:* ${b.paymentMethod || 'Efectivo / Transferencia'}
+${balance > 0 ? `⚠️ *Saldo Pendiente a Cobrar en Destino:* $${balance.toLocaleString('es-AR')}\n` : '✨ *Saldo Pendiente:* $0 (Cancelado)\n'}------------------------------------------------
+¡Muchas gracias por confiar en *RutaPrivada - Traslados Ejecutivos*!`;
+
+  const encoded = encodeURIComponent(receiptText);
+  const waUrl = phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+  window.open(waUrl, '_blank');
+}
+
+// ==========================================
+// 12. MODALES (NOTAS, MANUAL, ACCIONES)
+// ==========================================
+
+function initModals() {
+  // Modal de Pago
+  const payModal = document.getElementById('payment-modal');
+  const closePayModal = document.getElementById('close-payment-modal');
+  const btnCancelPay = document.getElementById('btn-cancel-pay');
+  const payForm = document.getElementById('payment-form');
+  const btnGenReceipt = document.getElementById('btn-generate-receipt');
+
+  const closePayment = () => { if (payModal) payModal.classList.add('hidden'); };
+  if (closePayModal) closePayModal.addEventListener('click', closePayment);
+  if (btnCancelPay) btnCancelPay.addEventListener('click', closePayment);
+
+  if (payForm) {
+    payForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const b = state.bookings.find(item => item.id === state.payingBookingId);
+      if (b) {
+        b.paymentStatus = document.getElementById('pay-status-select').value;
+        b.paymentMethod = document.getElementById('pay-method-select').value;
+        b.depositAmount = Number(document.getElementById('pay-deposit-input').value) || 0;
+        b.tipAmount = Number(document.getElementById('pay-tip-input').value) || 0;
+        b.tollActual = Number(document.getElementById('pay-toll-actual').value) || 0;
+        b.fuelCostEst = Number(document.getElementById('pay-fuel-est').value) || 0;
+
+        saveBookingSync(b);
+        closePayment();
+        renderActiveTab();
+        showToast('💾 Liquidación y pago guardados.');
+      }
+    });
+  }
+
+  if (btnGenReceipt) {
+    btnGenReceipt.addEventListener('click', () => {
+      const b = state.bookings.find(item => item.id === state.payingBookingId);
+      if (b) sendWhatsAppReceipt(b);
+    });
+  }
+
+  // Modal Notas
+  const notesModal = document.getElementById('notes-modal');
+  const closeNotesModal = document.getElementById('close-notes-modal');
+  const btnCancelNotes = document.getElementById('btn-cancel-notes');
+  const notesForm = document.getElementById('notes-form');
+
+  const closeNotes = () => { if (notesModal) notesModal.classList.add('hidden'); };
+  if (closeNotesModal) closeNotesModal.addEventListener('click', closeNotes);
+  if (btnCancelNotes) btnCancelNotes.addEventListener('click', closeNotes);
+
+  if (notesForm) {
+    notesForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const b = state.bookings.find(item => item.id === state.editingBookingId);
+      if (b) {
+        b.customerName = document.getElementById('edit-customer-name').value.trim();
+        b.customerPhone = document.getElementById('edit-customer-phone').value.trim();
+        b.notes = document.getElementById('edit-booking-notes').value.trim();
+
+        saveBookingSync(b);
+        closeNotes();
+        renderActiveTab();
+        showToast('📝 Notas del viaje guardadas.');
+      }
+    });
+  }
+
+  // Modal Reserva Manual
+  const manualModal = document.getElementById('manual-booking-modal');
+  const btnOpenManual = document.getElementById('btn-open-manual-modal');
+  const closeManualModal = document.getElementById('close-manual-modal');
+  const btnCancelManual = document.getElementById('btn-cancel-manual');
+  const manualForm = document.getElementById('manual-booking-form');
+
+  if (btnOpenManual) {
+    btnOpenManual.addEventListener('click', () => {
+      document.getElementById('mb-date').value = state.selectedDate || getTodayString();
+      if (manualModal) manualModal.classList.remove('hidden');
+    });
+  }
+
+  const closeManual = () => { if (manualModal) manualModal.classList.add('hidden'); };
+  if (closeManualModal) closeManualModal.addEventListener('click', closeManual);
+  if (btnCancelManual) btnCancelManual.addEventListener('click', closeManual);
+
+  if (manualForm) {
+    manualForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const newBooking = {
+        id: 'res_manual_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        createdAt: new Date().toISOString(),
+        date: document.getElementById('mb-date').value,
+        time: document.getElementById('mb-time').value,
+        origin: document.getElementById('mb-origin').value.trim(),
+        destination: document.getElementById('mb-destination').value.trim(),
+        totalFare: Number(document.getElementById('mb-fare').value) || 0,
+        status: document.getElementById('mb-status').value,
+        customerName: document.getElementById('mb-name').value.trim(),
+        customerPhone: document.getElementById('mb-phone').value.trim(),
+        notes: document.getElementById('mb-notes').value.trim(),
+        paymentStatus: 'Pendiente',
+        paymentMethod: 'Efectivo',
+        depositAmount: 0
+      };
+
+      state.bookings.unshift(newBooking);
+      saveBookingSync(newBooking);
+      closeManual();
+      manualForm.reset();
+      renderActiveTab();
+      showToast('✨ Reserva agregada con éxito.');
+    });
+  }
+
+  // Exportar & Imprimir
+  const btnPrint = document.getElementById('btn-print-agenda');
+  if (btnPrint) {
+    btnPrint.addEventListener('click', () => window.print());
+  }
+
+  const btnExportCsv = document.getElementById('btn-export-csv');
+  if (btnExportCsv) {
+    btnExportCsv.addEventListener('click', exportBookingsToCSV);
+  }
+}
+
+function openNotesModal(id) {
+  const b = state.bookings.find(item => item.id === id);
+  if (!b) return;
+
+  state.editingBookingId = id;
+  const modal = document.getElementById('notes-modal');
+  const nameInput = document.getElementById('edit-customer-name');
+  const phoneInput = document.getElementById('edit-customer-phone');
+  const notesInput = document.getElementById('edit-booking-notes');
+
+  if (nameInput) nameInput.value = b.customerName || '';
+  if (phoneInput) phoneInput.value = b.customerPhone || '';
+  if (notesInput) notesInput.value = b.notes || '';
+
+  if (modal) modal.classList.remove('hidden');
+}
+
+function exportBookingsToCSV() {
+  const list = getFilteredBookings();
+  if (list.length === 0) {
+    showToast('⚠️ No hay viajes para exportar.');
+    return;
+  }
+
+  let csv = 'Fecha,Hora,Origen,Destino,Tarifa,Estado,Pago,Metodo,Senia,Pasajero,Telefono,Notas\n';
+
+  list.forEach(b => {
+    const row = [
+      b.date,
+      b.time,
+      `"${(b.origin || '').replace(/"/g, '""')}"`,
+      `"${(b.destination || '').replace(/"/g, '""')}"`,
+      b.totalFare || 0,
+      b.status || 'Pendiente',
+      b.paymentStatus || 'Pendiente',
+      b.paymentMethod || 'Efectivo',
+      b.depositAmount || 0,
+      `"${(b.customerName || '').replace(/"/g, '""')}"`,
+      `"${(b.customerPhone || '').replace(/"/g, '""')}"`,
+      `"${(b.notes || '').replace(/"/g, '""')}"`
+    ];
+    csv += row.join(',') + '\n';
+  });
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rutaprivada_portal_${getTodayString()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📥 Planilla Excel exportada.');
+}
+
+// ==========================================
+// 13. HELPERS Y UTILIDADES
+// ==========================================
+
+function formatDatePretty(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function escapeHTML(str) {
   if (!str) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
-// ==========================================
-// 5. ACCIONES SOBRE RESERVAS
-// ==========================================
-
-function updateBookingStatus(id, newStatus) {
-  const item = state.bookings.find(b => b.id === id);
-  if (item) {
-    item.status = newStatus;
-    saveBookings();
-    renderDashboard();
-    showToast(`Estado actualizado: ${getStatusIcon(newStatus)} ${newStatus}`);
-  }
-}
-
-function confirmDeleteBooking(id) {
-  if (confirm('¿Estás seguro de que deseas eliminar este viaje de la agenda?')) {
-    state.bookings = state.bookings.filter(b => b.id !== id);
-    saveBookings();
-    renderDashboard();
-    showToast('🗑️ Viaje eliminado de la agenda.');
-  }
-}
-
-function openGoogleCalendar(b) {
-  try {
-    const dateClean = (b.date || getTodayString()).replace(/-/g, '');
-    const timeClean = (b.time || '12:00').replace(':', '') + '00';
-    
-    // Duración estimada para fin de evento (default 1 hora)
-    const startIso = `${dateClean}T${timeClean}`;
-    
-    const title = encodeURIComponent(`🚖 Traslado Ejecutivo: ${b.origin} ➔ ${b.destination}`);
-    const details = encodeURIComponent(
-      `Reserva RutaPrivada\n\n` +
-      `Pasajero: ${b.customerName || 'Cliente'}\n` +
-      `Teléfono: ${b.customerPhone || 'Consultar'}\n` +
-      `Tarifa Acordada: $${(Number(b.totalFare) || 0).toLocaleString('es-AR')} ARS\n` +
-      `Distancia: ${b.distanceKm || 0} km\n` +
-      `Notas: ${b.notes || 'Ninguna'}`
-    );
-    const location = encodeURIComponent(b.origin || '');
-
-    const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${startIso}/${startIso}`;
-    window.open(gcalUrl, '_blank');
-  } catch (err) {
-    console.error('Error al generar enlace de Google Calendar:', err);
-    showToast('Error al abrir Google Calendar.');
-  }
-}
-
-function openWhatsAppConfirmation(b) {
-  const fare = (Number(b.totalFare) || 0).toLocaleString('es-AR');
-  const text = encodeURIComponent(
-    `*¡Hola! Te confirmamos tu traslado privado en RutaPrivada.* 🚖✨\n\n` +
-    `📅 *Fecha:* ${formatDateDisplay(b.date)}\n` +
-    `🕒 *Horario de Recogida:* ${b.time} hs\n` +
-    `📍 *Origen:* ${b.origin}\n` +
-    `🏁 *Destino:* ${b.destination}\n` +
-    `💰 *Tarifa Final:* $${fare} ARS\n\n` +
-    `Tu chofer ejecutivo te estará esperando puntualmente en el punto de encuentro. ¡Muchas gracias por elegirnos!`
-  );
-
-  const phone = b.customerPhone ? b.customerPhone.replace(/\D/g, '') : '';
-  const url = phone 
-    ? `https://api.whatsapp.com/send?phone=${phone}&text=${text}`
-    : `https://api.whatsapp.com/send?text=${text}`;
-
-  window.open(url, '_blank');
-}
-
-// ==========================================
-// 6. MODALES (NOTAS Y NUEVA RESERVA)
-// ==========================================
-
-function initModals() {
-  // Modal de Notas
-  const notesModal = document.getElementById('notes-modal');
-  const closeNotesBtn = document.getElementById('close-notes-modal');
-  const cancelNotesBtn = document.getElementById('btn-cancel-notes');
-  const notesForm = document.getElementById('notes-form');
-
-  if (closeNotesBtn && notesModal) {
-    closeNotesBtn.addEventListener('click', () => notesModal.classList.add('hidden'));
-  }
-  if (cancelNotesBtn && notesModal) {
-    cancelNotesBtn.addEventListener('click', () => notesModal.classList.add('hidden'));
-  }
-  if (notesForm) {
-    notesForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      saveEditedNotes();
-    });
-  }
-
-  // Modal de Nueva Reserva Manual
-  const manualModal = document.getElementById('manual-booking-modal');
-  const openManualBtn = document.getElementById('btn-open-manual-modal');
-  const closeManualBtn = document.getElementById('close-manual-modal');
-  const cancelManualBtn = document.getElementById('btn-cancel-manual');
-  const manualForm = document.getElementById('manual-booking-form');
-
-  if (openManualBtn && manualModal) {
-    openManualBtn.addEventListener('click', () => {
-      manualForm.reset();
-      document.getElementById('mb-date').value = state.selectedDate || getTodayString();
-      manualModal.classList.remove('hidden');
-    });
-  }
-  if (closeManualBtn && manualModal) {
-    closeManualBtn.addEventListener('click', () => manualModal.classList.add('hidden'));
-  }
-  if (cancelManualBtn && manualModal) {
-    cancelManualBtn.addEventListener('click', () => manualModal.classList.add('hidden'));
-  }
-  if (manualForm) {
-    manualForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      createManualBooking();
-    });
-  }
-}
-
-function openNotesModal(id) {
-  const item = state.bookings.find(b => b.id === id);
-  if (!item) return;
-
-  state.editingBookingId = id;
-  const modal = document.getElementById('notes-modal');
-  const inputName = document.getElementById('edit-customer-name');
-  const inputPhone = document.getElementById('edit-customer-phone');
-  const inputNotes = document.getElementById('edit-booking-notes');
-
-  if (inputName) inputName.value = item.customerName || '';
-  if (inputPhone) inputPhone.value = item.customerPhone || '';
-  if (inputNotes) inputNotes.value = item.notes || '';
-
-  if (modal) modal.classList.remove('hidden');
-}
-
-function saveEditedNotes() {
-  const item = state.bookings.find(b => b.id === state.editingBookingId);
-  if (!item) return;
-
-  const inputName = document.getElementById('edit-customer-name');
-  const inputPhone = document.getElementById('edit-customer-phone');
-  const inputNotes = document.getElementById('edit-booking-notes');
-  const modal = document.getElementById('notes-modal');
-
-  item.customerName = inputName ? inputName.value.trim() : '';
-  item.customerPhone = inputPhone ? inputPhone.value.trim() : '';
-  item.notes = inputNotes ? inputNotes.value.trim() : '';
-
-  saveBookings();
-  renderDashboard();
-  if (modal) modal.classList.add('hidden');
-  showToast('💾 Datos y notas guardadas correctamente.');
-}
-
-function createManualBooking() {
-  const date = document.getElementById('mb-date').value;
-  const time = document.getElementById('mb-time').value;
-  const origin = document.getElementById('mb-origin').value.trim();
-  const destination = document.getElementById('mb-destination').value.trim();
-  const fare = parseFloat(document.getElementById('mb-fare').value) || 0;
-  const name = document.getElementById('mb-name').value.trim();
-  const phone = document.getElementById('mb-phone').value.trim();
-  const notes = document.getElementById('mb-notes').value.trim();
-  const status = document.getElementById('mb-status').value || 'Confirmada';
-  const modal = document.getElementById('manual-booking-modal');
-
-  if (!origin || !destination) {
-    showToast('⚠️ Completa el origen y destino.');
-    return;
-  }
-
-  const newBooking = {
-    id: 'res_manual_' + Date.now(),
-    createdAt: new Date().toISOString(),
-    date: date || getTodayString(),
-    time: time || '12:00',
-    origin,
-    destination,
-    stop: '',
-    distanceKm: 0,
-    durationMin: 0,
-    totalFare: fare,
-    isRoundtrip: false,
-    isPet: false,
-    tollFare: 0,
-    status,
-    notes,
-    customerName: name,
-    customerPhone: phone
-  };
-
-  state.bookings.unshift(newBooking);
-  saveBookings();
-  renderDashboard();
-
-  if (modal) modal.classList.add('hidden');
-  showToast('✨ Reserva manual agregada a la agenda.');
-}
-
-// ==========================================
-// 7. EXPORTACIÓN E IMPRESIÓN
-// ==========================================
-
-function initActions() {
-  const btnExport = document.getElementById('btn-export-csv');
-  const btnPrint = document.getElementById('btn-print-agenda');
-
-  if (btnExport) {
-    btnExport.addEventListener('click', exportBookingsToCsv);
-  }
-
-  if (btnPrint) {
-    btnPrint.addEventListener('click', () => {
-      window.print();
-    });
-  }
-}
-
-function exportBookingsToCsv() {
-  if (state.bookings.length === 0) {
-    showToast('No hay reservas registradas para exportar.');
-    return;
-  }
-
-  const headers = ['ID', 'Fecha', 'Hora', 'Estado', 'Origen', 'Destino', 'Parada', 'Tarifa ARS', 'Pasajero', 'Telefono', 'Notas', 'Creado El'];
-  const rows = state.bookings.map(b => [
-    b.id,
-    b.date,
-    b.time,
-    b.status,
-    `"${(b.origin || '').replace(/"/g, '""')}"`,
-    `"${(b.destination || '').replace(/"/g, '""')}"`,
-    `"${(b.stop || '').replace(/"/g, '""')}"`,
-    b.totalFare,
-    `"${(b.customerName || '').replace(/"/g, '""')}"`,
-    `"${(b.customerPhone || '').replace(/"/g, '""')}"`,
-    `"${(b.notes || '').replace(/"/g, '""')}"`,
-    b.createdAt
-  ]);
-
-  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `agenda_reservas_rutaprivada_${getTodayString()}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('📥 Agenda exportada a Excel (CSV).');
-}
-
-function showToast(msg) {
+let toastTimer = null;
+function showToast(message) {
   const toast = document.getElementById('toast');
   if (!toast) return;
-  toast.textContent = msg;
+
+  toast.textContent = message;
   toast.classList.remove('hidden');
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => {
+
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
     toast.classList.add('hidden');
   }, 3500);
 }

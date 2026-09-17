@@ -4057,9 +4057,56 @@ function recordConfirmedReservation() {
       bookings.unshift(newBooking);
       if (bookings.length > 300) bookings = bookings.slice(0, 300);
       localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings));
+
+      // Sincronizar en la nube en tiempo real con Firebase Firestore
+      syncBookingToCloudREST(newBooking);
     }
   } catch (err) {
     console.warn('No se pudo registrar la reserva en la agenda:', err);
+  }
+}
+
+function syncBookingToCloudREST(booking) {
+  try {
+    const rawCfg = localStorage.getItem('rutaprivada_firebase_config');
+    if (!rawCfg) return;
+    const cfg = JSON.parse(rawCfg);
+    if (!cfg || !cfg.projectId) return;
+
+    const projectId = cfg.projectId;
+    const apiKey = cfg.apiKey;
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/bookings?documentId=${booking.id}${apiKey ? `&key=${apiKey}` : ''}`;
+
+    const fields = {
+      id: { stringValue: String(booking.id) },
+      createdAt: { stringValue: String(booking.createdAt) },
+      date: { stringValue: String(booking.date) },
+      time: { stringValue: String(booking.time) },
+      origin: { stringValue: String(booking.origin) },
+      destination: { stringValue: String(booking.destination) },
+      stop: { stringValue: String(booking.stop || '') },
+      distanceKm: { doubleValue: Number(booking.distanceKm || 0) },
+      durationMin: { integerValue: String(Math.round(booking.durationMin || 0)) },
+      totalFare: { doubleValue: Number(booking.totalFare || 0) },
+      isRoundtrip: { booleanValue: !!booking.isRoundtrip },
+      isPet: { booleanValue: !!booking.isPet },
+      tollFare: { doubleValue: Number(booking.tollFare || 0) },
+      status: { stringValue: String(booking.status || 'Pendiente') },
+      notes: { stringValue: String(booking.notes || '') },
+      customerName: { stringValue: String(booking.customerName || '') },
+      customerPhone: { stringValue: String(booking.customerPhone || '') },
+      paymentStatus: { stringValue: 'Pendiente' },
+      paymentMethod: { stringValue: 'Efectivo' },
+      depositAmount: { doubleValue: 0 }
+    };
+
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    }).catch(err => console.warn('Cloud sync background error:', err));
+  } catch(e) {
+    console.warn('Cloud sync error:', e);
   }
 }
 

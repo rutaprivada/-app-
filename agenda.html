@@ -3,13 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agenda Ejecutiva de Reservas | RutaPrivada</title>
+  <title>Portal Partner & Agenda Ejecutiva | RutaPrivada</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="agenda.css?v=2" />
+  <link rel="stylesheet" href="agenda.css?v=3" />
+
+  <!-- Firebase App & Cloud Firestore SDKs (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -17,8 +21,8 @@
   <div id="pin-login-modal" class="pin-login-backdrop hidden">
     <div class="pin-login-box">
       <div class="pin-shield-icon">🔒</div>
-      <h2>Agenda Ejecutiva</h2>
-      <p>Ingresa tu clave de administrador para desbloquear la hoja de ruta y reservas.</p>
+      <h2>Portal Partner Ejecutivo</h2>
+      <p>Ingresa tu clave de administrador para desbloquear la hoja de ruta, cobros y finanzas.</p>
       
       <form id="agenda-pin-form">
         <input 
@@ -32,7 +36,7 @@
           autofocus 
         />
         <button type="submit" class="btn btn-primary full-width" style="width:100%; justify-content:center; padding: 12px;">
-          Desbloquear Agenda
+          Desbloquear Portal
         </button>
       </form>
       <div style="margin-top: 18px;">
@@ -49,113 +53,402 @@
         <div>
           <div class="brand-title">
             Ruta<span>Privada</span>
-            <span class="brand-badge">Agenda Chofer</span>
+            <span class="brand-badge">Portal Partner</span>
           </div>
-          <p class="brand-subtitle">Control de Viajes Confirmados & Hoja de Ruta Diaria</p>
+          <p class="brand-subtitle">Centro de Mando Chofer: Reservas, Cobranzas & Finanzas</p>
         </div>
       </div>
 
+      <!-- Sync Status & Action Buttons -->
       <div class="header-actions">
-        <a href="index.html" class="btn btn-secondary btn-sm" title="Ir a la página del cotizador">
-          🚖 Cotizador Principal
-        </a>
+        <div id="sync-status-badge" class="sync-badge local" title="Haz clic para configurar Firebase Cloud Sync">
+          <span class="sync-dot"></span>
+          <span id="sync-status-text">Modo Local</span>
+        </div>
+
+        <button id="btn-sound-toggle" class="btn btn-outline btn-sm" title="Activar/Desactivar sonido de nuevas reservas">
+          🔔 Audio ON
+        </button>
+        <button id="btn-cloud-config" class="btn btn-secondary btn-sm" title="Configurar conexión en tiempo real con Firebase">
+          ☁️ Nube
+        </button>
         <button id="btn-open-manual-modal" class="btn btn-primary btn-sm" title="Cargar un viaje solicitado por teléfono o WhatsApp">
           ➕ Nueva Reserva
         </button>
-        <button id="btn-logout" class="btn btn-outline btn-sm" title="Cerrar sesión de administrador">
+        <a href="index.html" class="btn btn-outline btn-sm" title="Ir a la página del cotizador">
+          🚖 Cotizador
+        </a>
+        <button id="btn-logout" class="btn btn-danger-subtle btn-sm" title="Cerrar sesión de administrador">
           🔒 Salir
         </button>
       </div>
     </div>
   </header>
 
-  <main class="container">
+  <!-- Main App Navigation Tabs -->
+  <nav class="partner-nav-bar">
+    <div class="container nav-inner">
+      <button type="button" class="partner-tab-btn active" data-tab="tab-agenda">
+        📋 Hoja de Ruta
+      </button>
+      <button type="button" class="partner-tab-btn" data-tab="tab-payments">
+        💳 Control de Pagos & Recibos
+      </button>
+      <button type="button" class="partner-tab-btn" data-tab="tab-finances">
+        📊 Finanzas & Ganancia Neta
+      </button>
+      <button type="button" class="partner-tab-btn" data-tab="tab-clients">
+        👥 Pasajeros VIP
+      </button>
+    </div>
+  </nav>
+
+  <main class="container main-content">
     
-    <!-- KPI Statistics of the Day -->
-    <section class="agenda-stats-grid">
-      <div class="kpi-card">
-        <div class="kpi-icon">🚖</div>
-        <div class="kpi-info">
-          <span class="kpi-label">Viajes en Pantalla</span>
-          <span id="kpi-total-trips" class="kpi-value">0</span>
+    <!-- ========================================================
+         TAB 1: HOJA DE RUTA / ITINERARIO (AGENDA)
+         ======================================================== -->
+    <div id="tab-agenda" class="tab-pane active">
+      
+      <!-- KPI Statistics of the Day -->
+      <section class="agenda-stats-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon">🚖</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Viajes del Período</span>
+            <span id="kpi-total-trips" class="kpi-value">0</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">💰</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Facturación Bruta</span>
+            <span id="kpi-total-revenue" class="kpi-value gold">$0</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">⏳</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Viajes Pendientes</span>
+            <span id="kpi-pending-trips" class="kpi-value">0</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">✅</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Confirmados / En Curso</span>
+            <span id="kpi-confirmed-trips" class="kpi-value">0</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Controls Bar (Date Filters, Export, Print) -->
+      <section class="agenda-controls-bar">
+        <div class="date-preset-group">
+          <button type="button" id="btn-filter-today" class="date-pill-btn active">⚡ Hoy</button>
+          <button type="button" id="btn-filter-tomorrow" class="date-pill-btn">📅 Mañana</button>
+          <button type="button" id="btn-filter-week" class="date-pill-btn">🗓️ Esta Semana</button>
+          <button type="button" id="btn-filter-all" class="date-pill-btn">📂 Todas</button>
+        </div>
+
+        <div class="custom-date-picker-wrap">
+          <label for="custom-filter-date" style="font-size: 0.8rem; color: #94a3b8; font-weight: 700;">Fecha:</label>
+          <input type="date" id="custom-filter-date" class="custom-date-input" />
+        </div>
+
+        <div class="section-actions">
+          <button type="button" id="btn-print-agenda" class="btn btn-secondary btn-sm" title="Imprimir hoja de ruta del día">
+            🖨️ Imprimir Hoja
+          </button>
+          <button type="button" id="btn-export-csv" class="btn btn-outline btn-sm" title="Descargar planilla Excel CSV">
+            📥 Exportar Excel
+          </button>
+        </div>
+      </section>
+
+      <!-- Bookings List -->
+      <section class="agenda-list-section">
+        <div class="section-heading-row">
+          <h2 class="section-heading-title">
+            <span>Itinerario Cronológico de Viajes</span>
+            <span id="list-count-badge" class="badge-count">0 viajes</span>
+          </h2>
+        </div>
+
+        <!-- Bookings Cards Container -->
+        <div id="bookings-container" class="bookings-grid">
+          <!-- Injected via agenda.js -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="agenda-empty-state" class="agenda-empty-state hidden">
+          <div class="empty-icon">📅</div>
+          <h3>No hay viajes agendados para este período</h3>
+          <p>Las reservas cotizadas por los clientes en la web se registrarán aquí automáticamente en tiempo real, o puedes cargar un viaje manualmente.</p>
+          <button type="button" class="btn btn-primary" onclick="document.getElementById('btn-open-manual-modal').click()">
+            ➕ Cargar Reserva Manual
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <!-- ========================================================
+         TAB 2: CONTROL DE PAGOS Y RECIBOS DIGITALES
+         ======================================================== -->
+    <div id="tab-payments" class="tab-pane hidden">
+      
+      <!-- Payment Summary KPIs -->
+      <section class="agenda-stats-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon">🟢</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Total Cobrado</span>
+            <span id="kpi-pay-collected" class="kpi-value gold">$0</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">🔴</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Saldo Pendiente de Cobro</span>
+            <span id="kpi-pay-pending" class="kpi-value danger">$0</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">💳</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Transferencias / MP</span>
+            <span id="kpi-pay-digital" class="kpi-value">$0</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">💵</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Efectivo en Mano</span>
+            <span id="kpi-pay-cash" class="kpi-value">$0</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Payments Table & Cards -->
+      <section class="partner-card-section">
+        <div class="section-heading-row">
+          <h2 class="section-heading-title">
+            <span>Gestión de Cobranzas y Comprobantes</span>
+            <span class="badge-count">Liquidación de Viajes</span>
+          </h2>
+        </div>
+
+        <div id="payments-container" class="payments-list-grid">
+          <!-- Injected via agenda.js -->
+        </div>
+      </section>
+    </div>
+
+    <!-- ========================================================
+         TAB 3: FINANZAS Y GANANCIA NETA
+         ======================================================== -->
+    <div id="tab-finances" class="tab-pane hidden">
+      
+      <!-- Executive Profit Breakdown Cards -->
+      <section class="finance-hero-grid">
+        <div class="finance-hero-card gross">
+          <div class="finance-hero-label">Facturación Bruta Total</div>
+          <div id="fin-gross-total" class="finance-hero-amount">$0</div>
+          <div class="finance-hero-sub">Ingresos por tarifas y extras</div>
+        </div>
+
+        <div class="finance-hero-card expenses">
+          <div class="finance-hero-label">Gastos Operativos (Peajes + Combustible)</div>
+          <div id="fin-expenses-total" class="finance-hero-amount">-$0</div>
+          <div class="finance-hero-sub">Costos deducibles de la jornada</div>
+        </div>
+
+        <div class="finance-hero-card net">
+          <div class="finance-hero-label">💎 Ganancia Neta Real de Bolsillo</div>
+          <div id="fin-net-total" class="finance-hero-amount">$0</div>
+          <div class="finance-hero-sub" id="fin-margin-pct">Margen operativo: 100%</div>
+        </div>
+      </section>
+
+      <!-- Financial Metrics Details -->
+      <div class="finance-breakdown-row">
+        <div class="finance-detail-card">
+          <h3>⛽ Desglose de Costos de Traslado</h3>
+          <div class="cost-row">
+            <span>🛣️ Peajes Reales Abonados:</span>
+            <strong id="fin-tolls-total">$0</strong>
+          </div>
+          <div class="cost-row">
+            <span>⛽ Combustible Estimado:</span>
+            <strong id="fin-fuel-total">$0</strong>
+          </div>
+          <div class="cost-row">
+            <span>🛣️ Kilómetros Totales Recorridos:</span>
+            <strong id="fin-km-total">0 km</strong>
+          </div>
+        </div>
+
+        <div class="finance-detail-card">
+          <h3>📈 Promedios & Rentabilidad</h3>
+          <div class="cost-row">
+            <span>🏷️ Ticket Promedio por Viaje:</span>
+            <strong id="fin-avg-ticket">$0</strong>
+          </div>
+          <div class="cost-row">
+            <span>⏱️ Ganancia Promedio por Hora:</span>
+            <strong id="fin-avg-hourly">$0 / hs</strong>
+          </div>
+          <div class="cost-row">
+            <span>🎁 Total Propinas Recibidas:</span>
+            <strong id="fin-tips-total">$0</strong>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="kpi-card">
-        <div class="kpi-icon">💰</div>
-        <div class="kpi-info">
-          <span class="kpi-label">Facturación Estimada</span>
-          <span id="kpi-total-revenue" class="kpi-value gold">$0</span>
+    <!-- ========================================================
+         TAB 4: LIBRETA DE PASAJEROS VIP
+         ======================================================== -->
+    <div id="tab-clients" class="tab-pane hidden">
+      <section class="partner-card-section">
+        <div class="section-heading-row">
+          <h2 class="section-heading-title">
+            <span>Directorio de Clientes VIP</span>
+            <span id="clients-count-badge" class="badge-count">0 pasajeros</span>
+          </h2>
         </div>
-      </div>
 
-      <div class="kpi-card">
-        <div class="kpi-icon">⏳</div>
-        <div class="kpi-info">
-          <span class="kpi-label">Pendientes</span>
-          <span id="kpi-pending-trips" class="kpi-value">0</span>
+        <div id="clients-container" class="clients-grid">
+          <!-- Injected via agenda.js -->
         </div>
-      </div>
-
-      <div class="kpi-card">
-        <div class="kpi-icon">✅</div>
-        <div class="kpi-info">
-          <span class="kpi-label">Confirmados / En Curso</span>
-          <span id="kpi-confirmed-trips" class="kpi-value">0</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- Controls Bar (Date Filters, Export, Print) -->
-    <section class="agenda-controls-bar">
-      <div class="date-preset-group">
-        <button type="button" id="btn-filter-today" class="date-pill-btn active">⚡ Hoy</button>
-        <button type="button" id="btn-filter-tomorrow" class="date-pill-btn">📅 Mañana</button>
-        <button type="button" id="btn-filter-week" class="date-pill-btn">🗓️ Esta Semana</button>
-        <button type="button" id="btn-filter-all" class="date-pill-btn">📂 Todas</button>
-      </div>
-
-      <div class="custom-date-picker-wrap">
-        <label for="custom-filter-date" style="font-size: 0.8rem; color: #94a3b8; font-weight: 700;">Fecha:</label>
-        <input type="date" id="custom-filter-date" class="custom-date-input" />
-      </div>
-
-      <div class="section-actions">
-        <button type="button" id="btn-print-agenda" class="btn btn-secondary btn-sm" title="Imprimir hoja de ruta del día">
-          🖨️ Imprimir Hoja
-        </button>
-        <button type="button" id="btn-export-csv" class="btn btn-outline btn-sm" title="Descargar planilla Excel CSV">
-          📥 Exportar Excel
-        </button>
-      </div>
-    </section>
-
-    <!-- Bookings List -->
-    <section class="agenda-list-section">
-      <div class="section-heading-row">
-        <h2 class="section-heading-title">
-          <span>Itinerario de Viajes</span>
-          <span id="list-count-badge" class="badge-count">0 viajes</span>
-        </h2>
-      </div>
-
-      <!-- Bookings Cards Container -->
-      <div id="bookings-container" class="bookings-grid">
-        <!-- Injected via agenda.js -->
-      </div>
-
-      <!-- Empty State -->
-      <div id="agenda-empty-state" class="agenda-empty-state hidden">
-        <div class="empty-icon">📅</div>
-        <h3>No hay viajes agendados para este período</h3>
-        <p>Las reservas cotizadas por los clientes en la web se registrarán aquí automáticamente, o puedes cargar un viaje manualmente.</p>
-        <button type="button" class="btn btn-primary" onclick="document.getElementById('btn-open-manual-modal').click()">
-          ➕ Cargar Reserva Manual
-        </button>
-      </div>
-    </section>
+      </section>
+    </div>
 
   </main>
+
+  <!-- ========================================================
+       MODAL: GESTIÓN DE PAGOS Y LIQUIDACIÓN
+       ======================================================== -->
+  <div id="payment-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>💳 Registro de Pago & Liquidación</h3>
+        <button type="button" id="close-payment-modal" class="modal-close">&times;</button>
+      </div>
+      <form id="payment-form">
+        <input type="hidden" id="pay-booking-id" />
+
+        <div class="payment-modal-hero">
+          <div>
+            <div class="payment-modal-title" id="pay-modal-route">Origen ➔ Destino</div>
+            <div class="payment-modal-sub" id="pay-modal-date-time">Fecha y hora</div>
+          </div>
+          <div class="payment-modal-fare" id="pay-modal-total-fare">$0</div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="pay-status-select">Estado del Pago</label>
+            <select id="pay-status-select">
+              <option value="Pendiente">🔴 Pendiente de Cobro</option>
+              <option value="Señado">🔵 Seña / Anticipo Abonado</option>
+              <option value="Pagado">🟢 Pagado al 100%</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="pay-method-select">Método de Pago</label>
+            <select id="pay-method-select">
+              <option value="Efectivo">💵 Efectivo</option>
+              <option value="Transferencia">🏦 Transferencia Bancaria</option>
+              <option value="Mercado Pago">📱 Mercado Pago</option>
+              <option value="Tarjeta">💳 Tarjeta de Débito/Crédito</option>
+              <option value="Cuenta Corriente">🏢 Cuenta Corriente Corporativa</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="pay-deposit-input">Seña / Anticipo Pagado ($ ARS)</label>
+            <input type="number" id="pay-deposit-input" placeholder="0" min="0" step="500" />
+          </div>
+
+          <div class="form-group">
+            <label for="pay-tip-input">Propina ($ ARS)</label>
+            <input type="number" id="pay-tip-input" placeholder="0" min="0" step="100" />
+          </div>
+
+          <div class="form-group">
+            <label for="pay-toll-actual">Peajes Reales Pagados ($ ARS)</label>
+            <input type="number" id="pay-toll-actual" placeholder="0" min="0" step="100" />
+          </div>
+
+          <div class="form-group">
+            <label for="pay-fuel-est">Combustible Estimado ($ ARS)</label>
+            <input type="number" id="pay-fuel-est" placeholder="0" min="0" step="500" />
+          </div>
+
+          <div class="form-group full-width live-balance-card">
+            <div class="live-balance-row">
+              <span>Saldo Restante a Cobrar al Pasajero:</span>
+              <strong id="pay-live-balance" class="danger">$0</strong>
+            </div>
+            <div class="live-balance-row">
+              <span>Ganancia Neta Estimada de este Viaje:</span>
+              <strong id="pay-live-net" class="gold">$0</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions" style="justify-content: space-between;">
+          <button type="button" id="btn-generate-receipt" class="btn btn-secondary">
+            🧾 Recibo WhatsApp
+          </button>
+          <div style="display:flex; gap:10px;">
+            <button type="button" id="btn-cancel-pay" class="btn btn-outline">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar Liquidación</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL: CONFIGURACIÓN FIREBASE CLOUD SYNC
+       ======================================================== -->
+  <div id="cloud-sync-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>☁️ Sincronización en la Nube (Firebase)</h3>
+        <button type="button" id="close-cloud-modal" class="modal-close">&times;</button>
+      </div>
+      <form id="cloud-sync-form">
+        <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 16px;">
+          Conecta Firebase Cloud Firestore para recibir reservas en vivo con timbre sonoro desde cualquier celular en tiempo real.
+        </p>
+
+        <div class="form-group full-width">
+          <label for="firebase-config-json">Firebase Config JSON o Parámetros</label>
+          <textarea id="firebase-config-json" rows="6" placeholder='{ "apiKey": "...", "authDomain": "...", "projectId": "...", "storageBucket": "...", "messagingSenderId": "...", "appId": "..." }'></textarea>
+        </div>
+
+        <div class="modal-actions" style="justify-content: space-between;">
+          <button type="button" id="btn-clear-cloud" class="btn btn-danger-subtle">
+            Desconectar
+          </button>
+          <div style="display:flex; gap:10px;">
+            <button type="button" id="btn-cancel-cloud" class="btn btn-outline">Cerrar</button>
+            <button type="submit" class="btn btn-primary">Guardar y Conectar</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- Modal: Editar Notas y Datos de Pasajero -->
   <div id="notes-modal" class="modal-backdrop hidden">
@@ -248,7 +541,7 @@
   <!-- Toast Notification -->
   <div id="toast" class="toast hidden"></div>
 
-  <!-- Agenda Script -->
-  <script src="agenda.js?v=2"></script>
+  <!-- Partner App Script -->
+  <script src="agenda.js?v=3"></script>
 </body>
 </html>
