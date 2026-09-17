@@ -2679,24 +2679,8 @@ body {
 }
 
 /* =========================================================
-   Live Weather Indicator & Logo Download Modal Styles
+   Live Weather Indicator & Header Layout Styles
    ========================================================= */
-
-.logo-download-btn {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  color: #fef08a;
-  font-weight: 700;
-  transition: var(--transition);
-}
-
-.logo-download-btn:hover {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.35) 0%, rgba(217, 119, 6, 0.5) 100%);
-  border-color: #f59e0b;
-  color: #ffffff;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
-}
 
 .flex-between-header {
   display: flex;
@@ -2740,122 +2724,10 @@ body {
   animation: pulse-soft 1.5s infinite;
 }
 
-/* Modal Descarga de Logo */
-.logo-dialog {
-  max-width: 580px;
-}
-
-.logo-header-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo-header-icon {
-  font-size: 1.8rem;
-}
-
-.logo-preview-card {
-  text-align: center;
-  background: linear-gradient(180deg, #0f1520 0%, #06090e 100%);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  border-radius: var(--radius-lg);
-  padding: 24px 16px;
-  margin-bottom: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-.logo-hd-preview {
-  width: 140px;
-  height: 140px;
-  border-radius: 28px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 20px rgba(245, 158, 11, 0.25);
-  margin-bottom: 12px;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.logo-hd-preview:hover {
-  transform: scale(1.05);
-}
-
-.logo-preview-badge {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #f59e0b;
-  letter-spacing: 0.5px;
-}
-
-.logo-download-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.logo-option-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 12px 16px;
-  transition: var(--transition);
-}
-
-.logo-option-card:hover {
-  background: var(--bg-card-hover);
-  border-color: rgba(245, 158, 11, 0.3);
-  transform: translateY(-1px);
-}
-
-.logo-option-card .option-icon {
-  font-size: 1.6rem;
-  flex-shrink: 0;
-}
-
-.logo-option-card .option-details {
-  flex: 1;
-}
-
-.logo-option-card .option-details h4 {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 2px;
-}
-
-.logo-option-card .option-details p {
-  font-size: 0.76rem;
-  color: var(--text-muted);
-  line-height: 1.35;
-}
-
-.logo-guide-box {
-  background: rgba(16, 185, 129, 0.06);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  font-size: 0.8rem;
-  color: #e2e8f0;
-}
-
-.logo-guide-box h4 {
-  color: #34d399;
-  font-size: 0.86rem;
-  margin-bottom: 8px;
-}
-
-.logo-guide-box ol {
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.logo-guide-box li {
-  line-height: 1.4;
+.brand-logo-img {
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 /* ---------------- App Download & Installation Modal ---------------- */
