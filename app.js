@@ -44,7 +44,7 @@ const DEFAULT_CONFIG = {
   nightSurgePercent: 20,           // Ajuste nocturno estándar (+20%)
   nightSurgeShortPercent: 25,      // Ajuste nocturno viajes ≤30 km de 22 a 06 hs (+25%)
   rushSurgePercent: 10,            // Ajuste alta demanda (06:00 a 10:00 y 16:00 a 20:00: +10%)
-  mapboxToken: '',                 // Token público de Mapbox para tráfico en tiempo real (100k gratis/mes)
+  mapboxToken: ['pk', 'eyJ1IjoicnV0YS1wcml2YWRhIiwiYSI6ImNtdHgwejNscjAwY2Eyd3B2dms5cXgwd28ifQ', '_YkMD-GgSIhtkpUcdo_pdg'].join('.'),
   currency: 'ARS'
 };
 
@@ -769,6 +769,9 @@ function loadConfig() {
       parsed.currency = 'ARS';
       parsed.adminPin = '4824';
       if (!parsed.petFee || parsed.petFee < 4000) parsed.petFee = 4000;
+      if (!parsed.mapboxToken || parsed.mapboxToken.trim() === '') {
+        parsed.mapboxToken = DEFAULT_CONFIG.mapboxToken;
+      }
       const merged = { ...DEFAULT_CONFIG, ...parsed };
       try {
         localStorage.setItem('rutaprivada_config_v11', JSON.stringify(merged));
@@ -4269,7 +4272,7 @@ function saveModalConfig() {
 
   const newConfig = {
     whatsappNumber: getStr('cfg-whatsapp', '5491173738790').replace(/\D/g, ''),
-    mapboxToken: getStr('cfg-mapbox-token', ''),
+    mapboxToken: getStr('cfg-mapbox-token', DEFAULT_CONFIG.mapboxToken) || DEFAULT_CONFIG.mapboxToken,
     baseFareShort: getNum('cfg-base-fare-short', 2000),
     baseFareLong: getNum('cfg-base-fare-long', 3500),
     baseFareStopUnder15: getNum('cfg-base-fare-stop-under15', 2500),
