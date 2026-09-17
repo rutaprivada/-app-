@@ -1005,32 +1005,24 @@ function sendWhatsAppQuickReply(b) {
   const phone = cleanWhatsAppPhone(b.customerPhone);
   const fare = Number(b.totalFare || 0).toLocaleString('es-AR');
   const dateStr = formatDatePretty(b.date);
-  const isRound = b.isRoundtrip ? '🔁 Traslado Ida y Vuelta' : '🚗 Traslado de Ida';
-  const petStr = b.isPet ? '🐾 Acompañante Mascota (Pet Friendly)\n' : '';
-  const stopStr = b.stop ? `🛑 *Parada Intermedia:* ${b.stop}\n` : '';
-  const payStr = b.paymentStatus === 'Pagado' 
-    ? '✅ *Estado de Pago:* Abonado al 100%' 
-    : (b.paymentStatus === 'Señado' ? `🔵 *Estado de Pago:* Seña Abonada ($${Number(b.depositAmount || 0).toLocaleString('es-AR')})` : '💳 *Estado de Pago:* A convenir / Pendiente');
+  const stopStr = b.stop ? `🛑 *Parada:* ${b.stop}\n` : '';
+  const payStatus = b.paymentStatus === 'Pagado' 
+    ? '🟢 Pagado 100%' 
+    : (b.paymentStatus === 'Señado' ? `🔵 Seña $${Number(b.depositAmount || 0).toLocaleString('es-AR')}` : '💳 Pendiente a abonar');
 
   const text = 
-`✨ *RUTAPRIVADA | Confirmación de Traslado Ejecutivo* 🚘
+`✨ *RUTAPRIVADA | Traslado Confirmado* 🚘
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-¡Hola *${b.customerName || 'Estimado/a'}*! 👋 Es un placer saludarte.
-
-Te confirmamos con gusto la reserva de tu traslado:
+¡Hola *${b.customerName || 'Estimado/a'}*! Te confirmamos tu traslado:
 
 📅 *Fecha:* ${dateStr}
-⏰ *Hora de Recogida:* ${b.time} hs
+⏰ *Hora:* ${b.time} hs
 🟢 *Origen:* ${b.origin}
 ${stopStr}🏁 *Destino:* ${b.destination}
-🔖 *Modalidad:* ${isRound}
-${petStr}💵 *Tarifa Acordada:* $${fare}
-${payStr}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎩 *Chofer Asignado:* Daniel • *RutaPrivada*
-⭐ *Compromiso:* Puntualidad garantizada, vehículo higienizado y máximo confort.
+💵 *Tarifa:* $${fare} (${payStatus})
 
-Quedamos a tu entera disposición ante cualquier duda o requerimiento especial. ¡Muchas gracias por elegirnos y buen viaje! 🌟`;
+🎩 *Chofer:* Daniel • *RutaPrivada*
+Quedamos a tu entera disposición ante cualquier duda. ¡Buen viaje! 🌟`;
 
   const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
   window.open(waUrl, '_blank');

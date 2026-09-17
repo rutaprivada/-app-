@@ -3838,73 +3838,29 @@ async function reverseGeocode(lat, lon) {
 // ==========================================
 
 function buildReservationMessage() {
-  const originStr = document.getElementById('origin-input').value.trim() || 'A coordinar con chofer';
-  const destStr = document.getElementById('destination-input').value.trim() || 'A coordinar con chofer';
-  const stopStr = (state.hasIntermediateStop && state.intermediateStop) ? state.intermediateStop.address : null;
+  const originRaw = document.getElementById('origin-input')?.value?.trim() || (state.origin ? state.origin.address : 'A coordinar');
+  const destRaw = document.getElementById('destination-input')?.value?.trim() || (state.destination ? state.destination.address : 'A coordinar');
+  const originStr = cleanAddressDisplay(originRaw);
+  const destStr = cleanAddressDisplay(destRaw);
+  const stopStr = (state.hasIntermediateStop && state.intermediateStop) ? cleanAddressDisplay(state.intermediateStop.address) : null;
   const dateFormatted = state.date ? formatDateWithWeekday(state.date) : 'A convenir';
-  const b = state.breakdown;
   const passName = document.getElementById('passenger-name-input')?.value?.trim() || '';
   const passPhone = document.getElementById('passenger-phone-input')?.value?.trim() || '';
   const passNotes = document.getElementById('passenger-notes-input')?.value?.trim() || '';
+  const isRound = state.extras.roundtrip ? ' • 🔁 Ida y Vuelta' : '';
+  const isPet = state.extras.pet ? ' • 🐾 Mascota' : '';
 
-  let msg = `🚘 *RUTAPRIVADA* | _Reserva de Traslado_\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
-
-  if (passName) {
-    msg += `👤 *Pasajero:* ${passName}\n`;
-  }
-  if (passPhone) {
-    msg += `📱 *WhatsApp:* ${passPhone}\n`;
-  }
-  if (passNotes) {
-    msg += `📝 *Detalles:* ${passNotes}\n`;
-  }
-  if (passName || passPhone || passNotes) {
-    msg += `\n`;
-  }
-
-  msg += `📍 *Origen:* ${originStr}\n`;
-  if (stopStr) {
-    let stopNote = '+$500';
-    if (state.stopDetourKm >= 15) stopNote = `+$3.500 (Desvío +${state.stopDetourKm} km)`;
-    else if (state.stopDetourKm >= 10) stopNote = `+$3.000 (Desvío +${state.stopDetourKm} km)`;
-    else if (state.stopDetourKm >= 5) stopNote = `+$2.000 (Desvío +${state.stopDetourKm} km)`;
-    else if (state.stopDetourKm >= 2) stopNote = `+$1.000 (Desvío +${state.stopDetourKm} km)`;
-    msg += `🛑 *Parada:* ${stopStr} _(${stopNote})_\n`;
-  }
-  msg += `🏁 *Destino:* ${destStr}\n\n`;
+  let msg = `👋 ¡Hola! Solicito reserva de traslado en *RutaPrivada*:\n\n`;
+  if (passName) msg += `👤 *Pasajero:* ${passName}\n`;
+  if (passPhone) msg += `📱 *WhatsApp:* ${passPhone}\n`;
   msg += `📅 *Fecha:* ${dateFormatted}\n`;
   msg += `⏰ *Hora:* ${state.time || 'A convenir'} hs\n`;
-  msg += `🚘 *Vehículo:* Sedán Ejecutivo & Confort\n`;
-  msg += `🛣️ *Recorrido:* ${state.distanceKm.toFixed(1)} km (~${state.durationMin} min)\n`;
-
-  if (state.routeHasTolls && b.tollCost > 0) {
-    msg += `🛣️ *Peajes:* ${formatMoney(b.tollCost)} (${state.tollRoadNames.join(' + ')})\n`;
-  } else {
-    msg += `🛣️ *Peajes:* $0 (Sin peaje)\n`;
-  }
-
-  if (b.isLongDistance && b.longDistanceDiscount > 0) {
-    msg += `✨ *Descuento Larga Distancia:* -${formatMoney(b.longDistanceDiscount)} (-40% >200 km)\n`;
-  }
-  if (state.extras.roundtrip) {
-    msg += `🔄 *Servicio:* Ida y Vuelta (-${b.roundtripDiscountPercent || 15}% en regreso)\n`;
-  }
-  if (state.extras.pet) {
-    msg += `🐾 *Mascota:* Incluida (+${formatMoney(state.config.petFee || 4000)})\n`;
-  }
-  if (b.timeSurgePercent > 0) {
-    msg += `⏱️ *Ajuste Clima:* +${b.timeSurgePercent}% (${b.timeSurgeReason})\n`;
-  }
-  if (state.weather && state.weather.isRaining) {
-    msg += `🌧️ *Clima:* ${state.weather.label}\n`;
-  }
-
-  msg += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `💳 *TARIFA FINAL:* *${formatMoney(state.totalPrice)} ${state.config.currency}*\n`;
-  msg += `_✓ Tarifa fija garantizada sin cargos ocultos_\n`;
-  msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
-  msg += `_¡Hola! Deseo coordinar este traslado privado. ¿Tienen disponibilidad para ese horario? Muchas gracias._`;
+  msg += `📍 *Origen:* ${originStr}\n`;
+  if (stopStr) msg += `🛑 *Parada:* ${stopStr}\n`;
+  msg += `🏁 *Destino:* ${destStr}\n`;
+  msg += `💵 *Tarifa Cotizada:* ${formatMoney(state.totalPrice)} ${state.config.currency}${isRound}${isPet}\n`;
+  if (passNotes) msg += `📝 *Notas:* ${passNotes}\n`;
+  msg += `\n¿Tienen disponibilidad? ¡Muchas gracias!`;
 
   return msg;
 }
