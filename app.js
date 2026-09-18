@@ -1402,15 +1402,8 @@ function initMap() {
     scrollWheelZoom: false
   }).setView(defaultCoords, 12);
 
-  const mbToken = (state.config.mapboxToken || '').trim();
-  const tileUrl = mbToken 
-    ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${encodeURIComponent(mbToken)}`
-    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-
-  L.tileLayer(tileUrl, {
-    attribution: '&copy; Mapbox &copy; OpenStreetMap contributors',
-    tileSize: 512,
-    zoomOffset: mbToken ? -1 : 0,
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19
   }).addTo(map);
 

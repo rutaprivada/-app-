@@ -6,18 +6,32 @@
  */
 
 const STORAGE_KEY = 'rutaprivada_bookings_v1';
+const DRIVERS_STORAGE_KEY = 'rutaprivada_drivers_v1';
 const CONFIG_KEY = 'rutaprivada_config_v11';
 const FIREBASE_CONFIG_KEY = 'rutaprivada_firebase_config';
 const AUTH_SESSION_KEY = 'rutaprivada_agenda_authenticated';
 const SOUND_SETTING_KEY = 'rutaprivada_sound_enabled';
+
+const DEFAULT_DRIVERS = [
+  {
+    id: 'drv_default_1',
+    name: 'Daniel Pabon',
+    vehicle: 'Fiat Cronos Negro',
+    plate: 'AE927CN',
+    phone: '1122558226'
+  }
+];
 
 const state = {
   activeTab: 'tab-agenda',
   activeFilter: 'all', // 'all', 'today', 'tomorrow', 'week', 'custom'
   selectedDate: getTodayString(),
   bookings: [],
+  drivers: [],
   editingBookingId: null,
   payingBookingId: null,
+  editingDriverId: null,
+  pendingWhatsAppBooking: null,
   soundEnabled: localStorage.getItem(SOUND_SETTING_KEY) !== 'false',
   firebaseApp: null,
   firestoreDb: null,
@@ -175,15 +189,19 @@ function renderActiveTab() {
     renderFinancesTab();
   } else if (state.activeTab === 'tab-clients') {
     renderClientsTab();
+  } else if (state.activeTab === 'tab-drivers') {
+    renderDriversTab();
   }
 }
 
 function loadAndRenderAll() {
   loadBookings();
+  loadDrivers();
   renderDashboard();
   renderPaymentsTab();
   renderFinancesTab();
   renderClientsTab();
+  renderDriversTab();
 }
 
 // ==========================================
@@ -1029,6 +1047,51 @@ function openWhatsAppChat(phone, message) {
 }
 
 function sendWhatsAppQuickReply(b) {
+  loadDrivers();
+  const list = state.drivers && state.drivers.length > 0 ? state.drivers : DEFAULT_DRIVERS;
+
+  if (list.length === 1) {
+    confirmWithDriver(b, list[0]);
+    return;
+  }
+
+  // Si hay más de un chofer, abrir modal de selección
+  openDriverSelectModal(b, list);
+}
+
+function openDriverSelectModal(b, list) {
+  state.pendingWhatsAppBooking = b;
+  const modal = document.getElementById('driver-select-modal');
+  const container = document.getElementById('driver-select-list');
+  if (!modal || !container) {
+    confirmWithDriver(b, list[0]);
+    return;
+  }
+
+  container.innerHTML = list.map(d => `
+    <button type="button" class="btn btn-outline btn-select-driver-choice" data-id="${d.id}" style="display:flex; justify-content:space-between; align-items:center; text-align:left; padding:12px 16px; border-radius:10px; width:100%;">
+      <div>
+        <div style="font-weight:700; color:#ffffff; font-size:0.95rem;">🎩 ${escapeHTML(d.name)}</div>
+        <div style="font-size:0.82rem; color:#94a3b8;">🚘 ${escapeHTML(d.vehicle)} • Patente: <strong style="color:#38bdf8;">${escapeHTML(d.plate)}</strong></div>
+      </div>
+      <span style="font-size:1.1rem; color:#fbbf24;">➔</span>
+    </button>
+  `).join('');
+
+  // Listeners para selección
+  container.querySelectorAll('.btn-select-driver-choice').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const drvId = btn.getAttribute('data-id');
+      const chosen = list.find(d => d.id === drvId) || list[0];
+      modal.classList.add('hidden');
+      confirmWithDriver(state.pendingWhatsAppBooking || b, chosen);
+    });
+  });
+
+  modal.classList.remove('hidden');
+}
+
+function confirmWithDriver(b, driver) {
   const fare = Number(b.totalFare || 0).toLocaleString('es-AR');
   const dateStr = formatDatePretty(b.date);
   const payStatus = b.paymentStatus === 'Pagado' 
@@ -1041,9 +1104,9 @@ function sendWhatsAppQuickReply(b) {
 ¡Hola *${b.customerName || 'Estimado/a'}*! Con gusto te confirmamos el servicio para el día *${dateStr} a las ${b.time} hs*.
 
 💵 *Tarifa acordada:* $${fare} (${payStatus})
-🚘 *Vehículo:* Fiat Cronos Negro
-🔢 *Patente:* AE927CN
-🎩 *Chofer:* Daniel Pabon • *RutaPrivada*
+🚘 *Vehículo:* ${driver.vehicle}
+🔢 *Patente:* ${driver.plate}
+🎩 *Chofer:* ${driver.name} • *RutaPrivada*
 
 Estaremos puntuales en el lugar de recogida. ¡Muchas gracias por tu confianza y buen viaje! 🌟`;
 
@@ -1344,6 +1407,139 @@ function renderClientsTab() {
 }
 
 // ==========================================
+// 10.1 RENDERIZADO: CHOFERES & FLOTA (TAB 5)
+// ==========================================
+
+function loadDrivers() {
+  try {
+    const raw = localStorage.getItem(DRIVERS_STORAGE_KEY);
+    if (raw) {
+      state.drivers = JSON.parse(raw);
+    } else {
+      state.drivers = JSON.parse(JSON.stringify(DEFAULT_DRIVERS));
+      saveDrivers();
+    }
+  } catch (err) {
+    console.error('Error al cargar choferes:', err);
+    state.drivers = JSON.parse(JSON.stringify(DEFAULT_DRIVERS));
+  }
+}
+
+function saveDrivers() {
+  try {
+    localStorage.setItem(DRIVERS_STORAGE_KEY, JSON.stringify(state.drivers));
+  } catch (err) {
+    console.error('Error al guardar choferes:', err);
+  }
+}
+
+function renderDriversTab() {
+  loadDrivers();
+  const container = document.getElementById('drivers-container');
+  const countBadge = document.getElementById('drivers-count-badge');
+
+  if (countBadge) {
+    countBadge.textContent = `${state.drivers.length} ${state.drivers.length === 1 ? 'chofer activo' : 'choferes activos'}`;
+  }
+
+  if (!container) return;
+
+  if (state.drivers.length === 0) {
+    container.innerHTML = `
+      <div class="agenda-empty-state">
+        <div class="empty-icon">🚗</div>
+        <h3>No hay choferes registrados</h3>
+        <p>Agrega los choferes y vehículos de tu flota para seleccionarlos rápidamente al confirmar reservas por WhatsApp.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = state.drivers.map(d => {
+    const initials = d.name ? d.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : 'CH';
+
+    return `
+      <div class="client-card driver-card" data-id="${d.id}">
+        <div class="client-header">
+          <div class="client-avatar" style="background: linear-gradient(135deg, #10b981, #059669); color: #fff;">${initials}</div>
+          <div>
+            <div class="client-name">${escapeHTML(d.name)}</div>
+            <div class="client-phone">${d.phone ? '📱 ' + escapeHTML(d.phone) : 'Sin teléfono'}</div>
+          </div>
+        </div>
+
+        <div class="client-stats" style="grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>Auto: <strong style="color: #ffffff;">${escapeHTML(d.vehicle)}</strong></div>
+          <div>Patente: <strong style="color: #38bdf8; text-transform: uppercase;">${escapeHTML(d.plate)}</strong></div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:12px;">
+          <button type="button" class="btn btn-secondary btn-sm btn-edit-driver" data-id="${d.id}" style="flex:1; justify-content:center;">
+            ✏️ Editar
+          </button>
+          <button type="button" class="btn btn-danger-subtle btn-sm btn-delete-driver" data-id="${d.id}" style="justify-content:center;" title="Eliminar chofer">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Listeners para editar y eliminar chofer
+  container.querySelectorAll('.btn-edit-driver').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      openDriverModal(id);
+    });
+  });
+
+  container.querySelectorAll('.btn-delete-driver').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      deleteDriver(id);
+    });
+  });
+}
+
+function openDriverModal(id = null) {
+  state.editingDriverId = id;
+  const modal = document.getElementById('driver-modal');
+  const modalTitle = document.getElementById('driver-modal-title');
+  const nameInput = document.getElementById('drv-name');
+  const vehicleInput = document.getElementById('drv-vehicle');
+  const plateInput = document.getElementById('drv-plate');
+  const phoneInput = document.getElementById('drv-phone');
+
+  if (id) {
+    const d = state.drivers.find(item => item.id === id);
+    if (d) {
+      if (modalTitle) modalTitle.textContent = '✏️ Editar Chofer y Vehículo';
+      if (nameInput) nameInput.value = d.name || '';
+      if (vehicleInput) vehicleInput.value = d.vehicle || '';
+      if (plateInput) plateInput.value = d.plate || '';
+      if (phoneInput) phoneInput.value = d.phone || '';
+    }
+  } else {
+    if (modalTitle) modalTitle.textContent = '➕ Agregar Chofer y Vehículo';
+    if (nameInput) nameInput.value = '';
+    if (vehicleInput) vehicleInput.value = '';
+    if (plateInput) plateInput.value = '';
+    if (phoneInput) phoneInput.value = '';
+  }
+
+  if (modal) modal.classList.remove('hidden');
+}
+
+function deleteDriver(id) {
+  if (confirm('¿Estás seguro de que deseas eliminar este chofer de la flota?')) {
+    state.drivers = state.drivers.filter(d => d.id !== id);
+    saveDrivers();
+    renderDriversTab();
+    showToast('🗑️ Chofer eliminado.');
+  }
+}
+
+// ==========================================
 // 11. MODAL DE PAGOS & RECIBOS DIGITALES
 // ==========================================
 
@@ -1553,6 +1749,73 @@ function initModals() {
       manualForm.reset();
       renderActiveTab();
       showToast('✨ Reserva agregada con éxito.');
+    });
+  }
+
+  // Modal Chofer y Flota
+  const driverModal = document.getElementById('driver-modal');
+  const btnOpenDriver = document.getElementById('btn-open-driver-modal');
+  const closeDriverModal = document.getElementById('close-driver-modal');
+  const btnCancelDriver = document.getElementById('btn-cancel-driver');
+  const driverForm = document.getElementById('driver-form');
+
+  if (btnOpenDriver) {
+    btnOpenDriver.addEventListener('click', () => openDriverModal(null));
+  }
+
+  const closeDriver = () => { if (driverModal) driverModal.classList.add('hidden'); };
+  if (closeDriverModal) closeDriverModal.addEventListener('click', closeDriver);
+  if (btnCancelDriver) btnCancelDriver.addEventListener('click', closeDriver);
+
+  if (driverForm) {
+    driverForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('drv-name').value.trim();
+      const vehicle = document.getElementById('drv-vehicle').value.trim();
+      const plate = document.getElementById('drv-plate').value.trim().toUpperCase();
+      const phone = document.getElementById('drv-phone').value.trim();
+
+      if (!name || !vehicle || !plate) {
+        showToast('⚠️ Por favor completa los campos obligatorios.');
+        return;
+      }
+
+      if (state.editingDriverId) {
+        const d = state.drivers.find(item => item.id === state.editingDriverId);
+        if (d) {
+          d.name = name;
+          d.vehicle = vehicle;
+          d.plate = plate;
+          d.phone = phone;
+          showToast('✅ Datos del chofer actualizados.');
+        }
+      } else {
+        const newDrv = {
+          id: 'drv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          name,
+          vehicle,
+          plate,
+          phone
+        };
+        state.drivers.push(newDrv);
+        showToast('🚗 Nuevo chofer vinculado a la flota.');
+      }
+
+      saveDrivers();
+      closeDriver();
+      driverForm.reset();
+      state.editingDriverId = null;
+      renderDriversTab();
+    });
+  }
+
+  // Modal Selección de Chofer para WhatsApp
+  const driverSelectModal = document.getElementById('driver-select-modal');
+  const closeDriverSelectModal = document.getElementById('close-driver-select-modal');
+  if (closeDriverSelectModal && driverSelectModal) {
+    closeDriverSelectModal.addEventListener('click', () => {
+      driverSelectModal.classList.add('hidden');
+      state.pendingWhatsAppBooking = null;
     });
   }
 

@@ -100,6 +100,9 @@
       <button type="button" class="partner-tab-btn" data-tab="tab-clients">
         👥 Pasajeros VIP
       </button>
+      <button type="button" class="partner-tab-btn" data-tab="tab-drivers">
+        🚗 Choferes & Flota
+      </button>
     </div>
   </nav>
 
@@ -330,7 +333,85 @@
       </section>
     </div>
 
+    <!-- ========================================================
+         TAB 5: GESTIÓN DE CHOFERES & FLOTA
+         ======================================================== -->
+    <div id="tab-drivers" class="tab-pane hidden">
+      <section class="partner-card-section">
+        <div class="section-heading-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <h2 class="section-heading-title">
+            <span>Flota y Choferes Vinculados</span>
+            <span id="drivers-count-badge" class="badge-count">1 chofer activo</span>
+          </h2>
+          <button type="button" id="btn-open-driver-modal" class="btn btn-primary btn-sm">
+            ➕ Agregar Chofer / Auto
+          </button>
+        </div>
+
+        <div id="drivers-container" class="clients-grid">
+          <!-- Injected via agenda.js -->
+        </div>
+      </section>
+    </div>
+
   </main>
+
+  <!-- ========================================================
+       MODAL: SELECCIONAR CHOFER PARA CONFIRMACIÓN WHATSAPP
+       ======================================================== -->
+  <div id="driver-select-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>📲 Seleccionar Chofer para Confirmación</h3>
+        <button type="button" id="close-driver-select-modal" class="modal-close">&times;</button>
+      </div>
+      <div style="padding: 18px 24px;">
+        <p style="color: #94a3b8; font-size: 0.88rem; margin-bottom: 16px;">
+          Elige qué chofer y vehículo realizará este servicio para generar el mensaje de WhatsApp correspondiente:
+        </p>
+        <div id="driver-select-list" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Injected via agenda.js -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL: AGREGAR / EDITAR CHOFER Y VEHÍCULO
+       ======================================================== -->
+  <div id="driver-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="driver-modal-title">🚗 Chofer y Vehículo</h3>
+        <button type="button" id="close-driver-modal" class="modal-close">&times;</button>
+      </div>
+      <form id="driver-form">
+        <input type="hidden" id="drv-id" />
+        <div class="form-grid">
+          <div class="form-group full-width">
+            <label for="drv-name">Nombre y Apellido del Chofer</label>
+            <input type="text" id="drv-name" placeholder="Ej: Daniel Pabon" required />
+          </div>
+          <div class="form-group">
+            <label for="drv-vehicle">Modelo y Color del Auto</label>
+            <input type="text" id="drv-vehicle" placeholder="Ej: Fiat Cronos Negro" required />
+          </div>
+          <div class="form-group">
+            <label for="drv-plate">Patente / Dominio</label>
+            <input type="text" id="drv-plate" placeholder="Ej: AE927CN" style="text-transform: uppercase;" required />
+          </div>
+          <div class="form-group full-width">
+            <label for="drv-phone">Teléfono / WhatsApp</label>
+            <input type="text" id="drv-phone" placeholder="Ej: 1122558226" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel-driver" class="btn btn-outline">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Chofer</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- ========================================================
        MODAL: GESTIÓN DE PAGOS Y LIQUIDACIÓN
@@ -542,6 +623,6 @@
   <div id="toast" class="toast hidden"></div>
 
   <!-- Partner App Script -->
-  <script src="agenda.js?v=30"></script>
+  <script src="agenda.js?v=33"></script>
 </body>
 </html>
