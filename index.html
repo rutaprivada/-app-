@@ -134,10 +134,10 @@
     <div class="container top-announcement-content">
       <span>✨ <strong>Servicio Privado Puerta a Puerta en Argentina</strong> — Flota Ejecutiva, vehículos higienizados y puntualidad garantizada</span>
       <div class="top-actions">
-        <button id="btn-install-pwa" class="icon-btn pwa-top-btn" title="Descargar e instalar RutaPrivada en tu dispositivo" aria-label="Descargar App">
-          📲 Descargar App
+        <button id="btn-install-pwa" class="icon-btn pwa-top-btn" title="Descargar e instalar las Apps de RutaPrivada (Cliente y Conductor)" aria-label="Descargar Apps">
+          📱 Apps Móviles
         </button>
-        <a href="conductor.html" class="icon-btn" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Acceso al panel de Chofer / Conductor Partner">
+        <a href="conductor.html" class="icon-btn header-driver-link" title="Acceso al panel de Chofer / Conductor Partner">
           🚗 Modo Conductor
         </a>
         <span class="currency-locked-badge">🇦🇷 Tarifas en Pesos Argentinos (ARS)</span>
@@ -162,13 +162,17 @@
         </div>
       </div>
       <div class="header-badges">
-        <button id="btn-download-app-header" class="btn-download-app-header" title="Descargar e instalar la App de RutaPrivada en tu celular" aria-label="Descargar App">
+        <button id="btn-download-app-header" class="btn-download-app-header" title="Descargar e instalar las Apps de RutaPrivada (Cliente y Conductor)" aria-label="Descargar Apps">
           <span class="dl-app-icon">📲</span>
           <span class="dl-app-label">
-            <span class="dl-app-title">Descargar App</span>
-            <span class="dl-app-sub">Reserva Directa</span>
+            <span class="dl-app-title">Apps Móviles</span>
+            <span class="dl-app-sub">Cliente & Chofer</span>
           </span>
         </button>
+        <a href="conductor.html" class="header-driver-btn" title="Ir a la App de Conductor Partner">
+          <span class="driver-btn-icon">🚗</span>
+          <span class="driver-btn-text">Modo Conductor</span>
+        </a>
         <span class="badge badge-trust">🛡️ Choferes Verificados</span>
         <span class="badge badge-fair">⭐ Servicio 24 Horas</span>
       </div>
@@ -639,6 +643,91 @@
 
   </main>
 
+  <!-- Apps Showcase Section (Client & Driver) -->
+  <section class="apps-ecosystem-section" id="seccion-apps">
+    <div class="container">
+      <div class="ecosystem-header text-center">
+        <span class="ecosystem-tag">📱 Ecosistema Digital RutaPrivada</span>
+        <h2>Nuestras Apps Móviles de Alta Calidad</h2>
+        <p>Acceso instantáneo sin descargas pesadas desde tiendas. Instalación en 1 toque en tu pantalla de inicio con rendimiento nativo.</p>
+      </div>
+
+      <div class="ecosystem-cards-grid">
+        <!-- Card 1: App Cliente -->
+        <div class="app-eco-card client-card">
+          <div class="card-glow"></div>
+          <div class="eco-card-top">
+            <div class="eco-app-icon client-icon">
+              <img src="favicon.svg" alt="App Cliente" />
+            </div>
+            <div class="eco-app-meta">
+              <div class="eco-badge-row">
+                <span class="eco-pill green">👤 Pasajeros</span>
+                <span class="eco-pill gold">⭐ 5.0 Ejecutiva</span>
+              </div>
+              <h3>App Pasajeros & Clientes</h3>
+              <p class="eco-tagline">Cotizaciones exactas, peajes y reservas directas</p>
+            </div>
+          </div>
+
+          <div class="eco-card-body">
+            <p class="eco-desc">Diseñada para una experiencia ágil y sin complicaciones al coordinar tus viajes ejecutivos en Buenos Aires.</p>
+            <ul class="eco-features">
+              <li><i class="feature-icon">✨</i> <strong>Cotizador Inteligente:</strong> Cálculo de peajes oficiales AUSA/Riccheri en vivo.</li>
+              <li><i class="feature-icon">⚡</i> <strong>Confirmación Directa:</strong> Reserva inmediata por WhatsApp oficial.</li>
+              <li><i class="feature-icon">📍</i> <strong>Seguimiento en Vivo:</strong> Aviso cuando tu chofer asignado esté en camino.</li>
+            </ul>
+          </div>
+
+          <div class="eco-card-actions">
+            <button type="button" class="btn btn-primary btn-open-client-app" id="btn-showcase-client-install">
+              📲 Instalar App Pasajeros
+            </button>
+            <a href="#origin-input" class="btn btn-secondary">
+              ✨ Cotizar en la Web
+            </a>
+          </div>
+        </div>
+
+        <!-- Card 2: App Conductor -->
+        <div class="app-eco-card driver-card">
+          <div class="card-glow gold"></div>
+          <div class="eco-card-top">
+            <div class="eco-app-icon driver-icon">
+              <span class="driver-icon-symbol">🚗</span>
+            </div>
+            <div class="eco-app-meta">
+              <div class="eco-badge-row">
+                <span class="eco-pill gold">🚘 Chofer Partner</span>
+                <span class="eco-pill live">🔴 En Vivo</span>
+              </div>
+              <h3>App Conductor & Flota</h3>
+              <p class="eco-tagline">Consola operativa, radar de viajes y navegación GPS</p>
+            </div>
+          </div>
+
+          <div class="eco-card-body">
+            <p class="eco-desc">Panel exclusivo para choferes asociados: recepción de viajes con alertas de sonido, métricas de recaudación y GPS.</p>
+            <ul class="eco-features">
+              <li><i class="feature-icon">🔔</i> <strong>Alertas Sonoras:</strong> Solicitudes en tiempo real con cuenta regresiva.</li>
+              <li><i class="feature-icon">🗺️</i> <strong>Navegación Waze / Maps:</strong> Apertura de ruta con un toque.</li>
+              <li><i class="feature-icon">💵</i> <strong>Control de Ganancias:</strong> Registro de viajes diarios y cobros 100% directos.</li>
+            </ul>
+          </div>
+
+          <div class="eco-card-actions">
+            <a href="conductor.html" class="btn btn-gold-action">
+              🚗 Abrir App de Conductor
+            </a>
+            <button type="button" class="btn btn-secondary" id="btn-showcase-driver-install">
+              📲 Guía de Instalación Chofer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Post-Booking Confirmation & Rating Experience Modal -->
   <div id="booking-success-modal" class="modal-backdrop hidden">
     <div class="modal-dialog success-experience-dialog">
@@ -918,80 +1007,155 @@
     </div>
   </div>
 
-  <!-- App Download / PWA Installation Modal -->
+  <!-- App Download / PWA Installation Modal (Dual Client & Driver Hub) -->
   <div id="app-install-modal" class="modal-backdrop hidden">
     <div class="modal-dialog app-install-dialog">
       <div class="modal-header">
         <div class="app-install-title-wrap">
-          <span class="app-install-icon">📲</span>
+          <span class="app-install-icon">📱</span>
           <div>
-            <h3>Descargar App de RutaPrivada</h3>
-            <p class="app-install-sub">Instalación directa en tu teléfono — Sin ocupar memoria</p>
+            <h3>Centro de Aplicaciones RutaPrivada</h3>
+            <p class="app-install-sub">Instalación directa en tu teléfono — Sin ocupar memoria ni descargas pesadas</p>
           </div>
         </div>
         <button id="close-install-modal-btn" class="modal-close" aria-label="Cerrar ventana">&times;</button>
       </div>
-      <div class="modal-body">
+
+      <!-- App Tabs Switcher -->
+      <div class="app-modal-tabs">
+        <button type="button" class="app-modal-tab-btn active" id="tab-btn-client" data-tab="client">
+          <span class="tab-icon">👤</span>
+          <span>App Pasajeros</span>
+        </button>
+        <button type="button" class="app-modal-tab-btn" id="tab-btn-driver" data-tab="driver">
+          <span class="tab-icon">🚗</span>
+          <span>App Conductores</span>
+        </button>
+      </div>
+
+      <div class="modal-body app-modal-body">
         
-        <!-- App Showcase Card -->
-        <div class="app-showcase-box">
-          <div class="app-showcase-icon">
-            <img src="favicon.svg" alt="RutaPrivada App Icon" />
-          </div>
-          <div class="app-showcase-info">
-            <h4>RutaPrivada Oficial</h4>
-            <div class="app-badge-row">
-              <span class="app-tag-pill">⭐ 5.0 (Chofer Ejecutivo)</span>
-              <span class="app-tag-pill">⚡ 0 MB de Descarga</span>
-              <span class="app-tag-pill">🇦🇷 CABA & GBA</span>
+        <!-- ================= TAB 1: CLIENTE / PASAJERO ================= -->
+        <div class="app-tab-panel active" id="tab-panel-client">
+          <!-- App Showcase Card -->
+          <div class="app-showcase-box">
+            <div class="app-showcase-icon">
+              <img src="favicon.svg" alt="RutaPrivada App Icon" />
             </div>
-            <p>Tené la app oficial en la pantalla de tu celular para cotizar al instante y coordinar tu traslado en cualquier momento.</p>
-          </div>
-        </div>
-
-        <!-- Direct Install Action Button (Android / Chrome / Edge) -->
-        <div id="direct-install-action" class="direct-install-action">
-          <button id="btn-trigger-pwa-install" class="btn btn-primary full-width btn-install-large">
-            <span>📥 Instalar App en mi Celular</span>
-          </button>
-          <p class="install-action-hint">Se agregará el icono de RutaPrivada a tus aplicaciones.</p>
-        </div>
-
-        <!-- Instructions for Devices -->
-        <div class="install-instructions-card">
-          <h4 class="install-guide-heading">📱 Pasos según tu Celular o Navegador:</h4>
-          
-          <!-- Android / Chrome / Samsung -->
-          <div class="device-step-item">
-            <div class="device-step-badge">Android</div>
-            <div class="device-step-content">
-              <strong>1.</strong> Toca el botón <strong>"Instalar App"</strong> de arriba, o presiona el menú de <strong>tres puntos (⋮)</strong> en la esquina superior de tu navegador.<br>
-              <strong>2.</strong> Selecciona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a pantalla principal"</strong>.
+            <div class="app-showcase-info">
+              <h4>RutaPrivada · App Pasajeros</h4>
+              <div class="app-badge-row">
+                <span class="app-tag-pill">⭐ 5.0 (Chofer Ejecutivo)</span>
+                <span class="app-tag-pill">⚡ 0 MB de Espacio</span>
+                <span class="app-tag-pill">🇦🇷 CABA & GBA</span>
+              </div>
+              <p>Tené la app oficial en la pantalla de inicio de tu celular para cotizar al instante con peajes exactos y coordinar tu traslado seguro.</p>
             </div>
           </div>
 
-          <!-- iOS / iPhone / Safari -->
-          <div class="device-step-item">
-            <div class="device-step-badge badge-ios">iPhone (iOS)</div>
-            <div class="device-step-content">
-              <strong>1.</strong> En Safari, toca el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba <span style="font-size:1.1rem;">⎙ / 📤</span> en la barra inferior).<br>
-              <strong>2.</strong> Desplázate hacia abajo y selecciona <strong>"Agregar a pantalla de inicio"</strong> (+).
+          <!-- Direct Install Action Button (Android / Chrome / Edge) -->
+          <div id="direct-install-action" class="direct-install-action">
+            <button id="btn-trigger-pwa-install" class="btn btn-primary full-width btn-install-large">
+              <span>📥 Instalar App Pasajeros en mi Celular</span>
+            </button>
+            <p class="install-action-hint">Se agregará el icono oficial de RutaPrivada a tus aplicaciones.</p>
+          </div>
+
+          <!-- Instructions for Devices -->
+          <div class="install-instructions-card">
+            <h4 class="install-guide-heading">📱 Pasos según tu Celular:</h4>
+            
+            <!-- Android / Chrome / Samsung -->
+            <div class="device-step-item">
+              <div class="device-step-badge">Android</div>
+              <div class="device-step-content">
+                <strong>1.</strong> Toca el botón <strong>"Instalar App"</strong> de arriba, o presiona el menú de <strong>tres puntos (⋮)</strong> en tu navegador.<br>
+                <strong>2.</strong> Selecciona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a pantalla principal"</strong>.
+              </div>
+            </div>
+
+            <!-- iOS / iPhone / Safari -->
+            <div class="device-step-item">
+              <div class="device-step-badge badge-ios">iPhone (iOS)</div>
+              <div class="device-step-content">
+                <strong>1.</strong> En Safari, toca el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba <span style="font-size:1.1rem;">⎙ / 📤</span> en la barra inferior).<br>
+                <strong>2.</strong> Desplázate hacia abajo y selecciona <strong>"Agregar a pantalla de inicio"</strong> (+).
+              </div>
+            </div>
+          </div>
+
+          <div class="app-benefits-grid">
+            <div class="benefit-chip">
+              <span>⚡</span>
+              <span>Cotización exacta 24hs</span>
+            </div>
+            <div class="benefit-chip">
+              <span>💬</span>
+              <span>Contacto directo WhatsApp</span>
+            </div>
+            <div class="benefit-chip">
+              <span>🛡️</span>
+              <span>Chofer profesional y seguro</span>
             </div>
           </div>
         </div>
 
-        <div class="app-benefits-grid">
-          <div class="benefit-chip">
-            <span>⚡</span>
-            <span>Cotización inmediata 24hs</span>
+        <!-- ================= TAB 2: CONDUCTOR / CHOFER PARTNER ================= -->
+        <div class="app-tab-panel hidden" id="tab-panel-driver">
+          <!-- Driver App Showcase Card -->
+          <div class="app-showcase-box driver-showcase-box">
+            <div class="app-showcase-icon driver-showcase-icon">
+              <span style="font-size: 2.2rem; line-height: 1;">🚗</span>
+            </div>
+            <div class="app-showcase-info">
+              <h4>RutaPrivada · App Chofer Partner</h4>
+              <div class="app-badge-row">
+                <span class="app-tag-pill gold-pill">🚘 Modo Conductor</span>
+                <span class="app-tag-pill">🔔 Alertas Sonoras</span>
+                <span class="app-tag-pill">🗺️ Waze / GMaps</span>
+              </div>
+              <p>Consola interactiva para conductores asociados con radar en vivo, recepción de viajes, cálculo de ganancias y navegación GPS.</p>
+            </div>
           </div>
-          <div class="benefit-chip">
-            <span>💬</span>
-            <span>Contacto directo a WhatsApp</span>
+
+          <!-- Driver Action Buttons -->
+          <div class="driver-modal-actions-box">
+            <a href="conductor.html" class="btn btn-gold-action full-width btn-install-large" style="text-decoration: none; display: flex; justify-content: center; align-items: center; gap: 8px;">
+              <span>🚗 Abrir Modo Conductor Ahora</span>
+            </a>
+            <p class="install-action-hint">Ingresa a la consola operativa de viajes en tiempo real.</p>
           </div>
-          <div class="benefit-chip">
-            <span>🛡️</span>
-            <span>Chofer profesional y seguro</span>
+
+          <!-- Instructions for Driver Device -->
+          <div class="install-instructions-card">
+            <h4 class="install-guide-heading">📲 Cómo instalar la App de Conductor:</h4>
+            <div class="device-step-item">
+              <div class="device-step-badge gold-badge">Paso 1</div>
+              <div class="device-step-content">
+                Abre el <strong>"Modo Conductor"</strong> desde el botón superior o desde el enlace directo.
+              </div>
+            </div>
+            <div class="device-step-item">
+              <div class="device-step-badge gold-badge">Paso 2</div>
+              <div class="device-step-content">
+                En el menú de tu navegador (⋮ en Android o 📤 en Safari iPhone), selecciona <strong>"Agregar a pantalla de inicio"</strong> para tener el icono de conductor en tu teléfono.
+              </div>
+            </div>
+          </div>
+
+          <div class="app-benefits-grid">
+            <div class="benefit-chip">
+              <span>🔔</span>
+              <span>Alertas con sonido y tiempo</span>
+            </div>
+            <div class="benefit-chip">
+              <span>💵</span>
+              <span>100% Cobro directo</span>
+            </div>
+            <div class="benefit-chip">
+              <span>🗺️</span>
+              <span>Navegación Waze & Maps</span>
+            </div>
           </div>
         </div>
 
