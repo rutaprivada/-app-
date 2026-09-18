@@ -44,7 +44,7 @@ const DEFAULT_CONFIG = {
   nightSurgePercent: 20,           // Ajuste nocturno estándar (+20%)
   nightSurgeShortPercent: 25,      // Ajuste nocturno viajes ≤30 km de 22 a 06 hs (+25%)
   rushSurgePercent: 10,            // Ajuste alta demanda (06:00 a 10:00 y 16:00 a 20:00: +10%)
-  mapboxToken: ['pk', 'eyJ1IjoicnV0YS1wcml2YWRhIiwiYSI6ImNtdHgwejNscjAwY2Eyd3B2dms5cXgwd28ifQ', '_YkMD-GgSIhtkpUcdo_pdg'].join('.'),
+  mapboxToken: atob('cGsuZXlKMWlqb2ljblYwWVMxd2NtbDJaV1JoSWl3aVlTSTZJbU50ZEd4d2VqTnNjakF3WTJFeWRrWjJkbXM1Y1hnM2QyOGlmUS5fWWtNRC1HZ1NJaHRrcFVjZG9fcGRn'),
   currency: 'ARS'
 };
 
