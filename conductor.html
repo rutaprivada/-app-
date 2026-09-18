@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ruta Privada - Conductor Partner</title>
+    <meta name="theme-color" content="#0d1117">
+    <link rel="manifest" href="manifest-driver.json">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="conductor.css">
+</head>
+<body class="driver-body">
+    <!-- BARRA SUPERIOR -->
+    <header class="driver-header">
+        <div class="driver-profile-info">
+            <div class="driver-avatar-wrap">
+                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" alt="Conductor" class="driver-avatar" id="driverAvatar">
+                <span class="status-indicator" id="headerStatusDot"></span>
+            </div>
+            <div class="driver-meta">
+                <h2 class="driver-name" id="driverName">Martín G.</h2>
+                <div class="driver-rating">
+                    <i class="fa-solid fa-star"></i> <span>4.96</span>
+                    <span class="bullet">•</span>
+                    <span class="driver-car-badge" id="driverCarBadge">Toyota Corolla</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="driver-earnings-pill" id="btnVerGanancias">
+            <span class="earnings-label">Hoy</span>
+            <span class="earnings-amount" id="headerGananciasHoy">$0</span>
+        </div>
+    </header>
+
+    <!-- TOGGLE EN LÍNEA / DESCONECTADO -->
+    <div class="status-bar-container">
+        <button class="driver-status-toggle offline" id="btnToggleStatus">
+            <div class="toggle-glow"></div>
+            <div class="toggle-content">
+                <i class="fa-solid fa-power-off"></i>
+                <span id="statusText">ESTÁS DESCONECTADO</span>
+            </div>
+            <span class="toggle-subtext" id="statusSubtext">Toca para conectarte y recibir viajes</span>
+        </button>
+    </div>
+
+    <!-- CONTENEDOR PRINCIPAL DINÁMICO -->
+    <main class="driver-main">
+        
+        <!-- ESTADO 1: DESCONECTADO -->
+        <section class="driver-state-card active" id="stateOffline">
+            <div class="state-icon-box offline">
+                <i class="fa-solid fa-car-side"></i>
+            </div>
+            <h3>Listo para salir a manejar?</h3>
+            <p>Conéctate para recibir alertas sonoras de viajes en tiempo real en tu zona de cobertura.</p>
+            <div class="quick-stats-row">
+                <div class="stat-box">
+                    <span class="stat-num" id="statViajesHoy">0</span>
+                    <span class="stat-desc">Viajes Hoy</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-num" id="statHorasOnline">0h</span>
+                    <span class="stat-desc">Tiempo En Línea</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-num" id="statAceptacion">100%</span>
+                    <span class="stat-desc">Aceptación</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ESTADO 2: EN LÍNEA / BUSCANDO -->
+        <section class="driver-state-card" id="stateSearching">
+            <div class="radar-container">
+                <div class="radar-circle circle-1"></div>
+                <div class="radar-circle circle-2"></div>
+                <div class="radar-circle circle-3"></div>
+                <div class="radar-center">
+                    <i class="fa-solid fa-location-crosshairs"></i>
+                </div>
+            </div>
+            <h3 class="pulse-text">Buscando viajes cercanos...</h3>
+            <p class="radar-subtext">Te notificaremos inmediatamente cuando un pasajero solicite un viaje en tu radio.</p>
+            
+            <div class="demand-indicator">
+                <i class="fa-solid fa-fire text-gold"></i>
+                <span>Demanda alta en CABA, Aeroparque y Ezeiza</span>
+            </div>
+
+            <!-- Botón de prueba simulada -->
+            <button class="btn-demo-trip" id="btnSimularViaje">
+                <i class="fa-solid fa-bolt"></i> Simular Solicitud de Prueba
+            </button>
+        </section>
+
+        <!-- ESTADO 3: VIAJE ACTIVO EN CURSO -->
+        <section class="driver-state-card" id="stateActiveTrip">
+            <div class="trip-stage-header" id="tripStageBadge">
+                <i class="fa-solid fa-route"></i>
+                <span id="tripStageTitle">EN CAMINO AL ORIGEN</span>
+            </div>
+
+            <!-- Datos del Pasajero -->
+            <div class="passenger-card">
+                <div class="passenger-info">
+                    <div class="passenger-avatar-box">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div>
+                        <h4 id="activeTripPassengerName">Pasajero</h4>
+                        <span class="payment-method-badge" id="activeTripPayment">
+                            <i class="fa-solid fa-money-bill-wave"></i> Efectivo / Transferencia
+                        </span>
+                    </div>
+                </div>
+                <div class="passenger-actions">
+                    <a href="#" class="btn-circle-action" id="btnCallPassenger" title="Llamar">
+                        <i class="fa-solid fa-phone"></i>
+                    </a>
+                    <a href="#" class="btn-circle-action whatsapp" id="btnWhatsappPassenger" title="WhatsApp" target="_blank">
+                        <i class="fa-brands fa-whatsapp"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Puntos de Ruta -->
+            <div class="active-trip-route">
+                <div class="route-step">
+                    <div class="route-icon origin"><i class="fa-solid fa-circle-dot"></i></div>
+                    <div class="route-details">
+                        <span class="step-label">RECOGIDA</span>
+                        <p class="step-address" id="activeTripOrigin">Av. 9 de Julio 1200, CABA</p>
+                    </div>
+                </div>
+                <div class="route-connector-line"></div>
+                <div class="route-step">
+                    <div class="route-icon destination"><i class="fa-solid fa-location-dot"></i></div>
+                    <div class="route-details">
+                        <span class="step-label">DESTINO</span>
+                        <p class="step-address" id="activeTripDestination">Aeropuerto Int. de Ezeiza (EZE)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Métricas del viaje -->
+            <div class="active-trip-metrics">
+                <div class="metric-item">
+                    <span class="m-label">Distancia</span>
+                    <span class="m-val" id="activeTripDistance">32 km</span>
+                </div>
+                <div class="metric-item">
+                    <span class="m-label">Tu Ganancia</span>
+                    <span class="m-val text-gold" id="activeTripEarnings">$35.000</span>
+                </div>
+                <div class="metric-item">
+                    <span class="m-label">Peajes</span>
+                    <span class="m-val" id="activeTripTolls">Incluidos</span>
+                </div>
+            </div>
+
+            <!-- Botones de Navegación GPS Externa -->
+            <div class="navigation-apps-row">
+                <a href="#" class="btn-nav-app waze" id="btnOpenWaze" target="_blank">
+                    <i class="fa-brands fa-waze"></i> Navegar en Waze
+                </a>
+                <a href="#" class="btn-nav-app gmaps" id="btnOpenGoogleMaps" target="_blank">
+                    <i class="fa-solid fa-map-location-dot"></i> Google Maps
+                </a>
+            </div>
+
+            <!-- Botón de avance de estado del viaje -->
+            <div class="trip-flow-controls">
+                <button class="btn-flow-action" id="btnNextTripState">
+                    <span id="btnNextTripText">Llegué al punto de recogida</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+                <button class="btn-cancel-trip" id="btnCancelActiveTrip">
+                    <i class="fa-solid fa-xmark"></i> Cancelar viaje
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL / BOTTOM-SHEET: VIAJE ENTRANTE CON AUDIO Y CUENTA REGRESIVA -->
+    <div class="incoming-trip-overlay" id="incomingTripModal">
+        <div class="incoming-trip-card">
+            <!-- Barra de tiempo regresivo -->
+            <div class="countdown-bar-container">
+                <div class="countdown-bar-fill" id="countdownBar"></div>
+            </div>
+
+            <div class="incoming-header">
+                <div class="incoming-badge">
+                    <i class="fa-solid fa-bell fa-shake"></i> ¡NUEVO VIAJE ENTRANTE!
+                </div>
+                <div class="countdown-circle" id="countdownSecs">15s</div>
+            </div>
+
+            <!-- Tarifa destacada -->
+            <div class="incoming-price-box">
+                <span class="price-title">Ganancia Estimada</span>
+                <div class="price-number" id="incomingPrice">$0</div>
+                <span class="category-pill" id="incomingCategory">Sedán Ejecutivo</span>
+            </div>
+
+            <!-- Ruta del viaje entrante -->
+            <div class="incoming-route-info">
+                <div class="incoming-point">
+                    <i class="fa-solid fa-circle-dot text-emerald"></i>
+                    <div>
+                        <span class="p-label">ORIGEN (Recogida)</span>
+                        <p class="p-address" id="incomingOrigin">Cargando...</p>
+                    </div>
+                </div>
+                <div class="incoming-point">
+                    <i class="fa-solid fa-location-dot text-gold"></i>
+                    <div>
+                        <span class="p-label">DESTINO</span>
+                        <p class="p-address" id="incomingDestination">Cargando...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Distancia y tiempo -->
+            <div class="incoming-quick-info">
+                <span><i class="fa-solid fa-road"></i> <strong id="incomingDistance">0 km</strong></span>
+                <span><i class="fa-solid fa-clock"></i> <strong id="incomingDuration">0 min</strong></span>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="incoming-actions">
+                <button class="btn-reject-trip" id="btnRejectTrip">
+                    <i class="fa-solid fa-xmark"></i> Rechazar
+                </button>
+                <button class="btn-accept-trip" id="btnAcceptTrip">
+                    <i class="fa-solid fa-check"></i> ACEPTAR VIAJE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE GANANCIAS & HISTORIAL -->
+    <div class="driver-modal-overlay" id="modalGanancias">
+        <div class="driver-modal-sheet">
+            <div class="modal-sheet-header">
+                <h3><i class="fa-solid fa-wallet text-gold"></i> Mis Ganancias</h3>
+                <button class="btn-close-modal" id="btnCloseGanancias"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="earnings-summary-card">
+                <span class="sum-title">Total Acumulado Hoy</span>
+                <h2 class="sum-total" id="modalTotalGanancias">$0</h2>
+                <div class="sum-row">
+                    <span><strong id="modalCantViajes">0</strong> viajes completados</span>
+                    <span class="badge-tag">100% Cobrado</span>
+                </div>
+            </div>
+
+            <h4 class="history-title">Historial de Hoy</h4>
+            <div class="trips-history-list" id="tripsHistoryList">
+                <div class="empty-history">
+                    <i class="fa-regular fa-folder-open"></i>
+                    <p>Aún no has completado viajes en este turno.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="sync.js"></script>
+    <script src="conductor.js"></script>
+</body>
+</html>

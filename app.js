@@ -4232,6 +4232,21 @@ function recordConfirmedReservation() {
 
       // Sincronizar en la nube en tiempo real con Firebase Firestore
       syncBookingToCloudREST(newBooking);
+
+      // Notificar a la App de Conductores en tiempo real
+      if (window.RutaSync) {
+        window.RutaSync.solicitarViaje({
+          id: newBooking.id,
+          nombrePasajero: newBooking.customerName || 'Pasajero',
+          telefono: newBooking.customerPhone || '',
+          categoria: 'Ejecutivo Premium',
+          origen: newBooking.origin,
+          destino: newBooking.destination,
+          distancia: `${newBooking.distanceKm} km`,
+          duracion: `${newBooking.durationMin} min`,
+          precioEstimado: newBooking.totalFare
+        });
+      }
     }
   } catch (err) {
     console.warn('No se pudo registrar la reserva en la agenda:', err);
@@ -4661,6 +4676,27 @@ async function fetchRealtimeWeather(lat = -34.6037, lng = -58.3816) {
   } catch (err) {
     console.warn('No se pudo sincronizar el clima en vivo:', err);
   }
+}
+
+// 15. SINCRONIZACIÓN EN TIEMPO REAL CON LA APP DE CONDUCTORES
+if (window.RutaSync) {
+  window.RutaSync.on('VIAJE_ACEPTADO', (viaje) => {
+    if (viaje && viaje.conductor) {
+      showToast(`🚗 ¡Conductor Asignado! ${viaje.conductor.nombre} (${viaje.conductor.auto}) aceptó tu viaje y está en camino.`);
+    }
+  });
+
+  window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', (viaje) => {
+    if (viaje) {
+      if (viaje.estado === 'en_origen') {
+        showToast(`📍 Tu conductor ha llegado al punto de recogida.`);
+      } else if (viaje.estado === 'en_viaje') {
+        showToast(`🚀 Viaje iniciado. ¡Que tengas un excelente traslado!`);
+      } else if (viaje.estado === 'completado') {
+        showToast(`✨ Viaje finalizado. ¡Gracias por viajar con RutaPrivada!`);
+      }
+    }
+  });
 }
 
 
