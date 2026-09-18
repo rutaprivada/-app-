@@ -437,6 +437,61 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // 10. MODAL E INSTALACIÓN PWA DE CONDUCTOR
+    const btnInstallDriverApp = document.getElementById('btnInstallDriverApp');
+    const modalDriverInstall = document.getElementById('modalDriverInstall');
+    const btnCloseDriverInstall = document.getElementById('btnCloseDriverInstall');
+    const btnTriggerDriverPwaInstall = document.getElementById('btnTriggerDriverPwaInstall');
+    let deferredDriverPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredDriverPrompt = e;
+        if (btnTriggerDriverPwaInstall) {
+            btnTriggerDriverPwaInstall.innerHTML = '<i class="fa-solid fa-download"></i> Instalar App Chofer Ahora';
+        }
+    });
+
+    if (btnInstallDriverApp && modalDriverInstall) {
+        btnInstallDriverApp.addEventListener('click', () => {
+            modalDriverInstall.classList.add('active');
+        });
+    }
+
+    if (btnCloseDriverInstall && modalDriverInstall) {
+        btnCloseDriverInstall.addEventListener('click', () => {
+            modalDriverInstall.classList.remove('active');
+        });
+    }
+
+    if (modalDriverInstall) {
+        modalDriverInstall.addEventListener('click', (e) => {
+            if (e.target === modalDriverInstall) {
+                modalDriverInstall.classList.remove('active');
+            }
+        });
+    }
+
+    if (btnTriggerDriverPwaInstall) {
+        btnTriggerDriverPwaInstall.addEventListener('click', async () => {
+            if (deferredDriverPrompt) {
+                deferredDriverPrompt.prompt();
+                const choice = await deferredDriverPrompt.userChoice;
+                if (choice.outcome === 'accepted') {
+                    if (modalDriverInstall) modalDriverInstall.classList.remove('active');
+                }
+                deferredDriverPrompt = null;
+            } else {
+                const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                if (isIos) {
+                    alert('En Safari: toca el botón Compartir (📤) en la barra inferior y elige "Agregar a pantalla de inicio".');
+                } else {
+                    alert('Toca el menú (⋮) de tu navegador y selecciona "Instalar aplicación" o "Agregar a pantalla principal".');
+                }
+            }
+        });
+    }
+
     // INICIALIZACIÓN
     loadSavedStats();
 });
