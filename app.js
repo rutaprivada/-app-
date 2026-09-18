@@ -1475,13 +1475,13 @@ function setDestination(lat, lng, address) {
   checkAndRoute();
 }
 
-// Selección de la ruta óptima (priorizando autopistas, General Paz y accesos rápidos sobre avenidas lentas con semáforos y peajes caros)
+// Selección de la ruta óptima (priorizando autopistas, General Paz y accesos rápidos sobre cruces urbanos lentos y peajes de 25 de Mayo)
 function selectOptimalRoute(routes) {
   if (!routes || routes.length === 0) return null;
   if (routes.length === 1) return routes[0];
 
-  const gralPazRiccheriRegex = /(gral\.?\s*paz|general\s*paz|rn\s*a001|riccheri|rn\s*a002|panamericana|buen\s*ayre|acceso\s*norte|acceso\s*oeste)/i;
-  const centralTollCityRegex = /(25\s*de\s*mayo|dellepiane|perito\s*moreno|paseo\s*del\s*bajo|illia)/i;
+  const gralPazRingRegex = /(gral\.?\s*paz|general\s*paz|rn\s*a001|au\s*001|lugones|cantilo|panamericana|buen\s*ayre|acceso\s*norte|acceso\s*oeste)/i;
+  const centralTollCityRegex = /(25\s*de\s*mayo|au\s*1\b|dellepiane|perito\s*moreno|paseo\s*del\s*bajo|illia|9\s*de\s*julio)/i;
 
   const scored = routes.map((r) => {
     let gralPazHits = 0;
@@ -1492,20 +1492,20 @@ function selectOptimalRoute(routes) {
         if (leg.steps) {
           leg.steps.forEach(step => {
             const name = ((step.name || '') + ' ' + (step.ref || '')).toLowerCase();
-            if (gralPazRiccheriRegex.test(name)) gralPazHits++;
+            if (gralPazRingRegex.test(name)) gralPazHits++;
             if (centralTollCityRegex.test(name)) centralTollHits++;
           });
         }
       });
     }
 
-    // Ruta fluida por Gral Paz / Riccheri: máxima prioridad sobre cruzar por el centro
+    // Ruta fluida por Gral Paz / Autopistas perimetrales: máxima prioridad absoluta sobre cruzar el centro
     let adjustedScore = r.duration || 0;
     if (gralPazHits > 0) {
-      adjustedScore -= 600; // -10 min de preferencia por vía rápida perimetral
+      adjustedScore -= 3000; // Gran preferencia por circunvalación rápida perimetral (General Paz)
     }
     if (centralTollHits > 0 && gralPazHits === 0) {
-      adjustedScore += 300; // Penalizar cruce céntrico con peajes caros
+      adjustedScore += 4000; // Fuerte penalización por cruzar el centro denso y pagar peaje caro de 25 de Mayo
     }
 
     return { route: r, adjustedScore, duration: r.duration || 0, distance: r.distance || 0, gralPazHits, centralTollHits };
@@ -1537,6 +1537,12 @@ async function checkAndRoute() {
   }
   waypoints += `${d.lng},${d.lat}`;
 
+  // Detectar si es un viaje entre Norte/Oeste (Belgrano, Núñez, Palermo, Saavedra, Zona Norte/Oeste) y Ezeiza / Canning / Zona Sur
+  const isNorthOrWestToEzeiza = !s && (
+    ((o.lat > -34.615 || o.lng < -58.45) && d.lat < -34.70) ||
+    ((d.lat > -34.615 || d.lng < -58.45) && o.lat < -34.70)
+  );
+
   let route = null;
   let isMapboxSuccess = false;
   const token = (state.config.mapboxToken || '').trim();
@@ -1554,11 +1560,10 @@ async function checkAndRoute() {
         }
       }
 
-      // Si el viaje es Norte <-> Ezeiza/Sur sin parada intermedia, consultar también la alternativa por Gral Paz
-      const isNorthToEzeiza = !s && ((o.lat > -34.60 && d.lat < -34.70) || (d.lat > -34.60 && o.lat < -34.70));
-      if (isNorthToEzeiza) {
+      // Si el viaje es Norte/Oeste <-> Ezeiza/Sur sin parada intermedia, consultar siempre el corredor rápido por Av. General Paz (RN A001)
+      if (isNorthOrWestToEzeiza) {
         try {
-          const gralPazConnector = '-58.530,-34.580'; // Conector Av. Gral Paz (RN A001)
+          const gralPazConnector = '-58.520,-34.605'; // Conector Av. Gral Paz (RN A001) en Villa Real / Ciudadela
           const gralPazWaypoints = `${o.lng},${o.lat};${gralPazConnector};${d.lng},${d.lat}`;
           const mbGpUrl = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${gralPazWaypoints}?overview=full&geometries=geojson&steps=true&annotations=congestion,duration&access_token=${encodeURIComponent(token)}`;
           const mbGpRes = await fetch(mbGpUrl);
@@ -1617,23 +1622,38 @@ async function checkAndRoute() {
     }
   }
 
-  // 2. Si no se usó Mapbox o falló, recurrir a OSRM directo y limpio
+  // 2. Si no se usó Mapbox o falló, recurrir a OSRM
   if (!isMapboxSuccess) {
     state.trafficEngine = 'osrm';
     state.trafficCongestion = 'normal';
     state.mapboxCongestionLabel = '';
+    const osrmCandidateRoutes = [];
+
+    // Consulta directa OSRM
     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson&steps=true&alternatives=true`;
-    
     try {
       const osrmRes = await fetch(osrmUrl);
       const osrmData = await osrmRes.json();
       if (osrmData.code === 'Ok' && osrmData.routes && osrmData.routes.length > 0) {
-        route = selectOptimalRoute(osrmData.routes);
-      } else {
-        throw new Error('Sin ruta de OSRM');
+        osrmCandidateRoutes.push(...osrmData.routes);
       }
-    } catch (osrmErr) {
-      console.warn('Fallo OSRM, recurriendo a estimación geográfica:', osrmErr);
+    } catch (osrmErr) {}
+
+    // Consulta OSRM vía corredor General Paz si es viaje hacia Ezeiza / Sur
+    if (isNorthOrWestToEzeiza) {
+      try {
+        const gralPazConnector = '-58.520,-34.605';
+        const osrmGpUrl = `https://router.project-osrm.org/route/v1/driving/${o.lng},${o.lat};${gralPazConnector};${d.lng},${d.lat}?overview=full&geometries=geojson&steps=true`;
+        const osrmGpRes = await fetch(osrmGpUrl);
+        const osrmGpData = await osrmGpRes.json();
+        if (osrmGpData.code === 'Ok' && osrmGpData.routes && osrmGpData.routes.length > 0) {
+          osrmCandidateRoutes.push(...osrmGpData.routes);
+        }
+      } catch(osrmGpErr) {}
+    }
+
+    if (osrmCandidateRoutes.length > 0) {
+      route = selectOptimalRoute(osrmCandidateRoutes);
     }
   }
 

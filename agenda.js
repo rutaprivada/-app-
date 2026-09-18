@@ -1094,16 +1094,13 @@ function openDriverSelectModal(b, list) {
 function confirmWithDriver(b, driver) {
   const fare = Number(b.totalFare || 0).toLocaleString('es-AR');
   const dateStr = formatDatePretty(b.date);
-  const payStatus = b.paymentStatus === 'Pagado' 
-    ? '🟢 Pagado 100%' 
-    : (b.paymentStatus === 'Señado' ? `🔵 Seña $${Number(b.depositAmount || 0).toLocaleString('es-AR')}` : '💳 Pendiente a abonar');
 
   const text = 
 `✨ *¡Traslado Confirmado con Éxito!* 🚘
 --------------------------------
 ¡Hola *${b.customerName || 'Estimado/a'}*! Con gusto te confirmamos el servicio para el día *${dateStr} a las ${b.time} hs*.
 
-💵 *Tarifa acordada:* $${fare} (${payStatus})
+💵 *Tarifa acordada:* $${fare}
 🚘 *Vehículo:* ${driver.vehicle}
 🔢 *Patente:* ${driver.plate}
 🎩 *Chofer:* ${driver.name} • *RutaPrivada*
