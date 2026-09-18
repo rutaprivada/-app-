@@ -1,0 +1,17 @@
+{
+  "appId": "com.rutaprivada.chofer",
+  "appName": "RutaPrivada Chofer",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "url": "conductor.html?mode=app"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#090d16",
+      "showSpinner": false
+    }
+  }
+}

@@ -5,6 +5,16 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Detección de Modo App Nativa / PWA vs Web
+    const isAppMode = window.matchMedia('(display-mode: standalone)').matches || 
+                     window.navigator.standalone === true || 
+                     new URLSearchParams(window.location.search).get('mode') === 'app' || 
+                     window.Capacitor !== undefined;
+
+    if (isAppMode) {
+        document.body.classList.add('is-app-mode');
+    }
+
     // ESTADO DEL CONDUCTOR
     const driverState = {
         isOnline: false,

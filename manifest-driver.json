@@ -1,7 +1,9 @@
 {
-  "name": "Ruta Privada Conductor",
-  "short_name": "Ruta Driver",
-  "start_url": "./conductor.html",
+  "name": "RutaPrivada Chofer - Conductor Partner",
+  "short_name": "RutaPrivada Chofer",
+  "id": "com.rutaprivada.chofer",
+  "start_url": "./conductor.html?mode=app",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#090d16",
   "theme_color": "#f59e0b",

@@ -1,0 +1,17 @@
+{
+  "appId": "com.rutaprivada.pasajero",
+  "appName": "RutaPrivada",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "url": "index.html?mode=app"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0a0d14",
+      "showSpinner": false
+    }
+  }
+}

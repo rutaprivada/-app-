@@ -4720,16 +4720,204 @@ async function fetchRealtimeWeather(lat = -34.6037, lng = -58.3816) {
   }
 }
 
-// 15. SINCRONIZACIÓN EN TIEMPO REAL CON LA APP DE CONDUCTORES
+// ==========================================
+// 15. SINCRONIZACIÓN Y DESPACHO EN TIEMPO REAL (IN-APP TRIP DISPATCH)
+// ==========================================
+
+// Detección de Modo App Nativa / PWA vs Web Pública
+const isAppMode = window.matchMedia('(display-mode: standalone)').matches || 
+                 window.navigator.standalone === true || 
+                 new URLSearchParams(window.location.search).get('mode') === 'app' || 
+                 window.Capacitor !== undefined;
+
+if (isAppMode) {
+  document.body.classList.add('is-app-mode');
+}
+
+// Elementos del Modal In-App
+const inappTripModal = document.getElementById('inapp-trip-modal');
+const closeInappTripBtn = document.getElementById('close-inapp-trip-btn');
+const btnRequestInapp = document.getElementById('btn-request-inapp');
+const btnPassengerCancelTrip = document.getElementById('btn-passenger-cancel-trip') || document.getElementById('btnPassengerCancelTrip');
+const pStateSearching = document.getElementById('pStateSearching');
+const pStateDriverAssigned = document.getElementById('pStateDriverAssigned');
+
+const pDriverName = document.getElementById('pDriverName');
+const pDriverRating = document.getElementById('pDriverRating');
+const pDriverCar = document.getElementById('pDriverCar');
+const pDriverAvatar = document.getElementById('pDriverAvatar');
+const pStageBannerText = document.getElementById('pStageBannerText');
+const btnPassengerCallDriver = document.getElementById('btnPassengerCallDriver');
+const btnPassengerChatDriver = document.getElementById('btnPassengerChatDriver');
+
+const pTripOrigin = document.getElementById('pTripOrigin');
+const pTripDestination = document.getElementById('pTripDestination');
+const pTripTotal = document.getElementById('pTripTotal');
+const passengerTripModalTitle = document.getElementById('passengerTripModalTitle');
+
+const pStepAssigned = document.getElementById('pStepAssigned');
+const pStepEnCamino = document.getElementById('pStepEnCamino');
+const pStepEnOrigen = document.getElementById('pStepEnOrigen');
+const pStepEnViaje = document.getElementById('pStepEnViaje');
+const pLine1 = document.getElementById('pLine1');
+const pLine2 = document.getElementById('pLine2');
+const pLine3 = document.getElementById('pLine3');
+
+function openInAppTripModal(trip) {
+  if (!inappTripModal) return;
+
+  if (pTripOrigin) pTripOrigin.textContent = trip.origen || 'Origen seleccionado';
+  if (pTripDestination) pTripDestination.textContent = trip.destino || 'Destino seleccionado';
+  if (pTripTotal) pTripTotal.textContent = '$' + (trip.precioEstimado || 0).toLocaleString('es-AR');
+
+  // Estado inicial: Buscando
+  if (pStateSearching) pStateSearching.classList.remove('hidden');
+  if (pStateDriverAssigned) pStateDriverAssigned.classList.add('hidden');
+  if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Buscando Chofer Ejecutivo...';
+
+  inappTripModal.classList.remove('hidden');
+}
+
+function closeInAppTripModal() {
+  if (inappTripModal) {
+    inappTripModal.classList.add('hidden');
+  }
+}
+
+function updatePassengerTripStage(stage) {
+  // Reset
+  [pStepAssigned, pStepEnCamino, pStepEnOrigen, pStepEnViaje].forEach(el => el && el.classList.remove('active'));
+  [pLine1, pLine2, pLine3].forEach(el => el && el.classList.remove('active'));
+
+  if (stage === 'aceptado') {
+    if (pStepAssigned) pStepAssigned.classList.add('active');
+    if (pStageBannerText) pStageBannerText.textContent = '¡Chofer confirmado! Preparando salida.';
+    if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Chofer Asignado';
+  } else if (stage === 'en_camino') {
+    if (pStepAssigned) pStepAssigned.classList.add('active');
+    if (pLine1) pLine1.classList.add('active');
+    if (pStepEnCamino) pStepEnCamino.classList.add('active');
+    if (pStageBannerText) pStageBannerText.textContent = 'Tu chofer está en camino a tu punto de recogida.';
+    if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Chofer en Camino';
+  } else if (stage === 'en_origen') {
+    if (pStepAssigned) pStepAssigned.classList.add('active');
+    if (pLine1) pLine1.classList.add('active');
+    if (pStepEnCamino) pStepEnCamino.classList.add('active');
+    if (pLine2) pLine2.classList.add('active');
+    if (pStepEnOrigen) pStepEnOrigen.classList.add('active');
+    if (pStageBannerText) pStageBannerText.textContent = '📍 ¡Tu chofer ha llegado al origen y te está esperando!';
+    if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Chofer en el Origen';
+  } else if (stage === 'en_viaje') {
+    if (pStepAssigned) pStepAssigned.classList.add('active');
+    if (pLine1) pLine1.classList.add('active');
+    if (pStepEnCamino) pStepEnCamino.classList.add('active');
+    if (pLine2) pLine2.classList.add('active');
+    if (pStepEnOrigen) pStepEnOrigen.classList.add('active');
+    if (pLine3) pLine3.classList.add('active');
+    if (pStepEnViaje) pStepEnViaje.classList.add('active');
+    if (pStageBannerText) pStageBannerText.textContent = '🚀 Viaje en curso hacia el destino. ¡Buen viaje!';
+    if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'En Viaje';
+  } else if (stage === 'completado') {
+    if (pStageBannerText) pStageBannerText.textContent = '✨ ¡Has llegado a tu destino! Gracias por viajar con RutaPrivada.';
+    if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Viaje Completado';
+    setTimeout(() => {
+      closeInAppTripModal();
+      showToast('✨ Viaje finalizado con éxito.');
+    }, 4000);
+  }
+}
+
+// Disparador del Pedido In-App
+if (btnRequestInapp) {
+  btnRequestInapp.addEventListener('click', (e) => {
+    e.preventDefault();
+
+    const originVal = document.getElementById('origin-input') ? document.getElementById('origin-input').value.trim() : '';
+    const destVal = document.getElementById('destination-input') ? document.getElementById('destination-input').value.trim() : '';
+
+    if (!originVal || !destVal) {
+      showToast('⚠️ Por favor indica punto de partida y destino antes de solicitar.');
+      return;
+    }
+
+    const nameInput = document.getElementById('passenger-name-input');
+    const phoneInput = document.getElementById('passenger-phone-input');
+    const notesInput = document.getElementById('passenger-notes-input');
+
+    const passName = nameInput && nameInput.value.trim() ? nameInput.value.trim() : 'Pasajero Ejecutivo';
+    const passPhone = phoneInput && phoneInput.value.trim() ? phoneInput.value.trim() : '+54 9 11 7373-8790';
+    const passNotes = notesInput ? notesInput.value.trim() : '';
+
+    const tripData = {
+      origen: (state.origin && state.origin.name) ? state.origin.name : originVal,
+      destino: (state.destination && state.destination.name) ? state.destination.name : destVal,
+      distancia: `${(state.distanceKm || 12).toFixed(1)} km`,
+      duracion: `${state.durationMinutes || 25} min`,
+      precioEstimado: state.breakdown ? state.breakdown.totalFare : 4500,
+      nombrePasajero: passName,
+      telefono: passPhone,
+      notas: passNotes,
+      categoria: 'Sedán Ejecutivo',
+      fecha: state.date,
+      hora: state.time
+    };
+
+    if (window.RutaSync) {
+      const activeTrip = window.RutaSync.solicitarViaje(tripData);
+      openInAppTripModal(activeTrip);
+      showToast('⚡ Solicitud enviada a la flota en tiempo real.');
+    } else {
+      openInAppTripModal(tripData);
+    }
+  });
+}
+
+if (closeInappTripBtn) {
+  closeInappTripBtn.addEventListener('click', closeInAppTripModal);
+}
+
+if (btnPassengerCancelTrip) {
+  btnPassengerCancelTrip.addEventListener('click', () => {
+    if (confirm('¿Deseas cancelar la solicitud de viaje?')) {
+      if (window.RutaSync) {
+        window.RutaSync.actualizarEstadoViaje('cancelado');
+        window.RutaSync.limpiarViajeActivo();
+      }
+      closeInAppTripModal();
+      showToast('❌ Solicitud de viaje cancelada.');
+    }
+  });
+}
+
+// Sincronización en tiempo real de eventos
 if (window.RutaSync) {
   window.RutaSync.on('VIAJE_ACEPTADO', (viaje) => {
     if (viaje && viaje.conductor) {
-      showToast(`🚗 ¡Conductor Asignado! ${viaje.conductor.nombre} (${viaje.conductor.auto}) aceptó tu viaje y está en camino.`);
+      if (pStateSearching) pStateSearching.classList.add('hidden');
+      if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
+
+      if (pDriverName) pDriverName.textContent = viaje.conductor.nombre || 'Martín G.';
+      if (pDriverCar) pDriverCar.textContent = viaje.conductor.auto || 'Toyota Corolla · Sedán Ejecutivo';
+      if (pDriverRating) pDriverRating.textContent = viaje.conductor.calificacion || '4.96';
+
+      if (btnPassengerCallDriver) {
+        btnPassengerCallDriver.href = `tel:${viaje.conductor.telefono || '+5491173738790'}`;
+      }
+
+      if (btnPassengerChatDriver) {
+        btnPassengerChatDriver.onclick = () => {
+          showToast(`💬 Canal directo activo con ${viaje.conductor.nombre}.`);
+        };
+      }
+
+      updatePassengerTripStage('en_camino');
+      showToast(`🚗 ¡Conductor Asignado! ${viaje.conductor.nombre} aceptó tu viaje y está en camino.`);
     }
   });
 
   window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', (viaje) => {
     if (viaje) {
+      updatePassengerTripStage(viaje.estado);
       if (viaje.estado === 'en_origen') {
         showToast(`📍 Tu conductor ha llegado al punto de recogida.`);
       } else if (viaje.estado === 'en_viaje') {
@@ -4740,5 +4928,6 @@ if (window.RutaSync) {
     }
   });
 }
+
 
 

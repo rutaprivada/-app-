@@ -130,7 +130,7 @@
 <body>
 
   <!-- Top Announcement Bar -->
-  <aside class="top-announcement" aria-label="Información de servicio">
+  <aside class="top-announcement web-only" aria-label="Información de servicio">
     <div class="container top-announcement-content">
       <span>✨ <strong>Servicio Privado Puerta a Puerta en Argentina</strong> — Flota Ejecutiva, vehículos higienizados y puntualidad garantizada</span>
       <div class="top-actions">
@@ -162,14 +162,14 @@
         </div>
       </div>
       <div class="header-badges">
-        <button id="btn-download-app-header" class="btn-download-app-header" title="Descargar e instalar las Apps de RutaPrivada (Cliente y Conductor)" aria-label="Descargar Apps">
+        <button id="btn-download-app-header" class="btn-download-app-header web-only" title="Descargar e instalar las Apps de RutaPrivada (Cliente y Conductor)" aria-label="Descargar Apps">
           <span class="dl-app-icon">📲</span>
           <span class="dl-app-label">
             <span class="dl-app-title">Apps Móviles</span>
             <span class="dl-app-sub">Cliente & Chofer</span>
           </span>
         </button>
-        <a href="conductor.html" class="header-driver-btn" title="Ir a la App de Conductor Partner">
+        <a href="conductor.html" class="header-driver-btn web-only" title="Ir a la App de Conductor Partner">
           <span class="driver-btn-icon">🚗</span>
           <span class="driver-btn-text">Modo Conductor</span>
         </a>
@@ -599,7 +599,16 @@
             </div>
           </div>
 
-          <button id="btn-reserve-whatsapp" class="btn btn-whatsapp">
+          <!-- In-App Dispatch Direct Action Button -->
+          <button id="btn-request-inapp" class="btn btn-primary full-width btn-inapp-trip-action">
+            <span class="btn-icon">⚡</span>
+            <span class="btn-text">
+              <strong>Pedir Chofer en Vivo (In-App)</strong>
+              <small>Búsqueda inmediata y seguimiento en tiempo real</small>
+            </span>
+          </button>
+
+          <button id="btn-reserve-whatsapp" class="btn btn-whatsapp web-only">
             <span class="btn-icon">💬</span>
             <span class="btn-text">
               <strong>Confirmar y Reservar por WhatsApp</strong>
@@ -610,7 +619,7 @@
           <!-- Mensaje de Privacidad y Confidencialidad de Número -->
           <div class="privacy-guarantee-note">
             <span class="privacy-lock-icon">🔒</span>
-            <p><strong>Tu número es privado:</strong> No se comparte con los conductores. Tu contacto es gestionado de forma confidencial exclusivamente por el WhatsApp oficial de la empresa.</p>
+            <p><strong>Tu número es privado:</strong> No se comparte con terceros. Comunicación directa y protegida dentro del servicio.</p>
           </div>
 
           <div class="secondary-actions">
@@ -643,8 +652,125 @@
 
   </main>
 
+  <!-- Live In-App Dispatch & Driver Tracking Modal -->
+  <div id="inapp-trip-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog inapp-trip-dialog">
+      <div class="modal-header inapp-header">
+        <div class="inapp-status-badge-wrap">
+          <span class="status-pulse-dot" id="passengerTripStatusDot"></span>
+          <div>
+            <h3 id="passengerTripModalTitle">Buscando Chofer Ejecutivo...</h3>
+            <p class="inapp-status-sub" id="passengerTripModalSub">Conectando con la flota en tiempo real</p>
+          </div>
+        </div>
+        <button id="close-inapp-trip-btn" class="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+
+      <div class="modal-body inapp-trip-body">
+        
+        <!-- STATE 1: RADAR BUSCANDO CHOFER -->
+        <div class="inapp-state-panel active" id="pStateSearching">
+          <div class="inapp-radar-box">
+            <div class="inapp-radar-ring ring-1"></div>
+            <div class="inapp-radar-ring ring-2"></div>
+            <div class="inapp-radar-center">
+              <span>🚘</span>
+            </div>
+          </div>
+          <h4 class="inapp-searching-title">Solicitud enviada a los choferes cercanos</h4>
+          <p class="inapp-searching-sub">En unos instantes un chofer asignado aceptará tu viaje.</p>
+        </div>
+
+        <!-- STATE 2: CHOFER ASIGNADO / EN CAMINO / EN VIAJE -->
+        <div class="inapp-state-panel hidden" id="pStateDriverAssigned">
+          
+          <!-- Driver Card -->
+          <div class="inapp-driver-card">
+            <div class="inapp-driver-avatar-wrap">
+              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" alt="Chofer" class="inapp-driver-avatar" id="pDriverAvatar" />
+              <span class="driver-verified-check">✓</span>
+            </div>
+            <div class="inapp-driver-info">
+              <div class="driver-name-row">
+                <h4 id="pDriverName">Martín G.</h4>
+                <span class="driver-rating-pill"><span class="star-icon">★</span> <span id="pDriverRating">4.96</span></span>
+              </div>
+              <p class="driver-car-desc" id="pDriverCar">Toyota Corolla · Sedán Ejecutivo</p>
+            </div>
+          </div>
+
+          <!-- Live Stage Tracker -->
+          <div class="inapp-stage-indicator">
+            <div class="stage-step active" id="pStepAssigned">
+              <div class="step-bullet"><i class="bullet-icon">🚗</i></div>
+              <span>Asignado</span>
+            </div>
+            <div class="stage-line" id="pLine1"></div>
+            <div class="stage-step" id="pStepEnCamino">
+              <div class="step-bullet"><i class="bullet-icon">📍</i></div>
+              <span>En camino</span>
+            </div>
+            <div class="stage-line" id="pLine2"></div>
+            <div class="stage-step" id="pStepEnOrigen">
+              <div class="step-bullet"><i class="bullet-icon">🚪</i></div>
+              <span>En origen</span>
+            </div>
+            <div class="stage-line" id="pLine3"></div>
+            <div class="stage-step" id="pStepEnViaje">
+              <div class="step-bullet"><i class="bullet-icon">🚀</i></div>
+              <span>En viaje</span>
+            </div>
+          </div>
+
+          <div class="inapp-stage-banner" id="pStageBanner">
+            <span class="banner-icon">🚘</span>
+            <span class="banner-text" id="pStageBannerText">Tu chofer está en camino a tu recogida</span>
+          </div>
+
+          <!-- Direct In-App Communication Buttons -->
+          <div class="inapp-comm-actions">
+            <a href="#" id="btnPassengerCallDriver" class="btn btn-primary btn-comm-action">
+              <span>📞 Llamar al Chofer</span>
+            </a>
+            <button type="button" id="btnPassengerChatDriver" class="btn btn-secondary btn-comm-action">
+              <span>💬 Mensaje Directo</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Trip Summary Details -->
+        <div class="inapp-trip-summary-box">
+          <div class="inapp-route-row">
+            <span class="pin-dot origin"></span>
+            <div>
+              <small>RECOGIDA</small>
+              <strong id="pTripOrigin">Cargando...</strong>
+            </div>
+          </div>
+          <div class="inapp-route-row">
+            <span class="pin-dot destination"></span>
+            <div>
+              <small>DESTINO</small>
+              <strong id="pTripDestination">Cargando...</strong>
+            </div>
+          </div>
+          <div class="inapp-fare-row">
+            <span>Tarifa Confirmada:</span>
+            <strong class="inapp-fare-total" id="pTripTotal">$0</strong>
+          </div>
+        </div>
+
+        <!-- Cancel Trip Button -->
+        <button type="button" id="btnPassengerCancelTrip" class="btn btn-outline full-width btn-cancel-inapp">
+          ✕ Cancelar Solicitud de Viaje
+        </button>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Apps Showcase Section (Client & Driver) -->
-  <section class="apps-ecosystem-section" id="seccion-apps">
+  <section class="apps-ecosystem-section web-only" id="seccion-apps">
     <div class="container">
       <div class="ecosystem-header text-center">
         <span class="ecosystem-tag">📱 Ecosistema Digital RutaPrivada</span>

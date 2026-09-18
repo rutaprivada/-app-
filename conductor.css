@@ -1045,3 +1045,9 @@ body.driver-body {
     flex-shrink: 0;
 }
 
+/* App Mode (Clean Standalone / Capacitor / PWA) */
+body.is-app-mode .web-only {
+    display: none !important;
+}
+
+
