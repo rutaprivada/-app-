@@ -804,6 +804,15 @@
               <small class="field-hint">Opcional. Si colocas tu Token Público de Mapbox, la página calculará la duración exacta con demoras y congestión en vivo. Si lo dejas vacío, usa OSRM con estimación horaria.</small>
             </div>
 
+            <div class="form-group full-width highlight-group" style="border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.05);">
+              <div class="mapbox-label-row">
+                <label for="cfg-google-maps-key">🗺️ Google Maps API Key (Directions / Routes API)</label>
+                <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noopener noreferrer" class="mapbox-link">Google Cloud Console ↗</a>
+              </div>
+              <input type="text" id="cfg-google-maps-key" placeholder="AIzaSy... (Opcional - Google Routes API)" autocomplete="off" />
+              <small class="field-hint">Opcional. Si ingresas tu Google Maps API Key, el cotizador consultará de inmediato las rutas y tráfico nativo de Google / Waze con alta precisión.</small>
+            </div>
+
             <div class="form-group">
               <label for="cfg-base-fare-short">Tarifa Base Viajes Cortos (≤10 km) ($)</label>
               <input type="number" id="cfg-base-fare-short" min="0" step="100" value="2000" required />
@@ -1008,6 +1017,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- App JS -->
-  <script src="app.js?v=36"></script>
+  <script src="app.js?v=37"></script>
 </body>
 </html>

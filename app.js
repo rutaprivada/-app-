@@ -45,6 +45,7 @@ const DEFAULT_CONFIG = {
   nightSurgeShortPercent: 25,      // Ajuste nocturno viajes ≤30 km de 22 a 06 hs (+25%)
   rushSurgePercent: 10,            // Ajuste alta demanda (06:00 a 10:00 y 16:00 a 20:00: +10%)
   mapboxToken: atob('cGsuZXlKMWlqb2ljblYwWVMxd2NtbDJaV1JoSWl3aVlTSTZJbU50ZEd4d2VqTnNjakF3WTJFeWRrWjJkbXM1Y1hnM2QyOGlmUS5fWWtNRC1HZ1NJaHRrcFVjZG9fcGRn'),
+  googleMapsApiKey: '',            // Clave opcional de Google Maps Platform (Directions / Routes API)
   currency: 'ARS'
 };
 
@@ -640,26 +641,26 @@ const OFFICIAL_ARGENTINA_TOLLS = {
   },
   aubasa_docksud: {
     id: 'aubasa_docksud',
-    name: 'AUBASA (Peaje Dock Sud - Hacia La Plata)',
-    peakFee: 2700,
-    offPeakFee: 2200,
-    gantry: { lat: -34.6465, lng: -58.3492, radiusKm: 0.45 },
+    name: 'AUBASA Peaje Dock Sud',
+    peakFee: 1290.51,
+    offPeakFee: 1032.41,
+    gantry: { lat: -34.6465, lng: -58.3492, radiusKm: 0.75 },
     regex: /(peaje.*dock sud|aubasa.*dock sud)/i
   },
   aubasa_hudson: {
     id: 'aubasa_hudson',
-    name: 'AUBASA (Peaje Hudson - Hacia La Plata)',
-    peakFee: 3000,
-    offPeakFee: 2400,
-    gantry: { lat: -34.7831, lng: -58.1724, radiusKm: 0.5 },
+    name: 'AUBASA Peaje Hudson',
+    peakFee: 1290.51,
+    offPeakFee: 1032.41,
+    gantry: { lat: -34.7831, lng: -58.1724, radiusKm: 0.75 },
     regex: /(peaje.*hudson|aubasa.*hudson)/i
   },
   aubasa_hudson_unificado: {
     id: 'aubasa_hudson_unificado',
-    name: 'AUBASA (Peaje Hudson Unificado - Hacia CABA)',
-    peakFee: 5800,
-    offPeakFee: 4600,
-    gantry: { lat: -34.7831, lng: -58.1724, radiusKm: 0.5 },
+    name: 'AUBASA Peaje Hudson Unificado',
+    peakFee: 2581.02,
+    offPeakFee: 2064.82,
+    gantry: { lat: -34.7831, lng: -58.1724, radiusKm: 0.75 },
     regex: /(peaje.*hudson|aubasa.*hudson)/i
   },
   buen_ayre: {
@@ -1475,6 +1476,45 @@ function setDestination(lat, lng, address) {
   checkAndRoute();
 }
 
+// Decodificador de Polyline estándar para Google Maps API
+function decodePolyline(str, precision = 5) {
+  if (!str) return [];
+  let index = 0, lat = 0, lng = 0, coordinates = [], factor = Math.pow(10, precision);
+  while (index < str.length) {
+    let byte, shift = 0, result = 0;
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    let dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lng += dlng;
+
+    coordinates.push([lng / factor, lat / factor]);
+  }
+  return coordinates;
+}
+
+// Conector dinámico de circunvalación por General Paz según el sector de partida
+function getGeneralPazConnector(o, d) {
+  // Para viajes originados o con destino en CABA Norte / Este (Belgrano, Núñez, Palermo, Recoleta, Vicente López):
+  // Ingresar limpiamente por el distribuidor Norte de Av. Libertador / Lugones y General Paz (Puente Saavedra)
+  if ((o.lat > -34.60 && o.lng > -58.48) || (d.lat > -34.60 && d.lng > -58.48)) {
+    return '-58.468,-34.536'; // Puente Saavedra / Lugones y General Paz
+  }
+  return '-58.520,-34.605'; // Villa Real / San Martín para Zona Oeste
+}
+
 // Selección de la ruta óptima (priorizando autopistas, General Paz y accesos rápidos sobre cruces urbanos lentos y peajes de 25 de Mayo)
 function selectOptimalRoute(routes, isNorthWestEzeiza = false) {
   if (!routes || routes.length === 0) return null;
@@ -1521,10 +1561,10 @@ function selectOptimalRoute(routes, isNorthWestEzeiza = false) {
 
     let adjustedScore = r.duration || 0;
     if (gralPazHits > 0) {
-      adjustedScore -= 5000; // Gran preferencia por circunvalación perimetral (General Paz)
+      adjustedScore -= 5000;
     }
     if (centralTollHits > 0 && gralPazHits === 0) {
-      adjustedScore += 6000; // Fuerte penalización por cruzar el centro denso y peajes de 25 de Mayo
+      adjustedScore += 6000;
     }
 
     return { route: r, adjustedScore };
@@ -1534,7 +1574,7 @@ function selectOptimalRoute(routes, isNorthWestEzeiza = false) {
   return scored[0].route;
 }
 
-// Cálculo de ruta con Tráfico en Tiempo Real (Mapbox driving-traffic) o Fallback OSRM
+// Cálculo de ruta con Tráfico en Tiempo Real (Google Maps API / Mapbox Traffic / Fallback OSRM)
 async function checkAndRoute() {
   if (!state.origin || !state.destination) return;
 
@@ -1555,12 +1595,9 @@ async function checkAndRoute() {
     ((d.lat > -34.615 || d.lng < -58.43) && o.lat < -34.70)
   );
 
-  // Conector de circunvalación por Av. General Paz (RN A001) en Villa Real / Ciudadela
-  const gralPazConnector = '-58.520,-34.605';
-
-  // Si es viaje Norte/Oeste <-> Ezeiza, trazar directamente por el corredor rápido perimetral
   let waypoints = '';
   if (isNorthOrWestToEzeiza) {
+    const gralPazConnector = getGeneralPazConnector(o, d);
     waypoints = `${o.lng},${o.lat};${gralPazConnector};${d.lng},${d.lat}`;
   } else {
     waypoints = `${o.lng},${o.lat};`;
@@ -1571,11 +1608,60 @@ async function checkAndRoute() {
   }
 
   let route = null;
-  let isMapboxSuccess = false;
-  const token = (state.config.mapboxToken || '').trim();
+  let isRoutingSuccess = false;
 
-  // 1. Intentar con Mapbox Traffic en tiempo real si hay token configurado
-  if (token) {
+  // 1. Intentar con Google Maps Directions API si hay API Key configurada
+  const googleKey = (state.config.googleMapsApiKey || '').trim();
+  if (googleKey) {
+    try {
+      const gWp = isNorthOrWestToEzeiza 
+        ? `&waypoints=${getGeneralPazConnector(o, d).split(',')[1]},${getGeneralPazConnector(o, d).split(',')[0]}`
+        : (s ? `&waypoints=${s.lat},${s.lng}` : '');
+      const googleUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${o.lat},${o.lng}&destination=${d.lat},${d.lng}${gWp}&alternatives=true&mode=driving&departure_time=now&key=${encodeURIComponent(googleKey)}`;
+      
+      const gRes = await fetch(googleUrl);
+      if (gRes.ok) {
+        const gData = await gRes.json();
+        if (gData.status === 'OK' && gData.routes && gData.routes.length > 0) {
+          const gRoute = gData.routes[0];
+          const decodedCoords = decodePolyline(gRoute.overview_polyline.points);
+          let totalDistM = 0;
+          let totalDurS = 0;
+          const legs = (gRoute.legs || []).map(leg => {
+            totalDistM += leg.distance.value;
+            totalDurS += (leg.duration_in_traffic ? leg.duration_in_traffic.value : leg.duration.value);
+            return {
+              steps: (leg.steps || []).map(st => ({
+                name: st.html_instructions ? st.html_instructions.replace(/<[^>]*>/g, '') : '',
+                distance: st.distance.value,
+                duration: st.duration.value
+              }))
+            };
+          });
+
+          route = {
+            distance: totalDistM,
+            duration: totalDurS,
+            geometry: {
+              type: 'LineString',
+              coordinates: decodedCoords
+            },
+            legs
+          };
+          isRoutingSuccess = true;
+          state.trafficEngine = 'google';
+          state.mapboxCongestionLabel = 'Tráfico Google Maps / Waze en vivo';
+          state.trafficCongestion = 'normal';
+        }
+      }
+    } catch (gErr) {
+      console.warn('Fallo Google Directions API, usando Mapbox/OSRM:', gErr);
+    }
+  }
+
+  // 2. Intentar con Mapbox Traffic en tiempo real si Google no está activo o falló
+  const token = (state.config.mapboxToken || '').trim();
+  if (!isRoutingSuccess && token) {
     try {
       const candidateRoutes = [];
       const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${waypoints}?overview=full&geometries=geojson&steps=true&annotations=congestion,duration&access_token=${encodeURIComponent(token)}`;
@@ -1589,7 +1675,7 @@ async function checkAndRoute() {
 
       if (candidateRoutes.length > 0) {
         route = selectOptimalRoute(candidateRoutes, isNorthOrWestToEzeiza);
-        isMapboxSuccess = true;
+        isRoutingSuccess = true;
         state.trafficEngine = 'mapbox';
 
         // Analizar nivel de congestión de Mapbox
@@ -1633,8 +1719,8 @@ async function checkAndRoute() {
     }
   }
 
-  // 2. Si no se usó Mapbox o falló, recurrir a OSRM con el corredor seleccionado
-  if (!isMapboxSuccess) {
+  // 3. Si no se usó Google ni Mapbox, recurrir a OSRM con el corredor seleccionado
+  if (!isRoutingSuccess) {
     state.trafficEngine = 'osrm';
     state.trafficCongestion = 'normal';
     state.mapboxCongestionLabel = '';
@@ -1921,38 +2007,40 @@ function detectOfficialTollsInRoute(route) {
     }
   }
 
-  // Manejo inteligente de AUBASA según el sentido de circulación:
-  // Hacia La Plata (Norte a Sur): Peaje Dock Sud (Pico $2.700 / No Pico $2.200) + Peaje Hudson (Pico $3.000 / No Pico $2.400)
-  // Desde La Plata hacia CABA (Sur a Norte): Peaje Hudson Unificado (Pico $5.800 / No Pico $4.600)
-  const isAubasaTraversed = matchedConcessions.has('aubasa_docksud') || matchedConcessions.has('aubasa_hudson') || matchedConcessions.has('aubasa_hudson_unificado');
-  if (isAubasaTraversed) {
-    matchedConcessions.delete('aubasa_docksud');
-    matchedConcessions.delete('aubasa_hudson');
-    matchedConcessions.delete('aubasa_hudson_unificado');
-    roadNames.delete('AUBASA (Peaje Dock Sud - Hacia La Plata)');
-    roadNames.delete('AUBASA (Peaje Hudson - Hacia La Plata)');
-    roadNames.delete('AUBASA (Peaje Hudson Unificado - Hacia CABA)');
+  // Manejo inteligente de AUBASA según el paso real por cada cabina:
+  const passesDockSud = matchedConcessions.has('aubasa_docksud');
+  const passesHudson = matchedConcessions.has('aubasa_hudson') || matchedConcessions.has('aubasa_hudson_unificado');
 
-    // Determinar sentido según latitud de origen y destino (CABA ~ -34.60, La Plata ~ -34.92)
-    const isGoingToLaPlata = (state.origin && state.destination && state.destination.lat < state.origin.lat);
+  matchedConcessions.delete('aubasa_docksud');
+  matchedConcessions.delete('aubasa_hudson');
+  matchedConcessions.delete('aubasa_hudson_unificado');
+  roadNames.delete('AUBASA (Peaje Dock Sud - Hacia La Plata)');
+  roadNames.delete('AUBASA (Peaje Hudson - Hacia La Plata)');
+  roadNames.delete('AUBASA (Peaje Hudson Unificado - Hacia CABA)');
 
-    if (isGoingToLaPlata) {
-      const feeDock = isPeak ? 2700 : 2200;
-      const feeHudson = isPeak ? 3000 : 2400;
-      matchedConcessions.set('aubasa_docksud', {
-        name: 'AUBASA Peaje Dock Sud',
-        fee: feeDock,
-        isPeak
-      });
+  const isGoingSouth = (state.origin && state.destination && state.destination.lat < state.origin.lat);
+
+  if (passesDockSud) {
+    const feeDock = isPeak ? 1290.51 : 1032.41;
+    matchedConcessions.set('aubasa_docksud', {
+      name: 'AUBASA Peaje Dock Sud',
+      fee: feeDock,
+      isPeak
+    });
+    roadNames.add('AUBASA Dock Sud');
+  }
+
+  if (passesHudson) {
+    if (isGoingSouth) {
+      const feeHudson = isPeak ? 1290.51 : 1032.41;
       matchedConcessions.set('aubasa_hudson', {
         name: 'AUBASA Peaje Hudson',
         fee: feeHudson,
         isPeak
       });
-      roadNames.add('AUBASA Dock Sud');
       roadNames.add('AUBASA Hudson');
     } else {
-      const feeHudsonUni = isPeak ? 5800 : 4600;
+      const feeHudsonUni = isPeak ? 2581.02 : 2064.82;
       matchedConcessions.set('aubasa_hudson_unificado', {
         name: 'AUBASA Peaje Hudson Unificado',
         fee: feeHudsonUni,
@@ -4300,6 +4388,7 @@ function loadConfigToModal() {
 
   setVal('cfg-whatsapp', cfg.whatsappNumber);
   setVal('cfg-mapbox-token', cfg.mapboxToken || '');
+  setVal('cfg-google-maps-key', cfg.googleMapsApiKey || '');
   setVal('cfg-base-fare-short', cfg.baseFareShort !== undefined ? cfg.baseFareShort : 2000);
   setVal('cfg-base-fare-long', cfg.baseFareLong !== undefined ? cfg.baseFareLong : 3500);
   setVal('cfg-base-fare-stop-under15', cfg.baseFareStopUnder15 !== undefined ? cfg.baseFareStopUnder15 : 2500);
@@ -4340,6 +4429,7 @@ function saveModalConfig() {
   const newConfig = {
     whatsappNumber: getStr('cfg-whatsapp', '5491173738790').replace(/\D/g, ''),
     mapboxToken: getStr('cfg-mapbox-token', DEFAULT_CONFIG.mapboxToken) || DEFAULT_CONFIG.mapboxToken,
+    googleMapsApiKey: getStr('cfg-google-maps-key', ''),
     baseFareShort: getNum('cfg-base-fare-short', 2000),
     baseFareLong: getNum('cfg-base-fare-long', 3500),
     baseFareStopUnder15: getNum('cfg-base-fare-stop-under15', 2500),
