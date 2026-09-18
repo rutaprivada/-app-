@@ -4505,12 +4505,39 @@ function initPwa() {
     });
   }
 
-  // 2. Elementos de la interfaz de descarga de App
+  // 2. Elementos de la interfaz de descarga de App (Dual Hub: Cliente & Conductor)
   const topInstallBtn = document.getElementById('btn-install-pwa');
   const headerInstallBtn = document.getElementById('btn-download-app-header');
+  const showcaseClientBtn = document.getElementById('btn-showcase-client-install');
+  const showcaseDriverBtn = document.getElementById('btn-showcase-driver-install');
   const modal = document.getElementById('app-install-modal');
   const closeModalBtn = document.getElementById('close-install-modal-btn');
   const triggerInstallBtn = document.getElementById('btn-trigger-pwa-install');
+  const tabBtnClient = document.getElementById('tab-btn-client');
+  const tabBtnDriver = document.getElementById('tab-btn-driver');
+  const tabPanelClient = document.getElementById('tab-panel-client');
+  const tabPanelDriver = document.getElementById('tab-panel-driver');
+
+  function switchAppTab(tabName) {
+    if (tabName === 'driver') {
+      if (tabBtnDriver) tabBtnDriver.classList.add('active');
+      if (tabBtnClient) tabBtnClient.classList.remove('active');
+      if (tabPanelDriver) tabPanelDriver.classList.remove('hidden');
+      if (tabPanelClient) tabPanelClient.classList.add('hidden');
+    } else {
+      if (tabBtnClient) tabBtnClient.classList.add('active');
+      if (tabBtnDriver) tabBtnDriver.classList.remove('active');
+      if (tabPanelClient) tabPanelClient.classList.remove('hidden');
+      if (tabPanelDriver) tabPanelDriver.classList.add('hidden');
+    }
+  }
+
+  if (tabBtnClient) {
+    tabBtnClient.addEventListener('click', () => switchAppTab('client'));
+  }
+  if (tabBtnDriver) {
+    tabBtnDriver.addEventListener('click', () => switchAppTab('driver'));
+  }
 
   // Capturar evento de instalación nativa (Chrome, Edge, Android)
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -4521,7 +4548,8 @@ function initPwa() {
     }
   });
 
-  function openInstallModal() {
+  function openInstallModal(initialTab = 'client') {
+    switchAppTab(initialTab);
     if (modal) {
       modal.classList.remove('hidden');
     }
@@ -4533,18 +4561,32 @@ function initPwa() {
     }
   }
 
-  // Abrir modal desde botones de la cabecera
+  // Abrir modal desde botones de la cabecera y sección showcase
   if (topInstallBtn) {
     topInstallBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      openInstallModal();
+      openInstallModal('client');
     });
   }
 
   if (headerInstallBtn) {
     headerInstallBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      openInstallModal();
+      openInstallModal('client');
+    });
+  }
+
+  if (showcaseClientBtn) {
+    showcaseClientBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openInstallModal('client');
+    });
+  }
+
+  if (showcaseDriverBtn) {
+    showcaseDriverBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openInstallModal('driver');
     });
   }
 
