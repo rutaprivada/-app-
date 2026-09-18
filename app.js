@@ -1828,6 +1828,37 @@ async function checkAndRoute() {
   updateCalculation();
 }
 
+// Helper geoespacial para calcular la distancia mínima de un punto (cabina de peaje) a un segmento de ruta
+function distanceToSegmentKm(pLat, pLng, aLat, aLng, bLat, bLng) {
+  const dx = bLng - aLng;
+  const dy = bLat - aLat;
+
+  if (dx === 0 && dy === 0) {
+    return haversineDistance(pLat, pLng, aLat, aLng);
+  }
+
+  const t = Math.max(0, Math.min(1, ((pLng - aLng) * dx + (pLat - aLat) * dy) / (dx * dx + dy * dy)));
+  const projLng = aLng + t * dx;
+  const projLat = aLat + t * dy;
+
+  return haversineDistance(pLat, pLng, projLat, projLng);
+}
+
+function minDistanceToPolylineKm(pLat, pLng, coords) {
+  if (!coords || coords.length === 0) return 999999;
+  if (coords.length === 1) return haversineDistance(pLat, pLng, coords[0].lat, coords[0].lng);
+
+  let minDist = Infinity;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const d = distanceToSegmentKm(pLat, pLng, coords[i].lat, coords[i].lng, coords[i + 1].lat, coords[i + 1].lng);
+    if (d < minDist) {
+      minDist = d;
+      if (minDist <= 0.05) return minDist;
+    }
+  }
+  return minDist;
+}
+
 // Detección de peajes según cabinas troncales oficiales y pasos de peaje
 function detectOfficialTollsInRoute(route) {
   const matchedConcessions = new Map();
@@ -1868,16 +1899,12 @@ function detectOfficialTollsInRoute(route) {
     const conc = OFFICIAL_ARGENTINA_TOLLS[key];
     let isTraversed = false;
 
-    // A. Cotejo de proximidad espacial precisa contra cabina troncal oficial
+    // A. Cotejo de proximidad espacial precisa contra cabina troncal oficial por proyección de segmento
     if (conc.gantry && polylineCoords.length > 0) {
-      const radius = conc.gantry.radiusKm || 0.45;
-      for (let i = 0; i < polylineCoords.length; i++) {
-        const pt = polylineCoords[i];
-        const dist = haversineDistance(pt.lat, pt.lng, conc.gantry.lat, conc.gantry.lng);
-        if (dist <= radius) {
-          isTraversed = true;
-          break;
-        }
+      const radius = conc.gantry.radiusKm || 0.65;
+      const distToRoute = minDistanceToPolylineKm(conc.gantry.lat, conc.gantry.lng, polylineCoords);
+      if (distToRoute <= radius) {
+        isTraversed = true;
       }
     }
 
@@ -1890,7 +1917,7 @@ function detectOfficialTollsInRoute(route) {
       const tollFee = isPeak ? conc.peakFee : conc.offPeakFee;
       matchedConcessions.set(conc.id, {
         name: conc.name,
-        fee: tollFee,
+        fee: Math.round(tollFee),
         isPeak
       });
       roadNames.add(conc.name);
