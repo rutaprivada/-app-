@@ -1402,9 +1402,15 @@ function initMap() {
     scrollWheelZoom: false
   }).setView(defaultCoords, 12);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
+  const mbToken = (state.config.mapboxToken || '').trim();
+  const tileUrl = mbToken 
+    ? `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${encodeURIComponent(mbToken)}`
+    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+  L.tileLayer(tileUrl, {
+    attribution: '&copy; Mapbox &copy; OpenStreetMap contributors',
+    tileSize: 512,
+    zoomOffset: mbToken ? -1 : 0,
     maxZoom: 19
   }).addTo(map);
 
@@ -1476,39 +1482,43 @@ function setDestination(lat, lng, address) {
   checkAndRoute();
 }
 
-// Selección de la ruta óptima (priorizando autopistas y accesos rápidos sobre avenidas lentas con semáforos)
+// Selección de la ruta óptima (priorizando autopistas, General Paz y accesos rápidos sobre avenidas lentas con semáforos y peajes caros)
 function selectOptimalRoute(routes) {
   if (!routes || routes.length === 0) return null;
   if (routes.length === 1) return routes[0];
 
-  const highwayRegex = /(autopista|gral\.?\s*paz|general\s*paz|riccheri|dellepiane|lugones|cantilo|25\s*de\s*mayo|perito\s*moreno|panamericana|acceso\s*norte|acceso\s*oeste|acceso\s*sur|illia|paseo\s*del\s*bajo|ramal|au\b)/i;
+  const gralPazRiccheriRegex = /(gral\.?\s*paz|general\s*paz|rn\s*a001|riccheri|rn\s*a002|panamericana|buen\s*ayre|acceso\s*norte|acceso\s*oeste)/i;
+  const centralTollCityRegex = /(25\s*de\s*mayo|dellepiane|perito\s*moreno|paseo\s*del\s*bajo|illia)/i;
 
   const scored = routes.map((r) => {
-    let highwayStepsCount = 0;
-    let totalSteps = 0;
+    let gralPazHits = 0;
+    let centralTollHits = 0;
 
     if (r.legs) {
       r.legs.forEach(leg => {
         if (leg.steps) {
           leg.steps.forEach(step => {
-            totalSteps++;
-            if (highwayRegex.test(step.name || '') || highwayRegex.test(step.ref || '')) {
-              highwayStepsCount++;
-            }
+            const name = ((step.name || '') + ' ' + (step.ref || '')).toLowerCase();
+            if (gralPazRiccheriRegex.test(name)) gralPazHits++;
+            if (centralTollCityRegex.test(name)) centralTollHits++;
           });
         }
       });
     }
 
-    const hasHighway = highwayStepsCount > 0;
-    // Bonificación para autopistas y vías rápidas para evitar cruzar el centro con semáforos
-    const highwayBonusSecs = hasHighway ? 240 : 0; 
-    const score = (r.duration || 0) - highwayBonusSecs;
+    // Ruta fluida por Gral Paz / Riccheri: máxima prioridad sobre cruzar por el centro
+    let adjustedScore = r.duration || 0;
+    if (gralPazHits > 0) {
+      adjustedScore -= 600; // -10 min de preferencia por vía rápida perimetral
+    }
+    if (centralTollHits > 0 && gralPazHits === 0) {
+      adjustedScore += 300; // Penalizar cruce céntrico con peajes caros
+    }
 
-    return { route: r, score, duration: r.duration || 0, distance: r.distance || 0, hasHighway };
+    return { route: r, adjustedScore, duration: r.duration || 0, distance: r.distance || 0, gralPazHits, centralTollHits };
   });
 
-  scored.sort((a, b) => a.score - b.score);
+  scored.sort((a, b) => a.adjustedScore - b.adjustedScore);
   return scored[0].route;
 }
 
@@ -1519,7 +1529,7 @@ async function checkAndRoute() {
   const statusEl = document.getElementById('route-calc-status');
   const trafficPill = document.getElementById('traffic-indicator-pill');
   if (statusEl) {
-    statusEl.textContent = 'Calculando ruta más rápida...';
+    statusEl.textContent = 'Calculando ruta más rápida por autopista...';
     statusEl.style.color = '#38bdf8';
   }
 
@@ -1541,53 +1551,73 @@ async function checkAndRoute() {
   // 1. Intentar con Mapbox Traffic en tiempo real si hay token configurado
   if (token) {
     try {
+      const candidateRoutes = [];
       const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${waypoints}?overview=full&geometries=geojson&steps=true&annotations=congestion,duration&alternatives=true&access_token=${encodeURIComponent(token)}`;
       const mbRes = await fetch(mapboxUrl);
       if (mbRes.ok) {
         const mbData = await mbRes.json();
         if (mbData.code === 'Ok' && mbData.routes && mbData.routes.length > 0) {
-          route = selectOptimalRoute(mbData.routes);
-          isMapboxSuccess = true;
-          state.trafficEngine = 'mapbox';
-
-          // Analizar nivel de congestión de Mapbox
-          let congestionSummary = 'low';
-          let congestionCounts = { low: 0, moderate: 0, heavy: 0, severe: 0 };
-          let totalAnnotations = 0;
-
-          if (route.legs) {
-            route.legs.forEach(leg => {
-              if (leg.annotation && leg.annotation.congestion) {
-                leg.annotation.congestion.forEach(c => {
-                  if (congestionCounts[c] !== undefined) {
-                    congestionCounts[c]++;
-                    totalAnnotations++;
-                  }
-                });
-              }
-            });
-          }
-
-          if (totalAnnotations > 0) {
-            const heavySevereRatio = (congestionCounts.heavy + congestionCounts.severe) / totalAnnotations;
-            const modRatio = congestionCounts.moderate / totalAnnotations;
-            if (heavySevereRatio > 0.18 || congestionCounts.severe > 2) {
-              congestionSummary = 'heavy';
-              state.mapboxCongestionLabel = 'Tráfico pesado en vivo';
-            } else if (modRatio > 0.22 || congestionCounts.heavy > 2) {
-              congestionSummary = 'moderate';
-              state.mapboxCongestionLabel = 'Tráfico moderado en vivo';
-            } else {
-              congestionSummary = 'low';
-              state.mapboxCongestionLabel = 'Tráfico fluido en vivo';
-            }
-          } else {
-            state.mapboxCongestionLabel = 'Tráfico en tiempo real';
-          }
-          state.trafficCongestion = congestionSummary;
+          candidateRoutes.push(...mbData.routes);
         }
-      } else {
-        console.warn('Mapbox Traffic API devolvió código:', mbRes.status, 'activando fallback OSRM');
+      }
+
+      // Si el viaje es Norte <-> Ezeiza/Sur sin parada intermedia, consultar también la alternativa por Gral Paz
+      const isNorthToEzeiza = !s && ((o.lat > -34.60 && d.lat < -34.70) || (d.lat > -34.60 && o.lat < -34.70));
+      if (isNorthToEzeiza) {
+        try {
+          const gralPazConnector = '-58.530,-34.580'; // Conector Av. Gral Paz (RN A001)
+          const gralPazWaypoints = `${o.lng},${o.lat};${gralPazConnector};${d.lng},${d.lat}`;
+          const mbGpUrl = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${gralPazWaypoints}?overview=full&geometries=geojson&steps=true&annotations=congestion,duration&access_token=${encodeURIComponent(token)}`;
+          const mbGpRes = await fetch(mbGpUrl);
+          if (mbGpRes.ok) {
+            const mbGpData = await mbGpRes.json();
+            if (mbGpData.code === 'Ok' && mbGpData.routes && mbGpData.routes.length > 0) {
+              candidateRoutes.push(...mbGpData.routes);
+            }
+          }
+        } catch(gpErr) {}
+      }
+
+      if (candidateRoutes.length > 0) {
+        route = selectOptimalRoute(candidateRoutes);
+        isMapboxSuccess = true;
+        state.trafficEngine = 'mapbox';
+
+        // Analizar nivel de congestión de Mapbox
+        let congestionSummary = 'low';
+        let congestionCounts = { low: 0, moderate: 0, heavy: 0, severe: 0 };
+        let totalAnnotations = 0;
+
+        if (route.legs) {
+          route.legs.forEach(leg => {
+            if (leg.annotation && leg.annotation.congestion) {
+              leg.annotation.congestion.forEach(c => {
+                if (congestionCounts[c] !== undefined) {
+                  congestionCounts[c]++;
+                  totalAnnotations++;
+                }
+              });
+            }
+          });
+        }
+
+        if (totalAnnotations > 0) {
+          const heavySevereRatio = (congestionCounts.heavy + congestionCounts.severe) / totalAnnotations;
+          const modRatio = congestionCounts.moderate / totalAnnotations;
+          if (heavySevereRatio > 0.18 || congestionCounts.severe > 2) {
+            congestionSummary = 'heavy';
+            state.mapboxCongestionLabel = 'Tráfico pesado en vivo';
+          } else if (modRatio > 0.22 || congestionCounts.heavy > 2) {
+            congestionSummary = 'moderate';
+            state.mapboxCongestionLabel = 'Tráfico moderado en vivo';
+          } else {
+            congestionSummary = 'low';
+            state.mapboxCongestionLabel = 'Tráfico fluido en vivo';
+          }
+        } else {
+          state.mapboxCongestionLabel = 'Tráfico en tiempo real';
+        }
+        state.trafficCongestion = congestionSummary;
       }
     } catch (mbErr) {
       console.warn('Fallo de conexión con Mapbox Traffic, activando fallback OSRM:', mbErr);
