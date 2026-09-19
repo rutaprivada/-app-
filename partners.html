@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Portal Conductores & Flota Partner | RutaPrivada</title>
+  <meta name="description" content="Acceso exclusivo para conductores ejecutivos y flota partner de RutaPrivada. Consola de viajes en vivo, hoja de ruta, reservas y liquidaciones directas.">
+  <meta name="theme-color" content="#090d16">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css?v=16">
+  <style>
+    :root {
+      --partner-gold: #fbbf24;
+      --partner-gold-dark: #d97706;
+      --partner-bg: #090d16;
+      --partner-card-bg: rgba(15, 23, 42, 0.85);
+      --partner-border: rgba(251, 191, 36, 0.2);
+    }
+    body.partners-page {
+      background: radial-gradient(circle at 50% 0%, #172554 0%, #090d16 60%, #030712 100%);
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .partners-header {
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 16px 0;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .partners-container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 20px;
+      width: 100%;
+    }
+    .partners-nav-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .partner-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .partner-brand img {
+      width: 38px;
+      height: 38px;
+    }
+    .partner-brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .partner-brand-title span {
+      color: var(--partner-gold);
+    }
+    .partner-tag-badge {
+      font-size: 0.72rem;
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      color: var(--partner-gold);
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-left: 6px;
+    }
+    .partners-hero {
+      padding: 48px 0 32px;
+      text-align: center;
+    }
+    .partners-hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 999px;
+      color: var(--partner-gold);
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .partners-hero h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(2rem, 4vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 14px;
+    }
+    .partners-hero h1 span {
+      background: linear-gradient(135deg, #fef08a 0%, #fbbf24 50%, #d97706 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .partners-hero p {
+      color: #94a3b8;
+      max-width: 650px;
+      margin: 0 auto 30px;
+      font-size: 1.05rem;
+      line-height: 1.5;
+    }
+    .partners-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+    .partner-action-card {
+      background: var(--partner-card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 30px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+      transition: all 0.3s ease;
+      overflow: hidden;
+    }
+    .partner-action-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--partner-gold);
+      box-shadow: 0 20px 45px rgba(251, 191, 36, 0.15);
+    }
+    .partner-card-glow {
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 140px;
+      height: 140px;
+      background: radial-gradient(circle, rgba(251, 191, 36, 0.25) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .card-icon-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .card-icon-box {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.7rem;
+      background: rgba(251, 191, 36, 0.15);
+      color: var(--partner-gold);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+    .card-badge-status {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .partner-action-card h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .partner-action-card p {
+      color: #94a3b8;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      flex-grow: 1;
+    }
+    .partner-card-features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 24px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 16px;
+    }
+    .partner-card-features li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #cbd5e1;
+      font-size: 0.88rem;
+      margin-bottom: 10px;
+    }
+    .partner-card-features li i {
+      color: var(--partner-gold);
+      font-size: 0.85rem;
+    }
+    .btn-gold-partner {
+      background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 14px 22px;
+      border-radius: 14px;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 6px 18px rgba(217, 119, 6, 0.35);
+      transition: all 0.2s ease;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-gold-partner:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(217, 119, 6, 0.5);
+      color: #000;
+    }
+    .btn-outline-partner {
+      background: rgba(255, 255, 255, 0.05);
+      color: #f8fafc;
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 14px 22px;
+      border-radius: 14px;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      transition: all 0.2s ease;
+    }
+    .btn-outline-partner:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    .pwa-install-banner {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 18px;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+    .pwa-banner-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .pwa-icon-large {
+      font-size: 2.2rem;
+    }
+    .pwa-banner-text h4 {
+      margin: 0 0 4px 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .pwa-banner-text p {
+      margin: 0;
+      color: #94a3b8;
+      font-size: 0.88rem;
+    }
+    .footer-partners {
+      margin-top: auto;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 24px 0;
+      text-align: center;
+      color: #64748b;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body class="partners-page">
+
+  <!-- HEADER -->
+  <header class="partners-header">
+    <div class="partners-container partners-nav-row">
+      <a href="index.html" class="partner-brand">
+        <img src="favicon.svg" alt="RutaPrivada Logo">
+        <div>
+          <div class="partner-brand-title">Ruta<span>Privada</span> <span class="partner-tag-badge">Partners</span></div>
+        </div>
+      </a>
+      <a href="index.html" class="btn-outline-partner" style="padding: 8px 16px; font-size: 0.85rem;">
+        <i class="fa-solid fa-arrow-left"></i> Modo Pasajeros
+      </a>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="partners-hero">
+    <div class="partners-container">
+      <span class="partners-hero-tag">
+        <i class="fa-solid fa-shield-halved"></i> Acceso Exclusivo para Conductores & Flota
+      </span>
+      <h1>Consola Operativa & <span>Portal Partner</span></h1>
+      <p>Bienvenido al ecosistema exclusivo de choferes profesionales de RutaPrivada. Gestiona tus viajes en vivo, reservas programadas y liquidaciones directas.</p>
+    </div>
+  </section>
+
+  <!-- ACCIONES PRINCIPALES -->
+  <main class="partners-container">
+    <div class="partners-grid">
+
+      <!-- TARJETA 1: APP CHOFER EN VIVO -->
+      <div class="partner-action-card">
+        <div class="partner-card-glow"></div>
+        <div class="card-icon-header">
+          <div class="card-icon-box">
+            <i class="fa-solid fa-car-side"></i>
+          </div>
+          <span class="card-badge-status">🔴 En Vivo</span>
+        </div>
+        <h3>App Chofer en Vivo</h3>
+        <p>Consola interactiva para salir a manejar, recibir viajes inmediatos con radar, alertas con sonido y navegación con Waze / Google Maps.</p>
+        <ul class="partner-card-features">
+          <li><i class="fa-solid fa-check"></i> Radar de viajes inmediatos en CABA y GBA</li>
+          <li><i class="fa-solid fa-check"></i> Bandeja de reservas de pasajeros para aceptar</li>
+          <li><i class="fa-solid fa-check"></i> Control de ganancias diarias, semanales y mensuales</li>
+          <li><i class="fa-solid fa-check"></i> Navegación GPS directa con 1 toque</li>
+        </ul>
+        <a href="conductor.html" class="btn-gold-partner">
+          <i class="fa-solid fa-bolt"></i> Abrir Modo Conductor Ahora
+        </a>
+      </div>
+
+      <!-- TARJETA 2: PORTAL PARTNER & AGENDA -->
+      <div class="partner-action-card">
+        <div class="card-icon-header">
+          <div class="card-icon-box" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.3);">
+            <i class="fa-solid fa-clipboard-list"></i>
+          </div>
+          <span class="card-badge-status" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.3);">
+            🔒 Requiere PIN
+          </span>
+        </div>
+        <h3>Portal Partner & Finanzas</h3>
+        <p>Panel integral de administración: hoja de ruta ejecutiva, cobranzas, liquidaciones de peajes y sincronización en la nube.</p>
+        <ul class="partner-card-features">
+          <li><i class="fa-solid fa-check"></i> Hoja de ruta semanal completa</li>
+          <li><i class="fa-solid fa-check"></i> Registro de transferencias y cobros en efectivo</li>
+          <li><i class="fa-solid fa-check"></i> Sincronización en la nube con Firebase Firestore</li>
+          <li><i class="fa-solid fa-check"></i> Exportación de comprobantes y balances</li>
+        </ul>
+        <a href="agenda.html" class="btn-outline-partner">
+          <i class="fa-solid fa-key"></i> Ingresar al Portal Partner
+        </a>
+      </div>
+
+    </div>
+
+    <!-- BANNER DE INSTALACIÓN PWA -->
+    <div class="pwa-install-banner">
+      <div class="pwa-banner-left">
+        <span class="pwa-icon-large">📱</span>
+        <div class="pwa-banner-text">
+          <h4>¿Querés tener la App de Chofer en tu pantalla de inicio?</h4>
+          <p>Instalala directamente en tu teléfono Android o iPhone en 2 pasos sin descargar archivos pesados.</p>
+        </div>
+      </div>
+      <a href="conductor.html" class="btn-gold-partner" style="padding: 10px 18px; font-size: 0.9rem;">
+        <i class="fa-solid fa-mobile-screen-button"></i> Abrir e Instalar App
+      </a>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer-partners">
+    <div class="partners-container">
+      <p>© RutaPrivada • Red Exclusiva de Choferes Ejecutivos & Traslados Privados en Argentina.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

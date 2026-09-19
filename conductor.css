@@ -1050,4 +1050,762 @@ body.is-app-mode .web-only {
     display: none !important;
 }
 
+/* ==========================================
+   MULTI-TAB APP SYSTEM & BOTTOM NAVIGATION
+   ========================================== */
+.driver-main-container {
+    flex: 1;
+    max-width: 600px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 16px 16px 90px;
+}
+
+.driver-tab-view {
+    display: none;
+    animation: fadeInTab 0.25s ease-out;
+}
+
+.driver-tab-view.active {
+    display: block;
+}
+
+@keyframes fadeInTab {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* BARRA DE NAVEGACIÓN INFERIOR (BOTTOM NAV) */
+.driver-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 68px;
+    background: rgba(10, 14, 23, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 90;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    max-width: 600px;
+    margin: 0 auto;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.bottom-nav-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 14px;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    flex: 1;
+    position: relative;
+}
+
+.bottom-nav-btn i {
+    font-size: 1.25rem;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.bottom-nav-btn.active {
+    color: var(--primary-gold);
+}
+
+.bottom-nav-btn.active i {
+    color: var(--primary-gold);
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.4));
+}
+
+.nav-icon-badge-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.nav-badge {
+    position: absolute;
+    top: -4px;
+    right: -10px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 999px;
+    border: 2px solid #0a0e17;
+    min-width: 16px;
+    text-align: center;
+    line-height: 1.1;
+    display: none;
+}
+
+.nav-badge.show {
+    display: inline-block;
+}
+
+/* ==========================================
+   SECCIÓN DE RESERVAS PROGRAMADAS
+   ========================================== */
+.section-title-wrap {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.section-title-wrap h3 {
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-sub {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.btn-refresh-reservas {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-refresh-reservas:hover {
+    color: var(--primary-gold);
+    border-color: var(--primary-gold);
+}
+
+.reservas-filter-tabs {
+    display: flex;
+    gap: 8px;
+    background: rgba(18, 24, 38, 0.8);
+    padding: 4px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 16px;
+}
+
+.reserva-filter-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.reserva-filter-btn.active {
+    background: rgba(245, 158, 11, 0.18);
+    color: var(--primary-gold);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.reserva-filter-btn .badge-count {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    color: inherit;
+}
+
+.reservas-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.reserva-card {
+    background: var(--bg-card);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    position: relative;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    transition: all 0.25s ease;
+}
+
+.reserva-card:hover {
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+.reserva-card.reserva-tomada {
+    border-color: rgba(16, 185, 129, 0.4);
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.05) 0%, rgba(18, 24, 38, 0.9) 100%);
+}
+
+.reserva-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 10px;
+}
+
+.reserva-datetime {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.reserva-date-pill {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    color: var(--primary-gold);
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.reserva-time-bold {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.reserva-status-tag {
+    font-size: 0.72rem;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-weight: 700;
+}
+
+.reserva-status-tag.disponible {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.reserva-status-tag.tomada {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.reserva-route-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.reserva-point {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.85rem;
+}
+
+.reserva-point i {
+    font-size: 0.85rem;
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+.reserva-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+}
+
+.reserva-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.reserva-meta-item .m-title {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+.reserva-meta-item .m-val {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.reserva-actions-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-tomar-reserva {
+    flex: 1;
+    background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+    color: #0f172a;
+    font-weight: 800;
+    font-size: 0.88rem;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-tomar-reserva:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(217, 119, 6, 0.45);
+}
+
+.btn-ver-reserva-whatsapp {
+    background: rgba(37, 211, 102, 0.15);
+    border: 1px solid rgba(37, 211, 102, 0.35);
+    color: #25d366;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 1.1rem;
+    transition: all 0.2s;
+}
+
+.btn-ver-reserva-whatsapp:hover {
+    background: #25d366;
+    color: #000;
+}
+
+/* ==========================================
+   CENTRO FINANCIERO & GANANCIAS
+   ========================================== */
+.earnings-period-tabs {
+    display: flex;
+    gap: 6px;
+    background: rgba(18, 24, 38, 0.85);
+    padding: 4px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 16px;
+    overflow-x: auto;
+}
+
+.period-tab-btn {
+    flex: 1;
+    min-width: 70px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.period-tab-btn.active {
+    background: rgba(245, 158, 11, 0.18);
+    color: var(--primary-gold);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.earnings-hero-card {
+    background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.15) 0%, rgba(18, 24, 38, 0.9) 70%);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: var(--radius-lg);
+    padding: 24px 20px;
+    text-align: center;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.period-hero-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.period-hero-amount {
+    font-family: var(--font-heading);
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #ffffff;
+    text-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
+    margin-bottom: 18px;
+}
+
+.earnings-hero-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 14px;
+}
+
+.hero-metric-box {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.hero-metric-box .metric-val {
+    font-family: var(--font-heading);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-gold);
+}
+
+.hero-metric-box .metric-lbl {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/* DESGLOSE SEMANAL */
+.period-breakdown-card {
+    background: var(--bg-card);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.breakdown-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.weekly-bars-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    align-items: flex-end;
+    height: 140px;
+    padding-top: 20px;
+}
+
+.weekly-bar-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.bar-track {
+    width: 100%;
+    max-width: 28px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    height: 90px;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    position: relative;
+}
+
+.bar-fill {
+    width: 100%;
+    background: linear-gradient(to top, #d97706, #fbbf24);
+    border-radius: 6px 6px 0 0;
+    transition: height 0.5s ease;
+    min-height: 4px;
+}
+
+.bar-fill.today {
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+}
+
+.bar-day {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.bar-day.today {
+    color: var(--primary-gold);
+    font-weight: 800;
+}
+
+.bar-amount-tip {
+    font-size: 0.62rem;
+    color: #cbd5e1;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* DESGLOSE MENSUAL */
+.monthly-summary-boxes {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.monthly-stat-tile {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.monthly-stat-tile .tile-lbl {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.monthly-stat-tile .tile-val {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+/* HISTORIAL COMPLETO */
+.period-trips-section {
+    background: var(--bg-card);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+}
+
+.trips-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 10px;
+}
+
+.trips-section-header h4 {
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.trips-history-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.trip-card-detailed {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+}
+
+.trip-card-detailed:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.trip-left-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.trip-time-cat {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.trip-route-compact {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+.trip-right-amount {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.trip-money-val {
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--text-gold);
+}
+
+.trip-payment-type {
+    font-size: 0.68rem;
+    color: var(--accent-emerald);
+}
+
+/* ==========================================
+   PERFIL Y AJUSTES
+   ========================================== */
+.profile-card {
+    background: var(--bg-card);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.profile-card-top {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.profile-avatar-large {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--primary-gold);
+}
+
+.profile-role {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.profile-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 14px;
+}
+
+.profile-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.profile-info-item .info-lbl {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.profile-info-item .info-val {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.profile-links-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.profile-link-item {
+    background: var(--bg-card);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #ffffff;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: all 0.2s;
+}
+
+.profile-link-item:hover {
+    border-color: rgba(245, 158, 11, 0.4);
+    transform: translateY(-1px);
+}
+
+.link-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.link-left i {
+    font-size: 1.2rem;
+}
+
+.link-left strong {
+    font-size: 0.9rem;
+    display: block;
+}
+
+.link-left p {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+
 
