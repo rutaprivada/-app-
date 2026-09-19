@@ -3,15 +3,23 @@ param(
 )
 
 $path = $PSScriptRoot
-$ip = [System.Net.IPAddress]::Loopback
+$ip = [System.Net.IPAddress]::Any
 $listener = New-Object System.Net.Sockets.TcpListener($ip, $Port)
+
+# Obtener IP local de la red Wi-Fi / Ethernet
+$localIp = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Wi-Fi*","Ethernet*" -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } | Select-Object -First 1).IPAddress
+if (-not $localIp) {
+    $localIp = "127.0.0.1"
+}
 
 try {
     $listener.Start()
-    Write-Host "====================================================" -ForegroundColor Cyan
-    Write-Host "  RutaPrivada - Servidor Local PWA Activo" -ForegroundColor Green
-    Write-Host "====================================================" -ForegroundColor Cyan
-    Write-Host "Abriendo en tu navegador: http://localhost:$Port" -ForegroundColor Yellow
+    Write-Host "================================================================" -ForegroundColor Cyan
+    Write-Host "  RutaPrivada - Servidor Multi-Dispositivo (PC & Celular) Activo" -ForegroundColor Green
+    Write-Host "================================================================" -ForegroundColor Cyan
+    Write-Host "  -> En tu PC:       http://localhost:$Port" -ForegroundColor Yellow
+    Write-Host "  -> En tu Celular:  http://${localIp}:$Port/conductor.html" -ForegroundColor Cyan
+    Write-Host "================================================================" -ForegroundColor Cyan
     Write-Host "Presiona Ctrl + C en esta ventana para detener el servidor." -ForegroundColor Gray
     Write-Host ""
     

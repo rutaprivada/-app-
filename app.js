@@ -4769,9 +4769,14 @@ const pLine3 = document.getElementById('pLine3');
 function openInAppTripModal(trip) {
   if (!inappTripModal) return;
 
-  if (pTripOrigin) pTripOrigin.textContent = trip.origen || 'Origen seleccionado';
-  if (pTripDestination) pTripDestination.textContent = trip.destino || 'Destino seleccionado';
-  if (pTripTotal) pTripTotal.textContent = '$' + (trip.precioEstimado || 0).toLocaleString('es-AR');
+  const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto;
+  const tripFare = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
+    ? Number(rawPrice)
+    : 35000;
+
+  if (pTripOrigin) pTripOrigin.textContent = trip.origen || trip.pickupAddress || 'Origen seleccionado';
+  if (pTripDestination) pTripDestination.textContent = trip.destino || trip.dropoffAddress || 'Destino seleccionado';
+  if (pTripTotal) pTripTotal.textContent = '$' + tripFare.toLocaleString('es-AR');
 
   // Estado inicial: Buscando
   if (pStateSearching) pStateSearching.classList.remove('hidden');
