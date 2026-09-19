@@ -4956,15 +4956,44 @@ if (closeInappTripBtn) {
 
 if (btnPassengerCancelTrip) {
   btnPassengerCancelTrip.addEventListener('click', () => {
-    if (confirm('¿Deseas cancelar la solicitud de viaje?')) {
-      if (window.RutaSync) {
-        window.RutaSync.actualizarEstadoViaje('cancelado');
-        window.RutaSync.limpiarViajeActivo();
+    const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+    
+    // Si el viaje ya fue asignado o aceptado por un chofer
+    if (activeTrip && activeTrip.estado && activeTrip.estado !== 'buscando_conductor' && activeTrip.estado !== 'solicitado') {
+      const aceptadoEn = activeTrip.aceptadoEn || activeTrip.timestamp || Date.now();
+      const elapsedMs = Date.now() - aceptadoEn;
+      const elapsedSec = Math.floor(elapsedMs / 1000);
+      const elapsedMin = Math.floor(elapsedSec / 60);
+
+      if (elapsedMs > 2 * 60 * 1000) { // Pasados más de 2 minutos
+        const tarifaMinimaStr = activeTrip.precio ? ('$' + Math.round(Number(activeTrip.precio) * 0.5 || 3500).toLocaleString('es-AR')) : '$3.500';
+        const driverName = (activeTrip.conductor && activeTrip.conductor.nombre) ? activeTrip.conductor.nombre : 'Daniel Pabon';
+        const msgPenalizacion = `⚠️ COBRO DE TARIFA MÍNIMA POR CANCELACIÓN:\n\nTu chofer asignado (${driverName}) ya se encuentra en camino hacia tu ubicación y han transcurrido más de 2 minutos (${elapsedMin} min) desde que tomó el servicio.\n\nPor políticas del servicio ejecutivo, cancelar este viaje aplicará el cobro de la TARIFA MÍNIMA (${tarifaMinimaStr}) como penalización por el desplazamiento y tiempo del chofer.\n\n¿Deseas confirmar la cancelación del viaje?`;
+        
+        if (!confirm(msgPenalizacion)) {
+          return;
+        }
+      } else {
+        const segRestantes = Math.max(0, 120 - elapsedSec);
+        const msgAviso = `¿Deseas cancelar la solicitud de viaje?\n\n(Aviso: Quedan ${segRestantes}s antes de que aplique penalización de tarifa mínima por chofer en camino).`;
+        if (!confirm(msgAviso)) {
+          return;
+        }
       }
-      closeInAppTripModal();
-      closePassengerChatModal();
-      showToast('❌ Solicitud de viaje cancelada.');
+    } else {
+      if (!confirm('¿Deseas cancelar la solicitud de viaje?')) {
+        return;
+      }
     }
+
+    if (window.RutaSync) {
+      window.RutaSync.actualizarEstadoViaje('cancelado');
+      window.RutaSync.limpiarViajeActivo();
+      window.RutaSync.limpiarChat();
+    }
+    closeInAppTripModal();
+    closePassengerChatModal();
+    showToast('❌ Solicitud de viaje cancelada.');
   });
 }
 
@@ -5153,7 +5182,9 @@ if (window.RutaSync) {
     if (pFinalPaymentMethod) pFinalPaymentMethod.textContent = paymentMethodStr;
     if (pFinalDriverName) pFinalDriverName.textContent = driverNameStr;
 
-    setPassengerStarRating(5);
+    setPassengerStarRating(0);
+    document.querySelectorAll('#passengerComplimentsRow .compliment-tag').forEach(t => t.classList.remove('selected'));
+    if (passengerRatingComment) passengerRatingComment.value = '';
     modalPassengerTripCompleted.classList.remove('hidden');
     modalPassengerTripCompleted.style.display = 'flex';
   }
@@ -5165,7 +5196,7 @@ if (window.RutaSync) {
     const stars = passengerStarRating.querySelectorAll('.star-item');
     stars.forEach(s => {
       const starVal = Number(s.getAttribute('data-value'));
-      if (starVal <= val) {
+      if (val > 0 && starVal <= val) {
         s.classList.add('active');
       } else {
         s.classList.remove('active');
@@ -5174,6 +5205,7 @@ if (window.RutaSync) {
 
     if (passengerRatingCaption) {
       const captions = {
+        0: 'Toca las estrellas para calificar al chofer',
         1: 'Muy insatisfecho (1/5)',
         2: 'Regular (2/5)',
         3: 'Bueno (3/5)',
@@ -5181,6 +5213,7 @@ if (window.RutaSync) {
         5: '¡Excelente servicio! (5/5)'
       };
       passengerRatingCaption.textContent = captions[val] || `${val}/5`;
+      passengerRatingCaption.style.color = val > 0 ? '#fbbf24' : '#94a3b8';
     }
   }
 
@@ -5202,6 +5235,10 @@ if (window.RutaSync) {
 
   if (btnSubmitPassengerRating) {
     btnSubmitPassengerRating.addEventListener('click', () => {
+      if (passengerSelectedRating === 0) {
+        alert('Por favor selecciona una calificación de estrellas para tu chofer.');
+        return;
+      }
       const selectedTags = Array.from(document.querySelectorAll('#passengerComplimentsRow .compliment-tag.selected'))
         .map(t => t.getAttribute('data-tag'));
       const comment = passengerRatingComment ? passengerRatingComment.value.trim() : '';

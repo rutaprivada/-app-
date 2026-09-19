@@ -1243,9 +1243,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 modalDriverFareSummary.classList.remove('active');
             }
 
-            // Abrir Modal de Calificación al Pasajero
+            // Abrir Modal de Calificación al Pasajero (sin preselección de estrellas ni tags)
             if (ratePassengerName) ratePassengerName.textContent = passName;
-            setDriverPassengerRating(5);
+            setDriverPassengerRating(0);
+            document.querySelectorAll('#driverPassengerTagsRow .compliment-tag').forEach(t => t.classList.remove('selected'));
             if (modalDriverRatePassenger) {
                 modalDriverRatePassenger.classList.add('active');
             }
@@ -1261,7 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const stars = driverStarRating.querySelectorAll('.star-item');
         stars.forEach(s => {
             const starVal = Number(s.getAttribute('data-value'));
-            if (starVal <= val) {
+            if (val > 0 && starVal <= val) {
                 s.classList.add('active');
             } else {
                 s.classList.remove('active');
@@ -1270,6 +1271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (driverRatingCaption) {
             const captions = {
+                0: 'Toca las estrellas para calificar',
                 1: 'Pasajero con inconvenientes (1/5)',
                 2: 'Regular (2/5)',
                 3: 'Bueno (3/5)',
@@ -1277,6 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 5: '¡Excelente pasajero! (5/5)'
             };
             driverRatingCaption.textContent = captions[val] || `${val}/5`;
+            driverRatingCaption.style.color = val > 0 ? '#fbbf24' : '#94a3b8';
         }
     }
 
@@ -1297,6 +1300,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnSubmitDriverRating) {
         btnSubmitDriverRating.addEventListener('click', () => {
+            if (driverSelectedPassengerRating === 0) {
+                alert('⚠️ Por favor selecciona una calificación de estrellas para el pasajero antes de finalizar.');
+                return;
+            }
+
             const selectedTags = Array.from(document.querySelectorAll('#driverPassengerTagsRow .compliment-tag.selected'))
                 .map(t => t.getAttribute('data-tag'));
 
@@ -1334,7 +1342,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     btnCancelActiveTrip.addEventListener('click', () => {
-        if (confirm('¿Estás seguro de que deseas cancelar este viaje activo?')) {
+        const warningMsg = '⚠️ ADVERTENCIA DE CANCELACIÓN:\n\nAl cancelar un viaje que ya has aceptado, disminuye tu tasa de aceptación y cumplimiento, lo cual afectará tu prioridad para recibir traslados de la flota.\n\n¿Estás seguro de que deseas cancelar este viaje?';
+        if (confirm(warningMsg)) {
             if (window.RutaSync) {
                 window.RutaSync.actualizarEstadoViaje('cancelado');
                 window.RutaSync.limpiarViajeActivo();
@@ -1590,4 +1599,15 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDriverProfileInfo();
     loadSavedStats();
     renderReservas();
+
+    // Registro y actualización de Service Worker para la PWA de Chofer
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js?v=26')
+                .then(reg => {
+                    reg.update().catch(() => {});
+                })
+                .catch(() => {});
+        });
+    }
 });
