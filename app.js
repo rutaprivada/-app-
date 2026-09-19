@@ -4882,6 +4882,16 @@ if (btnRequestInapp) {
       return;
     }
 
+    // Validación de viaje inmediato (5 a 10 min) vs Reserva programada
+    const todayStr = new Date().toISOString().split('T')[0];
+    const selectedDate = document.getElementById('pickup-date-input')?.value || state.date || todayStr;
+    if (selectedDate && selectedDate > todayStr) {
+      showToast('ℹ️ El pedido de chofer en vivo es para salidas inmediatas (5 a 10 min). Para traslados programados, por favor toca "Reservar Traslado".');
+      const btnReserve = document.getElementById('btn-action-reserva');
+      if (btnReserve) btnReserve.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     // Obtener la cotización exacta activa
     let calculatedFare = 0;
     if (state.totalPrice && Number(state.totalPrice) > 0) {
@@ -5136,8 +5146,8 @@ if (window.RutaSync) {
 
     const rawFare = viaje.totalCobrado || viaje.precioEstimado || viaje.precio || viaje.totalFare || viaje.monto || 0;
     const finalFareNum = Number(rawFare) || 0;
-    const paymentMethodStr = viaje.metodoPago || viaje.paymentMethod || 'Efectivo / Transferencia';
-    const driverNameStr = (viaje.conductor && viaje.conductor.nombre) ? viaje.conductor.nombre : 'Martín Gómez';
+    const paymentMethodStr = viaje.metodoPago || viaje.paymentMethod || 'Efectivo';
+    const driverNameStr = (viaje.conductor && viaje.conductor.nombre) ? viaje.conductor.nombre : 'Daniel Pabon';
 
     if (pFinalFareTotal) pFinalFareTotal.textContent = '$' + finalFareNum.toLocaleString('es-AR');
     if (pFinalPaymentMethod) pFinalPaymentMethod.textContent = paymentMethodStr;
@@ -5145,6 +5155,7 @@ if (window.RutaSync) {
 
     setPassengerStarRating(5);
     modalPassengerTripCompleted.classList.remove('hidden');
+    modalPassengerTripCompleted.style.display = 'flex';
   }
 
   function setPassengerStarRating(val) {
@@ -5197,7 +5208,7 @@ if (window.RutaSync) {
 
       const ratingRecord = {
         id: 'rating_' + Date.now(),
-        driver: pFinalDriverName ? pFinalDriverName.textContent : 'Martín Gómez',
+        driver: pFinalDriverName ? pFinalDriverName.textContent : 'Daniel Pabon',
         stars: passengerSelectedRating,
         tags: selectedTags,
         comment: comment,
@@ -5219,6 +5230,7 @@ if (window.RutaSync) {
 
       if (modalPassengerTripCompleted) {
         modalPassengerTripCompleted.classList.add('hidden');
+        modalPassengerTripCompleted.style.display = 'none';
       }
 
       showToast('🌟 ¡Muchas gracias por tu calificación! Esperamos verte pronto.');
@@ -5228,6 +5240,7 @@ if (window.RutaSync) {
   if (closePassengerCompletedBtn && modalPassengerTripCompleted) {
     closePassengerCompletedBtn.addEventListener('click', () => {
       modalPassengerTripCompleted.classList.add('hidden');
+      modalPassengerTripCompleted.style.display = 'none';
       if (window.RutaSync) window.RutaSync.limpiarViajeActivo();
     });
   }

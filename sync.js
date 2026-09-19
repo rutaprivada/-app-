@@ -18,7 +18,8 @@ class RutaSyncManager {
         this.wsConnected = false;
         this.reconnectTimer = null;
         this.pollTimer = null;
-        this.lastEventTimestamp = Date.now() - 1000;
+        this.lastEventSeq = 0;
+        this.processedEvents = new Set();
         this.deviceId = 'dev_' + Math.random().toString(36).substr(2, 9);
 
         this.initLocalChannels();
@@ -56,15 +57,15 @@ class RutaSyncManager {
     initServerHttpSync() {
         const pollServer = async () => {
             try {
-                const resp = await fetch(`/api/sync/events?since=${this.lastEventTimestamp}`, {
+                const resp = await fetch(`/api/sync/events?seq=${this.lastEventSeq}`, {
                     cache: 'no-store'
                 });
                 if (resp.ok) {
                     const rawData = await resp.json();
                     const events = Array.isArray(rawData) ? rawData : (rawData && rawData.type ? [rawData] : []);
                     events.forEach(ev => {
-                        if (ev && ev.timestamp > this.lastEventTimestamp) {
-                            this.lastEventTimestamp = ev.timestamp;
+                        if (ev && ev.seq && ev.seq > this.lastEventSeq) {
+                            this.lastEventSeq = ev.seq;
                         }
                         if (ev && ev.senderId !== this.deviceId) {
                             this.handleIncoming(ev);
@@ -75,7 +76,7 @@ class RutaSyncManager {
         };
 
         if (this.pollTimer) clearInterval(this.pollTimer);
-        this.pollTimer = setInterval(pollServer, 400);
+        this.pollTimer = setInterval(pollServer, 350);
     }
 
     // ==========================================
@@ -168,7 +169,7 @@ class RutaSyncManager {
             timestamp: now
         };
 
-        this.lastEventTimestamp = now;
+        this.processedEvents.add(message.id);
 
         // 1. Enviar al Servidor Local HTTP si está disponible
         fetch('/api/sync/emit', {
@@ -222,9 +223,28 @@ class RutaSyncManager {
     handleIncoming(message, isSelf = false) {
         if (!message || !message.type) return;
 
+        // Deduplicación por ID único para evitar ejecuciones repetidas
+        if (!isSelf && message.id) {
+            if (this.processedEvents.has(message.id)) return;
+            this.processedEvents.add(message.id);
+            if (this.processedEvents.size > 500) {
+                const first = this.processedEvents.values().next().value;
+                this.processedEvents.delete(first);
+            }
+        }
+
         if (message.type === 'NUEVO_VIAJE_SOLICITADO' || message.type === 'VIAJE_ACEPTADO' || message.type === 'ESTADO_VIAJE_CAMBIADO') {
             if (message.payload) {
                 this.guardarViajeActivo(message.payload);
+
+                // Si el viaje fue completado, registrarlo automáticamente en el historial de Partners / Agenda
+                if (message.payload.estado === 'completado') {
+                    this.guardarViajeEnAgenda(message.payload);
+                }
+            }
+        } else if (message.type === 'RESERVA_CREADA') {
+            if (message.payload && message.payload.id) {
+                this.guardarReservaEnAgenda(message.payload);
             }
         } else if (message.type === 'CHAT_MENSAJE_ENVIADO') {
             if (message.payload && message.payload.texto) {
@@ -247,6 +267,70 @@ class RutaSyncManager {
                 cb(message.type, message.payload, { isSelf, timestamp: message.timestamp, id: message.id });
             } catch (err) {}
         });
+    }
+
+    guardarViajeEnAgenda(viaje) {
+        try {
+            const rawFare = viaje.totalCobrado || viaje.precioEstimado || viaje.precio || viaje.totalFare || viaje.monto || 0;
+            const fareNum = Number(rawFare) || 0;
+            const today = new Date().toISOString().split('T')[0];
+            const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const completedBooking = {
+                id: viaje.id || ('live_' + Date.now()),
+                customerName: viaje.nombrePasajero || viaje.clientName || 'Pasajero',
+                customerPhone: viaje.telefono || viaje.clientPhone || '',
+                clientName: viaje.nombrePasajero || viaje.clientName || 'Pasajero',
+                clientPhone: viaje.telefono || viaje.clientPhone || '',
+                pickupAddress: viaje.origen || viaje.pickupAddress || 'Origen',
+                dropoffAddress: viaje.destino || viaje.dropoffAddress || 'Destino',
+                origin: viaje.origen || viaje.pickupAddress || 'Origen',
+                destination: viaje.destino || viaje.dropoffAddress || 'Destino',
+                date: viaje.fecha || today,
+                time: viaje.hora || nowTime,
+                pickupDate: viaje.fecha || today,
+                pickupTime: viaje.hora || nowTime,
+                category: viaje.categoria || 'Sedán Ejecutivo',
+                totalFare: fareNum,
+                price: fareNum,
+                paymentMethod: viaje.metodoPago || 'Efectivo',
+                paymentStatus: 'paid',
+                status: 'completada',
+                driverAssigned: (viaje.conductor && viaje.conductor.nombre) ? viaje.conductor.nombre : 'Daniel Pabon',
+                driverVehicle: (viaje.conductor && viaje.conductor.auto) ? viaje.conductor.auto : 'Fiat Cronos Negro',
+                driverPlate: (viaje.conductor && viaje.conductor.patente) ? viaje.conductor.patente : 'AE927CN',
+                notes: `Viaje en vivo finalizado. Cobrado vía ${viaje.metodoPago || 'Efectivo'}.`,
+                isLiveTrip: true,
+                createdAt: new Date().toISOString()
+            };
+
+            let bookings = [];
+            const raw = localStorage.getItem('rutaprivada_bookings_v1');
+            if (raw) bookings = JSON.parse(raw);
+
+            // Reemplazar o insertar
+            const idx = bookings.findIndex(b => b.id === completedBooking.id);
+            if (idx >= 0) {
+                bookings[idx] = completedBooking;
+            } else {
+                bookings.unshift(completedBooking);
+            }
+
+            localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(bookings));
+        } catch(e) {}
+    }
+
+    guardarReservaEnAgenda(reserva) {
+        try {
+            let bookings = [];
+            const raw = localStorage.getItem('rutaprivada_bookings_v1');
+            if (raw) bookings = JSON.parse(raw);
+
+            if (!bookings.some(b => b.id === reserva.id)) {
+                bookings.unshift(reserva);
+                localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(bookings));
+            }
+        } catch(e) {}
     }
 
     // ==========================================

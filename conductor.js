@@ -855,7 +855,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 6. CAMBIO DE ESTADO (EN LÍNEA / DESCONECTADO)
+    // 6. CONTROL DE PANTALLA ACTIVA (Screen Wake Lock API)
+    // ==========================================
+    let screenWakeLock = null;
+
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                screenWakeLock = await navigator.wakeLock.request('screen');
+                screenWakeLock.addEventListener('release', () => {
+                    screenWakeLock = null;
+                });
+            }
+        } catch (err) {}
+    }
+
+    function releaseWakeLock() {
+        if (screenWakeLock) {
+            try { screenWakeLock.release(); } catch(e) {}
+            screenWakeLock = null;
+        }
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && driverState.isOnline) {
+            await requestWakeLock();
+        }
+    });
+
+    // ==========================================
+    // 7. CAMBIO DE ESTADO (EN LÍNEA / DESCONECTADO)
     // ==========================================
     function setOnlineStatus(online) {
         driverState.isOnline = online;
@@ -869,6 +898,9 @@ document.addEventListener('DOMContentLoaded', () => {
             stateOffline.classList.remove('active');
             stateActiveTrip.classList.remove('active');
             stateSearching.classList.add('active');
+
+            // Mantener pantalla activa del celular
+            requestWakeLock();
 
             // Iniciar contador de tiempo en línea
             if (!driverState.onlineTimer) {
@@ -888,6 +920,7 @@ document.addEventListener('DOMContentLoaded', () => {
             stateActiveTrip.classList.remove('active');
             stateOffline.classList.add('active');
 
+            releaseWakeLock();
             closeIncomingModal();
 
             if (driverState.onlineTimer) {
@@ -1454,7 +1487,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        window.RutaSync.on('RESERVA_CREADA', () => {
+        window.RutaSync.on('RESERVA_CREADA', (reserva) => {
+            if (reserva && reserva.id) {
+                let bookings = getStoredBookings();
+                if (!bookings.some(b => b.id === reserva.id)) {
+                    bookings.unshift(reserva);
+                    saveStoredBookings(bookings);
+                }
+            }
             renderReservas();
             playAlertSound('incoming');
         });

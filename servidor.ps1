@@ -8,6 +8,7 @@ $listener = New-Object System.Net.Sockets.TcpListener($ip, $Port)
 
 # Memoria compartida de eventos en tiempo real (PC <-> Celular)
 $global:syncEvents = [System.Collections.ArrayList]::new()
+$global:syncEventSeq = 0
 $global:activeTrip = $null
 
 # Obtener IP local de la red Wi-Fi / Ethernet
@@ -82,8 +83,11 @@ try {
                 try {
                     $eventObj = ConvertFrom-Json $body
                     if ($null -ne $eventObj) {
-                        [void]$global:syncEvents.Add($body)
-                        if ($global:syncEvents.Count -gt 200) {
+                        $global:syncEventSeq++
+                        $eventObj | Add-Member -NotePropertyName "seq" -NotePropertyValue $global:syncEventSeq -Force
+                        $updatedBody = ConvertTo-Json $eventObj -Compress
+                        [void]$global:syncEvents.Add($updatedBody)
+                        if ($global:syncEvents.Count -gt 300) {
                             $global:syncEvents.RemoveRange(0, 50)
                         }
                     }
@@ -96,17 +100,17 @@ try {
             $stream.Write($respBytes, 0, $respBytes.Length)
         }
         elseif ($rawPath.StartsWith("api/sync/events")) {
-            # Extraer parámetro 'since'
-            $since = 0
-            if ($queryString -match "since=(\d+)") {
-                $since = [long]$matches[1]
+            # Extraer parámetro 'seq' o 'since'
+            $sinceSeq = 0
+            if ($queryString -match "seq=(\d+)") {
+                $sinceSeq = [long]$matches[1]
             }
 
             $matchedEvents = [System.Collections.ArrayList]::new()
             foreach ($evJson in $global:syncEvents) {
                 try {
                     $ev = ConvertFrom-Json $evJson
-                    if ($ev.timestamp -gt $since) {
+                    if ($ev.seq -gt $sinceSeq) {
                         [void]$matchedEvents.Add($evJson)
                     }
                 } catch {}
