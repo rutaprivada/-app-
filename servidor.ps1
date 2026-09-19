@@ -85,10 +85,10 @@ try {
                     if ($null -ne $eventObj) {
                         $global:syncEventSeq++
                         $eventObj | Add-Member -NotePropertyName "seq" -NotePropertyValue $global:syncEventSeq -Force
-                        $updatedBody = ConvertTo-Json $eventObj -Compress
+                        $updatedBody = ConvertTo-Json $eventObj -Depth 10 -Compress
                         [void]$global:syncEvents.Add($updatedBody)
-                        if ($global:syncEvents.Count -gt 300) {
-                            $global:syncEvents.RemoveRange(0, 50)
+                        if ($global:syncEvents.Count -gt 500) {
+                            $global:syncEvents.RemoveRange(0, 100)
                         }
                     }
                 } catch {}

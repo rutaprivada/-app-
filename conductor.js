@@ -521,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         tripsHistoryContainer.innerHTML = trips.map(trip => `
-            <div class="trip-card-detailed">
+            <div class="trip-card-detailed clickable-trip-item" data-id="${trip.id || ''}" style="cursor: pointer; transition: transform 0.15s; user-select: none;">
                 <div class="trip-left-info">
                     <span class="trip-time-cat">
                         <i class="fa-regular fa-clock"></i> ${trip.hora || '00:00'} • ${trip.fecha || getTodayKey()} • ${trip.categoria || 'Sedán Ejecutivo'}
@@ -530,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${trip.origen} ➔ ${trip.destino}
                     </span>
                     <span style="font-size: 0.72rem; color: #94a3b8;">
-                        ${trip.distancia ? '📍 ' + trip.distancia : ''}
+                        ${trip.distancia ? '📍 ' + trip.distancia + ' • ' : ''}<span style="color: #38bdf8;"><i class="fa-solid fa-circle-info"></i> Toca para ver detalle</span>
                     </span>
                 </div>
                 <div class="trip-right-amount">
@@ -539,6 +539,60 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
         `).join('');
+
+        // Manejar clics para ver detalle completo y explícito
+        tripsHistoryContainer.querySelectorAll('.clickable-trip-item').forEach((item, idx) => {
+            item.addEventListener('click', () => {
+                const tripObj = trips[idx];
+                if (tripObj) {
+                    openTripDetailModal(tripObj);
+                }
+            });
+        });
+    }
+
+    const modalTripDetail = document.getElementById('modalTripDetail');
+    const btnCloseTripDetail = document.getElementById('btnCloseTripDetail');
+    const btnCerrarDetalleSheet = document.getElementById('btnCerrarDetalleSheet');
+    const tdMonto = document.getElementById('tdMonto');
+    const tdMetodoBadge = document.getElementById('tdMetodoBadge');
+    const tdOrigen = document.getElementById('tdOrigen');
+    const tdDestino = document.getElementById('tdDestino');
+    const tdPasajero = document.getElementById('tdPasajero');
+    const tdFechaHora = document.getElementById('tdFechaHora');
+    const tdCategoria = document.getElementById('tdCategoria');
+    const tdDistancia = document.getElementById('tdDistancia');
+    const tdEstado = document.getElementById('tdEstado');
+
+    function openTripDetailModal(trip) {
+        if (!modalTripDetail) return;
+        const montoNum = Number(trip.monto || trip.totalFare || trip.price || 0);
+        if (tdMonto) tdMonto.textContent = '$' + montoNum.toLocaleString('es-AR');
+        if (tdMetodoBadge) {
+            tdMetodoBadge.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${trip.metodoPago || 'Efectivo / Transferencia'}`;
+        }
+        if (tdOrigen) tdOrigen.textContent = trip.origen || trip.pickupAddress || 'Punto de Origen';
+        if (tdDestino) tdDestino.textContent = trip.destino || trip.dropoffAddress || 'Punto de Destino';
+        if (tdPasajero) tdPasajero.textContent = trip.nombrePasajero || trip.clientName || trip.customerName || 'Pasajero Ejecutivo';
+        if (tdFechaHora) tdFechaHora.textContent = `${trip.fecha || getTodayKey()} • ${trip.hora || '00:00'} hs`;
+        if (tdCategoria) tdCategoria.textContent = trip.categoria || trip.category || 'Sedán Ejecutivo';
+        if (tdDistancia) tdDistancia.textContent = trip.distancia || (trip.distanceKm ? `${trip.distanceKm} km` : 'Traslado Directo');
+        if (tdEstado) tdEstado.textContent = (trip.estado === 'completado' || trip.estado === 'Completada') ? 'Finalizado y Cobrado' : (trip.status || 'Completado');
+
+        modalTripDetail.classList.add('active');
+        playAlertSound('success');
+    }
+
+    function closeTripDetailModal() {
+        if (modalTripDetail) modalTripDetail.classList.remove('active');
+    }
+
+    if (btnCloseTripDetail) btnCloseTripDetail.addEventListener('click', closeTripDetailModal);
+    if (btnCerrarDetalleSheet) btnCerrarDetalleSheet.addEventListener('click', closeTripDetailModal);
+    if (modalTripDetail) {
+        modalTripDetail.addEventListener('click', (e) => {
+            if (e.target === modalTripDetail) closeTripDetailModal();
+        });
     }
 
     // ==========================================
@@ -758,49 +812,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (btnSimularReserva) {
-        btnSimularReserva.addEventListener('click', () => {
-            const bookings = getStoredBookings();
-            const dKey = getTodayKey();
-            const horas = ['14:00', '16:30', '19:15', '21:00', '07:30'];
-            const horaRandom = horas[Math.floor(Math.random() * horas.length)];
-            const destinos = [
-                'Aeropuerto Int. Ezeiza (EZE)',
-                'Aeroparque Jorge Newbery (AEP)',
-                'Nordelta Centro Comercial',
-                'Pilar Golf & Country Club'
-            ];
-            const destinoRandom = destinos[Math.floor(Math.random() * destinos.length)];
-
-            const nuevaReserva = {
-                id: 'res_' + Date.now(),
-                clientName: 'Pasajero ' + (bookings.length + 1),
-                clientPhone: '+549115555' + Math.floor(1000 + Math.random() * 9000),
-                pickupAddress: 'Av. Libertador y Callao, Recoleta',
-                dropoffAddress: destinoRandom,
-                date: dKey,
-                time: horaRandom,
-                category: 'Sedán Ejecutivo',
-                price: 34000 + Math.floor(Math.random() * 15000),
-                paymentMethod: 'Transferencia',
-                status: 'pendiente',
-                notes: 'Pasajero puntual. Requiere climatización media.'
-            };
-
-            bookings.unshift(nuevaReserva);
-            saveStoredBookings(bookings);
-            renderReservas();
-            playAlertSound('incoming');
-
-            // Emitir evento sync
-            if (window.RutaSync) {
-                window.RutaSync.emit('RESERVA_CREADA', nuevaReserva);
-            }
-
-            alert('¡Nueva reserva de pasajero agregada a la bandeja!');
-        });
-    }
-
     function aceptarReservaProgramada(resId) {
         const bookings = getStoredBookings();
         const item = bookings.find(b => b.id === resId);
@@ -888,6 +899,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     function setOnlineStatus(online) {
         driverState.isOnline = online;
+        try {
+            localStorage.setItem('rutaprivada_driver_is_online', online ? 'true' : 'false');
+        } catch(e) {}
 
         if (online) {
             btnToggleStatus.className = 'driver-status-toggle online';
@@ -1467,27 +1481,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ==========================================
-    // 10. SIMULACIÓN DE PRUEBA EN VIVO
-    // ==========================================
-    btnSimularViaje.addEventListener('click', () => {
-        const demoTrip = {
-            id: 'demo_' + Date.now(),
-            nombrePasajero: 'Daniel P.',
-            telefono: '+5491155554444',
-            categoria: 'Ejecutivo Premium',
-            origen: 'Av. Libertador 2400, Palermo',
-            destino: 'Aeropuerto Internacional de Ezeiza (EZE)',
-            distancia: '34.2 km',
-            duracion: '42 min',
-            precioEstimado: 38500,
-            metodoPago: 'Transferencia'
-        };
-
-        showIncomingTrip(demoTrip);
-    });
-
-    // ==========================================
-    // 11. ESCUCHAR SOLICITUDES Y CHAT DESDE sync.js
+    // 10. ESCUCHAR SOLICITUDES Y CHAT DESDE sync.js
     // ==========================================
     if (window.RutaSync) {
         window.RutaSync.on('NUEVO_VIAJE_SOLICITADO', (viaje) => {
@@ -1599,6 +1593,14 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDriverProfileInfo();
     loadSavedStats();
     renderReservas();
+
+    // Restaurar estado En Línea persistente (para evitar desconexiones al recargar / pull-to-refresh)
+    try {
+        const savedOnline = localStorage.getItem('rutaprivada_driver_is_online') === 'true';
+        if (savedOnline) {
+            setOnlineStatus(true);
+        }
+    } catch(e) {}
 
     // Registro y actualización de Service Worker para la PWA de Chofer
     if ('serviceWorker' in navigator) {

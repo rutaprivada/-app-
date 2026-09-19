@@ -790,7 +790,8 @@ function createBookingCardHTML(b) {
   const notesSnippet = b.notes ? `📝 "${escapeHTML(b.notes)}"` : '';
 
   // Estado del pago para el itinerario
-  const paymentBadge = b.paymentStatus === 'Pagado' 
+  const isPaidBadge = b.paymentStatus === 'Pagado' || b.paymentStatus === 'paid' || b.status === 'Completada' || b.status === 'completada';
+  const paymentBadge = isPaidBadge 
     ? '<span class="payment-badge pagado">🟢 Pagado</span>'
     : (b.paymentStatus === 'Señado' ? '<span class="payment-badge señado">🔵 Seña Abonada</span>' : '<span class="payment-badge pendiente">🔴 Pago Pendiente</span>');
 
@@ -1127,11 +1128,11 @@ function renderPaymentsTab() {
   let totalCash = 0;
 
   state.bookings.forEach(b => {
-    if (b.status === 'Cancelada') return;
+    if (b.status === 'Cancelada' || b.status === 'cancelada') return;
 
     const fare = Number(b.totalFare) || 0;
     const deposit = Number(b.depositAmount) || 0;
-    const isPaid = b.paymentStatus === 'Pagado';
+    const isPaid = b.paymentStatus === 'Pagado' || b.paymentStatus === 'paid' || b.status === 'Completada' || b.status === 'completada';
     const isDeposit = b.paymentStatus === 'Señado';
 
     let collectedForThis = isPaid ? fare : (isDeposit ? deposit : 0);
@@ -1141,7 +1142,7 @@ function renderPaymentsTab() {
     totalPending += pendingForThis;
 
     const method = b.paymentMethod || 'Efectivo';
-    if (method === 'Efectivo') {
+    if (method.toLowerCase().includes('efectivo')) {
       totalCash += collectedForThis;
     } else {
       totalDigital += collectedForThis;
@@ -1169,7 +1170,7 @@ function renderPaymentsTab() {
   container.innerHTML = state.bookings.map(b => {
     const fare = Number(b.totalFare) || 0;
     const deposit = Number(b.depositAmount) || 0;
-    const isPaid = b.paymentStatus === 'Pagado';
+    const isPaid = b.paymentStatus === 'Pagado' || b.paymentStatus === 'paid' || b.status === 'Completada' || b.status === 'completada';
     const isDeposit = b.paymentStatus === 'Señado';
     const pendingBalance = isPaid ? 0 : Math.max(0, fare - deposit);
 
@@ -1258,16 +1259,18 @@ function renderFinancesTab() {
   let validTripsCount = 0;
 
   state.bookings.forEach(b => {
-    // REGLA: Solo evaluar y tomar en cuenta reservas que ya estén COMPLETADAS y con PAGO REGISTRADO en Control de Pagos
-    if (b.status !== 'Completada') return;
-    if (b.paymentStatus !== 'Pagado' && b.paymentStatus !== 'Señado') return;
+    // REGLA: Solo evaluar y tomar en cuenta reservas que ya estén COMPLETADAS o con PAGO REGISTRADO
+    const isCompleted = b.status === 'Completada' || b.status === 'completada';
+    const isPaid = b.paymentStatus === 'Pagado' || b.paymentStatus === 'paid' || isCompleted;
+    const isDeposit = b.paymentStatus === 'Señado';
+
+    if (!isCompleted && !isPaid && !isDeposit) return;
 
     validTripsCount++;
     const fare = Number(b.totalFare) || 0;
     const deposit = Number(b.depositAmount) || 0;
-    const isPaid = b.paymentStatus === 'Pagado';
     // Dinero efectivamente cobrado
-    const collectedFare = isPaid ? fare : deposit;
+    const collectedFare = (isPaid || isCompleted) ? fare : deposit;
 
     const toll = Number(b.tollActual !== undefined && b.tollActual !== null && b.tollActual !== '' ? b.tollActual : (b.tollFare || 0));
     const km = Number(b.distanceKm) || 0;

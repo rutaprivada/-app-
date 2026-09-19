@@ -96,11 +96,6 @@
                     <i class="fa-solid fa-fire text-gold"></i>
                     <span>Demanda alta en CABA, Aeroparque y Ezeiza</span>
                 </div>
-
-                <!-- Botón de prueba simulada -->
-                <button class="btn-demo-trip" id="btnSimularViaje">
-                    <i class="fa-solid fa-bolt"></i> Simular Solicitud Inmediata de Prueba
-                </button>
             </section>
 
             <!-- ESTADO 3: VIAJE ACTIVO EN CURSO -->
@@ -220,13 +215,6 @@
             <!-- Contenedor de Reservas -->
             <div class="reservas-list" id="reservasContainer">
                 <!-- Se inyecta dinámicamente -->
-            </div>
-
-            <!-- Botón para simular / agregar reservas de ejemplo si está vacío -->
-            <div class="reservas-demo-action" style="margin-top: 18px; text-align: center;">
-                <button type="button" class="btn-demo-trip" id="btnSimularReserva">
-                    <i class="fa-solid fa-calendar-plus"></i> Generar Reserva de Pasajero de Prueba
-                </button>
             </div>
         </div>
 
@@ -618,6 +606,73 @@
 
                 <button type="button" class="btn-accept-trip full-width" id="btnSubmitDriverRating" style="width: 100%; border-radius: 12px; font-size: 0.95rem; justify-content: center; margin-top: 14px; padding: 12px;">
                     <i class="fa-solid fa-check"></i> Guardar Calificación y Finalizar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALLE EXPLÍCITO DEL VIAJE / TICKET COMPLETO -->
+    <div class="driver-modal-overlay" id="modalTripDetail">
+        <div class="driver-modal-sheet" style="max-height: 90vh; overflow-y: auto;">
+            <div class="modal-sheet-header">
+                <h3><i class="fa-solid fa-receipt text-gold"></i> Detalle del Viaje</h3>
+                <button type="button" class="btn-close-modal" id="btnCloseTripDetail" style="background:none; border:none; color:#94a3b8; font-size:1.4rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <div class="trip-detail-modal-body" style="padding: 10px 0; text-align: left;">
+                <!-- Monto e Identificador -->
+                <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 14px; padding: 14px; text-align: center; margin-bottom: 16px;">
+                    <span style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; display: block;">Monto Total Cobrado</span>
+                    <h2 id="tdMonto" style="font-size: 2rem; color: #fbbf24; font-weight: 800; margin: 4px 0;">$0</h2>
+                    <span id="tdMetodoBadge" style="display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4);">
+                        <i class="fa-solid fa-check-circle"></i> Efectivo
+                    </span>
+                </div>
+
+                <!-- Datos de Recorrido -->
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
+                        <span style="color: #38bdf8; font-size: 1.1rem; margin-top: 2px;">🟢</span>
+                        <div>
+                            <span style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; display: block;">Punto de Origen</span>
+                            <strong id="tdOrigen" style="color: #fff; font-size: 0.92rem; word-break: break-word;">Origen</strong>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="color: #f59e0b; font-size: 1.1rem; margin-top: 2px;">🏁</span>
+                        <div>
+                            <span style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; display: block;">Punto de Destino</span>
+                            <strong id="tdDestino" style="color: #fff; font-size: 0.92rem; word-break: break-word;">Destino</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Datos del Cliente y Servicio -->
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem;">
+                        <span style="color: #94a3b8;"><i class="fa-regular fa-user"></i> Pasajero:</span>
+                        <strong id="tdPasajero" style="color: #fff;">Daniel</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem;">
+                        <span style="color: #94a3b8;"><i class="fa-regular fa-calendar"></i> Fecha y Hora:</span>
+                        <strong id="tdFechaHora" style="color: #fff;">19/09/2026 • 18:30</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem;">
+                        <span style="color: #94a3b8;"><i class="fa-solid fa-car-side"></i> Categoría:</span>
+                        <strong id="tdCategoria" style="color: #fbbf24;">Sedán Ejecutivo</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem;">
+                        <span style="color: #94a3b8;"><i class="fa-solid fa-route"></i> Distancia:</span>
+                        <strong id="tdDistancia" style="color: #fff;">18 km</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem;">
+                        <span style="color: #94a3b8;"><i class="fa-solid fa-shield-halved"></i> Estado:</span>
+                        <span id="tdEstado" style="color: #34d399; font-weight: 700;">Finalizado con éxito</span>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-cancel-trip full-width" id="btnCerrarDetalleSheet" style="width: 100%; border-radius: 12px; justify-content: center; padding: 12px; font-size: 0.95rem;">
+                    Cerrar Detalle
                 </button>
             </div>
         </div>
