@@ -54,32 +54,28 @@ class RutaSyncManager {
     // 2. HTTP REST SYNC CON SERVIDOR LOCAL (PC <-> Celular en Wi-Fi)
     // ==========================================
     initServerHttpSync() {
-        // Consultar eventos del servidor cada 500ms para garantizar llegada inmediata al celular
         const pollServer = async () => {
             try {
                 const resp = await fetch(`/api/sync/events?since=${this.lastEventTimestamp}`, {
                     cache: 'no-store'
                 });
                 if (resp.ok) {
-                    const events = await resp.json();
-                    if (Array.isArray(events)) {
-                        events.forEach(ev => {
-                            if (ev && ev.timestamp > this.lastEventTimestamp) {
-                                this.lastEventTimestamp = ev.timestamp;
-                            }
-                            if (ev && ev.senderId !== this.deviceId) {
-                                this.handleIncoming(ev);
-                            }
-                        });
-                    }
+                    const rawData = await resp.json();
+                    const events = Array.isArray(rawData) ? rawData : (rawData && rawData.type ? [rawData] : []);
+                    events.forEach(ev => {
+                        if (ev && ev.timestamp > this.lastEventTimestamp) {
+                            this.lastEventTimestamp = ev.timestamp;
+                        }
+                        if (ev && ev.senderId !== this.deviceId) {
+                            this.handleIncoming(ev);
+                        }
+                    });
                 }
-            } catch (e) {
-                // Silencioso si no hay servidor HTTP local
-            }
+            } catch (e) {}
         };
 
         if (this.pollTimer) clearInterval(this.pollTimer);
-        this.pollTimer = setInterval(pollServer, 500);
+        this.pollTimer = setInterval(pollServer, 400);
     }
 
     // ==========================================
@@ -96,16 +92,16 @@ class RutaSyncManager {
                 this.sse.onmessage = (event) => {
                     try {
                         const parsed = JSON.parse(event.data);
+                        let msgData = null;
                         if (parsed && parsed.message) {
-                            const msgData = JSON.parse(parsed.message);
-                            if (msgData && msgData.senderId !== this.deviceId) {
-                                this.handleIncoming(msgData);
-                            }
+                            msgData = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : parsed.message;
+                        } else if (parsed && parsed.type) {
+                            msgData = parsed;
+                        }
+                        if (msgData && msgData.type && msgData.senderId !== this.deviceId) {
+                            this.handleIncoming(msgData);
                         }
                     } catch (e) {}
-                };
-                this.sse.onerror = () => {
-                    // Reintento automático del navegador
                 };
             }
         } catch (err) {}

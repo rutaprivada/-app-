@@ -102,18 +102,22 @@ try {
                 $since = [long]$matches[1]
             }
 
-            $matchedEvents = @()
+            $matchedEvents = [System.Collections.ArrayList]::new()
             foreach ($evJson in $global:syncEvents) {
                 try {
                     $ev = ConvertFrom-Json $evJson
                     if ($ev.timestamp -gt $since) {
-                        $matchedEvents += $ev
+                        [void]$matchedEvents.Add($evJson)
                     }
                 } catch {}
             }
 
-            $jsonResp = ConvertTo-Json -InputObject $matchedEvents -Compress
-            if (-not $jsonResp) { $jsonResp = "[]" }
+            if ($matchedEvents.Count -eq 0) {
+                $jsonResp = "[]"
+            } else {
+                $jsonResp = "[" + ($matchedEvents -join ",") + "]"
+            }
+
             $respBytes = [System.Text.Encoding]::UTF8.GetBytes($jsonResp)
             $header = "HTTP/1.1 200 OK`r`nContent-Type: application/json; charset=utf-8`r`nContent-Length: $($respBytes.Length)`r`nAccess-Control-Allow-Origin: *`r`nAccess-Control-Allow-Methods: GET, POST, OPTIONS`r`nAccess-Control-Allow-Headers: *`r`nConnection: close`r`n`r`n"
             $headerBytes = [System.Text.Encoding]::UTF8.GetBytes($header)

@@ -5068,10 +5068,10 @@ if (window.RutaSync) {
       if (pStateSearching) pStateSearching.classList.add('hidden');
       if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
 
-      const driverName = viaje.conductor.nombre || 'Martín Gómez';
-      const driverCar = viaje.conductor.auto || 'Toyota Corolla 2023 · Sedán Ejecutivo';
-      const driverPlate = viaje.conductor.patente ? ` · Patente: ${viaje.conductor.patente}` : (!driverCar.includes('Patente') ? ' · Patente: AE 782 ZK' : '');
-      const driverRating = viaje.conductor.calificacion || '4.96';
+      const driverName = viaje.conductor.nombre || 'Daniel Pabon';
+      const driverCar = viaje.conductor.auto || 'Fiat Cronos Negro';
+      const driverPlate = viaje.conductor.patente ? ` · Patente: ${viaje.conductor.patente}` : (!driverCar.includes('Patente') ? ' · Patente: AE927CN' : '');
+      const driverRating = viaje.conductor.calificacion || '4.98';
 
       if (pDriverName) pDriverName.textContent = driverName;
       if (pDriverCar) pDriverCar.textContent = `${driverCar}${driverPlate}`;
@@ -5079,7 +5079,7 @@ if (window.RutaSync) {
       if (pChatDriverName) pChatDriverName.textContent = `${driverName} (Chofer)`;
 
       if (btnPassengerCallDriver) {
-        btnPassengerCallDriver.href = `tel:${viaje.conductor.telefono || '+5491173738790'}`;
+        btnPassengerCallDriver.href = `tel:${viaje.conductor.telefono || '+5491122558226'}`;
       }
 
       updatePassengerTripStage('en_camino');

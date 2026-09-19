@@ -16,6 +16,34 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.add('is-app-mode');
     }
 
+    function getFleetDriverInfo() {
+        try {
+            const raw = localStorage.getItem('rutaprivada_drivers_v1');
+            if (raw) {
+                const list = JSON.parse(raw);
+                if (Array.isArray(list) && list.length > 0) {
+                    const d = list[0];
+                    return {
+                        nombre: d.name || 'Daniel Pabon',
+                        auto: d.vehicle || 'Fiat Cronos Negro',
+                        patente: d.plate || 'AE927CN',
+                        calificacion: 4.98,
+                        telefono: d.phone ? ('+54 9 ' + d.phone.replace(/^(\+?54\s?9?|\+)/, '')) : '+54 9 11 2255-8226'
+                    };
+                }
+            }
+        } catch(e) {}
+        return {
+            nombre: 'Daniel Pabon',
+            auto: 'Fiat Cronos Negro · Sedán Ejecutivo',
+            patente: 'AE927CN',
+            calificacion: 4.98,
+            telefono: '+54 9 11 2255-8226'
+        };
+    }
+
+    const currentFleetDriver = getFleetDriverInfo();
+
     // ESTADO DEL CONDUCTOR
     const driverState = {
         isOnline: false,
@@ -35,13 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
             viajesCompletados: 0,
             historial: []
         },
-        info: {
-            nombre: 'Martín Gómez',
-            auto: 'Toyota Corolla 2023 · Sedán Ejecutivo',
-            patente: 'AE 782 ZK',
-            calificacion: 4.96,
-            telefono: '+54 9 11 7373-8790'
-        }
+        info: currentFleetDriver
     };
 
     // ==========================================
@@ -221,10 +243,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startAlertLoop() {
+        stopAlertLoop();
         playAlertSound('incoming');
         driverState.soundInterval = setInterval(() => {
             playAlertSound('incoming');
-        }, 1000);
+        }, 1200);
     }
 
     function stopAlertLoop() {
@@ -232,6 +255,15 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(driverState.soundInterval);
             driverState.soundInterval = null;
         }
+        if (driverState.countdownTimer) {
+            clearInterval(driverState.countdownTimer);
+            driverState.countdownTimer = null;
+        }
+        try {
+            if (driverState.audioContext && driverState.audioContext.state === 'running') {
+                driverState.audioContext.suspend().catch(() => {});
+            }
+        } catch (e) {}
     }
 
     if (btnTestSound) {
@@ -1078,6 +1110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSubmitDriverRating = document.getElementById('btnSubmitDriverRating');
 
     let driverSelectedPassengerRating = 5;
+    let driverSelectedPaymentMethod = 'Efectivo';
     let tripPendingRating = null;
 
     function mostrarModalCobroViaje() {
@@ -1088,10 +1121,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const montoGanado = Number(rawPrice) || 0;
         const tollAmt = Number(trip.tollFare || trip.peajes || 0);
         const passName = trip.nombrePasajero || trip.clientName || trip.customerName || 'Pasajero';
-        const payMethod = trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia';
+        const initialPayMethod = trip.metodoPago || trip.paymentMethod || 'Efectivo';
+
+        // Preseleccionar método
+        driverSelectedPaymentMethod = initialPayMethod.includes('Transfer') ? 'Transferencia Bancaria' : 'Efectivo';
+        updateDriverPaymentPills();
 
         if (driverFareHeroTotal) driverFareHeroTotal.textContent = '$' + montoGanado.toLocaleString('es-AR');
-        if (driverFarePaymentMethod) driverFarePaymentMethod.innerHTML = `<i class="fa-solid fa-money-bill-wave"></i> Método: <strong>${payMethod}</strong>`;
         if (driverFareBaseAmount) driverFareBaseAmount.textContent = '$' + (montoGanado - tollAmt > 0 ? (montoGanado - tollAmt) : montoGanado).toLocaleString('es-AR');
         if (driverFareTollsAmount) {
             driverFareTollsAmount.textContent = tollAmt > 0 ? `$${tollAmt.toLocaleString('es-AR')} (Incluidos)` : 'Sin peajes';
@@ -1103,6 +1139,28 @@ document.addEventListener('DOMContentLoaded', () => {
             modalDriverFareSummary.classList.add('active');
         }
     }
+
+    function updateDriverPaymentPills() {
+        document.querySelectorAll('#driverPaymentOptionsGrid .driver-pay-pill').forEach(btn => {
+            const m = btn.getAttribute('data-method');
+            if (m === driverSelectedPaymentMethod) {
+                btn.style.borderColor = '#10b981';
+                btn.style.background = 'rgba(16, 185, 129, 0.2)';
+                btn.style.color = '#fff';
+            } else {
+                btn.style.borderColor = 'rgba(255,255,255,0.12)';
+                btn.style.background = 'rgba(255,255,255,0.04)';
+                btn.style.color = '#94a3b8';
+            }
+        });
+    }
+
+    document.querySelectorAll('#driverPaymentOptionsGrid .driver-pay-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+            driverSelectedPaymentMethod = btn.getAttribute('data-method') || 'Efectivo';
+            updateDriverPaymentPills();
+        });
+    });
 
     if (btnCloseDriverFareSummary && modalDriverFareSummary) {
         btnCloseDriverFareSummary.addEventListener('click', () => {
@@ -1120,7 +1178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const todayKey = getTodayKey();
             const passName = trip.nombrePasajero || trip.clientName || trip.customerName || 'Pasajero';
 
-            // Guardar en estadísticas del chofer
+            // Guardar en estadísticas del chofer con el método seleccionado
             const nuevoHistorialItem = {
                 id: trip.id || ('trip_' + Date.now()),
                 fecha: todayKey,
@@ -1129,7 +1187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 destino: trip.destino || trip.dropoffAddress || trip.destination,
                 monto: montoGanado,
                 distancia: trip.distancia || '18 km',
-                metodoPago: trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia',
+                metodoPago: driverSelectedPaymentMethod,
                 categoria: trip.categoria || trip.category || 'Sedán Ejecutivo',
                 estado: 'completado'
             };
@@ -1141,11 +1199,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.RutaSync) {
                 window.RutaSync.actualizarEstadoViaje('completado', {
                     totalCobrado: montoGanado,
-                    metodoPago: trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia'
+                    metodoPago: driverSelectedPaymentMethod
                 });
             }
 
-            tripPendingRating = { ...trip, montoGanado };
+            tripPendingRating = { ...trip, montoGanado, metodoPago: driverSelectedPaymentMethod };
             driverState.activeTrip = null;
 
             if (modalDriverFareSummary) {
@@ -1473,6 +1531,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // 13. INICIALIZACIÓN
     // ==========================================
+    function renderDriverProfileInfo() {
+        const info = driverState.info;
+        const nameEl = document.getElementById('driverName');
+        const badgeEl = document.getElementById('driverCarBadge');
+        const fullNameEl = document.getElementById('profileFullName');
+
+        if (nameEl) nameEl.textContent = info.nombre;
+        if (badgeEl) badgeEl.textContent = `${info.auto} · ${info.patente}`;
+        if (fullNameEl) fullNameEl.textContent = info.nombre;
+
+        const infoVals = document.querySelectorAll('#viewPerfil .profile-info-item .info-val');
+        if (infoVals && infoVals.length >= 2) {
+            infoVals[0].textContent = `${info.auto} (Patente: ${info.patente})`;
+        }
+    }
+
+    renderDriverProfileInfo();
     loadSavedStats();
     renderReservas();
 });

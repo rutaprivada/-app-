@@ -565,6 +565,21 @@
                 </div>
             </div>
 
+            <!-- Selector Interactivo de Método de Cobro -->
+            <div class="driver-payment-selector-box" style="margin-top: 14px; text-align: left;">
+                <label style="font-size: 0.78rem; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">
+                    <i class="fa-solid fa-hand-holding-dollar"></i> Método de Pago Abonado:
+                </label>
+                <div class="driver-payment-options-grid" id="driverPaymentOptionsGrid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <button type="button" class="driver-pay-pill active" data-method="Efectivo" style="padding: 10px 8px; border-radius: 10px; border: 1.5px solid #10b981; background: rgba(16, 185, 129, 0.2); color: #fff; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="fa-solid fa-money-bill-1-wave" style="color: #10b981;"></i> Efectivo
+                    </button>
+                    <button type="button" class="driver-pay-pill" data-method="Transferencia Bancaria" style="padding: 10px 8px; border-radius: 10px; border: 1.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #94a3b8; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="fa-solid fa-mobile-screen-button"></i> Transferencia
+                    </button>
+                </div>
+            </div>
+
             <div class="fare-actions-wrap" style="margin-top: 16px;">
                 <button type="button" class="btn-accept-trip full-width" id="btnConfirmDriverFareAndComplete" style="width: 100%; border-radius: 12px; font-size: 1rem; justify-content: center; padding: 14px;">
                     <i class="fa-solid fa-circle-check"></i> Confirmar Cobro y Calificar
