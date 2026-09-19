@@ -752,6 +752,46 @@
     </div>
   </div>
 
+  <!-- Modal de Chat en Vivo Pasajero <-> Conductor -->
+  <div id="passenger-chat-modal" class="modal-backdrop hidden" style="z-index: 9999;">
+    <div class="modal-dialog chat-dialog">
+      <div class="modal-header chat-header">
+        <div class="chat-header-user">
+          <div class="chat-avatar-wrap">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" alt="Chofer" class="chat-header-avatar" id="pChatDriverAvatar" />
+            <span class="chat-status-dot online"></span>
+          </div>
+          <div>
+            <h4 id="pChatDriverName" style="font-size: 1rem; margin: 0; color: #fff;">Martín G. (Chofer)</h4>
+            <span class="chat-status-sub" style="font-size: 0.75rem; color: #10b981;">● Conectado en tiempo real</span>
+          </div>
+        </div>
+        <button id="close-passenger-chat-btn" class="modal-close" aria-label="Cerrar chat">&times;</button>
+      </div>
+
+      <div class="modal-body chat-modal-body">
+        <div class="chat-messages-container" id="pChatMessagesList">
+          <!-- Mensajes inyectados dinámicamente -->
+        </div>
+
+        <!-- Respuestas Rápidas Sugeridas -->
+        <div class="chat-quick-replies">
+          <button type="button" class="quick-chip-btn" data-text="👋 Hola, estoy en la puerta esperándote.">👋 Estoy en la puerta</button>
+          <button type="button" class="quick-chip-btn" data-text="🚪 Estoy bajando en 2 minutos.">🚪 Estoy bajando</button>
+          <button type="button" class="quick-chip-btn" data-text="🚗 ¿Por dónde vienes aproximadamente?">🚗 ¿Por dónde vienes?</button>
+          <button type="button" class="quick-chip-btn" data-text="👍 ¡Perfecto, ya te vi!">👍 ¡Ya te vi!</button>
+        </div>
+
+        <form class="chat-input-form" id="pChatInputForm">
+          <input type="text" id="pChatInputText" placeholder="Escribe un mensaje directo a tu chofer..." autocomplete="off" required />
+          <button type="submit" class="btn-chat-send" id="pBtnSendChatMessage" aria-label="Enviar mensaje">
+            <span>➤</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
 
 
   <!-- Post-Booking Confirmation & Rating Experience Modal -->

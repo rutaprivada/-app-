@@ -140,6 +140,51 @@ class RutaSyncManager {
         return null;
     }
 
+    // Métodos de Chat en Vivo In-App (Pasajero <-> Conductor)
+    enviarMensajeChat(tripId, remitente, texto) {
+        if (!texto || !texto.trim()) return null;
+        const msg = {
+            id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            tripId: tripId || 'active_trip',
+            remitente: remitente, // 'pasajero' | 'conductor'
+            texto: texto.trim(),
+            timestamp: Date.now(),
+            hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        const chatKey = 'rutaprivada_chat_' + (tripId || 'active_trip');
+        let mensajes = [];
+        try {
+            const raw = localStorage.getItem(chatKey);
+            if (raw) mensajes = JSON.parse(raw);
+        } catch (e) {}
+
+        mensajes.push(msg);
+        try {
+            localStorage.setItem(chatKey, JSON.stringify(mensajes));
+        } catch (e) {}
+
+        this.emit('CHAT_MENSAJE_ENVIADO', msg);
+        return msg;
+    }
+
+    obtenerMensajesChat(tripId) {
+        const chatKey = 'rutaprivada_chat_' + (tripId || 'active_trip');
+        try {
+            const raw = localStorage.getItem(chatKey);
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    limpiarChat(tripId) {
+        const chatKey = 'rutaprivada_chat_' + (tripId || 'active_trip');
+        try {
+            localStorage.removeItem(chatKey);
+        } catch (e) {}
+    }
+
     guardarViajeActivo(viaje) {
         try {
             localStorage.setItem('rutaprivada_viaje_activo', JSON.stringify(viaje));
@@ -157,6 +202,11 @@ class RutaSyncManager {
 
     limpiarViajeActivo() {
         try {
+            const activo = this.obtenerViajeActivo();
+            if (activo && activo.id) {
+                this.limpiarChat(activo.id);
+            }
+            this.limpiarChat('active_trip');
             localStorage.removeItem('rutaprivada_viaje_activo');
         } catch (e) {}
     }
@@ -164,3 +214,4 @@ class RutaSyncManager {
 
 // Instancia global
 window.RutaSync = new RutaSyncManager();
+

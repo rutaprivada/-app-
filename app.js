@@ -4176,15 +4176,18 @@ async function sendWhatsAppReservation() {
 
 function recordConfirmedReservation() {
   try {
-    const originStr = document.getElementById('origin-input')?.value?.trim() || (state.origin ? state.origin.address : 'Punto de partida');
-    const destStr = document.getElementById('destination-input')?.value?.trim() || (state.destination ? state.destination.address : 'Destino acordado');
-    const stopStr = (state.hasIntermediateStop && state.intermediateStop) ? state.intermediateStop.address : '';
+    const originStr = document.getElementById('origin-input')?.value?.trim() || (state.origin ? (state.origin.address || state.origin.name) : 'Punto de partida');
+    const destStr = document.getElementById('destination-input')?.value?.trim() || (state.destination ? (state.destination.address || state.destination.name) : 'Destino acordado');
+    const stopStr = (state.hasIntermediateStop && state.intermediateStop) ? (state.intermediateStop.address || state.intermediateStop.name || '') : '';
     const b = state.breakdown || {};
     
-    const passName = document.getElementById('passenger-name-input')?.value?.trim() || '';
-    const passPhone = document.getElementById('passenger-phone-input')?.value?.trim() || '';
+    const passName = document.getElementById('passenger-name-input')?.value?.trim() || 'Pasajero Ejecutivo';
+    const passPhone = document.getElementById('passenger-phone-input')?.value?.trim() || '+54 9 11 7373-8790';
     const passNotes = document.getElementById('passenger-notes-input')?.value?.trim() || '';
-    const finalFare = Number(state.totalPrice) || Number(state.totalFare) || Number(b.totalFare) || 0;
+    
+    const domPriceText = document.getElementById('quote-total-amount')?.textContent?.replace(/\D/g, '') || '';
+    const domPrice = Number(domPriceText) || 0;
+    const finalFare = Number(state.totalPrice) || (b.finalTotal ? Number(b.finalTotal) : 0) || domPrice || 35000;
     
     const newBooking = {
       id: 'res_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
@@ -4192,20 +4195,30 @@ function recordConfirmedReservation() {
       date: state.date || new Date().toISOString().split('T')[0],
       time: state.time || '12:00',
       origin: originStr,
+      pickupAddress: originStr,
       destination: destStr,
+      dropoffAddress: destStr,
       stop: stopStr,
       distanceKm: Number(state.distanceKm) || 0,
       durationMin: Number(state.durationMin || state.baseDurationMin) || 0,
       totalFare: finalFare,
+      price: finalFare,
+      monto: finalFare,
       isRoundtrip: !!state.extras?.roundtrip,
       isPet: !!state.extras?.pet,
       tollFare: Number(b.tollCost || b.tollFare || 0),
-      status: 'Pendiente',
+      status: 'pendiente',
       notes: passNotes,
       customerName: passName,
+      clientName: passName,
+      nombrePasajero: passName,
       customerPhone: passPhone,
+      clientPhone: passPhone,
+      telefono: passPhone,
+      category: 'Sedán Ejecutivo',
+      categoria: 'Sedán Ejecutivo',
       paymentStatus: 'Pendiente',
-      paymentMethod: 'Efectivo',
+      paymentMethod: 'Efectivo / Transferencia',
       depositAmount: 0
     };
 
@@ -4216,13 +4229,13 @@ function recordConfirmedReservation() {
       if (stored) bookings = JSON.parse(stored);
     } catch(e) {}
 
-    // Evitar duplicados inmediatos en menos de 5 segundos con misma ruta y hora
-    const isRecentDup = bookings.some(b => 
-      b.origin === newBooking.origin &&
-      b.destination === newBooking.destination &&
-      b.date === newBooking.date &&
-      b.time === newBooking.time &&
-      (Date.now() - new Date(b.createdAt).getTime()) < 10000
+    // Evitar duplicados inmediatos en menos de 10 segundos
+    const isRecentDup = bookings.some(bk => 
+      (bk.origin === newBooking.origin || bk.pickupAddress === newBooking.pickupAddress) &&
+      (bk.destination === newBooking.destination || bk.dropoffAddress === newBooking.dropoffAddress) &&
+      bk.date === newBooking.date &&
+      bk.time === newBooking.time &&
+      (Date.now() - new Date(bk.createdAt || Date.now()).getTime()) < 10000
     );
 
     if (!isRecentDup) {
@@ -4235,17 +4248,7 @@ function recordConfirmedReservation() {
 
       // Notificar a la App de Conductores en tiempo real
       if (window.RutaSync) {
-        window.RutaSync.solicitarViaje({
-          id: newBooking.id,
-          nombrePasajero: newBooking.customerName || 'Pasajero',
-          telefono: newBooking.customerPhone || '',
-          categoria: 'Ejecutivo Premium',
-          origen: newBooking.origin,
-          destino: newBooking.destination,
-          distancia: `${newBooking.distanceKm} km`,
-          duracion: `${newBooking.durationMin} min`,
-          precioEstimado: newBooking.totalFare
-        });
+        window.RutaSync.emit('RESERVA_CREADA', newBooking);
       }
     }
   } catch (err) {
@@ -4848,18 +4851,35 @@ if (btnRequestInapp) {
     const passPhone = phoneInput && phoneInput.value.trim() ? phoneInput.value.trim() : '+54 9 11 7373-8790';
     const passNotes = notesInput ? notesInput.value.trim() : '';
 
+    const domPriceText = document.getElementById('quote-total-amount')?.textContent?.replace(/\D/g, '') || '';
+    const domPrice = Number(domPriceText) || 0;
+    const b = state.breakdown || {};
+    const calculatedFare = Number(state.totalPrice) || (b.finalTotal ? Number(b.finalTotal) : 0) || domPrice || 35000;
+
+    const originAddress = (state.origin && (state.origin.address || state.origin.name)) ? (state.origin.address || state.origin.name) : originVal;
+    const destAddress = (state.destination && (state.destination.address || state.destination.name)) ? (state.destination.address || state.destination.name) : destVal;
+
     const tripData = {
-      origen: (state.origin && state.origin.name) ? state.origin.name : originVal,
-      destino: (state.destination && state.destination.name) ? state.destination.name : destVal,
+      origen: originAddress,
+      pickupAddress: originAddress,
+      destino: destAddress,
+      dropoffAddress: destAddress,
       distancia: `${(state.distanceKm || 12).toFixed(1)} km`,
-      duracion: `${state.durationMinutes || 25} min`,
-      precioEstimado: state.breakdown ? state.breakdown.totalFare : 4500,
+      duracion: `${state.durationMin || state.durationMinutes || 25} min`,
+      precioEstimado: calculatedFare,
+      precio: calculatedFare,
+      totalFare: calculatedFare,
+      monto: calculatedFare,
       nombrePasajero: passName,
+      clientName: passName,
+      customerName: passName,
       telefono: passPhone,
+      clientPhone: passPhone,
+      customerPhone: passPhone,
       notas: passNotes,
       categoria: 'Sedán Ejecutivo',
-      fecha: state.date,
-      hora: state.time
+      fecha: state.date || new Date().toISOString().split('T')[0],
+      hora: state.time || '12:00'
     };
 
     if (window.RutaSync) {
@@ -4884,10 +4904,109 @@ if (btnPassengerCancelTrip) {
         window.RutaSync.limpiarViajeActivo();
       }
       closeInAppTripModal();
+      closePassengerChatModal();
       showToast('❌ Solicitud de viaje cancelada.');
     }
   });
 }
+
+// ==========================================
+// CHAT EN VIVO IN-APP (PASAJERO)
+// ==========================================
+const passengerChatModal = document.getElementById('passenger-chat-modal');
+const closePassengerChatBtn = document.getElementById('close-passenger-chat-btn');
+const pChatMessagesList = document.getElementById('pChatMessagesList');
+const pChatInputForm = document.getElementById('pChatInputForm');
+const pChatInputText = document.getElementById('pChatInputText');
+const pChatDriverName = document.getElementById('pChatDriverName');
+
+function openPassengerChatModal() {
+  if (!passengerChatModal) return;
+  passengerChatModal.classList.remove('hidden');
+  renderPassengerChatMessages();
+  setTimeout(() => {
+    if (pChatInputText) pChatInputText.focus();
+  }, 100);
+}
+
+function closePassengerChatModal() {
+  if (passengerChatModal) {
+    passengerChatModal.classList.add('hidden');
+  }
+}
+
+function renderPassengerChatMessages() {
+  if (!pChatMessagesList || !window.RutaSync) return;
+  const activeTrip = window.RutaSync.obtenerViajeActivo();
+  const tripId = activeTrip ? activeTrip.id : 'active_trip';
+  const mensajes = window.RutaSync.obtenerMensajesChat(tripId);
+
+  if (mensajes.length === 0) {
+    pChatMessagesList.innerHTML = `
+      <div style="text-align: center; color: #64748b; font-size: 0.78rem; padding: 20px 10px;">
+        <p>🔒 Canal directo y privado con tu chofer asignado.</p>
+        <p style="margin-top: 4px;">Usa las respuestas rápidas o escribe tu consulta.</p>
+      </div>
+    `;
+    return;
+  }
+
+  pChatMessagesList.innerHTML = mensajes.map(msg => {
+    const isMine = msg.remitente === 'pasajero';
+    return `
+      <div class="chat-bubble ${isMine ? 'mine' : 'theirs'}">
+        <span class="bubble-text">${escapeHtml(msg.texto)}</span>
+        <div class="bubble-meta">
+          <span>${msg.hora || ''}</span>
+          ${isMine ? '<span>✓✓</span>' : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  pChatMessagesList.scrollTop = pChatMessagesList.scrollHeight;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+if (btnPassengerChatDriver) {
+  btnPassengerChatDriver.addEventListener('click', openPassengerChatModal);
+}
+
+if (closePassengerChatBtn) {
+  closePassengerChatBtn.addEventListener('click', closePassengerChatModal);
+}
+
+if (pChatInputForm) {
+  pChatInputForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const txt = pChatInputText.value.trim();
+    if (!txt || !window.RutaSync) return;
+
+    const activeTrip = window.RutaSync.obtenerViajeActivo();
+    const tripId = activeTrip ? activeTrip.id : 'active_trip';
+    window.RutaSync.enviarMensajeChat(tripId, 'pasajero', txt);
+    pChatInputText.value = '';
+    renderPassengerChatMessages();
+  });
+}
+
+// Quick reply chips for passenger
+document.querySelectorAll('.chat-quick-replies .quick-chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const txt = btn.getAttribute('data-text');
+    if (txt && window.RutaSync) {
+      const activeTrip = window.RutaSync.obtenerViajeActivo();
+      const tripId = activeTrip ? activeTrip.id : 'active_trip';
+      window.RutaSync.enviarMensajeChat(tripId, 'pasajero', txt);
+      renderPassengerChatMessages();
+    }
+  });
+});
 
 // Sincronización en tiempo real de eventos
 if (window.RutaSync) {
@@ -4899,15 +5018,10 @@ if (window.RutaSync) {
       if (pDriverName) pDriverName.textContent = viaje.conductor.nombre || 'Martín G.';
       if (pDriverCar) pDriverCar.textContent = viaje.conductor.auto || 'Toyota Corolla · Sedán Ejecutivo';
       if (pDriverRating) pDriverRating.textContent = viaje.conductor.calificacion || '4.96';
+      if (pChatDriverName) pChatDriverName.textContent = `${viaje.conductor.nombre || 'Martín G.'} (Chofer)`;
 
       if (btnPassengerCallDriver) {
         btnPassengerCallDriver.href = `tel:${viaje.conductor.telefono || '+5491173738790'}`;
-      }
-
-      if (btnPassengerChatDriver) {
-        btnPassengerChatDriver.onclick = () => {
-          showToast(`💬 Canal directo activo con ${viaje.conductor.nombre}.`);
-        };
       }
 
       updatePassengerTripStage('en_camino');
@@ -4924,10 +5038,21 @@ if (window.RutaSync) {
         showToast(`🚀 Viaje iniciado. ¡Que tengas un excelente traslado!`);
       } else if (viaje.estado === 'completado') {
         showToast(`✨ Viaje finalizado. ¡Gracias por viajar con RutaPrivada!`);
+        closePassengerChatModal();
+      }
+    }
+  });
+
+  window.RutaSync.on('CHAT_MENSAJE_ENVIADO', (msg) => {
+    if (msg) {
+      renderPassengerChatMessages();
+      if (msg.remitente === 'conductor') {
+        showToast(`💬 Mensaje del chofer: "${msg.texto}"`);
       }
     }
   });
 }
+
 
 
 

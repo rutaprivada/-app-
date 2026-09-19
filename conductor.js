@@ -118,6 +118,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Elementos de Perfil / Utilidades
     const btnTestSound = document.getElementById('btnTestSound');
 
+    // Elementos de Chat In-App con Pasajero
+    const btnDriverChatPassenger = document.getElementById('btnDriverChatPassenger');
+    const driverChatUnreadDot = document.getElementById('driverChatUnreadDot');
+    const modalDriverChat = document.getElementById('modalDriverChat');
+    const btnCloseDriverChat = document.getElementById('btnCloseDriverChat');
+    const driverChatPassengerTitle = document.getElementById('driverChatPassengerTitle');
+    const driverChatMessagesList = document.getElementById('driverChatMessagesList');
+    const driverChatInputForm = document.getElementById('driverChatInputForm');
+    const driverChatInputText = document.getElementById('driverChatInputText');
+
     // ==========================================
     // 1. SISTEMA DE NAVEGACIÓN POR PESTAÑAS (BOTTOM NAV)
     // ==========================================
@@ -582,12 +592,10 @@ document.addEventListener('DOMContentLoaded', () => {
             navBadgeReservas.classList.remove('show');
         }
 
-        if (filter === 'disponibles') {
-            filtered = disponibles;
-        } else if (filter === 'tomadas') {
+        if (filter === 'tomadas') {
             filtered = tomadas;
         } else {
-            filtered = bookings;
+            filtered = disponibles; // Solo 'disponibles' o 'tomadas'
         }
 
         if (filtered.length === 0) {
@@ -603,14 +611,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         reservasContainer.innerHTML = filtered.map(b => {
             const isTomada = b.status === 'aceptada' || b.driverAssigned === driverState.info.nombre;
-            const rawPhone = (b.clientPhone || '5491100000000').replace(/[^0-9]/g, '');
+            const clientName = b.clientName || b.customerName || b.nombrePasajero || 'Cliente';
+            const pickupAddr = b.pickupAddress || b.origin || b.origen || 'Punto de recogida';
+            const dropoffAddr = b.dropoffAddress || b.destination || b.destino || 'Destino';
+            const rawPhone = (b.clientPhone || b.customerPhone || b.telefono || '5491100000000').replace(/[^0-9]/g, '');
+            const rawPrice = b.price || b.totalFare || b.monto || b.precioEstimado;
+            const priceVal = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
+                ? Number(rawPrice)
+                : 35000;
+            const dateStr = b.date || b.pickupDate || 'Hoy';
+            const timeStr = b.time || b.pickupTime || '00:00';
+            const paymentStr = b.paymentMethod || b.metodoPago || 'Efectivo / Transferencia';
 
             return `
                 <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''}">
                     <div class="reserva-header-row">
                         <div class="reserva-datetime">
-                            <span class="reserva-date-pill">📅 ${b.date || 'Hoy'}</span>
-                            <span class="reserva-time-bold">⏰ ${b.time || '00:00'} hs</span>
+                            <span class="reserva-date-pill">📅 ${dateStr}</span>
+                            <span class="reserva-time-bold">⏰ ${timeStr} hs</span>
                         </div>
                         <span class="reserva-status-tag ${isTomada ? 'tomada' : 'disponible'}">
                             ${isTomada ? '✓ Asignada a ti' : '⚡ Disponible'}
@@ -622,14 +640,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             <i class="fa-solid fa-circle-dot text-emerald"></i>
                             <div>
                                 <strong style="font-size: 0.76rem; color: #94a3b8; display: block;">ORIGEN</strong>
-                                <span>${b.pickupAddress || b.origen || 'Punto de recogida'}</span>
+                                <span>${pickupAddr}</span>
                             </div>
                         </div>
                         <div class="reserva-point">
                             <i class="fa-solid fa-location-dot text-gold"></i>
                             <div>
                                 <strong style="font-size: 0.76rem; color: #94a3b8; display: block;">DESTINO</strong>
-                                <span>${b.dropoffAddress || b.destino || 'Destino'}</span>
+                                <span>${dropoffAddr}</span>
                             </div>
                         </div>
                     </div>
@@ -637,15 +655,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="reserva-meta-grid">
                         <div class="reserva-meta-item">
                             <span class="m-title">Pasajero</span>
-                            <span class="m-val">${b.clientName || 'Cliente'}</span>
+                            <span class="m-val">${clientName}</span>
                         </div>
                         <div class="reserva-meta-item">
                             <span class="m-title">Tarifa Estimada</span>
-                            <span class="m-val text-gold">$${Number(b.price || b.monto || 35000).toLocaleString('es-AR')}</span>
+                            <span class="m-val text-gold">$${priceVal.toLocaleString('es-AR')}</span>
                         </div>
                         <div class="reserva-meta-item">
                             <span class="m-title">Pago</span>
-                            <span class="m-val">${b.paymentMethod || 'Efectivo / Transf'}</span>
+                            <span class="m-val">${paymentStr}</span>
                         </div>
                     </div>
 
@@ -665,7 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <i class="fa-solid fa-check"></i> Aceptar & Agendar Reserva
                             </button>
                         `}
-                        <a href="https://wa.me/${rawPhone}?text=Hola%20${encodeURIComponent(b.clientName || '')},%20soy%20tu%20chofer%20ejecutivo%20de%20RutaPrivada.%20Tengo%20tu%20reserva%20agendada%20para%20el%20${encodeURIComponent(b.date || '')}%20a%20las%20${encodeURIComponent(b.time || '')}hs." target="_blank" class="btn-ver-reserva-whatsapp" title="Chatear por WhatsApp">
+                        <a href="https://wa.me/${rawPhone}?text=Hola%20${encodeURIComponent(clientName)},%20soy%20tu%20chofer%20ejecutivo%20de%20RutaPrivada.%20Tengo%20tu%20reserva%20agendada%20para%20el%20${encodeURIComponent(dateStr)}%20a%20las%20${encodeURIComponent(timeStr)}hs." target="_blank" class="btn-ver-reserva-whatsapp" title="Chatear por WhatsApp">
                             <i class="fa-brands fa-whatsapp"></i>
                         </a>
                     </div>
@@ -709,7 +727,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnSimularReserva) {
         btnSimularReserva.addEventListener('click', () => {
             const bookings = getStoredBookings();
-            const now = new Date();
             const dKey = getTodayKey();
             const horas = ['14:00', '16:30', '19:15', '21:00', '07:30'];
             const horaRandom = horas[Math.floor(Math.random() * horas.length)];
@@ -772,7 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        alert(`¡Excelente!\nHas aceptado la reserva de ${item.clientName} para las ${item.time} hs.\nQuedó agendada en tu hoja de ruta.`);
+        alert(`¡Excelente!\nHas aceptado la reserva de ${item.clientName || item.customerName || 'Cliente'} para las ${item.time || item.pickupTime || '00:00'} hs.\nQuedó agendada en tu hoja de ruta.`);
     }
 
     function iniciarViajeDesdeReserva(resId) {
@@ -781,16 +798,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!item) return;
 
         // Convertir a viaje activo
+        const rawPrice = item.price || item.totalFare || item.monto || item.precioEstimado;
+        const tripPrice = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
+            ? Number(rawPrice)
+            : 35000;
+
         const tripData = {
             id: 'trip_' + item.id,
-            nombrePasajero: item.clientName,
-            telefono: item.clientPhone,
-            origen: item.pickupAddress || item.origen,
-            destino: item.dropoffAddress || item.destino,
-            precioEstimado: Number(item.price || item.monto || 35000),
-            categoria: item.category || 'Sedán Ejecutivo',
-            distancia: '28 km',
-            metodoPago: item.paymentMethod || 'Efectivo / Transf'
+            nombrePasajero: item.clientName || item.customerName || item.nombrePasajero || 'Pasajero',
+            telefono: item.clientPhone || item.customerPhone || item.telefono || '+5491155551234',
+            origen: item.pickupAddress || item.origin || item.origen || 'Punto de recogida',
+            destino: item.dropoffAddress || item.destination || item.destino || 'Destino',
+            precioEstimado: tripPrice,
+            categoria: item.category || item.categoria || 'Sedán Ejecutivo',
+            distancia: item.distancia || '28 km',
+            metodoPago: item.paymentMethod || item.metodoPago || 'Efectivo / Transferencia'
         };
 
         setOnlineStatus(true);
@@ -856,10 +878,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!driverState.isOnline || driverState.activeTrip) return;
 
         driverState.incomingTrip = tripData;
-        incomingPrice.textContent = '$' + (tripData.precioEstimado || tripData.precio || 35000).toLocaleString('es-AR');
-        incomingCategory.textContent = tripData.categoria || 'Sedán Ejecutivo';
-        incomingOrigin.textContent = tripData.origen || 'Punto de recogida';
-        incomingDestination.textContent = tripData.destino || 'Punto de destino';
+        const rawPrice = tripData.precioEstimado || tripData.precio || tripData.totalFare || tripData.monto;
+        const tripPrice = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
+            ? Number(rawPrice)
+            : 35000;
+
+        incomingPrice.textContent = '$' + tripPrice.toLocaleString('es-AR');
+        incomingCategory.textContent = tripData.categoria || tripData.category || 'Sedán Ejecutivo';
+        incomingOrigin.textContent = tripData.origen || tripData.pickupAddress || tripData.origin || 'Punto de recogida';
+        incomingDestination.textContent = tripData.destino || tripData.dropoffAddress || tripData.destination || 'Punto de destino';
         incomingDistance.textContent = tripData.distancia || '15 km';
         incomingDuration.textContent = tripData.duracion || '25 min';
 
@@ -931,8 +958,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // 8. FLUJO DE VIAJE ACTIVO
     // ==========================================
     function startActiveTrip(trip) {
+        const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto;
+        const tripPrice = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
+            ? Number(rawPrice)
+            : 35000;
+
         driverState.activeTrip = {
             ...trip,
+            precioEstimado: tripPrice,
             etapa: 'en_camino' // en_camino -> en_origen -> en_viaje
         };
 
@@ -940,20 +973,27 @@ document.addEventListener('DOMContentLoaded', () => {
         stateOffline.classList.remove('active');
         stateActiveTrip.classList.add('active');
 
-        activeTripPassengerName.textContent = trip.nombrePasajero || trip.clientName || 'Pasajero';
-        activeTripOrigin.textContent = trip.origen || trip.pickupAddress || 'Origen';
-        activeTripDestination.textContent = trip.destino || trip.dropoffAddress || 'Destino';
+        const passengerName = trip.nombrePasajero || trip.clientName || trip.customerName || 'Pasajero';
+        activeTripPassengerName.textContent = passengerName;
+        activeTripOrigin.textContent = trip.origen || trip.pickupAddress || trip.origin || 'Origen';
+        activeTripDestination.textContent = trip.destino || trip.dropoffAddress || trip.destination || 'Destino';
         activeTripDistance.textContent = trip.distancia || 'Calculando';
-        activeTripEarnings.textContent = '$' + (trip.precioEstimado || trip.precio || 35000).toLocaleString('es-AR');
-        activeTripPayment.innerHTML = `<i class="fa-solid fa-money-bill-wave"></i> ${trip.metodoPago || 'Efectivo / Transferencia'}`;
+        activeTripEarnings.textContent = '$' + tripPrice.toLocaleString('es-AR');
+        activeTripPayment.innerHTML = `<i class="fa-solid fa-money-bill-wave"></i> ${trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia'}`;
+
+        if (driverChatPassengerTitle) {
+            driverChatPassengerTitle.textContent = 'Chat con ' + passengerName;
+        }
+        if (driverChatUnreadDot) {
+            driverChatUnreadDot.classList.add('hidden');
+        }
 
         // Configurar enlaces GPS
-        updateGpsLinks(trip.origen || trip.pickupAddress);
+        updateGpsLinks(trip.origen || trip.pickupAddress || trip.origin);
 
         // Configurar contacto pasajero
-        const telPasajero = (trip.telefono || trip.clientPhone || '5491100000000').replace(/[^0-9]/g, '');
+        const telPasajero = (trip.telefono || trip.clientPhone || trip.customerPhone || '5491100000000').replace(/[^0-9]/g, '');
         btnCallPassenger.href = `tel:${telPasajero}`;
-        btnWhatsappPassenger.href = `https://wa.me/${telPasajero}?text=Hola,%20soy%20tu%20conductor%20de%20Ruta%20Privada.%20Estoy%20en%20camino!`;
 
         updateTripStageUI();
     }
@@ -971,15 +1011,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (trip.etapa === 'en_camino') {
             tripStageTitle.textContent = '1. EN CAMINO AL ORIGEN';
             btnNextTripText.textContent = 'Llegué al punto de recogida';
-            updateGpsLinks(trip.origen || trip.pickupAddress);
+            updateGpsLinks(trip.origen || trip.pickupAddress || trip.origin);
         } else if (trip.etapa === 'en_origen') {
             tripStageTitle.textContent = '2. EN EL ORIGEN (Esperando Pasajero)';
             btnNextTripText.textContent = 'Iniciar viaje (Pasajero a bordo)';
-            updateGpsLinks(trip.destino || trip.dropoffAddress);
+            updateGpsLinks(trip.destino || trip.dropoffAddress || trip.destination);
         } else if (trip.etapa === 'en_viaje') {
             tripStageTitle.textContent = '3. EN VIAJE HACIA EL DESTINO';
             btnNextTripText.textContent = 'Finalizar viaje y cobrar';
-            updateGpsLinks(trip.destino || trip.dropoffAddress);
+            updateGpsLinks(trip.destino || trip.dropoffAddress || trip.destination);
         }
     }
 
@@ -1004,7 +1044,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const trip = driverState.activeTrip;
         if (!trip) return;
 
-        const montoGanado = Number(trip.precioEstimado || trip.precio || 35000);
+        const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto;
+        const montoGanado = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
+            ? Number(rawPrice)
+            : 35000;
         const todayKey = getTodayKey();
         
         // Sumar a ganancias e historial persistente
@@ -1012,12 +1055,12 @@ document.addEventListener('DOMContentLoaded', () => {
             id: trip.id || ('trip_' + Date.now()),
             fecha: todayKey,
             hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            origen: trip.origen || trip.pickupAddress,
-            destino: trip.destino || trip.dropoffAddress,
+            origen: trip.origen || trip.pickupAddress || trip.origin,
+            destino: trip.destino || trip.dropoffAddress || trip.destination,
             monto: montoGanado,
             distancia: trip.distancia || '18 km',
-            metodoPago: trip.metodoPago || 'Efectivo / Transferencia',
-            categoria: trip.categoria || 'Sedán Ejecutivo',
+            metodoPago: trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia',
+            categoria: trip.categoria || trip.category || 'Sedán Ejecutivo',
             estado: 'completado'
         };
 
@@ -1028,6 +1071,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.RutaSync) {
             window.RutaSync.actualizarEstadoViaje('completado');
             window.RutaSync.limpiarViajeActivo();
+            window.RutaSync.limpiarChat();
         }
 
         driverState.activeTrip = null;
@@ -1046,6 +1090,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.RutaSync) {
                 window.RutaSync.actualizarEstadoViaje('cancelado');
                 window.RutaSync.limpiarViajeActivo();
+                window.RutaSync.limpiarChat();
             }
             driverState.activeTrip = null;
             stateActiveTrip.classList.remove('active');
@@ -1054,7 +1099,115 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ==========================================
-    // 9. SIMULACIÓN DE PRUEBA EN VIVO
+    // 9. CHAT IN-APP DIRECTO CON EL PASAJERO
+    // ==========================================
+    function openDriverChat() {
+        if (!modalDriverChat) return;
+        modalDriverChat.classList.add('active');
+        if (driverChatUnreadDot) driverChatUnreadDot.classList.add('hidden');
+        renderDriverChatMessages();
+        setTimeout(() => {
+            if (driverChatInputText) driverChatInputText.focus();
+        }, 100);
+    }
+
+    function closeDriverChat() {
+        if (!modalDriverChat) return;
+        modalDriverChat.classList.remove('active');
+    }
+
+    function renderDriverChatMessages() {
+        if (!driverChatMessagesList) return;
+        const mensajes = window.RutaSync ? window.RutaSync.obtenerMensajesChat() : [];
+
+        if (mensajes.length === 0) {
+            driverChatMessagesList.innerHTML = `
+                <div style="text-align: center; padding: 24px 10px; color: #94a3b8; font-size: 0.8rem;">
+                    <i class="fa-solid fa-comments" style="font-size: 1.8rem; margin-bottom: 8px; color: #475569; display: block;"></i>
+                    Canal directo de comunicación en tiempo real con el pasajero.
+                </div>
+            `;
+            return;
+        }
+
+        driverChatMessagesList.innerHTML = mensajes.map(msg => {
+            const isMine = msg.remitente === 'driver';
+            return `
+                <div class="chat-bubble ${isMine ? 'mine' : 'theirs'}" style="margin-bottom: 8px; display: flex; flex-direction: column; align-items: ${isMine ? 'flex-end' : 'flex-start'};">
+                    <div style="background: ${isMine ? '#059669' : '#334155'}; color: #fff; padding: 8px 12px; border-radius: 12px; font-size: 0.85rem; max-width: 82%; word-break: break-word;">
+                        ${escapeHtml(msg.texto)}
+                    </div>
+                    <span style="font-size: 0.68rem; color: #64748b; margin-top: 2px; padding: 0 4px;">
+                        ${msg.hora || ''} ${isMine ? '✓' : ''}
+                    </span>
+                </div>
+            `;
+        }).join('');
+
+        driverChatMessagesList.scrollTop = driverChatMessagesList.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, m => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[m]));
+    }
+
+    if (btnDriverChatPassenger) {
+        btnDriverChatPassenger.addEventListener('click', openDriverChat);
+    }
+
+    if (btnCloseDriverChat) {
+        btnCloseDriverChat.addEventListener('click', closeDriverChat);
+    }
+
+    if (modalDriverChat) {
+        modalDriverChat.addEventListener('click', (e) => {
+            if (e.target === modalDriverChat) closeDriverChat();
+        });
+    }
+
+    if (driverChatInputForm) {
+        driverChatInputForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = driverChatInputText.value.trim();
+            if (!text) return;
+
+            if (window.RutaSync) {
+                window.RutaSync.enviarMensajeChat({
+                    remitente: 'driver',
+                    autor: driverState.info.nombre,
+                    texto: text
+                });
+            }
+
+            driverChatInputText.value = '';
+            renderDriverChatMessages();
+        });
+    }
+
+    // Quick chips en chat del conductor
+    document.querySelectorAll('#modalDriverChat .quick-chip-btn').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const text = chip.getAttribute('data-text');
+            if (text && window.RutaSync) {
+                window.RutaSync.enviarMensajeChat({
+                    remitente: 'driver',
+                    autor: driverState.info.nombre,
+                    texto: text
+                });
+                renderDriverChatMessages();
+            }
+        });
+    });
+
+    // ==========================================
+    // 10. SIMULACIÓN DE PRUEBA EN VIVO
     // ==========================================
     btnSimularViaje.addEventListener('click', () => {
         const demoTrip = {
@@ -1074,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ==========================================
-    // 10. ESCUCHAR SOLICITUDES REALES DESDE sync.js
+    // 11. ESCUCHAR SOLICITUDES Y CHAT DESDE sync.js
     // ==========================================
     if (window.RutaSync) {
         window.RutaSync.on('NUEVO_VIAJE_SOLICITADO', (viaje) => {
@@ -1087,10 +1240,21 @@ document.addEventListener('DOMContentLoaded', () => {
             renderReservas();
             playAlertSound('incoming');
         });
+
+        window.RutaSync.on('CHAT_MENSAJE_ENVIADO', (msg) => {
+            if (modalDriverChat && modalDriverChat.classList.contains('active')) {
+                renderDriverChatMessages();
+            } else {
+                if (driverChatUnreadDot) driverChatUnreadDot.classList.remove('hidden');
+                if (msg.remitente === 'passenger') {
+                    playAlertSound('incoming');
+                }
+            }
+        });
     }
 
     // ==========================================
-    // 11. MODAL E INSTALACIÓN PWA DE CONDUCTOR
+    // 12. MODAL E INSTALACIÓN PWA DE CONDUCTOR
     // ==========================================
     const btnInstallDriverApp = document.getElementById('btnInstallDriverApp');
     const modalDriverInstall = document.getElementById('modalDriverInstall');
@@ -1147,7 +1311,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 12. INICIALIZACIÓN
+    // 13. INICIALIZACIÓN
     // ==========================================
     loadSavedStats();
     renderReservas();

@@ -12,20 +12,6 @@
     <link rel="stylesheet" href="conductor.css?v=8">
 </head>
 <body class="driver-body">
-    <!-- BARRA DE NAVEGACIÓN SUPERIOR / RETORNO Y DESCARGA -->
-    <div class="driver-top-nav web-only">
-        <a href="partners.html" class="btn-driver-back" title="Volver al Portal de Partners">
-            <i class="fa-solid fa-arrow-left"></i>
-            <span>Portal Partners</span>
-        </a>
-        <div class="driver-nav-right">
-            <button type="button" class="btn-driver-install" id="btnInstallDriverApp" title="Instalar App de Conductor en tu Celular">
-                <i class="fa-solid fa-mobile-screen-button"></i>
-                <span>Instalar App Chofer</span>
-            </button>
-        </div>
-    </div>
-
     <!-- BARRA SUPERIOR -->
     <header class="driver-header">
         <div class="driver-profile-info">
@@ -140,9 +126,10 @@
                         <a href="#" class="btn-circle-action" id="btnCallPassenger" title="Llamar">
                             <i class="fa-solid fa-phone"></i>
                         </a>
-                        <a href="#" class="btn-circle-action whatsapp" id="btnWhatsappPassenger" title="WhatsApp" target="_blank">
-                            <i class="fa-brands fa-whatsapp"></i>
-                        </a>
+                        <button type="button" class="btn-circle-action chat-btn-action" id="btnDriverChatPassenger" title="Chat In-App con Pasajero">
+                            <i class="fa-solid fa-comments"></i>
+                            <span class="chat-unread-dot hidden" id="driverChatUnreadDot"></span>
+                        </button>
                     </div>
                 </div>
 
@@ -219,16 +206,13 @@
                 </button>
             </div>
 
-            <!-- Filtros de Reservas -->
+            <!-- Filtros de Reservas (Solo Disponibles y Mis Reservas) -->
             <div class="reservas-filter-tabs">
                 <button type="button" class="reserva-filter-btn active" data-filter="disponibles">
                     Disponibles <span class="badge-count" id="countDisponibles">0</span>
                 </button>
                 <button type="button" class="reserva-filter-btn" data-filter="tomadas">
                     Mis Reservas <span class="badge-count" id="countTomadas">0</span>
-                </button>
-                <button type="button" class="reserva-filter-btn" data-filter="todas">
-                    Todas
                 </button>
             </div>
 
@@ -387,17 +371,6 @@
                     </div>
                     <i class="fa-solid fa-play"></i>
                 </button>
-
-                <a href="partners.html" class="profile-link-item">
-                    <div class="link-left">
-                        <i class="fa-solid fa-arrow-left text-muted"></i>
-                        <div>
-                            <strong>Volver al Menú Partners</strong>
-                            <p>Página de acceso de conductores</p>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right"></i>
-                </a>
             </div>
         </div>
 
@@ -522,8 +495,47 @@
         </div>
     </div>
 
+    <!-- MODAL DE CHAT EN VIVO CON PASAJERO (CONDUCTOR) -->
+    <div class="driver-modal-overlay" id="modalDriverChat">
+        <div class="driver-modal-sheet" style="max-height: 80vh; display: flex; flex-direction: column;">
+            <div class="modal-sheet-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); border: 1.5px solid #10b981; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #10b981;">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1rem; margin: 0;" id="driverChatPassengerTitle">Chat con Pasajero</h3>
+                        <span style="font-size: 0.72rem; color: #10b981;">● Canal directo en vivo</span>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btnCloseDriverChat"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Contenedor de Mensajes -->
+            <div class="chat-messages-container" id="driverChatMessagesList" style="flex: 1; height: 260px; overflow-y: auto; padding: 10px 0;">
+                <!-- Inyectado dinámicamente -->
+            </div>
+
+            <!-- Respuestas Rápidas del Conductor -->
+            <div class="chat-quick-replies" style="display: flex; gap: 6px; overflow-x: auto; padding: 6px 0;">
+                <button type="button" class="quick-chip-btn" data-text="🚗 Estoy en camino hacia tu punto de recogida.">🚗 Estoy en camino</button>
+                <button type="button" class="quick-chip-btn" data-text="📍 Llegué al origen y te estoy esperando.">📍 Llegué al origen</button>
+                <button type="button" class="quick-chip-btn" data-text="⏳ Llego en aproximadamente 2 a 3 minutos.">⏳ Llego en 2 min</button>
+                <button type="button" class="quick-chip-btn" data-text="👍 ¡Perfecto, muchas gracias!">👍 ¡Entendido!</button>
+            </div>
+
+            <!-- Formulario de Envío -->
+            <form class="chat-input-form" id="driverChatInputForm" style="display: flex; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <input type="text" id="driverChatInputText" placeholder="Escribe un mensaje al pasajero..." style="flex: 1; background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px 14px; color: #fff; font-size: 0.88rem; outline: none;" required />
+                <button type="submit" class="btn-accept-trip" style="padding: 10px 16px; border-radius: 12px; font-size: 1rem; justify-content: center;">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
     <!-- SCRIPTS -->
     <script src="sync.js"></script>
-    <script src="conductor.js?v=8"></script>
+    <script src="conductor.js?v=9"></script>
 </body>
 </html>
