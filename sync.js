@@ -264,7 +264,7 @@ class RutaSyncManager {
 
         if (!texto || !texto.trim()) return null;
 
-        // Normalizar remitente
+        // Normalizar remitente: 'pasajero' o 'conductor'
         const normRemitente = (remitente === 'driver' || remitente === 'conductor') ? 'conductor' : 'pasajero';
 
         const msg = {
@@ -284,39 +284,59 @@ class RutaSyncManager {
 
     guardarMensajeChatLocal(msg) {
         if (!msg || !msg.texto) return;
-        const chatKey = 'rutaprivada_chat_' + (msg.tripId || 'active_trip');
-        let mensajes = [];
-        try {
-            const raw = localStorage.getItem(chatKey);
-            if (raw) mensajes = JSON.parse(raw);
-        } catch (e) {}
-
-        // Evitar duplicados por id
-        if (!mensajes.some(m => m.id === msg.id)) {
-            mensajes.push(msg);
-            try {
-                localStorage.setItem(chatKey, JSON.stringify(mensajes));
-            } catch (e) {}
+        
+        // Guardar tanto en la clave general del chat activo como en la específica del viaje
+        const keys = ['rutaprivada_chat_live_shared', 'rutaprivada_chat_active_trip'];
+        if (msg.tripId && msg.tripId !== 'active_trip') {
+            keys.push('rutaprivada_chat_' + msg.tripId);
         }
+
+        keys.forEach(key => {
+            let mensajes = [];
+            try {
+                const raw = localStorage.getItem(key);
+                if (raw) mensajes = JSON.parse(raw);
+            } catch (e) {}
+
+            if (!mensajes.some(m => m.id === msg.id || (m.timestamp === msg.timestamp && m.texto === msg.texto))) {
+                mensajes.push(msg);
+                try {
+                    localStorage.setItem(key, JSON.stringify(mensajes));
+                } catch (e) {}
+            }
+        });
     }
 
     obtenerMensajesChat(tripId) {
-        const chatKey = 'rutaprivada_chat_' + (tripId || 'active_trip');
-        try {
-            const raw = localStorage.getItem(chatKey);
-            return raw ? JSON.parse(raw) : [];
-        } catch (e) {
-            return [];
+        const keys = ['rutaprivada_chat_live_shared'];
+        if (tripId && tripId !== 'active_trip') {
+            keys.unshift('rutaprivada_chat_' + tripId);
         }
+        keys.push('rutaprivada_chat_active_trip');
+
+        for (const key of keys) {
+            try {
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        return parsed;
+                    }
+                }
+            } catch (e) {}
+        }
+        return [];
     }
 
     limpiarChat(tripId) {
-        const chatKey = 'rutaprivada_chat_' + (tripId || 'active_trip');
-        try {
-            localStorage.removeItem(chatKey);
-        } catch (e) {}
+        const keys = ['rutaprivada_chat_live_shared', 'rutaprivada_chat_active_trip'];
+        if (tripId) keys.push('rutaprivada_chat_' + tripId);
+        keys.forEach(k => {
+            try { localStorage.removeItem(k); } catch (e) {}
+        });
     }
 }
 
 // Instancia global
 window.RutaSync = new RutaSyncManager();
+

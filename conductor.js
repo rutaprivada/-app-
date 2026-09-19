@@ -36,9 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
             historial: []
         },
         info: {
-            nombre: 'Martín G.',
-            auto: 'Toyota Corolla 2023',
-            calificacion: 4.96
+            nombre: 'Martín Gómez',
+            auto: 'Toyota Corolla 2023 · Sedán Ejecutivo',
+            patente: 'AE 782 ZK',
+            calificacion: 4.96,
+            telefono: '+54 9 11 7373-8790'
         }
     };
 
@@ -878,10 +880,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!driverState.isOnline || driverState.activeTrip) return;
 
         driverState.incomingTrip = tripData;
-        const rawPrice = tripData.precioEstimado || tripData.precio || tripData.totalFare || tripData.monto;
-        const tripPrice = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
+        const rawPrice = tripData.precioEstimado ?? tripData.precio ?? tripData.totalFare ?? tripData.monto;
+        const tripPrice = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)))
             ? Number(rawPrice)
-            : 35000;
+            : 0;
 
         incomingPrice.textContent = '$' + tripPrice.toLocaleString('es-AR');
         incomingCategory.textContent = tripData.categoria || tripData.category || 'Sedán Ejecutivo';
@@ -946,8 +948,9 @@ document.addEventListener('DOMContentLoaded', () => {
             window.RutaSync.aceptarViaje(trip.id, {
                 nombre: driverState.info.nombre,
                 auto: driverState.info.auto,
+                patente: driverState.info.patente,
                 calificacion: driverState.info.calificacion,
-                telefono: '+5491144448888'
+                telefono: driverState.info.telefono
             });
         }
 
@@ -958,10 +961,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 8. FLUJO DE VIAJE ACTIVO
     // ==========================================
     function startActiveTrip(trip) {
-        const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto;
-        const tripPrice = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
-            ? Number(rawPrice)
-            : 35000;
+        const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0;
+        const tripPrice = Number(rawPrice) || 0;
 
         driverState.activeTrip = {
             ...trip,
@@ -980,6 +981,19 @@ document.addEventListener('DOMContentLoaded', () => {
         activeTripDistance.textContent = trip.distancia || 'Calculando';
         activeTripEarnings.textContent = '$' + tripPrice.toLocaleString('es-AR');
         activeTripPayment.innerHTML = `<i class="fa-solid fa-money-bill-wave"></i> ${trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia'}`;
+
+        // Mostrar Peajes según corresponda en el viaje
+        const activeTripTolls = document.getElementById('activeTripTolls');
+        if (activeTripTolls) {
+            const tollAmt = Number(trip.tollFare || trip.peajes || 0);
+            if (tollAmt > 0) {
+                activeTripTolls.textContent = `$${tollAmt.toLocaleString('es-AR')} (Incluidos)`;
+                activeTripTolls.style.color = '#34d399';
+            } else {
+                activeTripTolls.textContent = 'Sin peajes';
+                activeTripTolls.style.color = '#94a3b8';
+            }
+        }
 
         if (driverChatPassengerTitle) {
             driverChatPassengerTitle.textContent = 'Chat con ' + passengerName;
@@ -1118,7 +1132,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderDriverChatMessages() {
         if (!driverChatMessagesList) return;
-        const mensajes = window.RutaSync ? window.RutaSync.obtenerMensajesChat() : [];
+        const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+        const tripId = activeTrip ? activeTrip.id : (driverState.activeTrip ? driverState.activeTrip.id : 'active_trip');
+        const mensajes = window.RutaSync ? window.RutaSync.obtenerMensajesChat(tripId) : [];
 
         if (mensajes.length === 0) {
             driverChatMessagesList.innerHTML = `
@@ -1131,14 +1147,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         driverChatMessagesList.innerHTML = mensajes.map(msg => {
-            const isMine = msg.remitente === 'driver';
+            const isMine = msg.remitente === 'conductor' || msg.remitente === 'driver';
             return `
-                <div class="chat-bubble ${isMine ? 'mine' : 'theirs'}" style="margin-bottom: 8px; display: flex; flex-direction: column; align-items: ${isMine ? 'flex-end' : 'flex-start'};">
-                    <div style="background: ${isMine ? '#059669' : '#334155'}; color: #fff; padding: 8px 12px; border-radius: 12px; font-size: 0.85rem; max-width: 82%; word-break: break-word;">
+                <div class="chat-bubble ${isMine ? 'mine' : 'theirs'}">
+                    <div class="bubble-content">
                         ${escapeHtml(msg.texto)}
                     </div>
-                    <span style="font-size: 0.68rem; color: #64748b; margin-top: 2px; padding: 0 4px;">
-                        ${msg.hora || ''} ${isMine ? '✓' : ''}
+                    <span class="bubble-time">
+                        ${msg.hora || ''} ${isMine ? '✓✓' : ''}
                     </span>
                 </div>
             `;
@@ -1156,6 +1172,21 @@ document.addEventListener('DOMContentLoaded', () => {
             '"': '&quot;',
             "'": '&#39;'
         }[m]));
+    }
+
+    function sendDriverChatMessage(text) {
+        if (!text || !text.trim() || !window.RutaSync) return;
+        const activeTrip = window.RutaSync.obtenerViajeActivo();
+        const tripId = activeTrip ? activeTrip.id : (driverState.activeTrip ? driverState.activeTrip.id : 'active_trip');
+        
+        window.RutaSync.enviarMensajeChat({
+            tripId: tripId,
+            remitente: 'conductor',
+            autor: driverState.info.nombre,
+            texto: text.trim()
+        });
+
+        renderDriverChatMessages();
     }
 
     if (btnDriverChatPassenger) {
@@ -1177,17 +1208,8 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const text = driverChatInputText.value.trim();
             if (!text) return;
-
-            if (window.RutaSync) {
-                window.RutaSync.enviarMensajeChat({
-                    remitente: 'driver',
-                    autor: driverState.info.nombre,
-                    texto: text
-                });
-            }
-
+            sendDriverChatMessage(text);
             driverChatInputText.value = '';
-            renderDriverChatMessages();
         });
     }
 
@@ -1195,13 +1217,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('#modalDriverChat .quick-chip-btn').forEach(chip => {
         chip.addEventListener('click', () => {
             const text = chip.getAttribute('data-text');
-            if (text && window.RutaSync) {
-                window.RutaSync.enviarMensajeChat({
-                    remitente: 'driver',
-                    autor: driverState.info.nombre,
-                    texto: text
-                });
-                renderDriverChatMessages();
+            if (text) {
+                sendDriverChatMessage(text);
             }
         });
     });

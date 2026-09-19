@@ -4187,7 +4187,7 @@ function recordConfirmedReservation() {
     
     const domPriceText = document.getElementById('quote-total-amount')?.textContent?.replace(/\D/g, '') || '';
     const domPrice = Number(domPriceText) || 0;
-    const finalFare = Number(state.totalPrice) || (b.finalTotal ? Number(b.finalTotal) : 0) || domPrice || 35000;
+    const finalFare = Number(state.totalPrice) || (b.finalTotal ? Number(b.finalTotal) : 0) || domPrice || 0;
     
     const newBooking = {
       id: 'res_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
@@ -4845,6 +4845,10 @@ if (btnRequestInapp) {
 
     if (!originVal || !destVal) {
       showToast('⚠️ Por favor indica punto de partida y destino antes de solicitar.');
+      const originInput = document.getElementById('origin-input');
+      const destInput = document.getElementById('destination-input');
+      if (originInput && !originVal) originInput.focus();
+      else if (destInput && !destVal) destInput.focus();
       return;
     }
 
@@ -4852,29 +4856,68 @@ if (btnRequestInapp) {
     const phoneInput = document.getElementById('passenger-phone-input');
     const notesInput = document.getElementById('passenger-notes-input');
 
-    const passName = nameInput && nameInput.value.trim() ? nameInput.value.trim() : 'Pasajero Ejecutivo';
-    const passPhone = phoneInput && phoneInput.value.trim() ? phoneInput.value.trim() : '+54 9 11 7373-8790';
+    const passName = nameInput ? nameInput.value.trim() : '';
+    const passPhone = phoneInput ? phoneInput.value.trim() : '';
     const passNotes = notesInput ? notesInput.value.trim() : '';
 
-    const domPriceText = document.getElementById('quote-total-amount')?.textContent?.replace(/\D/g, '') || '';
-    const domPrice = Number(domPriceText) || 0;
-    const b = state.breakdown || {};
-    const calculatedFare = Number(state.totalPrice) || (b.finalTotal ? Number(b.finalTotal) : 0) || domPrice || 35000;
+    if (!passName) {
+      showToast('⚠️ Por favor ingresa el Nombre y Apellido del pasajero.');
+      if (nameInput) {
+        nameInput.focus();
+        nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        nameInput.style.borderColor = '#ef4444';
+        setTimeout(() => { nameInput.style.borderColor = ''; }, 3000);
+      }
+      return;
+    }
 
+    if (!passPhone || passPhone.length < 6) {
+      showToast('⚠️ Por favor ingresa el número de WhatsApp de contacto del pasajero.');
+      if (phoneInput) {
+        phoneInput.focus();
+        phoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        phoneInput.style.borderColor = '#ef4444';
+        setTimeout(() => { phoneInput.style.borderColor = ''; }, 3000);
+      }
+      return;
+    }
+
+    // Obtener la cotización exacta activa
+    let calculatedFare = 0;
+    if (state.totalPrice && Number(state.totalPrice) > 0) {
+      calculatedFare = Number(state.totalPrice);
+    } else if (state.breakdown && state.breakdown.finalTotal && Number(state.breakdown.finalTotal) > 0) {
+      calculatedFare = Number(state.breakdown.finalTotal);
+    } else {
+      const domPriceText = document.getElementById('quote-total-amount')?.textContent?.replace(/\D/g, '') || '';
+      const domPrice = Number(domPriceText) || 0;
+      if (domPrice > 0) {
+        calculatedFare = domPrice;
+      } else {
+        updateCalculation();
+        calculatedFare = Number(state.totalPrice) || 0;
+      }
+    }
+
+    const b = state.breakdown || {};
     const originAddress = (state.origin && (state.origin.address || state.origin.name)) ? (state.origin.address || state.origin.name) : originVal;
     const destAddress = (state.destination && (state.destination.address || state.destination.name)) ? (state.destination.address || state.destination.name) : destVal;
+    const tollCostNum = Number(b.tollCost || b.tollFare || 0);
 
     const tripData = {
+      id: 'trip_' + Date.now(),
       origen: originAddress,
       pickupAddress: originAddress,
       destino: destAddress,
       dropoffAddress: destAddress,
-      distancia: `${(state.distanceKm || 12).toFixed(1)} km`,
-      duracion: `${state.durationMin || state.durationMinutes || 25} min`,
+      distancia: `${(state.distanceKm || 0).toFixed(1)} km`,
+      duracion: `${state.durationMin || state.baseDurationMin || 0} min`,
       precioEstimado: calculatedFare,
       precio: calculatedFare,
       totalFare: calculatedFare,
       monto: calculatedFare,
+      peajes: tollCostNum,
+      tollFare: tollCostNum,
       nombrePasajero: passName,
       clientName: passName,
       customerName: passName,
@@ -4978,6 +5021,18 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function sendPassengerChatMessage(txt) {
+  if (!txt || !txt.trim() || !window.RutaSync) return;
+  const activeTrip = window.RutaSync.obtenerViajeActivo();
+  const tripId = activeTrip ? activeTrip.id : 'active_trip';
+  window.RutaSync.enviarMensajeChat({
+    tripId: tripId,
+    remitente: 'pasajero',
+    texto: txt.trim()
+  });
+  renderPassengerChatMessages();
+}
+
 if (btnPassengerChatDriver) {
   btnPassengerChatDriver.addEventListener('click', openPassengerChatModal);
 }
@@ -4990,13 +5045,9 @@ if (pChatInputForm) {
   pChatInputForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const txt = pChatInputText.value.trim();
-    if (!txt || !window.RutaSync) return;
-
-    const activeTrip = window.RutaSync.obtenerViajeActivo();
-    const tripId = activeTrip ? activeTrip.id : 'active_trip';
-    window.RutaSync.enviarMensajeChat(tripId, 'pasajero', txt);
+    if (!txt) return;
+    sendPassengerChatMessage(txt);
     pChatInputText.value = '';
-    renderPassengerChatMessages();
   });
 }
 
@@ -5004,11 +5055,8 @@ if (pChatInputForm) {
 document.querySelectorAll('.chat-quick-replies .quick-chip-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const txt = btn.getAttribute('data-text');
-    if (txt && window.RutaSync) {
-      const activeTrip = window.RutaSync.obtenerViajeActivo();
-      const tripId = activeTrip ? activeTrip.id : 'active_trip';
-      window.RutaSync.enviarMensajeChat(tripId, 'pasajero', txt);
-      renderPassengerChatMessages();
+    if (txt) {
+      sendPassengerChatMessage(txt);
     }
   });
 });
@@ -5020,17 +5068,22 @@ if (window.RutaSync) {
       if (pStateSearching) pStateSearching.classList.add('hidden');
       if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
 
-      if (pDriverName) pDriverName.textContent = viaje.conductor.nombre || 'Martín G.';
-      if (pDriverCar) pDriverCar.textContent = viaje.conductor.auto || 'Toyota Corolla · Sedán Ejecutivo';
-      if (pDriverRating) pDriverRating.textContent = viaje.conductor.calificacion || '4.96';
-      if (pChatDriverName) pChatDriverName.textContent = `${viaje.conductor.nombre || 'Martín G.'} (Chofer)`;
+      const driverName = viaje.conductor.nombre || 'Martín Gómez';
+      const driverCar = viaje.conductor.auto || 'Toyota Corolla 2023 · Sedán Ejecutivo';
+      const driverPlate = viaje.conductor.patente ? ` · Patente: ${viaje.conductor.patente}` : (!driverCar.includes('Patente') ? ' · Patente: AE 782 ZK' : '');
+      const driverRating = viaje.conductor.calificacion || '4.96';
+
+      if (pDriverName) pDriverName.textContent = driverName;
+      if (pDriverCar) pDriverCar.textContent = `${driverCar}${driverPlate}`;
+      if (pDriverRating) pDriverRating.textContent = driverRating;
+      if (pChatDriverName) pChatDriverName.textContent = `${driverName} (Chofer)`;
 
       if (btnPassengerCallDriver) {
         btnPassengerCallDriver.href = `tel:${viaje.conductor.telefono || '+5491173738790'}`;
       }
 
       updatePassengerTripStage('en_camino');
-      showToast(`🚗 ¡Conductor Asignado! ${viaje.conductor.nombre} aceptó tu viaje y está en camino.`);
+      showToast(`🚗 ¡Conductor Asignado! ${driverName} aceptó tu viaje y está en camino.`);
     }
   });
 
@@ -5051,12 +5104,13 @@ if (window.RutaSync) {
   window.RutaSync.on('CHAT_MENSAJE_ENVIADO', (msg) => {
     if (msg) {
       renderPassengerChatMessages();
-      if (msg.remitente === 'conductor') {
+      if (msg.remitente === 'conductor' || msg.remitente === 'driver') {
         showToast(`💬 Mensaje del chofer: "${msg.texto}"`);
       }
     }
   });
 }
+
 
 
 
