@@ -1,5 +1,5 @@
 {
-  "name": "RutaPrivada Chofer - Conductor Partner",
+  "name": "RutaPrivada Chofer",
   "short_name": "RutaPrivada Chofer",
   "id": "com.rutaprivada.chofer",
   "start_url": "./conductor.html?mode=app",

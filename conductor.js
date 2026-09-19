@@ -934,9 +934,13 @@ document.addEventListener('DOMContentLoaded', () => {
         closeIncomingModal();
     }
 
-    btnRejectTrip.addEventListener('click', rejectIncomingTrip);
+    btnRejectTrip.addEventListener('click', () => {
+        stopAlertLoop();
+        rejectIncomingTrip();
+    });
 
     btnAcceptTrip.addEventListener('click', () => {
+        stopAlertLoop();
         if (!driverState.incomingTrip) return;
 
         const trip = driverState.incomingTrip;
@@ -961,6 +965,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 8. FLUJO DE VIAJE ACTIVO
     // ==========================================
     function startActiveTrip(trip) {
+        stopAlertLoop();
         const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0;
         const tripPrice = Number(rawPrice) || 0;
 
@@ -1050,53 +1055,191 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_viaje');
             updateTripStageUI();
         } else if (trip.etapa === 'en_viaje') {
-            finalizarViaje();
+            mostrarModalCobroViaje();
         }
     });
 
-    function finalizarViaje() {
+    // ==========================================
+    // MODAL DE COBRO FINAL Y CALIFICACIÓN AL PASAJERO
+    // ==========================================
+    const modalDriverFareSummary = document.getElementById('modalDriverFareSummary');
+    const btnCloseDriverFareSummary = document.getElementById('btnCloseDriverFareSummary');
+    const driverFareHeroTotal = document.getElementById('driverFareHeroTotal');
+    const driverFarePaymentMethod = document.getElementById('driverFarePaymentMethod');
+    const driverFareBaseAmount = document.getElementById('driverFareBaseAmount');
+    const driverFareTollsAmount = document.getElementById('driverFareTollsAmount');
+    const driverFarePassengerName = document.getElementById('driverFarePassengerName');
+    const btnConfirmDriverFareAndComplete = document.getElementById('btnConfirmDriverFareAndComplete');
+
+    const modalDriverRatePassenger = document.getElementById('modalDriverRatePassenger');
+    const ratePassengerName = document.getElementById('ratePassengerName');
+    const driverStarRating = document.getElementById('driverStarRating');
+    const driverRatingCaption = document.getElementById('driverRatingCaption');
+    const btnSubmitDriverRating = document.getElementById('btnSubmitDriverRating');
+
+    let driverSelectedPassengerRating = 5;
+    let tripPendingRating = null;
+
+    function mostrarModalCobroViaje() {
         const trip = driverState.activeTrip;
         if (!trip) return;
 
-        const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto;
-        const montoGanado = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
-            ? Number(rawPrice)
-            : 35000;
-        const todayKey = getTodayKey();
-        
-        // Sumar a ganancias e historial persistente
-        const nuevoHistorialItem = {
-            id: trip.id || ('trip_' + Date.now()),
-            fecha: todayKey,
-            hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            origen: trip.origen || trip.pickupAddress || trip.origin,
-            destino: trip.destino || trip.dropoffAddress || trip.destination,
-            monto: montoGanado,
-            distancia: trip.distancia || '18 km',
-            metodoPago: trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia',
-            categoria: trip.categoria || trip.category || 'Sedán Ejecutivo',
-            estado: 'completado'
-        };
+        const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0;
+        const montoGanado = Number(rawPrice) || 0;
+        const tollAmt = Number(trip.tollFare || trip.peajes || 0);
+        const passName = trip.nombrePasajero || trip.clientName || trip.customerName || 'Pasajero';
+        const payMethod = trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia';
 
-        driverState.stats.historial.unshift(nuevoHistorialItem);
-        saveStats();
-
-        // Notificar sync
-        if (window.RutaSync) {
-            window.RutaSync.actualizarEstadoViaje('completado');
-            window.RutaSync.limpiarViajeActivo();
-            window.RutaSync.limpiarChat();
+        if (driverFareHeroTotal) driverFareHeroTotal.textContent = '$' + montoGanado.toLocaleString('es-AR');
+        if (driverFarePaymentMethod) driverFarePaymentMethod.innerHTML = `<i class="fa-solid fa-money-bill-wave"></i> Método: <strong>${payMethod}</strong>`;
+        if (driverFareBaseAmount) driverFareBaseAmount.textContent = '$' + (montoGanado - tollAmt > 0 ? (montoGanado - tollAmt) : montoGanado).toLocaleString('es-AR');
+        if (driverFareTollsAmount) {
+            driverFareTollsAmount.textContent = tollAmt > 0 ? `$${tollAmt.toLocaleString('es-AR')} (Incluidos)` : 'Sin peajes';
+            driverFareTollsAmount.style.color = tollAmt > 0 ? '#34d399' : '#94a3b8';
         }
+        if (driverFarePassengerName) driverFarePassengerName.textContent = passName;
 
-        driverState.activeTrip = null;
-        playAlertSound('success');
+        if (modalDriverFareSummary) {
+            modalDriverFareSummary.classList.add('active');
+        }
+    }
 
-        // Feedback
-        alert(`¡Viaje finalizado con éxito!\nHas sumado $${montoGanado.toLocaleString('es-AR')} a tus ganancias.`);
+    if (btnCloseDriverFareSummary && modalDriverFareSummary) {
+        btnCloseDriverFareSummary.addEventListener('click', () => {
+            modalDriverFareSummary.classList.remove('active');
+        });
+    }
 
-        // Volver a radar buscando
-        stateActiveTrip.classList.remove('active');
-        stateSearching.classList.add('active');
+    if (btnConfirmDriverFareAndComplete) {
+        btnConfirmDriverFareAndComplete.addEventListener('click', () => {
+            const trip = driverState.activeTrip;
+            if (!trip) return;
+
+            const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0;
+            const montoGanado = Number(rawPrice) || 0;
+            const todayKey = getTodayKey();
+            const passName = trip.nombrePasajero || trip.clientName || trip.customerName || 'Pasajero';
+
+            // Guardar en estadísticas del chofer
+            const nuevoHistorialItem = {
+                id: trip.id || ('trip_' + Date.now()),
+                fecha: todayKey,
+                hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                origen: trip.origen || trip.pickupAddress || trip.origin,
+                destino: trip.destino || trip.dropoffAddress || trip.destination,
+                monto: montoGanado,
+                distancia: trip.distancia || '18 km',
+                metodoPago: trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia',
+                categoria: trip.categoria || trip.category || 'Sedán Ejecutivo',
+                estado: 'completado'
+            };
+
+            driverState.stats.historial.unshift(nuevoHistorialItem);
+            saveStats();
+
+            // Notificar a toda la red sync que el viaje fue completado
+            if (window.RutaSync) {
+                window.RutaSync.actualizarEstadoViaje('completado', {
+                    totalCobrado: montoGanado,
+                    metodoPago: trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia'
+                });
+            }
+
+            tripPendingRating = { ...trip, montoGanado };
+            driverState.activeTrip = null;
+
+            if (modalDriverFareSummary) {
+                modalDriverFareSummary.classList.remove('active');
+            }
+
+            // Abrir Modal de Calificación al Pasajero
+            if (ratePassengerName) ratePassengerName.textContent = passName;
+            setDriverPassengerRating(5);
+            if (modalDriverRatePassenger) {
+                modalDriverRatePassenger.classList.add('active');
+            }
+
+            playAlertSound('success');
+        });
+    }
+
+    function setDriverPassengerRating(val) {
+        driverSelectedPassengerRating = val;
+        if (!driverStarRating) return;
+
+        const stars = driverStarRating.querySelectorAll('.star-item');
+        stars.forEach(s => {
+            const starVal = Number(s.getAttribute('data-value'));
+            if (starVal <= val) {
+                s.classList.add('active');
+            } else {
+                s.classList.remove('active');
+            }
+        });
+
+        if (driverRatingCaption) {
+            const captions = {
+                1: 'Pasajero con inconvenientes (1/5)',
+                2: 'Regular (2/5)',
+                3: 'Bueno (3/5)',
+                4: 'Muy buen pasajero (4/5)',
+                5: '¡Excelente pasajero! (5/5)'
+            };
+            driverRatingCaption.textContent = captions[val] || `${val}/5`;
+        }
+    }
+
+    if (driverStarRating) {
+        driverStarRating.querySelectorAll('.star-item').forEach(star => {
+            star.addEventListener('click', () => {
+                const val = Number(star.getAttribute('data-value'));
+                if (val) setDriverPassengerRating(val);
+            });
+        });
+    }
+
+    document.querySelectorAll('#driverPassengerTagsRow .compliment-tag').forEach(tag => {
+        tag.addEventListener('click', () => {
+            tag.classList.toggle('selected');
+        });
+    });
+
+    if (btnSubmitDriverRating) {
+        btnSubmitDriverRating.addEventListener('click', () => {
+            const selectedTags = Array.from(document.querySelectorAll('#driverPassengerTagsRow .compliment-tag.selected'))
+                .map(t => t.getAttribute('data-tag'));
+
+            const passengerRatingRecord = {
+                id: 'pass_rating_' + Date.now(),
+                passenger: tripPendingRating ? (tripPendingRating.nombrePasajero || tripPendingRating.clientName || 'Pasajero') : 'Pasajero',
+                stars: driverSelectedPassengerRating,
+                tags: selectedTags,
+                fecha: new Date().toISOString()
+            };
+
+            try {
+                let ratings = [];
+                const raw = localStorage.getItem('rutaprivada_passenger_ratings');
+                if (raw) ratings = JSON.parse(raw);
+                ratings.push(passengerRatingRecord);
+                localStorage.setItem('rutaprivada_passenger_ratings', JSON.stringify(ratings));
+            } catch (e) {}
+
+            if (window.RutaSync) {
+                window.RutaSync.emit('CALIFICACION_PASAJERO_GUARDADA', passengerRatingRecord);
+                window.RutaSync.limpiarViajeActivo();
+                window.RutaSync.limpiarChat();
+            }
+
+            if (modalDriverRatePassenger) {
+                modalDriverRatePassenger.classList.remove('active');
+            }
+
+            // Volver a la pantalla de búsqueda radar en vivo
+            stateActiveTrip.classList.remove('active');
+            stateSearching.classList.add('active');
+            playAlertSound('success');
+        });
     }
 
     btnCancelActiveTrip.addEventListener('click', () => {
@@ -1263,7 +1406,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderDriverChatMessages();
             } else {
                 if (driverChatUnreadDot) driverChatUnreadDot.classList.remove('hidden');
-                if (msg.remitente === 'passenger') {
+                if (msg && (msg.remitente === 'pasajero' || msg.remitente === 'passenger')) {
                     playAlertSound('incoming');
                 }
             }

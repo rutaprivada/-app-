@@ -3,27 +3,32 @@
  * Sincronización en Tiempo Real Multi-Dispositivo (PC <-> Celular <-> Tablet)
  * 
  * Canales activos:
- * 1. Cloud WebSocket Relay (Conecta celulares y PC a través de Internet / Red Local sin configuración).
- * 2. BroadcastChannel API (Sincronización instantánea de 0ms entre pestañas y PWAs locales).
- * 3. localStorage Storage Event Bus (Máxima resiliencia y persistencia de estado).
+ * 1. Local Server REST Bus (/api/sync/emit y /api/sync/events en servidor local).
+ * 2. Cloud WebSocket Relay (Conexión directa en la nube multi-dispositivo sin configuración).
+ * 3. BroadcastChannel API (Sincronización instantánea de 0ms entre pestañas y PWAs locales).
+ * 4. localStorage Storage Event Bus (Máxima resiliencia y persistencia de estado).
  */
 
 class RutaSyncManager {
     constructor() {
-        this.channelName = 'rutaprivada_sync_global_v2';
+        this.channelName = 'rutaprivada_sync_global_v3';
         this.listeners = {};
         this.channel = null;
         this.ws = null;
         this.wsConnected = false;
         this.reconnectTimer = null;
+        this.pollTimer = null;
+        this.lastEventTimestamp = Date.now() - 1000;
         this.deviceId = 'dev_' + Math.random().toString(36).substr(2, 9);
 
         this.initLocalChannels();
         this.initCloudWebSocket();
+        this.initNtfySseSync();
+        this.initServerHttpSync();
     }
 
     // ==========================================
-    // CANALES LOCALES (BroadcastChannel + Storage)
+    // 1. CANALES LOCALES (BroadcastChannel + Storage)
     // ==========================================
     initLocalChannels() {
         if ('BroadcastChannel' in window) {
@@ -46,11 +51,71 @@ class RutaSyncManager {
     }
 
     // ==========================================
-    // CANAL EN LA NUBE (Cloud WebSocket Multi-Dispositivo)
+    // 2. HTTP REST SYNC CON SERVIDOR LOCAL (PC <-> Celular en Wi-Fi)
+    // ==========================================
+    initServerHttpSync() {
+        // Consultar eventos del servidor cada 500ms para garantizar llegada inmediata al celular
+        const pollServer = async () => {
+            try {
+                const resp = await fetch(`/api/sync/events?since=${this.lastEventTimestamp}`, {
+                    cache: 'no-store'
+                });
+                if (resp.ok) {
+                    const events = await resp.json();
+                    if (Array.isArray(events)) {
+                        events.forEach(ev => {
+                            if (ev && ev.timestamp > this.lastEventTimestamp) {
+                                this.lastEventTimestamp = ev.timestamp;
+                            }
+                            if (ev && ev.senderId !== this.deviceId) {
+                                this.handleIncoming(ev);
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                // Silencioso si no hay servidor HTTP local
+            }
+        };
+
+        if (this.pollTimer) clearInterval(this.pollTimer);
+        this.pollTimer = setInterval(pollServer, 500);
+    }
+
+    // ==========================================
+    // 3. CANAL EN LA NUBE SSE (ntfy.sh - Multi-Red 0ms PC <-> Celular)
+    // ==========================================
+    initNtfySseSync() {
+        try {
+            const topic = 'rutaprivada_fleet_sync_ar_v4';
+            if (window.EventSource) {
+                if (this.sse) {
+                    try { this.sse.close(); } catch(e) {}
+                }
+                this.sse = new EventSource(`https://ntfy.sh/${topic}/sse`);
+                this.sse.onmessage = (event) => {
+                    try {
+                        const parsed = JSON.parse(event.data);
+                        if (parsed && parsed.message) {
+                            const msgData = JSON.parse(parsed.message);
+                            if (msgData && msgData.senderId !== this.deviceId) {
+                                this.handleIncoming(msgData);
+                            }
+                        }
+                    } catch (e) {}
+                };
+                this.sse.onerror = () => {
+                    // Reintento automático del navegador
+                };
+            }
+        } catch (err) {}
+    }
+
+    // ==========================================
+    // 4. CANAL EN LA NUBE (Cloud WebSocket Multi-Dispositivo)
     // ==========================================
     initCloudWebSocket() {
-        // Usamos un relay WebSocket público y gratuito de alta velocidad con fallback
-        const wsUrl = 'wss://free.blr2.piesocket.com/v3/rutaprivada_fleet_channel?api_key=VC3OTc4ANqqm0QI2EMacrYn0ICrFed2mduuzCxWm&notify_self=0';
+        const wsUrl = 'wss://free.blr2.piesocket.com/v3/rutaprivada_fleet_v3?api_key=VC3OTc4ANqqm0QI2EMacrYn0ICrFed2mduuzCxWm&notify_self=0';
         
         try {
             if (this.ws) {
@@ -61,13 +126,11 @@ class RutaSyncManager {
 
             this.ws.onopen = () => {
                 this.wsConnected = true;
-                console.log('⚡ [RutaSync Cloud] Conectado en tiempo real multi-dispositivo.');
             };
 
             this.ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    // Ignorar mensajes generados por este mismo dispositivo para evitar duplicados
                     if (data && data.senderId !== this.deviceId) {
                         this.handleIncoming(data);
                     }
@@ -92,41 +155,59 @@ class RutaSyncManager {
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
         this.reconnectTimer = setTimeout(() => {
             this.initCloudWebSocket();
+            this.initNtfySseSync();
         }, 4000);
     }
 
     // ==========================================
-    // EMISIÓN Y RECEPCIÓN DE EVENTOS
+    // 5. EMISIÓN Y RECEPCIÓN DE EVENTOS
     // ==========================================
     emit(type, payload = {}) {
+        const now = Date.now();
         const message = {
-            id: 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            id: 'evt_' + now + '_' + Math.random().toString(36).substr(2, 5),
             type: type,
             payload: payload,
             senderId: this.deviceId,
-            timestamp: Date.now()
+            timestamp: now
         };
 
-        // 1. Enviar a través de Cloud WebSocket (Celulares, Tablets, PCs remotas)
+        this.lastEventTimestamp = now;
+
+        // 1. Enviar al Servidor Local HTTP si está disponible
+        fetch('/api/sync/emit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(message)
+        }).catch(() => {});
+
+        // 2. Enviar a través de Cloud SSE Bus (ntfy.sh)
+        fetch('https://ntfy.sh/rutaprivada_fleet_sync_ar_v4', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(message)
+        }).catch(() => {});
+
+        // 3. Enviar a través de Cloud WebSocket
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             try {
                 this.ws.send(JSON.stringify(message));
             } catch (e) {}
         }
 
-        // 2. Enviar a través de BroadcastChannel local
+        // 4. Enviar a través de BroadcastChannel local
         if (this.channel) {
             try {
                 this.channel.postMessage(message);
             } catch (e) {}
         }
 
-        // 3. Fallback localStorage local
+        // 5. Fallback localStorage local
         try {
             localStorage.setItem('rutaprivada_sync_event', JSON.stringify(message));
         } catch (e) {}
 
-        // 4. Procesar en la instancia actual
+        // 6. Procesar en la instancia actual
         this.handleIncoming(message, true);
     }
 
@@ -145,7 +226,6 @@ class RutaSyncManager {
     handleIncoming(message, isSelf = false) {
         if (!message || !message.type) return;
 
-        // Si es un evento de actualización de viaje, sincronizar con localStorage local
         if (message.type === 'NUEVO_VIAJE_SOLICITADO' || message.type === 'VIAJE_ACEPTADO' || message.type === 'ESTADO_VIAJE_CAMBIADO') {
             if (message.payload) {
                 this.guardarViajeActivo(message.payload);
@@ -165,7 +245,6 @@ class RutaSyncManager {
             }
         });
 
-        // Callback global
         const globalCallbacks = this.listeners['*'] || [];
         globalCallbacks.forEach(cb => {
             try {
@@ -175,7 +254,7 @@ class RutaSyncManager {
     }
 
     // ==========================================
-    // MÉTODOS DE VIAJES EN VIVO
+    // 5. MÉTODOS DE VIAJES EN VIVO
     // ==========================================
     solicitarViaje(viajeData) {
         const viaje = {
@@ -243,7 +322,7 @@ class RutaSyncManager {
     }
 
     // ==========================================
-    // MÉTODOS DE CHAT EN VIVO DIRECTO
+    // 6. MÉTODOS DE CHAT EN VIVO DIRECTO
     // ==========================================
     enviarMensajeChat(param1, param2, param3) {
         let tripId = 'active_trip';
@@ -264,7 +343,6 @@ class RutaSyncManager {
 
         if (!texto || !texto.trim()) return null;
 
-        // Normalizar remitente: 'pasajero' o 'conductor'
         const normRemitente = (remitente === 'driver' || remitente === 'conductor') ? 'conductor' : 'pasajero';
 
         const msg = {
@@ -285,7 +363,6 @@ class RutaSyncManager {
     guardarMensajeChatLocal(msg) {
         if (!msg || !msg.texto) return;
         
-        // Guardar tanto en la clave general del chat activo como en la específica del viaje
         const keys = ['rutaprivada_chat_live_shared', 'rutaprivada_chat_active_trip'];
         if (msg.tripId && msg.tripId !== 'active_trip') {
             keys.push('rutaprivada_chat_' + msg.tripId);
@@ -339,4 +416,3 @@ class RutaSyncManager {
 
 // Instancia global
 window.RutaSync = new RutaSyncManager();
-

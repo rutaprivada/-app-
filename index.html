@@ -792,9 +792,62 @@
     </div>
   </div>
 
+  <!-- Modal de Finalización de Viaje y Calificación del Pasajero -->
+  <div id="modalPassengerTripCompleted" class="modal-backdrop hidden" style="z-index: 10000;">
+    <div class="modal-dialog trip-completed-dialog">
+      <div class="modal-header trip-completed-header">
+        <div class="completed-icon-glow">
+          <span style="font-size: 2rem;">🏁</span>
+        </div>
+        <div>
+          <h3 style="font-size: 1.25rem; margin: 0; color: #fff;">¡Has llegado a tu destino!</h3>
+          <p style="font-size: 0.85rem; color: #10b981; margin: 2px 0 0;">✨ Gracias por viajar con RutaPrivada</p>
+        </div>
+        <button id="close-passenger-completed-btn" class="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
 
+      <div class="modal-body trip-completed-body">
+        <!-- Highlighted Final Amount to Pay -->
+        <div class="final-fare-box">
+          <span class="final-fare-label">TOTAL A PAGAR AL CHOFER</span>
+          <div class="final-fare-amount" id="pFinalFareTotal">$0</div>
+          <div class="final-fare-method">
+            <span>💳 Método: </span><strong id="pFinalPaymentMethod">Efectivo / Transferencia</strong>
+          </div>
+        </div>
 
-  <!-- Post-Booking Confirmation & Rating Experience Modal -->
+        <!-- Rating Section -->
+        <div class="passenger-rate-driver-section">
+          <h4 class="rate-section-title">¿Cómo estuvo tu experiencia con <span id="pFinalDriverName">Martín Gómez</span>?</h4>
+          <p class="rate-section-sub">Tu calificación nos ayuda a mantener el estándar de excelencia en traslados.</p>
+
+          <div class="star-rating-widget" id="passengerStarRating">
+            <span class="star-item active" data-value="1">★</span>
+            <span class="star-item active" data-value="2">★</span>
+            <span class="star-item active" data-value="3">★</span>
+            <span class="star-item active" data-value="4">★</span>
+            <span class="star-item active" data-value="5">★</span>
+          </div>
+          <span class="star-rating-caption" id="passengerRatingCaption">¡Excelente servicio! (5/5)</span>
+
+          <!-- Quick compliment tags -->
+          <div class="compliment-tags-row" id="passengerComplimentsRow">
+            <button type="button" class="compliment-tag selected" data-tag="Auto impecable">✨ Auto impecable</button>
+            <button type="button" class="compliment-tag selected" data-tag="Manejo seguro">🛡️ Manejo seguro</button>
+            <button type="button" class="compliment-tag selected" data-tag="Muy puntual">⏱️ Muy puntual</button>
+            <button type="button" class="compliment-tag" data-tag="Trato cordial">🤝 Trato cordial</button>
+          </div>
+
+          <textarea id="passengerRatingComment" class="rating-comment-input" rows="2" placeholder="Comentario opcional sobre el chofer o el viaje..."></textarea>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="button" id="btnSubmitPassengerRating" class="btn btn-primary full-width btn-submit-rating">
+          <span>✓ Enviar Calificación y Finalizar</span>
+        </button>
+      </div>
+    </div>
+  </div>
   <div id="booking-success-modal" class="modal-backdrop hidden">
     <div class="modal-dialog success-experience-dialog">
       <div class="modal-header success-header">

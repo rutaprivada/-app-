@@ -5095,8 +5095,14 @@ if (window.RutaSync) {
       } else if (viaje.estado === 'en_viaje') {
         showToast(`🚀 Viaje iniciado. ¡Que tengas un excelente traslado!`);
       } else if (viaje.estado === 'completado') {
-        showToast(`✨ Viaje finalizado. ¡Gracias por viajar con RutaPrivada!`);
+        // Cerrar chat y modal de seguimiento
         closePassengerChatModal();
+        if (passengerTripModal) {
+          passengerTripModal.classList.add('hidden');
+        }
+
+        // Abrir Modal de Cierre de Viaje y Calificación del Conductor
+        showPassengerCompletionModal(viaje);
       }
     }
   });
@@ -5109,7 +5115,124 @@ if (window.RutaSync) {
       }
     }
   });
+
+  // ====================================================
+  // MODAL FINAL DE VIAJE Y CALIFICACIÓN AL CHOFER
+  // ====================================================
+  const modalPassengerTripCompleted = document.getElementById('modalPassengerTripCompleted');
+  const closePassengerCompletedBtn = document.getElementById('close-passenger-completed-btn');
+  const pFinalFareTotal = document.getElementById('pFinalFareTotal');
+  const pFinalPaymentMethod = document.getElementById('pFinalPaymentMethod');
+  const pFinalDriverName = document.getElementById('pFinalDriverName');
+  const passengerStarRating = document.getElementById('passengerStarRating');
+  const passengerRatingCaption = document.getElementById('passengerRatingCaption');
+  const passengerRatingComment = document.getElementById('passengerRatingComment');
+  const btnSubmitPassengerRating = document.getElementById('btnSubmitPassengerRating');
+
+  let passengerSelectedRating = 5;
+
+  function showPassengerCompletionModal(viaje) {
+    if (!modalPassengerTripCompleted) return;
+
+    const rawFare = viaje.totalCobrado || viaje.precioEstimado || viaje.precio || viaje.totalFare || viaje.monto || 0;
+    const finalFareNum = Number(rawFare) || 0;
+    const paymentMethodStr = viaje.metodoPago || viaje.paymentMethod || 'Efectivo / Transferencia';
+    const driverNameStr = (viaje.conductor && viaje.conductor.nombre) ? viaje.conductor.nombre : 'Martín Gómez';
+
+    if (pFinalFareTotal) pFinalFareTotal.textContent = '$' + finalFareNum.toLocaleString('es-AR');
+    if (pFinalPaymentMethod) pFinalPaymentMethod.textContent = paymentMethodStr;
+    if (pFinalDriverName) pFinalDriverName.textContent = driverNameStr;
+
+    setPassengerStarRating(5);
+    modalPassengerTripCompleted.classList.remove('hidden');
+  }
+
+  function setPassengerStarRating(val) {
+    passengerSelectedRating = val;
+    if (!passengerStarRating) return;
+
+    const stars = passengerStarRating.querySelectorAll('.star-item');
+    stars.forEach(s => {
+      const starVal = Number(s.getAttribute('data-value'));
+      if (starVal <= val) {
+        s.classList.add('active');
+      } else {
+        s.classList.remove('active');
+      }
+    });
+
+    if (passengerRatingCaption) {
+      const captions = {
+        1: 'Muy insatisfecho (1/5)',
+        2: 'Regular (2/5)',
+        3: 'Bueno (3/5)',
+        4: 'Muy bueno (4/5)',
+        5: '¡Excelente servicio! (5/5)'
+      };
+      passengerRatingCaption.textContent = captions[val] || `${val}/5`;
+    }
+  }
+
+  if (passengerStarRating) {
+    passengerStarRating.querySelectorAll('.star-item').forEach(star => {
+      star.addEventListener('click', () => {
+        const val = Number(star.getAttribute('data-value'));
+        if (val) setPassengerStarRating(val);
+      });
+    });
+  }
+
+  // Tags de felicitación
+  document.querySelectorAll('#passengerComplimentsRow .compliment-tag').forEach(tag => {
+    tag.addEventListener('click', () => {
+      tag.classList.toggle('selected');
+    });
+  });
+
+  if (btnSubmitPassengerRating) {
+    btnSubmitPassengerRating.addEventListener('click', () => {
+      const selectedTags = Array.from(document.querySelectorAll('#passengerComplimentsRow .compliment-tag.selected'))
+        .map(t => t.getAttribute('data-tag'));
+      const comment = passengerRatingComment ? passengerRatingComment.value.trim() : '';
+
+      const ratingRecord = {
+        id: 'rating_' + Date.now(),
+        driver: pFinalDriverName ? pFinalDriverName.textContent : 'Martín Gómez',
+        stars: passengerSelectedRating,
+        tags: selectedTags,
+        comment: comment,
+        fecha: new Date().toISOString()
+      };
+
+      try {
+        let ratings = [];
+        const raw = localStorage.getItem('rutaprivada_driver_ratings');
+        if (raw) ratings = JSON.parse(raw);
+        ratings.push(ratingRecord);
+        localStorage.setItem('rutaprivada_driver_ratings', JSON.stringify(ratings));
+      } catch (e) {}
+
+      if (window.RutaSync) {
+        window.RutaSync.emit('CALIFICACION_GUARDADA', ratingRecord);
+        window.RutaSync.limpiarViajeActivo();
+      }
+
+      if (modalPassengerTripCompleted) {
+        modalPassengerTripCompleted.classList.add('hidden');
+      }
+
+      showToast('🌟 ¡Muchas gracias por tu calificación! Esperamos verte pronto.');
+    });
+  }
+
+  if (closePassengerCompletedBtn && modalPassengerTripCompleted) {
+    closePassengerCompletedBtn.addEventListener('click', () => {
+      modalPassengerTripCompleted.classList.add('hidden');
+      if (window.RutaSync) window.RutaSync.limpiarViajeActivo();
+    });
+  }
 }
+
 
 
 
