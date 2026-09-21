@@ -668,6 +668,22 @@
         <!-- STATE 2: CHOFER ASIGNADO / EN CAMINO / EN VIAJE -->
         <div class="inapp-state-panel hidden" id="pStateDriverAssigned">
           
+          <!-- Live Interactive Map (Passenger View) -->
+          <div class="passenger-live-map-container" id="passengerLiveMapContainer">
+            <div id="passengerLiveMap" class="passenger-active-map"></div>
+            <div class="passenger-map-top-bar">
+              <div class="map-live-tag">
+                <span class="pulse-dot"></span> <span id="passengerGpsStatus">SEGUIMIENTO EN VIVO</span>
+              </div>
+              <div class="passenger-eta-pill" id="passengerMapEtaPill">
+                <span id="passengerMapEtaText">Chofer en camino · Calculando llegada...</span>
+              </div>
+            </div>
+            <button type="button" class="btn-passenger-map-recenter" id="btnRecenterPassengerMap" title="Centrar mapa">
+              <span class="crosshair-icon">⌖</span>
+            </button>
+          </div>
+
           <!-- Driver Card -->
           <div class="inapp-driver-card">
             <div class="inapp-driver-avatar-wrap">
@@ -1154,9 +1170,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=27"></script>
+  <script src="sync.js?v=29"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=39"></script>
+  <script src="app.js?v=40"></script>
 </body>
 </html>

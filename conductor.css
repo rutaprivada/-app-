@@ -2095,6 +2095,200 @@ body.is-app-mode .web-only {
     font-weight: 600;
 }
 
+/* ==========================================
+   MAPA GPS EN VIVO (VISTA CHOFER)
+   ========================================== */
+.driver-live-map-container {
+    position: relative;
+    width: 100%;
+    height: 250px;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    border: 1px solid rgba(251, 191, 36, 0.25);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), inset 0 0 1px rgba(255, 255, 255, 0.1);
+    background: #090d16;
+}
+
+.driver-active-map {
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* Leaflet Dark Filter Tiles */
+.leaflet-tile {
+    filter: brightness(0.7) invert(1) contrast(1.2) hue-rotate(200deg) saturate(0.6) !important;
+}
+
+.driver-map-top-bar {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    z-index: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    pointer-events: none;
+}
+
+.map-live-tag {
+    background: rgba(11, 15, 25, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    border-radius: 20px;
+    padding: 5px 11px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #10b981;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.5px;
+    pointer-events: auto;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+    animation: pulseLiveDot 1.4s infinite alternate;
+}
+
+@keyframes pulseLiveDot {
+    0% { transform: scale(0.85); opacity: 0.7; }
+    100% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 14px #10b981; }
+}
+
+.driver-eta-pill {
+    background: rgba(11, 15, 25, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 20px;
+    padding: 5px 11px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fbbf24;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: auto;
+    max-width: 60%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.btn-driver-map-recenter {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    z-index: 500;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    color: #fbbf24;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+    font-size: 0.95rem;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.btn-driver-map-recenter:active {
+    transform: scale(0.92);
+    background: #1e293b;
+}
+
+/* MARCADOR DE AUTO EN VIVO */
+.driver-car-marker-container {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.car-marker-pulse {
+    position: absolute;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(251, 191, 36, 0.25);
+    animation: carPulseWave 2s infinite;
+}
+
+@keyframes carPulseWave {
+    0% { transform: scale(0.6); opacity: 0.8; }
+    100% { transform: scale(1.6); opacity: 0; }
+}
+
+.car-marker-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1e293b, #090d16);
+    border: 2px solid #fbbf24;
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+    transition: transform 0.3s ease;
+}
+
+.car-marker-emoji {
+    font-size: 15px;
+    line-height: 1;
+}
+
+.car-heading-arrow {
+    position: absolute;
+    top: -6px;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 7px solid #fbbf24;
+    filter: drop-shadow(0 -1px 3px rgba(251, 191, 36, 0.8));
+}
+
+/* MARCADORES DE RUTA (ORIGEN Y DESTINO) */
+.route-target-pin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 14px rgba(0,0,0,0.8);
+    font-size: 14px;
+    color: #fff;
+}
+
+.route-target-pin.origin {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #a7f3d0;
+}
+
+.route-target-pin.destination {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-color: #fde68a;
+}
+
+
 
 
 

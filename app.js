@@ -4804,12 +4804,14 @@ function updatePassengerTripStage(stage) {
     if (pStepAssigned) pStepAssigned.classList.add('active');
     if (pStageBannerText) pStageBannerText.textContent = '¡Chofer confirmado! Preparando salida.';
     if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Chofer Asignado';
+    updatePassengerLiveMapForStage('aceptado');
   } else if (stage === 'en_camino') {
     if (pStepAssigned) pStepAssigned.classList.add('active');
     if (pLine1) pLine1.classList.add('active');
     if (pStepEnCamino) pStepEnCamino.classList.add('active');
     if (pStageBannerText) pStageBannerText.textContent = 'Tu chofer está en camino a tu punto de recogida.';
     if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Chofer en Camino';
+    updatePassengerLiveMapForStage('en_camino');
   } else if (stage === 'en_origen') {
     if (pStepAssigned) pStepAssigned.classList.add('active');
     if (pLine1) pLine1.classList.add('active');
@@ -4818,6 +4820,7 @@ function updatePassengerTripStage(stage) {
     if (pStepEnOrigen) pStepEnOrigen.classList.add('active');
     if (pStageBannerText) pStageBannerText.textContent = '📍 ¡Tu chofer ha llegado al origen y te está esperando!';
     if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Chofer en el Origen';
+    updatePassengerLiveMapForStage('en_origen');
   } else if (stage === 'en_viaje') {
     if (pStepAssigned) pStepAssigned.classList.add('active');
     if (pLine1) pLine1.classList.add('active');
@@ -4828,6 +4831,7 @@ function updatePassengerTripStage(stage) {
     if (pStepEnViaje) pStepEnViaje.classList.add('active');
     if (pStageBannerText) pStageBannerText.textContent = '🚀 Viaje en curso hacia el destino. ¡Buen viaje!';
     if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'En Viaje';
+    updatePassengerLiveMapForStage('en_viaje');
   } else if (stage === 'completado') {
     if (pStageBannerText) pStageBannerText.textContent = '✨ ¡Has llegado a tu destino! Gracias por viajar con RutaPrivada.';
     if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Viaje Completado';
@@ -4944,7 +4948,9 @@ if (btnRequestInapp) {
       notas: passNotes,
       categoria: 'Sedán Ejecutivo',
       fecha: state.date || new Date().toISOString().split('T')[0],
-      hora: state.time || '12:00'
+      hora: state.time || '12:00',
+      originCoords: state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null,
+      destinationCoords: state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null
     };
 
     if (window.RutaSync) {
@@ -5128,7 +5134,322 @@ if (window.RutaSync) {
         btnPassengerCallDriver.href = `tel:${viaje.conductor.telefono || '+5491122558226'}`;
       }
 
+      initPassengerLiveMap(viaje);
       updatePassengerTripStage('en_camino');
+      showToast(`🚗 ¡Conductor Asignado! ${driverName} aceptó tu viaje y está en camino.`);
+    }
+  });
+
+  window.RutaSync.on('UBICACION_CHOFER_ACTUALIZADA', (locationData) => {
+    if (locationData && typeof locationData.lat === 'number' && typeof locationData.lng === 'number') {
+      onPassengerReceivedDriverLocation(locationData);
+    }
+  });
+
+  window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', (viaje) => {
+    if (viaje) {
+      updatePassengerTripStage(viaje.estado);
+      if (viaje.estado === 'en_origen') {
+        showToast(`📍 Tu conductor ha llegado al punto de recogida.`);
+      } else if (viaje.estado === 'en_viaje') {
+        showToast(`🚀 Viaje iniciado. ¡Que tengas un excelente traslado!`);
+      } else if (viaje.estado === 'completado') {
+        // Cerrar chat y modal de seguimiento
+        closePassengerChatModal();
+        if (passengerTripModal) {
+          passengerTripModal.classList.add('hidden');
+        }
+
+        // Abrir Modal de Cierre de Viaje y Calificación del Conductor
+        showPassengerCompletionModal(viaje);
+      }
+    }
+  });
+
+  window.RutaSync.on('CHAT_MENSAJE_ENVIADO', (msg) => {
+    if (msg) {
+      renderPassengerChatMessages();
+      if (msg.remitente === 'conductor' || msg.remitente === 'driver') {
+        showToast(`💬 Mensaje del chofer: "${msg.texto}"`);
+      }
+    }
+  });
+}
+
+// ==========================================
+// 15.1 MAPA GPS Y SEGUIMIENTO EN VIVO (PASAJERO)
+// ==========================================
+let passengerLiveMap = null;
+let pLiveCarMarker = null;
+let pLiveOriginMarker = null;
+let pLiveDestMarker = null;
+let pLiveRoutePolyline = null;
+let pCurrentDriverCoords = null;
+let pActiveTripData = null;
+
+const PASSENGER_BUE_LANDMARKS = {
+  'ezeiza': { lat: -34.8150, lng: -58.5348 },
+  'aeropuerto internacional de ezeiza': { lat: -34.8150, lng: -58.5348 },
+  'aeropuerto de ezeiza': { lat: -34.8150, lng: -58.5348 },
+  'eze': { lat: -34.8150, lng: -58.5348 },
+  'aeroparque': { lat: -34.5580, lng: -58.4173 },
+  'aeroparque jorge newbery': { lat: -34.5580, lng: -58.4173 },
+  'aep': { lat: -34.5580, lng: -58.4173 },
+  'obelisco': { lat: -34.6037, lng: -58.3816 },
+  'centro': { lat: -34.6037, lng: -58.3816 },
+  '9 de julio': { lat: -34.6037, lng: -58.3816 },
+  'av. 9 de julio': { lat: -34.6037, lng: -58.3816 },
+  'corrientes': { lat: -34.6037, lng: -58.3816 },
+  'puerto madero': { lat: -34.6118, lng: -58.3644 },
+  'palermo': { lat: -34.5889, lng: -58.4306 },
+  'recoleta': { lat: -34.5875, lng: -58.3974 },
+  'belgrano': { lat: -34.5614, lng: -58.4563 },
+  'nuñez': { lat: -34.5448, lng: -58.4632 },
+  'san telmo': { lat: -34.6212, lng: -58.3731 },
+  'caballito': { lat: -34.6186, lng: -58.4428 },
+  'almagro': { lat: -34.6105, lng: -58.4237 },
+  'villa crespo': { lat: -34.5975, lng: -58.4419 },
+  'villa urquiza': { lat: -34.5721, lng: -58.4908 },
+  'devoto': { lat: -34.5996, lng: -58.5135 },
+  'san isidro': { lat: -34.4719, lng: -58.5283 },
+  'vicente lopez': { lat: -34.5273, lng: -58.4764 },
+  'olivos': { lat: -34.5108, lng: -58.4878 },
+  'martinez': { lat: -34.4938, lng: -58.5085 },
+  'tigre': { lat: -34.4251, lng: -58.5796 },
+  'nordelta': { lat: -34.4072, lng: -58.6472 },
+  'pilar': { lat: -34.4589, lng: -58.9142 },
+  'escobar': { lat: -34.3486, lng: -58.7942 },
+  'ramos mejia': { lat: -34.6534, lng: -58.5636 },
+  'moron': { lat: -34.6521, lng: -58.6198 },
+  'quilmes': { lat: -34.7242, lng: -58.2527 },
+  'lanus': { lat: -34.7071, lng: -58.3934 },
+  'avellaneda': { lat: -34.6625, lng: -58.3653 },
+  'la plata': { lat: -34.9214, lng: -57.9545 }
+};
+
+function resolvePassengerCoords(addressStr, defaultFallback) {
+  if (!addressStr || typeof addressStr !== 'string') return defaultFallback;
+  const norm = addressStr.toLowerCase().trim();
+  for (const [key, coords] of Object.entries(PASSENGER_BUE_LANDMARKS)) {
+    if (norm.includes(key)) {
+      return coords;
+    }
+  }
+  return defaultFallback;
+}
+
+function createPassengerCarIcon(heading = 0) {
+  return L.divIcon({
+    className: 'live-driver-car-marker',
+    html: `
+      <div class="live-car-pulse-ring"></div>
+      <div class="live-car-body-circle" style="transform: rotate(${Math.round(heading)}deg);">
+        <div class="live-car-heading-arrow"></div>
+        <span>🚘</span>
+      </div>
+    `,
+    iconSize: [44, 44],
+    iconAnchor: [22, 22]
+  });
+}
+
+function createPassengerPointIcon(type = 'origin') {
+  const isOrigin = type === 'origin';
+  const iconClass = isOrigin ? 'fa-solid fa-circle-dot' : 'fa-solid fa-location-dot';
+  return L.divIcon({
+    className: 'custom-map-pin',
+    html: `
+      <div class="route-target-pin ${isOrigin ? 'origin' : 'destination'}">
+        <i class="${iconClass}"></i>
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+  });
+}
+
+async function initPassengerLiveMap(trip) {
+  if (!trip || typeof L === 'undefined') return;
+  pActiveTripData = trip;
+
+  const originCoords = trip.originCoords || (state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null) || resolvePassengerCoords(trip.origen || trip.pickupAddress, { lat: -34.6037, lng: -58.3816 });
+  const destCoords = trip.destinationCoords || (state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null) || resolvePassengerCoords(trip.destino || trip.dropoffAddress, { lat: -34.8150, lng: -58.5348 });
+
+  pActiveTripData._originCoords = originCoords;
+  pActiveTripData._destCoords = destCoords;
+
+  const initialDriverPos = pCurrentDriverCoords || {
+    lat: originCoords.lat + 0.011,
+    lng: originCoords.lng + 0.009,
+    heading: 210
+  };
+
+  const mapEl = document.getElementById('passengerLiveMap');
+  if (!mapEl) return;
+
+  if (!passengerLiveMap) {
+    passengerLiveMap = L.map('passengerLiveMap', {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([initialDriverPos.lat, initialDriverPos.lng], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(passengerLiveMap);
+  } else {
+    passengerLiveMap.invalidateSize();
+  }
+
+  // Limpiar capas previas
+  if (pLiveCarMarker) passengerLiveMap.removeLayer(pLiveCarMarker);
+  if (pLiveOriginMarker) passengerLiveMap.removeLayer(pLiveOriginMarker);
+  if (pLiveDestMarker) passengerLiveMap.removeLayer(pLiveDestMarker);
+  if (pLiveRoutePolyline) passengerLiveMap.removeLayer(pLiveRoutePolyline);
+
+  // Crear Marcador del Chofer
+  pLiveCarMarker = L.marker([initialDriverPos.lat, initialDriverPos.lng], {
+    icon: createPassengerCarIcon(initialDriverPos.heading),
+    zIndexOffset: 1000
+  }).addTo(passengerLiveMap);
+
+  // Crear Marcador de Recogida
+  pLiveOriginMarker = L.marker([originCoords.lat, originCoords.lng], {
+    icon: createPassengerPointIcon('origin')
+  }).addTo(passengerLiveMap);
+
+  // Crear Marcador de Destino
+  pLiveDestMarker = L.marker([destCoords.lat, destCoords.lng], {
+    icon: createPassengerPointIcon('destination')
+  }).addTo(passengerLiveMap);
+
+  await updatePassengerRoutePolyline(initialDriverPos, originCoords);
+
+  setTimeout(() => {
+    if (passengerLiveMap) {
+      passengerLiveMap.invalidateSize();
+      fitPassengerMapBounds();
+    }
+  }, 200);
+}
+
+async function updatePassengerRoutePolyline(fromCoords, toCoords) {
+  if (!passengerLiveMap || !fromCoords || !toCoords) return;
+
+  let points = [
+    [fromCoords.lat, fromCoords.lng],
+    [toCoords.lat, toCoords.lng]
+  ];
+
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${fromCoords.lng},${fromCoords.lat};${toCoords.lng},${toCoords.lat}?overview=full&geometries=geojson`;
+    const resp = await fetch(url);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
+        points = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+      }
+    }
+  } catch(e) {
+    // Interpolated fallback
+    const count = 20;
+    points = [];
+    for (let i = 0; i <= count; i++) {
+      const t = i / count;
+      const curve = Math.sin(t * Math.PI) * 0.003;
+      points.push([
+        fromCoords.lat + (toCoords.lat - fromCoords.lat) * t + curve,
+        fromCoords.lng + (toCoords.lng - fromCoords.lng) * t - curve
+      ]);
+    }
+  }
+
+  if (pLiveRoutePolyline) {
+    passengerLiveMap.removeLayer(pLiveRoutePolyline);
+  }
+
+  pLiveRoutePolyline = L.polyline(points, {
+    color: '#fbbf24',
+    weight: 5,
+    opacity: 0.85,
+    lineJoin: 'round'
+  }).addTo(passengerLiveMap);
+
+  fitPassengerMapBounds();
+}
+
+function fitPassengerMapBounds() {
+  if (!passengerLiveMap) return;
+  const group = [];
+  if (pLiveCarMarker) group.push(pLiveCarMarker.getLatLng());
+  if (pLiveOriginMarker) group.push(pLiveOriginMarker.getLatLng());
+  if (group.length > 0) {
+    const bounds = L.latLngBounds(group);
+    passengerLiveMap.fitBounds(bounds, { padding: [35, 35], maxZoom: 16 });
+  }
+}
+
+function onPassengerReceivedDriverLocation(loc) {
+  if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return;
+  pCurrentDriverCoords = loc;
+
+  if (!passengerLiveMap) {
+    const active = (window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null) || pActiveTripData;
+    if (active) initPassengerLiveMap(active);
+  }
+
+  if (pLiveCarMarker) {
+    pLiveCarMarker.setLatLng([loc.lat, loc.lng]);
+    pLiveCarMarker.setIcon(createPassengerCarIcon(loc.heading || 0));
+  }
+
+  const etaText = document.getElementById('passengerMapEtaText');
+  if (etaText) {
+    if (loc.stage === 'en_camino') {
+      etaText.textContent = `Chofer en camino · Llega en ~${loc.etaMin || 4} min`;
+    } else if (loc.stage === 'en_origen') {
+      etaText.textContent = `📍 Chofer en el punto de recogida`;
+    } else if (loc.stage === 'en_viaje') {
+      etaText.textContent = `En viaje · Destino en ~${loc.etaMin || 15} min`;
+    }
+  }
+}
+
+async function updatePassengerLiveMapForStage(stage) {
+  if (!passengerLiveMap) {
+    const active = (window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null) || pActiveTripData;
+    if (active) initPassengerLiveMap(active);
+  }
+  if (!passengerLiveMap || !pActiveTripData) return;
+
+  const origin = pActiveTripData._originCoords || (state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null) || resolvePassengerCoords(pActiveTripData.origen, { lat: -34.6037, lng: -58.3816 });
+  const dest = pActiveTripData._destCoords || (state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null) || resolvePassengerCoords(pActiveTripData.destino, { lat: -34.8150, lng: -58.5348 });
+
+  const etaText = document.getElementById('passengerMapEtaText');
+
+  if (stage === 'en_camino' || stage === 'aceptado') {
+    if (etaText) etaText.textContent = 'Chofer en camino · Calculando llegada...';
+    await updatePassengerRoutePolyline(pCurrentDriverCoords || origin, origin);
+  } else if (stage === 'en_origen') {
+    if (pLiveCarMarker) {
+      pLiveCarMarker.setLatLng([origin.lat, origin.lng]);
+      pLiveCarMarker.setIcon(createPassengerCarIcon(0));
+    }
+    if (etaText) etaText.textContent = '📍 ¡Tu chofer está en el origen!';
+    fitPassengerMapBounds();
+  } else if (stage === 'en_viaje') {
+    if (etaText) etaText.textContent = 'En viaje hacia el destino...';
+    await updatePassengerRoutePolyline(pCurrentDriverCoords || origin, dest);
+  }
+}
+
+const btnRecenterPassengerMap = document.getElementById('btnRecenterPassengerMap');
+if (btnRecenterPassengerMap) {
+  btnRecenterPassengerMap.addEventListener('click', () => {
+    if (passengerLiveMap && pCurrentDriverCoords) {
+      passengerLiveMap.setView([pCurrentDriverCoords.lat, pCurrentDriverCoords.lng], 15);
+    }
+  });
+}e('en_camino');
       showToast(`🚗 ¡Conductor Asignado! ${driverName} aceptó tu viaje y está en camino.`);
     }
   });

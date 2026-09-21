@@ -249,6 +249,12 @@ class RutaSyncManager {
                         timestamp: now,
                         ultimoEstadoEn: now
                     }).catch(() => {});
+                } else if (type === 'UBICACION_CHOFER_ACTUALIZADA') {
+                    this.firestore.collection('live_trips').doc('driver_location').set({
+                        ...payload,
+                        senderId: this.deviceId,
+                        timestamp: now
+                    }).catch(() => {});
                 }
             } catch (e) {}
         }
@@ -353,6 +359,12 @@ class RutaSyncManager {
         } else if (message.type === 'CHAT_MENSAJE_ENVIADO') {
             if (message.payload && message.payload.texto) {
                 this.guardarMensajeChatLocal(message.payload);
+            }
+        } else if (message.type === 'UBICACION_CHOFER_ACTUALIZADA') {
+            if (message.payload && message.payload.lat && message.payload.lng) {
+                try {
+                    localStorage.setItem('rutaprivada_driver_location', JSON.stringify(message.payload));
+                } catch (e) {}
             }
         }
 
@@ -602,10 +614,44 @@ class RutaSyncManager {
             }
             this.limpiarChat('active_trip');
             localStorage.removeItem('rutaprivada_viaje_activo');
+            localStorage.removeItem('rutaprivada_driver_location');
             if (this.firestore) {
                 this.firestore.collection('live_trips').doc('current_active_trip').delete().catch(() => {});
+                this.firestore.collection('live_trips').doc('driver_location').delete().catch(() => {});
             }
         } catch (e) {}
+    }
+
+    // ==========================================
+    // 6.1 UBICACIÓN Y TELEMETRÍA GPS DEL CHOFER EN TIEMPO REAL
+    // ==========================================
+    actualizarUbicacionChofer(coords) {
+        if (!coords || typeof coords.lat !== 'number' || typeof coords.lng !== 'number') return;
+        const locationData = {
+            lat: coords.lat,
+            lng: coords.lng,
+            heading: coords.heading || 0,
+            speed: coords.speed || 0,
+            stage: coords.stage || 'en_camino',
+            tripId: coords.tripId || 'active_trip',
+            etaMin: coords.etaMin !== undefined ? coords.etaMin : null,
+            timestamp: Date.now()
+        };
+
+        try {
+            localStorage.setItem('rutaprivada_driver_location', JSON.stringify(locationData));
+        } catch(e) {}
+
+        this.emit('UBICACION_CHOFER_ACTUALIZADA', locationData);
+    }
+
+    obtenerUbicacionChofer() {
+        try {
+            const raw = localStorage.getItem('rutaprivada_driver_location');
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
     }
 
     // ==========================================

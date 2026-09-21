@@ -1325,6 +1325,8 @@ document.addEventListener('DOMContentLoaded', () => {
         btnCallPassenger.href = `tel:${telPasajero}`;
 
         updateTripStageUI();
+        initDriverLiveMap(driverState.activeTrip);
+        startDriverGpsTracking(driverState.activeTrip);
     }
 
     function updateGpsLinks(targetAddress) {
@@ -1341,14 +1343,17 @@ document.addEventListener('DOMContentLoaded', () => {
             tripStageTitle.textContent = '1. EN CAMINO AL ORIGEN';
             btnNextTripText.textContent = 'Llegué al punto de recogida';
             updateGpsLinks(trip.origen || trip.pickupAddress || trip.origin);
+            updateDriverMapForStage('en_camino');
         } else if (trip.etapa === 'en_origen') {
             tripStageTitle.textContent = '2. EN EL ORIGEN (Esperando Pasajero)';
             btnNextTripText.textContent = 'Iniciar viaje (Pasajero a bordo)';
             updateGpsLinks(trip.destino || trip.dropoffAddress || trip.destination);
+            updateDriverMapForStage('en_origen');
         } else if (trip.etapa === 'en_viaje') {
             tripStageTitle.textContent = '3. EN VIAJE HACIA EL DESTINO';
             btnNextTripText.textContent = 'Finalizar viaje y cobrar';
             updateGpsLinks(trip.destino || trip.dropoffAddress || trip.destination);
+            updateDriverMapForStage('en_viaje');
         }
     }
 
@@ -1365,9 +1370,397 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_viaje');
             updateTripStageUI();
         } else if (trip.etapa === 'en_viaje') {
+            stopDriverGpsTracking();
             mostrarModalCobroViaje();
         }
     });
+
+    // ==========================================
+    // 8.1 MAPA GPS Y TELEMETRÍA EN VIVO (CHOFER)
+    // ==========================================
+    let driverLiveMap = null;
+    let driverCarMarker = null;
+    let driverTargetMarker = null;
+    let driverSecondaryMarker = null;
+    let driverRoutePolyline = null;
+    let gpsWatchId = null;
+    let gpsSimInterval = null;
+    let currentDriverCoords = null;
+    let driverCurrentRoutePoints = [];
+    let driverSimIndex = 0;
+
+    const BUE_LANDMARKS = {
+        'ezeiza': { lat: -34.8150, lng: -58.5348 },
+        'aeropuerto internacional de ezeiza': { lat: -34.8150, lng: -58.5348 },
+        'aeropuerto de ezeiza': { lat: -34.8150, lng: -58.5348 },
+        'eze': { lat: -34.8150, lng: -58.5348 },
+        'aeroparque': { lat: -34.5580, lng: -58.4173 },
+        'aeroparque jorge newbery': { lat: -34.5580, lng: -58.4173 },
+        'aep': { lat: -34.5580, lng: -58.4173 },
+        'obelisco': { lat: -34.6037, lng: -58.3816 },
+        'centro': { lat: -34.6037, lng: -58.3816 },
+        '9 de julio': { lat: -34.6037, lng: -58.3816 },
+        'av. 9 de julio': { lat: -34.6037, lng: -58.3816 },
+        'corrientes': { lat: -34.6037, lng: -58.3816 },
+        'puerto madero': { lat: -34.6118, lng: -58.3644 },
+        'palermo': { lat: -34.5889, lng: -58.4306 },
+        'recoleta': { lat: -34.5875, lng: -58.3974 },
+        'belgrano': { lat: -34.5614, lng: -58.4563 },
+        'nuñez': { lat: -34.5448, lng: -58.4632 },
+        'san telmo': { lat: -34.6212, lng: -58.3731 },
+        'caballito': { lat: -34.6186, lng: -58.4428 },
+        'almagro': { lat: -34.6105, lng: -58.4237 },
+        'villa crespo': { lat: -34.5975, lng: -58.4419 },
+        'villa urquiza': { lat: -34.5721, lng: -58.4908 },
+        'devoto': { lat: -34.5996, lng: -58.5135 },
+        'san isidro': { lat: -34.4719, lng: -58.5283 },
+        'vicente lopez': { lat: -34.5273, lng: -58.4764 },
+        'olivos': { lat: -34.5108, lng: -58.4878 },
+        'martinez': { lat: -34.4938, lng: -58.5085 },
+        'tigre': { lat: -34.4251, lng: -58.5796 },
+        'nordelta': { lat: -34.4072, lng: -58.6472 },
+        'pilar': { lat: -34.4589, lng: -58.9142 },
+        'escobar': { lat: -34.3486, lng: -58.7942 },
+        'ramos mejia': { lat: -34.6534, lng: -58.5636 },
+        'moron': { lat: -34.6521, lng: -58.6198 },
+        'quilmes': { lat: -34.7242, lng: -58.2527 },
+        'lanus': { lat: -34.7071, lng: -58.3934 },
+        'avellaneda': { lat: -34.6625, lng: -58.3653 },
+        'la plata': { lat: -34.9214, lng: -57.9545 }
+    };
+
+    function resolveAddressCoords(addressStr, defaultFallback) {
+        if (!addressStr || typeof addressStr !== 'string') return defaultFallback;
+        const norm = addressStr.toLowerCase().trim();
+        for (const [key, coords] of Object.entries(BUE_LANDMARKS)) {
+            if (norm.includes(key)) {
+                return coords;
+            }
+        }
+        return defaultFallback;
+    }
+
+    function calculateBearing(lat1, lng1, lat2, lng2) {
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const y = Math.sin(dLng) * Math.cos(lat2 * Math.PI / 180);
+        const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+                  Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLng);
+        const brng = Math.atan2(y, x) * 180 / Math.PI;
+        return (brng + 360) % 360;
+    }
+
+    function calculateDistanceKm(lat1, lng1, lat2, lng2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    function createDriverCarIcon(heading = 0) {
+        return L.divIcon({
+            className: 'driver-car-marker-container',
+            html: `
+                <div class="car-marker-pulse"></div>
+                <div class="car-marker-circle" style="transform: rotate(${Math.round(heading)}deg);">
+                    <div class="car-heading-arrow"></div>
+                    <span class="car-marker-emoji">🚘</span>
+                </div>
+            `,
+            iconSize: [44, 44],
+            iconAnchor: [22, 22]
+        });
+    }
+
+    function createPointPinIcon(type = 'origin') {
+        const isOrigin = type === 'origin';
+        const iconClass = isOrigin ? 'fa-solid fa-circle-dot' : 'fa-solid fa-location-dot';
+        return L.divIcon({
+            className: 'custom-map-pin',
+            html: `
+                <div class="route-target-pin ${isOrigin ? 'origin' : 'destination'}">
+                    <i class="${iconClass}"></i>
+                </div>
+            `,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+        });
+    }
+
+    async function initDriverLiveMap(trip) {
+        if (!trip || typeof L === 'undefined') return;
+        const mapContainer = document.getElementById('driverActiveMap');
+        if (!mapContainer) return;
+
+        const originCoords = trip.originCoords || resolveAddressCoords(trip.origen || trip.pickupAddress || trip.origin, { lat: -34.6037, lng: -58.3816 });
+        const destCoords = trip.destinationCoords || resolveAddressCoords(trip.destino || trip.dropoffAddress || trip.destination, { lat: -34.8150, lng: -58.5348 });
+
+        trip._originCoords = originCoords;
+        trip._destCoords = destCoords;
+
+        // Posición inicial del chofer: ~1.2 km al norte/este del origen
+        if (!currentDriverCoords) {
+            currentDriverCoords = {
+                lat: originCoords.lat + 0.011,
+                lng: originCoords.lng + 0.009,
+                heading: 210,
+                speed: 35
+            };
+        }
+
+        if (!driverLiveMap) {
+            driverLiveMap = L.map('driverActiveMap', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([currentDriverCoords.lat, currentDriverCoords.lng], 14);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(driverLiveMap);
+        } else {
+            driverLiveMap.invalidateSize();
+        }
+
+        // Limpiar capas previas
+        if (driverCarMarker) driverLiveMap.removeLayer(driverCarMarker);
+        if (driverTargetMarker) driverLiveMap.removeLayer(driverTargetMarker);
+        if (driverSecondaryMarker) driverLiveMap.removeLayer(driverSecondaryMarker);
+        if (driverRoutePolyline) driverLiveMap.removeLayer(driverRoutePolyline);
+
+        // Crear Marcador del Auto
+        driverCarMarker = L.marker([currentDriverCoords.lat, currentDriverCoords.lng], {
+            icon: createDriverCarIcon(currentDriverCoords.heading),
+            zIndexOffset: 1000
+        }).addTo(driverLiveMap);
+
+        // Crear Marcadores de Origen y Destino
+        driverTargetMarker = L.marker([originCoords.lat, originCoords.lng], {
+            icon: createPointPinIcon('origin')
+        }).addTo(driverLiveMap);
+
+        driverSecondaryMarker = L.marker([destCoords.lat, destCoords.lng], {
+            icon: createPointPinIcon('destination')
+        }).addTo(driverLiveMap);
+
+        // Cargar trazado de ruta
+        await updateDriverRouteLine(currentDriverCoords, originCoords);
+
+        setTimeout(() => {
+            if (driverLiveMap) {
+                driverLiveMap.invalidateSize();
+                fitDriverMapBounds();
+            }
+        }, 200);
+    }
+
+    async function updateDriverRouteLine(fromCoords, toCoords) {
+        if (!driverLiveMap || !fromCoords || !toCoords) return;
+
+        let points = [
+            [fromCoords.lat, fromCoords.lng],
+            [toCoords.lat, toCoords.lng]
+        ];
+
+        try {
+            const url = `https://router.project-osrm.org/route/v1/driving/${fromCoords.lng},${fromCoords.lat};${toCoords.lng},${toCoords.lat}?overview=full&geometries=geojson`;
+            const resp = await fetch(url);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
+                    points = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                }
+            }
+        } catch (e) {
+            // Generar puntos interpolados intermedios
+            points = generateInterpolatedPoints(fromCoords, toCoords, 25);
+        }
+
+        driverCurrentRoutePoints = points;
+        driverSimIndex = 0;
+
+        if (driverRoutePolyline) {
+            driverLiveMap.removeLayer(driverRoutePolyline);
+        }
+
+        driverRoutePolyline = L.polyline(points, {
+            color: '#fbbf24',
+            weight: 5,
+            opacity: 0.85,
+            lineJoin: 'round',
+            dashArray: null
+        }).addTo(driverLiveMap);
+
+        fitDriverMapBounds();
+    }
+
+    function generateInterpolatedPoints(start, end, count = 20) {
+        const pts = [];
+        for (let i = 0; i <= count; i++) {
+            const t = i / count;
+            // Añadir una ligera curva realista
+            const curve = Math.sin(t * Math.PI) * 0.003;
+            pts.push([
+                start.lat + (end.lat - start.lat) * t + curve,
+                start.lng + (end.lng - start.lng) * t - curve
+            ]);
+        }
+        return pts;
+    }
+
+    function fitDriverMapBounds() {
+        if (!driverLiveMap) return;
+        const group = [];
+        if (driverCarMarker) group.push(driverCarMarker.getLatLng());
+        if (driverTargetMarker) group.push(driverTargetMarker.getLatLng());
+        if (group.length > 0) {
+            const bounds = L.latLngBounds(group);
+            driverLiveMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+        }
+    }
+
+    async function updateDriverMapForStage(stage) {
+        const trip = driverState.activeTrip;
+        if (!trip || !driverLiveMap) return;
+
+        const origin = trip._originCoords || resolveAddressCoords(trip.origen, { lat: -34.6037, lng: -58.3816 });
+        const dest = trip._destCoords || resolveAddressCoords(trip.destino, { lat: -34.8150, lng: -58.5348 });
+
+        const etaBadge = document.getElementById('driverMapEtaText');
+
+        if (stage === 'en_camino') {
+            if (etaBadge) etaBadge.textContent = 'En camino al origen';
+            await updateDriverRouteLine(currentDriverCoords || origin, origin);
+        } else if (stage === 'en_origen') {
+            currentDriverCoords = { lat: origin.lat, lng: origin.lng, heading: 0, speed: 0 };
+            if (driverCarMarker) {
+                driverCarMarker.setLatLng([origin.lat, origin.lng]);
+                driverCarMarker.setIcon(createDriverCarIcon(0));
+            }
+            if (etaBadge) etaBadge.textContent = '📍 En el punto de recogida';
+            broadcastDriverPosition(origin.lat, origin.lng, 0, 0, 'en_origen', 0);
+            fitDriverMapBounds();
+        } else if (stage === 'en_viaje') {
+            if (etaBadge) etaBadge.textContent = 'En viaje hacia destino';
+            await updateDriverRouteLine(currentDriverCoords || origin, dest);
+        }
+    }
+
+    function startDriverGpsTracking(trip) {
+        stopDriverGpsTracking();
+
+        // 1. Intentar GPS real de alta precisión del dispositivo
+        if (navigator.geolocation) {
+            gpsWatchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 38;
+                    let heading = pos.coords.heading;
+
+                    if (heading === null || isNaN(heading) || heading === undefined) {
+                        if (currentDriverCoords) {
+                            heading = calculateBearing(currentDriverCoords.lat, currentDriverCoords.lng, lat, lng);
+                        } else {
+                            heading = 0;
+                        }
+                    }
+
+                    onDriverLocationUpdate(lat, lng, heading, speed);
+                },
+                () => {
+                    // Si el usuario no otorga permisos de GPS o está en PC, iniciar simulación suave en ruta
+                    startRouteSimulation(trip);
+                },
+                { enableHighAccuracy: true, maximumAge: 1000, timeout: 8000 }
+            );
+        } else {
+            startRouteSimulation(trip);
+        }
+    }
+
+    function startRouteSimulation(trip) {
+        if (gpsSimInterval) clearInterval(gpsSimInterval);
+
+        gpsSimInterval = setInterval(() => {
+            if (!driverState.activeTrip || driverState.activeTrip.etapa === 'en_origen') return;
+            if (!driverCurrentRoutePoints || driverCurrentRoutePoints.length === 0) return;
+
+            if (driverSimIndex < driverCurrentRoutePoints.length - 1) {
+                driverSimIndex++;
+                const cur = driverCurrentRoutePoints[driverSimIndex];
+                const prev = driverCurrentRoutePoints[driverSimIndex - 1];
+                const heading = calculateBearing(prev[0], prev[1], cur[0], cur[1]);
+                const speed = 42; // km/h promedio
+
+                onDriverLocationUpdate(cur[0], cur[1], heading, speed);
+            }
+        }, 1800);
+    }
+
+    function onDriverLocationUpdate(lat, lng, heading, speed) {
+        currentDriverCoords = { lat, lng, heading, speed };
+
+        if (driverCarMarker) {
+            driverCarMarker.setLatLng([lat, lng]);
+            driverCarMarker.setIcon(createDriverCarIcon(heading));
+        }
+
+        const trip = driverState.activeTrip;
+        const stage = trip ? trip.etapa : 'en_camino';
+        const targetCoords = (stage === 'en_viaje') ? (trip ? trip._destCoords : null) : (trip ? trip._originCoords : null);
+
+        let etaMin = 5;
+        if (targetCoords) {
+            const distKm = calculateDistanceKm(lat, lng, targetCoords.lat, targetCoords.lng);
+            etaMin = Math.max(1, Math.round((distKm / Math.max(25, speed)) * 60));
+            const etaBadge = document.getElementById('driverMapEtaText');
+            if (etaBadge) {
+                if (stage === 'en_camino') etaBadge.textContent = `Llegada en ~${etaMin} min`;
+                else if (stage === 'en_origen') etaBadge.textContent = `📍 En origen`;
+                else if (stage === 'en_viaje') etaBadge.textContent = `Destino en ~${etaMin} min`;
+            }
+        }
+
+        broadcastDriverPosition(lat, lng, heading, speed, stage, etaMin);
+    }
+
+    function broadcastDriverPosition(lat, lng, heading, speed, stage, etaMin) {
+        if (window.RutaSync) {
+            const trip = driverState.activeTrip;
+            window.RutaSync.actualizarUbicacionChofer({
+                lat,
+                lng,
+                heading: Math.round(heading || 0),
+                speed: Math.round(speed || 0),
+                stage: stage || 'en_camino',
+                tripId: trip ? trip.id : 'active_trip',
+                etaMin: etaMin || 5
+            });
+        }
+    }
+
+    function stopDriverGpsTracking() {
+        if (gpsWatchId !== null && navigator.geolocation) {
+            navigator.geolocation.clearWatch(gpsWatchId);
+            gpsWatchId = null;
+        }
+        if (gpsSimInterval) {
+            clearInterval(gpsSimInterval);
+            gpsSimInterval = null;
+        }
+    }
+
+    const btnRecenterDriverMap = document.getElementById('btnRecenterDriverMap');
+    if (btnRecenterDriverMap) {
+        btnRecenterDriverMap.addEventListener('click', () => {
+            if (driverLiveMap && currentDriverCoords) {
+                driverLiveMap.setView([currentDriverCoords.lat, currentDriverCoords.lng], 15);
+            }
+        });
+    }
 
     // ==========================================
     // MODAL DE COBRO FINAL Y CALIFICACIÓN AL PASAJERO
@@ -1671,6 +2064,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCancelActiveTrip.addEventListener('click', () => {
         const warningMsg = '⚠️ ADVERTENCIA DE CANCELACIÓN:\n\nAl cancelar un viaje que ya has aceptado, disminuye tu tasa de aceptación y cumplimiento, lo cual afectará tu prioridad para recibir traslados de la flota.\n\n¿Estás seguro de que deseas cancelar este viaje?';
         if (confirm(warningMsg)) {
+            stopDriverGpsTracking();
             if (window.RutaSync) {
                 window.RutaSync.actualizarEstadoViaje('cancelado');
                 window.RutaSync.limpiarViajeActivo();

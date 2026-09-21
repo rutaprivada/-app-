@@ -21,7 +21,8 @@
     <link rel="apple-touch-icon" href="logo_chofer.svg?v=26">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="conductor.css?v=26">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="conductor.css?v=28">
 </head>
 <body class="driver-body">
     <!-- BARRA SUPERIOR -->
@@ -110,6 +111,22 @@
                 <div class="trip-stage-header" id="tripStageBadge">
                     <i class="fa-solid fa-route"></i>
                     <span id="tripStageTitle">EN CAMINO AL ORIGEN</span>
+                </div>
+
+                <!-- MAPA GPS EN TIEMPO REAL (VISTA CHOFER) -->
+                <div class="driver-live-map-container" id="driverLiveMapContainer">
+                    <div id="driverActiveMap" class="driver-active-map"></div>
+                    <div class="driver-map-top-bar">
+                        <div class="map-live-tag">
+                            <span class="pulse-dot"></span> <span id="driverGpsStatus">GPS ACTIVO</span>
+                        </div>
+                        <div class="driver-eta-pill" id="driverMapEtaBadge">
+                            <i class="fa-solid fa-clock"></i> <span id="driverMapEtaText">Calculando ruta...</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-driver-map-recenter" id="btnRecenterDriverMap" title="Re-centrar en mi vehículo">
+                        <i class="fa-solid fa-location-crosshairs"></i>
+                    </button>
                 </div>
 
                 <!-- Datos del Pasajero -->
@@ -695,8 +712,11 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
+    <!-- Leaflet JS for Maps -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <!-- SCRIPTS -->
-    <script src="sync.js?v=27"></script>
-    <script src="conductor.js?v=27"></script>
+    <script src="sync.js?v=29"></script>
+    <script src="conductor.js?v=29"></script>
 </body>
 </html>
