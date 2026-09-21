@@ -5059,6 +5059,14 @@ if (btnPassengerCancelTrip) {
     
     // Si el viaje ya fue asignado o aceptado por un chofer
     if (activeTrip && activeTrip.estado && activeTrip.estado !== 'buscando_conductor' && activeTrip.estado !== 'solicitado') {
+      const currentStage = activeTrip.estado || activeTrip.etapa;
+      
+      // REGLA: Si el pasajero ya está a bordo y el viaje arrancó hacia parada o destino, no se puede cancelar por la app del pasajero
+      if (['hacia_parada', 'en_parada', 'en_viaje'].includes(currentStage)) {
+        alert('⚠️ TRASLADO EN CURSO:\n\nEl viaje ya ha comenzado con el pasajero a bordo. No es posible cancelar el viaje desde la app del pasajero mientras el vehículo está en marcha.\n\nSi necesitas finalizar el viaje anticipadamente, indícaselo a tu chofer para que termine el traslado desde su consola.');
+        return;
+      }
+
       const aceptadoEn = activeTrip.aceptadoEn || activeTrip.timestamp || Date.now();
       const elapsedMs = Date.now() - aceptadoEn;
       const elapsedSec = Math.floor(elapsedMs / 1000);
@@ -5104,7 +5112,7 @@ if (btnPassengerCancelTrip) {
     }
     closeInAppTripModal();
     closePassengerChatModal();
-    showToast(tienePenalizacion ? '❌ Viaje cancelado con penalización de tarifa mínima.' : '❌ Solicitud de viaje cancelada.');
+    showToast(tienePenalizacion ? '❌ Viaje cancelado con cobro del 10% de compensación.' : '❌ Solicitud de viaje cancelada.');
   });
 }
 
@@ -5118,8 +5126,14 @@ const pChatInputForm = document.getElementById('pChatInputForm');
 const pChatInputText = document.getElementById('pChatInputText');
 const pChatDriverName = document.getElementById('pChatDriverName');
 
+let passengerUnreadChatCount = 0;
+
 function openPassengerChatModal() {
   if (!passengerChatModal) return;
+  passengerUnreadChatCount = 0;
+  const pChatUnreadBadge = document.getElementById('pChatUnreadBadge');
+  if (pChatUnreadBadge) pChatUnreadBadge.classList.add('hidden');
+
   passengerChatModal.classList.remove('hidden');
   renderPassengerChatMessages();
   setTimeout(() => {
@@ -5280,7 +5294,17 @@ if (window.RutaSync) {
     if (msg) {
       renderPassengerChatMessages();
       if (msg.remitente === 'conductor' || msg.remitente === 'driver') {
-        showToast(`💬 Mensaje del chofer: "${msg.texto}"`);
+        const pChatUnreadBadge = document.getElementById('pChatUnreadBadge');
+        if (passengerChatModal && !passengerChatModal.classList.contains('hidden')) {
+          // Chat abierto
+        } else {
+          passengerUnreadChatCount++;
+          if (pChatUnreadBadge) {
+            pChatUnreadBadge.textContent = passengerUnreadChatCount;
+            pChatUnreadBadge.classList.remove('hidden');
+          }
+        }
+        showToast(`💬 Mensaje de tu chofer: "${msg.texto}"`);
       }
     }
   });
@@ -5301,6 +5325,16 @@ function updatePassengerTripStage(stage) {
       badge.textContent = 'En viaje hacia el destino';
     }
   }
+
+  // Ocultar botón de cancelar si el viaje ya está en curso con el pasajero a bordo
+  if (btnPassengerCancelTrip) {
+    if (['hacia_parada', 'en_parada', 'en_viaje'].includes(stage)) {
+      btnPassengerCancelTrip.style.display = 'none';
+    } else {
+      btnPassengerCancelTrip.style.display = 'block';
+    }
+  }
+
   updatePassengerLiveMapForStage(stage);
 }
 
@@ -5384,19 +5418,19 @@ function createPassengerCarIcon(heading = 0) {
 }
 
 function createPassengerPointIcon(type = 'origin', label = '') {
-  const isOrigin = type === 'origin';
-  const isStop = type === 'stop';
+  const isOrigin = type === 'origin' || type === 'partida';
+  const isStop = type === 'stop' || type === 'parada';
   const bgColor = isOrigin ? '#10b981' : (isStop ? '#f59e0b' : '#38bdf8');
   const emoji = isOrigin ? '🟢' : (isStop ? '🛑' : '🏁');
-  const title = label || (isOrigin ? 'Recogida' : (isStop ? 'Parada' : 'Destino'));
+  const title = label || (isOrigin ? 'Partida' : (isStop ? 'Parada' : 'Destino'));
   return L.divIcon({
     className: 'custom-map-pin',
     html: `
       <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto;">
-        <div style="background: rgba(10,13,20,0.92); border: 2px solid ${bgColor}; color: #fff; padding: 2px 7px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.6); margin-bottom: 2px;">
+        <div style="background: rgba(10,13,20,0.95); border: 2px solid ${bgColor}; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 800; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.7); margin-bottom: 2px; text-transform: uppercase;">
           ${emoji} ${title}
         </div>
-        <div style="width: 14px; height: 14px; background: ${bgColor}; border: 3px solid #ffffff; border-radius: 50%; box-shadow: 0 0 10px ${bgColor};"></div>
+        <div style="width: 14px; height: 14px; background: ${bgColor}; border: 3px solid #ffffff; border-radius: 50%; box-shadow: 0 0 12px ${bgColor};"></div>
       </div>
     `,
     iconSize: [80, 42],
@@ -5413,7 +5447,11 @@ async function initPassengerLiveMap(trip) {
 
   const originCoords = trip.originCoords || (state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null) || resolvePassengerCoords(trip.origen || trip.pickupAddress, { lat: -34.6037, lng: -58.3816 });
   const destCoords = trip.destinationCoords || (state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null) || resolvePassengerCoords(trip.destino || trip.dropoffAddress, { lat: -34.8150, lng: -58.5348 });
-  const stopCoords = trip.stopCoords || (trip.parada ? resolvePassengerCoords(trip.parada, null) : null) || (state.hasIntermediateStop && state.stop ? { lat: state.stop.lat, lng: state.stop.lng } : null);
+  const stopAddressStr = trip.parada || trip.stopAddress || (state.hasIntermediateStop && state.stop ? state.stop.address : null);
+  const stopCoords = trip.stopCoords || (stopAddressStr ? resolvePassengerCoords(stopAddressStr, {
+    lat: (originCoords.lat + destCoords.lat) / 2 + 0.005,
+    lng: (originCoords.lng + destCoords.lng) / 2 + 0.005
+  }) : null) || (state.hasIntermediateStop && state.stop ? { lat: state.stop.lat, lng: state.stop.lng } : null);
 
   pActiveTripData._originCoords = originCoords;
   pActiveTripData._destCoords = destCoords;
@@ -5455,9 +5493,9 @@ async function initPassengerLiveMap(trip) {
     zIndexOffset: 1000
   }).addTo(passengerLiveMap);
 
-  // Crear Marcador de Recogida (Verde)
+  // Crear Marcador de Partida (Verde)
   pLiveOriginMarker = L.marker([originCoords.lat, originCoords.lng], {
-    icon: createPassengerPointIcon('origin', 'Recogida')
+    icon: createPassengerPointIcon('origin', 'Partida')
   }).addTo(passengerLiveMap);
 
   // Crear Marcador de Parada Intermedia (Naranja) si existe

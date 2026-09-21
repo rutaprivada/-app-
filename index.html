@@ -732,8 +732,9 @@
             <a href="#" id="btnPassengerCallDriver" class="btn btn-primary btn-comm-action">
               <span>📞 Llamar al Chofer</span>
             </a>
-            <button type="button" id="btnPassengerChatDriver" class="btn btn-secondary btn-comm-action">
+            <button type="button" id="btnPassengerChatDriver" class="btn btn-secondary btn-comm-action" style="position: relative;">
               <span>💬 Mensaje Directo</span>
+              <span id="pChatUnreadBadge" class="chat-badge-counter hidden" style="position: absolute; top: -6px; right: -6px; background: #ef4444; color: #fff; font-size: 0.72rem; font-weight: 800; border-radius: 12px; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); border: 2px solid #0f172a;">1</span>
             </button>
           </div>
         </div>
@@ -1177,9 +1178,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=47"></script>
+  <script src="sync.js?v=48"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=47"></script>
+  <script src="app.js?v=48"></script>
 </body>
 </html>

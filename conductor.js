@@ -1220,6 +1220,10 @@ document.addEventListener('DOMContentLoaded', () => {
             stateActiveTrip.classList.remove('active');
             stateSearching.classList.add('active');
 
+            if (!driverState.activeTrip) {
+                toggleDriverStatusBar(true);
+            }
+
             // Mantener pantalla activa del celular
             requestWakeLock();
 
@@ -1243,6 +1247,10 @@ document.addEventListener('DOMContentLoaded', () => {
             stateSearching.classList.remove('active');
             stateActiveTrip.classList.remove('active');
             stateOffline.classList.add('active');
+
+            if (!driverState.activeTrip) {
+                toggleDriverStatusBar(true);
+            }
 
             stopGlobalGpsWatch();
             releaseWakeLock();
@@ -1268,6 +1276,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Poner en línea de inmediato para fluidez instantánea en la UI
+            setOnlineStatus(true);
+
+            // Obtener coordenadas de alta precisión sin bloquear
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     driverState.currentRealGpsCoords = {
@@ -1276,13 +1288,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         heading: pos.coords.heading || 0,
                         speed: pos.coords.speed || 0
                     };
-                    setOnlineStatus(true);
                 },
                 (err) => {
-                    alert('⚠️ GPS OBLIGATORIO:\n\nPara ponerte "En Línea" y recibir solicitudes de viaje ejecutivas, es obligatorio activar la ubicación GPS de tu celular.\n\nPor favor activa el GPS y otorga los permisos a la app.');
+                    console.warn('Advertencia GPS inicial:', err);
+                    alert('⚠️ GPS OBLIGATORIO:\n\nPara recibir viajes ejecutivos es obligatorio activar la ubicación GPS de tu celular.\n\nPor favor activa el GPS y otorga los permisos a la app.');
                     setOnlineStatus(false);
                 },
-                { enableHighAccuracy: true, timeout: 8000 }
+                { enableHighAccuracy: true, timeout: 6000 }
             );
         } else {
             setOnlineStatus(false);
@@ -1397,11 +1409,34 @@ document.addEventListener('DOMContentLoaded', () => {
         driverState.incomingTrip = null;
     }
 
+    let driverRejectRecycleTimers = {};
+
     function rejectIncomingTrip() {
-        if (driverState.incomingTrip) {
-            driverState.rejectedTrips.push(driverState.incomingTrip);
-        }
+        const trip = driverState.incomingTrip;
         closeIncomingModal();
+        if (!trip) return;
+
+        if (!driverState.rejectedTrips.some(t => t.id === trip.id)) {
+            driverState.rejectedTrips.push(trip);
+        }
+
+        // Programar re-intento tras 12 segundos si la solicitud continúa sin ser tomada
+        if (driverRejectRecycleTimers[trip.id]) clearTimeout(driverRejectRecycleTimers[trip.id]);
+        driverRejectRecycleTimers[trip.id] = setTimeout(() => {
+            if (driverState.isOnline && !driverState.activeTrip) {
+                let sigueBuscando = true;
+                if (window.RutaSync) {
+                    const active = window.RutaSync.obtenerViajeActivo();
+                    if (!active || active.id !== trip.id || (active.estado !== 'buscando_conductor' && active.estado !== 'solicitado')) {
+                        sigueBuscando = false;
+                    }
+                }
+                if (sigueBuscando) {
+                    enqueueIncomingTrip(trip);
+                }
+            }
+        }, 12000);
+
         // Procesar siguiente solicitud en la cola
         setTimeout(() => {
             processNextIncomingTripFromQueue();
@@ -1744,19 +1779,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createPointPinIcon(type = 'origin', label = '') {
-        const isOrigin = type === 'origin';
-        const isStop = type === 'stop';
+        const isOrigin = type === 'origin' || type === 'partida';
+        const isStop = type === 'stop' || type === 'parada';
         const bgColor = isOrigin ? '#10b981' : (isStop ? '#f59e0b' : '#38bdf8');
         const emoji = isOrigin ? '🟢' : (isStop ? '🛑' : '🏁');
-        const title = label || (isOrigin ? 'Recogida' : (isStop ? 'Parada' : 'Destino'));
+        const title = label || (isOrigin ? 'Partida' : (isStop ? 'Parada' : 'Destino'));
         return L.divIcon({
             className: 'custom-map-pin',
             html: `
                 <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto;">
-                    <div style="background: rgba(10,13,20,0.92); border: 2px solid ${bgColor}; color: #fff; padding: 2px 7px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.6); margin-bottom: 2px;">
+                    <div style="background: rgba(10,13,20,0.95); border: 2px solid ${bgColor}; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 800; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.7); margin-bottom: 2px; text-transform: uppercase;">
                         ${emoji} ${title}
                     </div>
-                    <div style="width: 14px; height: 14px; background: ${bgColor}; border: 3px solid #ffffff; border-radius: 50%; box-shadow: 0 0 10px ${bgColor};"></div>
+                    <div style="width: 14px; height: 14px; background: ${bgColor}; border: 3px solid #ffffff; border-radius: 50%; box-shadow: 0 0 12px ${bgColor};"></div>
                 </div>
             `,
             iconSize: [80, 42],
@@ -1771,7 +1806,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const originCoords = trip.originCoords || resolveAddressCoords(trip.origen || trip.pickupAddress || trip.origin, { lat: -34.6037, lng: -58.3816 });
         const destCoords = trip.destinationCoords || resolveAddressCoords(trip.destino || trip.dropoffAddress || trip.destination, { lat: -34.8150, lng: -58.5348 });
-        const stopCoords = trip.stopCoords || (trip.parada ? resolveAddressCoords(trip.parada, null) : null);
+        const stopAddrStr = trip.parada || trip.stopAddress;
+        const stopCoords = trip.stopCoords || (stopAddrStr ? resolveAddressCoords(stopAddrStr, {
+            lat: (originCoords.lat + destCoords.lat) / 2 + 0.005,
+            lng: (originCoords.lng + destCoords.lng) / 2 + 0.005
+        }) : null);
 
         trip._originCoords = originCoords;
         trip._destCoords = destCoords;
@@ -1834,9 +1873,9 @@ document.addEventListener('DOMContentLoaded', () => {
             zIndexOffset: 1000
         }).addTo(driverLiveMap);
 
-        // Crear Marcadores de Origen, Parada (si existe) y Destino
+        // Crear Marcadores de Partida, Parada (si existe) y Destino
         driverTargetMarker = L.marker([originCoords.lat, originCoords.lng], {
-            icon: createPointPinIcon('origin', 'Recogida')
+            icon: createPointPinIcon('origin', 'Partida')
         }).addTo(driverLiveMap);
 
         if (stopCoords && stopCoords.lat && stopCoords.lng) {
@@ -2454,10 +2493,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // 9. CHAT IN-APP DIRECTO CON EL PASAJERO
     // ==========================================
+    let driverUnreadChatCount = 0;
+
     function openDriverChat() {
         if (!modalDriverChat) return;
+        driverUnreadChatCount = 0;
+        if (driverChatUnreadDot) {
+            driverChatUnreadDot.classList.add('hidden');
+        }
         modalDriverChat.classList.add('active');
-        if (driverChatUnreadDot) driverChatUnreadDot.classList.add('hidden');
         renderDriverChatMessages();
         setTimeout(() => {
             if (driverChatInputText) driverChatInputText.focus();
@@ -2648,9 +2692,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (modalDriverChat && modalDriverChat.classList.contains('active')) {
                 renderDriverChatMessages();
             } else {
-                if (driverChatUnreadDot) driverChatUnreadDot.classList.remove('hidden');
                 if (msg && (msg.remitente === 'pasajero' || msg.remitente === 'passenger')) {
+                    driverUnreadChatCount++;
+                    if (driverChatUnreadDot) {
+                        driverChatUnreadDot.textContent = driverUnreadChatCount;
+                        driverChatUnreadDot.classList.remove('hidden');
+                    }
                     playAlertSound('incoming');
+                    showDriverToast(`💬 Mensaje del pasajero: "${msg.texto}"`);
                 }
             }
         });
