@@ -44,9 +44,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const currentFleetDriver = getFleetDriverInfo();
 
-    // ESTADO DEL CONDUCTOR
+    // ESTADO DEL CONDUCTOR (Online por defecto al ingresar a la app)
     const driverState = {
-        isOnline: false,
+        isOnline: true,
         activeTrip: null,
         incomingTrip: null,
         countdownTimer: null,
@@ -1541,9 +1541,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // 10. ESCUCHAR SOLICITUDES Y CHAT DESDE sync.js
     // ==========================================
+    if (btnSimularViaje) {
+        btnSimularViaje.addEventListener('click', () => {
+            playAlertSound('incoming');
+            const mockTrip = {
+                id: 'trip_' + Date.now(),
+                nombrePasajero: 'Daniel Test (Simulación)',
+                cliente: 'Daniel Test (Simulación)',
+                telefono: '+54 9 11 2255-8226',
+                origen: 'Av. del Libertador 3500, Palermo',
+                destino: 'Aeropuerto Jorge Newbery (AEP)',
+                precioEstimado: 18500,
+                precio: 18500,
+                monto: 18500,
+                totalFare: 18500,
+                distancia: '7.8 km',
+                distanceKm: 7.8,
+                duracion: '18 min',
+                durationMin: 18,
+                peajes: 0,
+                tollFare: 0,
+                tollActual: 0,
+                fuelCostEst: 1638,
+                metodoPago: 'Efectivo',
+                categoria: 'Sedán Ejecutivo',
+                creado: new Date().toISOString()
+            };
+            if (window.RutaSync) {
+                window.RutaSync.solicitarViaje(mockTrip);
+            } else {
+                showIncomingTrip(mockTrip);
+            }
+        });
+    }
+
     if (window.RutaSync) {
         window.RutaSync.on('NUEVO_VIAJE_SOLICITADO', (viaje) => {
-            if (driverState.isOnline && !driverState.activeTrip) {
+            if (!driverState.activeTrip) {
+                if (!driverState.isOnline) {
+                    setOnlineStatus(true);
+                }
                 showIncomingTrip(viaje);
             }
         });
@@ -1652,13 +1689,17 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSavedStats();
     renderReservas();
 
-    // Restaurar estado En Línea persistente (para evitar desconexiones al recargar / pull-to-refresh)
+    // Iniciar siempre en Línea para recibir solicitudes al instante (estilo Uber/Cabify)
     try {
-        const savedOnline = localStorage.getItem('rutaprivada_driver_is_online') === 'true';
-        if (savedOnline) {
+        const savedOnline = localStorage.getItem('rutaprivada_driver_is_online');
+        if (savedOnline !== 'false') {
             setOnlineStatus(true);
+        } else {
+            setOnlineStatus(false);
         }
-    } catch(e) {}
+    } catch(e) {
+        setOnlineStatus(true);
+    }
 
     // Registro y actualización de Service Worker para la PWA de Chofer
     if ('serviceWorker' in navigator) {

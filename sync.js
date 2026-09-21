@@ -2,13 +2,13 @@
  * Ruta Privada - Realtime Sync Layer (sync.js)
  * Sincronización en Tiempo Real Multi-Dispositivo (PC <-> Celular <-> Tablet)
  * 
- * Canales activos y redundantes:
- * 1. Firebase Cloud Firestore (Sincronización multi-dispositivo en la nube ultra-rápida y garantizada).
+ * Canales activos y redundantes (Multi-Cloud Uber/Cabify Style):
+ * 1. Firebase Cloud Firestore (Direct Doc Realtime Listeners).
  * 2. Cloud SSE Bus (ntfy.sh - Multi-Red 0ms PC <-> Celular).
- * 3. Cloud WebSocket Relay (Conexión directa en la nube multi-dispositivo).
- * 4. Local Server REST Bus (/api/sync/emit y /api/sync/events en servidor local).
- * 5. BroadcastChannel API (Sincronización instantánea de 0ms entre pestañas locales).
- * 6. localStorage Storage Event Bus (Persistencia y resiliencia de estado).
+ * 3. Cloud Fast Polling Relay (1.2s ntfy.sh fallback para celulares en segundo plano).
+ * 4. Local Server REST Bus (/api/sync/emit y /api/sync/events).
+ * 5. BroadcastChannel API (0ms instantáneo entre pestañas).
+ * 6. localStorage Storage Event Bus (Persistencia y resiliencia).
  */
 
 class RutaSyncManager {
@@ -16,10 +16,8 @@ class RutaSyncManager {
         this.channelName = 'rutaprivada_sync_global_v3';
         this.listeners = {};
         this.channel = null;
-        this.ws = null;
-        this.wsConnected = false;
-        this.reconnectTimer = null;
         this.pollTimer = null;
+        this.ntfyPollTimer = null;
         this.lastEventSeq = 0;
         this.processedEvents = new Set();
         this.deviceId = 'dev_' + Math.random().toString(36).substr(2, 9);
@@ -27,13 +25,12 @@ class RutaSyncManager {
 
         this.initFirebaseSync();
         this.initLocalChannels();
-        this.initCloudWebSocket();
         this.initNtfySseSync();
         this.initServerHttpSync();
     }
 
     // ==========================================
-    // 0. FIREBASE CLOUD FIRESTORE REALTIME SYNC
+    // 1. FIREBASE CLOUD FIRESTORE REALTIME SYNC
     // ==========================================
     initFirebaseSync() {
         const FIREBASE_CONFIG = {
@@ -54,32 +51,13 @@ class RutaSyncManager {
                     }
                     this.firestore = firebase.firestore();
 
-                    // Escuchar eventos en vivo emitidos en tiempo real
-                    const recentTime = Date.now() - (15 * 60 * 1000);
-                    this.firestore.collection('fleet_events')
-                        .where('timestamp', '>=', recentTime)
-                        .orderBy('timestamp', 'desc')
-                        .limit(25)
-                        .onSnapshot((snapshot) => {
-                            snapshot.docChanges().forEach((change) => {
-                                if (change.type === 'added' || change.type === 'modified') {
-                                    const data = change.doc.data();
-                                    if (data && data.senderId !== this.deviceId) {
-                                        this.handleIncoming(data);
-                                    }
-                                }
-                            });
-                        }, (err) => {
-                            console.warn('Firestore live events listener:', err);
-                        });
-
-                    // Escuchar estado del viaje activo global
+                    // Escuchar directamente el documento de viaje activo (0 índices requeridos, 100% instantáneo)
                     this.firestore.collection('live_trips').doc('current_active_trip')
                         .onSnapshot((doc) => {
                             if (doc.exists) {
                                 const data = doc.data();
                                 if (data && data.senderId !== this.deviceId) {
-                                    if (data.estado === 'buscando_conductor') {
+                                    if (data.estado === 'buscando_conductor' || data.estado === 'solicitado') {
                                         this.handleIncoming({
                                             id: 'fs_' + (data.id || Date.now()),
                                             type: 'NUEVO_VIAJE_SOLICITADO',
@@ -97,7 +75,7 @@ class RutaSyncManager {
                                         });
                                     } else if (data.estado) {
                                         this.handleIncoming({
-                                            id: 'fs_st_' + (data.id || Date.now()) + '_' + data.estado,
+                                            id: 'fs_st_' + (data.id || Date.now()) + '_' + data.estado + '_' + (data.ultimoEstadoEn || Date.now()),
                                             type: 'ESTADO_VIAJE_CAMBIADO',
                                             payload: data,
                                             senderId: data.senderId,
@@ -107,7 +85,20 @@ class RutaSyncManager {
                                 }
                             }
                         }, (err) => {
-                            console.warn('Firestore active trip listener:', err);
+                            console.warn('Firestore active trip listener warning:', err);
+                        });
+
+                    // Escuchar eventos globales emitidos
+                    this.firestore.collection('live_trips').doc('latest_event')
+                        .onSnapshot((doc) => {
+                            if (doc.exists) {
+                                const msg = doc.data();
+                                if (msg && msg.senderId !== this.deviceId && msg.type) {
+                                    this.handleIncoming(msg);
+                                }
+                            }
+                        }, (err) => {
+                            console.warn('Firestore latest event listener warning:', err);
                         });
                 } catch (err) {
                     console.warn('Firebase init error in sync.js:', err);
@@ -123,7 +114,65 @@ class RutaSyncManager {
     }
 
     // ==========================================
-    // 1. CANALES LOCALES (BroadcastChannel + Storage)
+    // 2. CANAL EN LA NUBE SSE Y FAST POLLING (ntfy.sh)
+    // ==========================================
+    initNtfySseSync() {
+        const topic = 'rutaprivada_fleet_sync_ar_v4';
+
+        // 1. SSE Stream en tiempo real
+        try {
+            if (window.EventSource) {
+                if (this.sse) {
+                    try { this.sse.close(); } catch(e) {}
+                }
+                this.sse = new EventSource(`https://ntfy.sh/${topic}/sse`);
+                this.sse.onmessage = (event) => {
+                    try {
+                        const parsed = JSON.parse(event.data);
+                        let msgData = null;
+                        if (parsed && parsed.message) {
+                            msgData = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : parsed.message;
+                        } else if (parsed && parsed.type) {
+                            msgData = parsed;
+                        }
+                        if (msgData && msgData.type && msgData.senderId !== this.deviceId) {
+                            this.handleIncoming(msgData);
+                        }
+                    } catch (e) {}
+                };
+            }
+        } catch (err) {}
+
+        // 2. Polling de respaldo cada 1.2s por si la conexión SSE se suspende en celulares
+        if (this.ntfyPollTimer) clearInterval(this.ntfyPollTimer);
+        this.ntfyPollTimer = setInterval(async () => {
+            try {
+                const resp = await fetch(`https://ntfy.sh/${topic}/json?poll=1&since=45s`, { cache: 'no-store' });
+                if (resp.ok) {
+                    const text = await resp.text();
+                    const lines = text.trim().split('\n');
+                    lines.forEach(line => {
+                        if (!line.trim()) return;
+                        try {
+                            const parsed = JSON.parse(line);
+                            let msgData = null;
+                            if (parsed && parsed.message) {
+                                msgData = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : parsed.message;
+                            } else if (parsed && parsed.type) {
+                                msgData = parsed;
+                            }
+                            if (msgData && msgData.type && msgData.senderId !== this.deviceId) {
+                                this.handleIncoming(msgData);
+                            }
+                        } catch(e) {}
+                    });
+                }
+            } catch(e) {}
+        }, 1200);
+    }
+
+    // ==========================================
+    // 3. CANALES LOCALES (BroadcastChannel + Storage)
     // ==========================================
     initLocalChannels() {
         if ('BroadcastChannel' in window) {
@@ -146,7 +195,7 @@ class RutaSyncManager {
     }
 
     // ==========================================
-    // 2. HTTP REST SYNC CON SERVIDOR LOCAL (PC <-> Celular en Wi-Fi)
+    // 4. HTTP REST SYNC CON SERVIDOR LOCAL (PC <-> Celular en Wi-Fi)
     // ==========================================
     initServerHttpSync() {
         const pollServer = async () => {
@@ -174,83 +223,6 @@ class RutaSyncManager {
     }
 
     // ==========================================
-    // 3. CANAL EN LA NUBE SSE (ntfy.sh - Multi-Red 0ms PC <-> Celular)
-    // ==========================================
-    initNtfySseSync() {
-        try {
-            const topic = 'rutaprivada_fleet_sync_ar_v4';
-            if (window.EventSource) {
-                if (this.sse) {
-                    try { this.sse.close(); } catch(e) {}
-                }
-                this.sse = new EventSource(`https://ntfy.sh/${topic}/sse`);
-                this.sse.onmessage = (event) => {
-                    try {
-                        const parsed = JSON.parse(event.data);
-                        let msgData = null;
-                        if (parsed && parsed.message) {
-                            msgData = typeof parsed.message === 'string' ? JSON.parse(parsed.message) : parsed.message;
-                        } else if (parsed && parsed.type) {
-                            msgData = parsed;
-                        }
-                        if (msgData && msgData.type && msgData.senderId !== this.deviceId) {
-                            this.handleIncoming(msgData);
-                        }
-                    } catch (e) {}
-                };
-            }
-        } catch (err) {}
-    }
-
-    // ==========================================
-    // 4. CANAL EN LA NUBE (Cloud WebSocket Multi-Dispositivo)
-    // ==========================================
-    initCloudWebSocket() {
-        const wsUrl = 'wss://free.blr2.piesocket.com/v3/rutaprivada_fleet_v3?api_key=VC3OTc4ANqqm0QI2EMacrYn0ICrFed2mduuzCxWm&notify_self=0';
-        
-        try {
-            if (this.ws) {
-                try { this.ws.close(); } catch (e) {}
-            }
-
-            this.ws = new WebSocket(wsUrl);
-
-            this.ws.onopen = () => {
-                this.wsConnected = true;
-            };
-
-            this.ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data && data.senderId !== this.deviceId) {
-                        this.handleIncoming(data);
-                    }
-                } catch (err) {}
-            };
-
-            this.ws.onclose = () => {
-                this.wsConnected = false;
-                this.scheduleReconnect();
-            };
-
-            this.ws.onerror = () => {
-                this.wsConnected = false;
-                try { this.ws.close(); } catch (e) {}
-            };
-        } catch (err) {
-            this.scheduleReconnect();
-        }
-    }
-
-    scheduleReconnect() {
-        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = setTimeout(() => {
-            this.initCloudWebSocket();
-            this.initNtfySseSync();
-        }, 4000);
-    }
-
-    // ==========================================
     // 5. EMISIÓN Y RECEPCIÓN DE EVENTOS
     // ==========================================
     emit(type, payload = {}) {
@@ -268,51 +240,46 @@ class RutaSyncManager {
         // 1. Firebase Firestore Cloud Sync
         if (this.firestore) {
             try {
+                this.firestore.collection('live_trips').doc('latest_event').set(message).catch(() => {});
                 this.firestore.collection('fleet_events').doc(message.id).set(message).catch(() => {});
                 if (type === 'NUEVO_VIAJE_SOLICITADO' || type === 'VIAJE_ACEPTADO' || type === 'ESTADO_VIAJE_CAMBIADO') {
                     this.firestore.collection('live_trips').doc('current_active_trip').set({
                         ...payload,
                         senderId: this.deviceId,
-                        timestamp: now
+                        timestamp: now,
+                        ultimoEstadoEn: now
                     }).catch(() => {});
                 }
             } catch (e) {}
         }
 
-        // 2. Enviar al Servidor Local HTTP si está disponible
+        // 2. Enviar a través de Cloud SSE / Push Bus (ntfy.sh)
+        fetch('https://ntfy.sh/rutaprivada_fleet_sync_ar_v4', {
+            method: 'POST',
+            headers: { 'Title': 'RutaPrivada Event', 'Priority': 'max', 'Tags': 'car,bell' },
+            body: JSON.stringify(message)
+        }).catch(() => {});
+
+        // 3. Enviar al Servidor Local HTTP si está disponible
         fetch('/api/sync/emit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(message)
         }).catch(() => {});
 
-        // 3. Enviar a través de Cloud SSE Bus (ntfy.sh)
-        fetch('https://ntfy.sh/rutaprivada_fleet_sync_ar_v4', {
-            method: 'POST',
-            headers: { 'Title': 'RutaPrivada Event', 'Priority': 'high' },
-            body: JSON.stringify(message)
-        }).catch(() => {});
-
-        // 4. Enviar a través de Cloud WebSocket
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            try {
-                this.ws.send(JSON.stringify(message));
-            } catch (e) {}
-        }
-
-        // 5. Enviar a través de BroadcastChannel local
+        // 4. Enviar a través de BroadcastChannel local
         if (this.channel) {
             try {
                 this.channel.postMessage(message);
             } catch (e) {}
         }
 
-        // 6. Fallback localStorage local
+        // 5. Fallback localStorage local
         try {
             localStorage.setItem('rutaprivada_sync_event', JSON.stringify(message));
         } catch (e) {}
 
-        // 7. Procesar en la instancia actual
+        // 6. Procesar en la instancia actual
         this.handleIncoming(message, true);
     }
 
@@ -555,8 +522,12 @@ class RutaSyncManager {
             this.guardarViajeActivo(viaje);
             this.emit('ESTADO_VIAJE_CAMBIADO', viaje);
             return viaje;
+        } else {
+            const tempViaje = { estado: nuevoEstado, ultimoEstadoEn: Date.now(), ...metadata };
+            this.guardarViajeActivo(tempViaje);
+            this.emit('ESTADO_VIAJE_CAMBIADO', tempViaje);
+            return tempViaje;
         }
-        return null;
     }
 
     guardarViajeActivo(viaje) {

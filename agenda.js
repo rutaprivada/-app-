@@ -1533,10 +1533,6 @@ function renderFinancesTab() {
   if (finAvgHourly) finAvgHourly.textContent = `$${avgHourly.toLocaleString('es-AR')} / hs`;
   if (finTips) finTips.textContent = `$${tipsTotal.toLocaleString('es-AR')}`;
 }
-  if (finAvgTicket) finAvgTicket.textContent = `$${avgTicket.toLocaleString('es-AR')}`;
-  if (finAvgHourly) finAvgHourly.textContent = `$${avgHourly.toLocaleString('es-AR')} / hs`;
-  if (finTips) finTips.textContent = `$${tipsTotal.toLocaleString('es-AR')}`;
-}
 
 // ==========================================
 // 10. RENDERIZADO: PASAJEROS VIP (TAB 4)
