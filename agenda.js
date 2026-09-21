@@ -69,6 +69,15 @@ function getTodayString() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function getYesterdayString() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function getTomorrowString() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -697,9 +706,9 @@ function initDateFilters() {
     });
   }
 
-  // 2. Filtros Control de Pagos (Tab 2)
+  // 2. Filtros Control de Pagos (Tab 2: Histórico de Cobranzas y Días Pasados)
   const btnPayToday = document.getElementById('btn-pay-filter-today');
-  const btnPayTomorrow = document.getElementById('btn-pay-filter-tomorrow');
+  const btnPayYesterday = document.getElementById('btn-pay-filter-yesterday');
   const btnPayWeek = document.getElementById('btn-pay-filter-week');
   const btnPayAll = document.getElementById('btn-pay-filter-all');
   const customPayInput = document.getElementById('custom-pay-filter-date');
@@ -726,12 +735,12 @@ function initDateFilters() {
     });
   }
 
-  if (btnPayTomorrow) {
-    btnPayTomorrow.addEventListener('click', () => {
-      state.paymentFilter = 'tomorrow';
-      state.paymentSelectedDate = getTomorrowString();
+  if (btnPayYesterday) {
+    btnPayYesterday.addEventListener('click', () => {
+      state.paymentFilter = 'yesterday';
+      state.paymentSelectedDate = getYesterdayString();
       if (customPayInput) customPayInput.value = state.paymentSelectedDate;
-      setActivePill(btnPayTomorrow, 'payment');
+      setActivePill(btnPayYesterday, 'payment');
       renderPaymentsTab();
     });
   }
@@ -752,9 +761,9 @@ function initDateFilters() {
     });
   }
 
-  // 3. Filtros Finanzas (Tab 3)
+  // 3. Filtros Finanzas (Tab 3: Histórico de Ganancias, Costos y Días Pasados)
   const btnFinToday = document.getElementById('btn-fin-filter-today');
-  const btnFinTomorrow = document.getElementById('btn-fin-filter-tomorrow');
+  const btnFinYesterday = document.getElementById('btn-fin-filter-yesterday');
   const btnFinWeek = document.getElementById('btn-fin-filter-week');
   const btnFinAll = document.getElementById('btn-fin-filter-all');
   const customFinInput = document.getElementById('custom-fin-filter-date');
@@ -781,12 +790,12 @@ function initDateFilters() {
     });
   }
 
-  if (btnFinTomorrow) {
-    btnFinTomorrow.addEventListener('click', () => {
-      state.financeFilter = 'tomorrow';
-      state.financeSelectedDate = getTomorrowString();
+  if (btnFinYesterday) {
+    btnFinYesterday.addEventListener('click', () => {
+      state.financeFilter = 'yesterday';
+      state.financeSelectedDate = getYesterdayString();
       if (customFinInput) customFinInput.value = state.financeSelectedDate;
-      setActivePill(btnFinTomorrow, 'finance');
+      setActivePill(btnFinYesterday, 'finance');
       renderFinancesTab();
     });
   }
@@ -853,10 +862,10 @@ function getFilteredBookings() {
   });
 }
 
-// CONTROL DE PAGOS: FILTRO POR DÍA (HOY POR DEFECTO, DÍAS PASADOS O TODO)
+// CONTROL DE PAGOS: FILTRO POR DÍA (HOY POR DEFECTO, AYER, SEMANA O DÍAS PASADOS)
 function getFilteredPaymentsBookings() {
   const today = getTodayString();
-  const tomorrow = getTomorrowString();
+  const yesterday = getYesterdayString();
 
   return state.bookings.filter(b => {
     if (b.status === 'Cancelada' || b.status === 'cancelada') return false;
@@ -864,15 +873,16 @@ function getFilteredPaymentsBookings() {
 
     if (state.paymentFilter === 'today') {
       return b.date === today;
-    } else if (state.paymentFilter === 'tomorrow') {
-      return b.date === tomorrow;
+    } else if (state.paymentFilter === 'yesterday') {
+      return b.date === yesterday;
     } else if (state.paymentFilter === 'custom') {
       return b.date === state.paymentSelectedDate;
     } else if (state.paymentFilter === 'week') {
       const now = new Date();
+      now.setHours(23, 59, 59, 999);
       const tripDate = new Date(b.date + 'T00:00:00');
-      const diffDays = (tripDate - now) / (1000 * 60 * 60 * 24);
-      return diffDays >= -1 && diffDays <= 7;
+      const diffDays = (now - tripDate) / (1000 * 60 * 60 * 24);
+      return diffDays >= 0 && diffDays <= 7;
     } else if (state.paymentFilter === 'all') {
       return true;
     }
@@ -883,10 +893,10 @@ function getFilteredPaymentsBookings() {
   });
 }
 
-// FINANZAS: FILTRO POR DÍA (HOY POR DEFECTO, DÍAS PASADOS O TODO)
+// FINANZAS: FILTRO POR DÍA (HOY POR DEFECTO, AYER, SEMANA O HISTÓRICO DE DÍAS PASADOS)
 function getFilteredFinanceBookings() {
   const today = getTodayString();
-  const tomorrow = getTomorrowString();
+  const yesterday = getYesterdayString();
 
   return state.bookings.filter(b => {
     const isCompleted = b.status === 'Completada' || b.status === 'completada';
@@ -897,15 +907,16 @@ function getFilteredFinanceBookings() {
 
     if (state.financeFilter === 'today') {
       return b.date === today;
-    } else if (state.financeFilter === 'tomorrow') {
-      return b.date === tomorrow;
+    } else if (state.financeFilter === 'yesterday') {
+      return b.date === yesterday;
     } else if (state.financeFilter === 'custom') {
       return b.date === state.financeSelectedDate;
     } else if (state.financeFilter === 'week') {
       const now = new Date();
+      now.setHours(23, 59, 59, 999);
       const tripDate = new Date(b.date + 'T00:00:00');
-      const diffDays = (tripDate - now) / (1000 * 60 * 60 * 24);
-      return diffDays >= -1 && diffDays <= 7;
+      const diffDays = (now - tripDate) / (1000 * 60 * 60 * 24);
+      return diffDays >= 0 && diffDays <= 7;
     } else if (state.financeFilter === 'all') {
       return true;
     }

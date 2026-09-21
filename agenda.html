@@ -166,7 +166,7 @@
         </div>
 
         <div class="custom-date-picker-wrap">
-          <label for="custom-filter-date" style="font-size: 0.8rem; color: #94a3b8; font-weight: 700;">Fecha:</label>
+          <label for="custom-filter-date"><span style="color: var(--gold-400);">📅</span> <strong>Elegir Fecha:</strong></label>
           <input type="date" id="custom-filter-date" class="custom-date-input" />
         </div>
 
@@ -246,18 +246,18 @@
         </div>
       </section>
 
-      <!-- Controls Bar (Date Filters para Control de Pagos) -->
+      <!-- Controls Bar (Date Filters para Control de Pagos: Histórico y Días Pasados) -->
       <section class="agenda-controls-bar">
         <div class="date-preset-group">
           <button type="button" id="btn-pay-filter-today" class="date-pill-btn active">⚡ Hoy</button>
-          <button type="button" id="btn-pay-filter-tomorrow" class="date-pill-btn">📅 Mañana</button>
+          <button type="button" id="btn-pay-filter-yesterday" class="date-pill-btn">⏮️ Ayer</button>
           <button type="button" id="btn-pay-filter-week" class="date-pill-btn">🗓️ Esta Semana</button>
           <button type="button" id="btn-pay-filter-all" class="date-pill-btn">📂 Todas</button>
         </div>
 
         <div class="custom-date-picker-wrap">
-          <label for="custom-pay-filter-date" style="font-size: 0.8rem; color: #94a3b8; font-weight: 700;">Fecha:</label>
-          <input type="date" id="custom-pay-filter-date" class="custom-date-input" />
+          <label for="custom-pay-filter-date"><span style="color: var(--gold-400);">📅</span> <strong>Elegir Fecha:</strong></label>
+          <input type="date" id="custom-pay-filter-date" class="custom-date-input" title="Seleccionar fecha histórica o específica" />
         </div>
       </section>
 
@@ -281,18 +281,18 @@
          ======================================================== -->
     <div id="tab-finances" class="tab-pane hidden">
       
-      <!-- Controls Bar (Date Filters para Finanzas) -->
+      <!-- Controls Bar (Date Filters para Finanzas: Histórico y Días Pasados) -->
       <section class="agenda-controls-bar">
         <div class="date-preset-group">
           <button type="button" id="btn-fin-filter-today" class="date-pill-btn active">⚡ Hoy</button>
-          <button type="button" id="btn-fin-filter-tomorrow" class="date-pill-btn">📅 Mañana</button>
+          <button type="button" id="btn-fin-filter-yesterday" class="date-pill-btn">⏮️ Ayer</button>
           <button type="button" id="btn-fin-filter-week" class="date-pill-btn">🗓️ Esta Semana</button>
           <button type="button" id="btn-fin-filter-all" class="date-pill-btn">📂 Todas</button>
         </div>
 
         <div class="custom-date-picker-wrap">
-          <label for="custom-fin-filter-date" style="font-size: 0.8rem; color: #94a3b8; font-weight: 700;">Fecha:</label>
-          <input type="date" id="custom-fin-filter-date" class="custom-date-input" />
+          <label for="custom-fin-filter-date"><span style="color: var(--gold-400);">📅</span> <strong>Elegir Fecha:</strong></label>
+          <input type="date" id="custom-fin-filter-date" class="custom-date-input" title="Seleccionar fecha histórica o específica" />
         </div>
       </section>
 
