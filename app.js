@@ -5348,6 +5348,30 @@ if (window.RutaSync) {
       return;
     }
 
+    // Actualizar datos de ruta y precio en vivo en caso de modificación
+    const rawPrice = viaje.precioEstimado || viaje.precio || viaje.totalFare || viaje.monto;
+    if (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0) {
+      if (pTripTotal) pTripTotal.textContent = '$' + Number(rawPrice).toLocaleString('es-AR');
+    }
+    if (viaje.origen && pTripOrigin) pTripOrigin.textContent = viaje.origen;
+    if (viaje.destino && pTripDestination) pTripDestination.textContent = viaje.destino;
+
+    const stopAddr = viaje.parada || viaje.stopAddress || viaje.intermediateStop || (viaje.hasStop && viaje.stop ? viaje.stop : null);
+    const pTripStopRow = document.getElementById('pTripStopRow');
+    const pTripStop = document.getElementById('pTripStop');
+    if (stopAddr) {
+      if (pTripStopRow) pTripStopRow.style.display = 'flex';
+      if (pTripStop) pTripStop.textContent = stopAddr;
+    } else {
+      if (pTripStopRow) pTripStopRow.style.display = 'none';
+    }
+
+    if (viaje.motivo === 'modificacion_ruta') {
+      initPassengerLiveMap(viaje);
+      playPassengerTone('chime');
+      showToast(`🔄 Ruta actualizada por el chofer. Nuevo total: $${Number(rawPrice || 0).toLocaleString('es-AR')}`);
+    }
+
     updatePassengerTripStage(viaje.estado);
     if (viaje.estado === 'en_origen') {
       playPassengerTone('arrived');

@@ -493,18 +493,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderWeeklyBars(trips) {
         const daysOfWeek = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
         const now = new Date();
-        // Obtener el lunes de la semana actual
         const dayOfWeekIndex = (now.getDay() + 6) % 7; // 0 = Lun, 6 = Dom
         const monday = new Date(now);
         monday.setDate(now.getDate() - dayOfWeekIndex);
         monday.setHours(0, 0, 0, 0);
 
         const dailyTotals = [0, 0, 0, 0, 0, 0, 0];
+        const dailyKeys = [];
 
         for (let i = 0; i < 7; i++) {
             const currentDay = new Date(monday);
             currentDay.setDate(monday.getDate() + i);
             const dKey = `${currentDay.getFullYear()}-${String(currentDay.getMonth() + 1).padStart(2, '0')}-${String(currentDay.getDate()).padStart(2, '0')}`;
+            dailyKeys.push(dKey);
             
             const dayTrips = trips.filter(t => t.fecha === dKey && t.estado === 'completado');
             dailyTotals[i] = dayTrips.reduce((sum, t) => sum + (Number(t.monto) || 0), 0);
@@ -514,12 +515,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         weeklyBarsGrid.innerHTML = daysOfWeek.map((day, idx) => {
             const amount = dailyTotals[idx];
+            const dKey = dailyKeys[idx];
             const heightPercent = Math.max(8, Math.round((amount / maxVal) * 100));
             const isToday = idx === dayOfWeekIndex;
+            const isSelected = driverState.currentEarningsPeriod === 'custom' && driverState.customDate === dKey;
             const formattedAmount = amount > 0 ? '$' + Math.round(amount / 1000) + 'k' : '$0';
 
             return `
-                <div class="weekly-bar-item">
+                <div class="weekly-bar-item ${isSelected ? 'selected-day' : ''}" data-date="${dKey}" title="Toca para ver viajes del ${day} (${dKey})">
                     <span class="bar-amount-tip">${formattedAmount}</span>
                     <div class="bar-track">
                         <div class="bar-fill ${isToday ? 'today' : ''}" style="height: ${heightPercent}%;"></div>
@@ -528,6 +531,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         }).join('');
+
+        // Eventos de clic para filtrar rápidamente al día seleccionado
+        weeklyBarsGrid.querySelectorAll('.weekly-bar-item').forEach(bar => {
+            bar.addEventListener('click', () => {
+                const dateVal = bar.getAttribute('data-date');
+                if (dateVal) {
+                    periodTabBtns.forEach(b => b.classList.remove('active'));
+                    driverState.currentEarningsPeriod = 'custom';
+                    driverState.customDate = dateVal;
+                    if (driverCustomDateInput) driverCustomDateInput.value = dateVal;
+                    updateFinancialView();
+                    showDriverToast(`📅 Mostrando ingresos y viajes del ${dateVal}`);
+                }
+            });
+        });
     }
 
     function renderMonthlyBreakdown(monthlyTrips) {
@@ -611,6 +629,67 @@ document.addEventListener('DOMContentLoaded', () => {
     const tdDistancia = document.getElementById('tdDistancia');
     const tdEstado = document.getElementById('tdEstado');
 
+    let tripDetailMapInstance = null;
+    function renderTripDetailMap(trip) {
+        const mapEl = document.getElementById('tripDetailMap');
+        if (!mapEl || typeof L === 'undefined') return;
+
+        if (tripDetailMapInstance) {
+            tripDetailMapInstance.remove();
+            tripDetailMapInstance = null;
+        }
+
+        const originCoords = trip._originCoords || resolveAddressCoords(trip.origen || trip.pickupAddress, { lat: -34.6037, lng: -58.3816 });
+        const destCoords = trip._destCoords || resolveAddressCoords(trip.destino || trip.dropoffAddress, { lat: -34.8150, lng: -58.5348 });
+        const stopAddress = trip.parada || trip.stopAddress;
+        const stopCoords = stopAddress ? (trip._stopCoords || resolveAddressCoords(stopAddress, { lat: -34.5889, lng: -58.4306 })) : null;
+
+        tripDetailMapInstance = L.map('tripDetailMap', {
+            zoomControl: false,
+            attributionControl: false
+        }).setView([originCoords.lat, originCoords.lng], 13);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(tripDetailMapInstance);
+
+        const bounds = L.latLngBounds([[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]]);
+
+        // Marcador Origen
+        L.marker([originCoords.lat, originCoords.lng], {
+            icon: createPointIcon('origin', 'Partida')
+        }).addTo(tripDetailMapInstance);
+
+        // Marcador Parada si existe
+        if (stopCoords) {
+            bounds.extend([stopCoords.lat, stopCoords.lng]);
+            L.marker([stopCoords.lat, stopCoords.lng], {
+                icon: createPointIcon('stop', 'Parada')
+            }).addTo(tripDetailMapInstance);
+        }
+
+        // Marcador Destino
+        L.marker([destCoords.lat, destCoords.lng], {
+            icon: createPointIcon('destination', 'Destino')
+        }).addTo(tripDetailMapInstance);
+
+        // Trazar línea de ruta
+        const routePoints = stopCoords 
+            ? [[originCoords.lat, originCoords.lng], [stopCoords.lat, stopCoords.lng], [destCoords.lat, destCoords.lng]]
+            : [[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]];
+
+        L.polyline(routePoints, {
+            color: '#f59e0b',
+            weight: 5,
+            opacity: 0.85
+        }).addTo(tripDetailMapInstance);
+
+        tripDetailMapInstance.fitBounds(bounds, { padding: [25, 25] });
+        setTimeout(() => {
+            if (tripDetailMapInstance) tripDetailMapInstance.invalidateSize();
+        }, 150);
+    }
+
     function openTripDetailModal(trip) {
         if (!modalTripDetail) return;
         const montoNum = Number(trip.monto || trip.totalFare || trip.price || 0);
@@ -627,6 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tdEstado) tdEstado.textContent = (trip.estado === 'completado' || trip.estado === 'Completada') ? 'Finalizado y Cobrado' : (trip.status || 'Completado');
 
         modalTripDetail.classList.add('active');
+        renderTripDetailMap(trip);
         playAlertSound('success');
     }
 
@@ -2786,15 +2866,235 @@ document.addEventListener('DOMContentLoaded', () => {
         const nameEl = document.getElementById('driverName');
         const badgeEl = document.getElementById('driverCarBadge');
         const fullNameEl = document.getElementById('profileFullName');
+        const vehicleValEl = document.getElementById('profileVehicleVal');
+        const phoneValEl = document.getElementById('profilePhoneVal');
+        const ratingNumEl = document.getElementById('profileRatingNum');
 
         if (nameEl) nameEl.textContent = info.nombre;
         if (badgeEl) badgeEl.textContent = `${info.auto} · ${info.patente}`;
         if (fullNameEl) fullNameEl.textContent = info.nombre;
+        if (vehicleValEl) vehicleValEl.textContent = `${info.auto} (Patente: ${info.patente})`;
+        if (phoneValEl) phoneValEl.textContent = info.telefono;
+        if (ratingNumEl) ratingNumEl.textContent = info.calificacion || '4.98';
+    }
 
-        const infoVals = document.querySelectorAll('#viewPerfil .profile-info-item .info-val');
-        if (infoVals && infoVals.length >= 2) {
-            infoVals[0].textContent = `${info.auto} (Patente: ${info.patente})`;
+    // Modal de Perfil Partner del Chofer (accesible desde la cabecera)
+    const btnOpenDriverProfile = document.getElementById('btnOpenDriverProfile');
+    const modalDriverProfile = document.getElementById('modalDriverProfile');
+    const btnCloseDriverProfile = document.getElementById('btnCloseDriverProfile');
+    const btnCerrarPerfilSheet = document.getElementById('btnCerrarPerfilSheet');
+
+    function openDriverProfileModal() {
+        if (!modalDriverProfile) return;
+        renderDriverProfileInfo();
+        modalDriverProfile.classList.add('active');
+        playAlertSound('success');
+    }
+
+    function closeDriverProfileModal() {
+        if (modalDriverProfile) modalDriverProfile.classList.remove('active');
+    }
+
+    if (btnOpenDriverProfile) btnOpenDriverProfile.addEventListener('click', openDriverProfileModal);
+    if (btnCloseDriverProfile) btnCloseDriverProfile.addEventListener('click', closeDriverProfileModal);
+    if (btnCerrarPerfilSheet) btnCerrarPerfilSheet.addEventListener('click', closeDriverProfileModal);
+    if (modalDriverProfile) {
+        modalDriverProfile.addEventListener('click', (e) => {
+            if (e.target === modalDriverProfile) closeDriverProfileModal();
+        });
+    }
+
+    // ==========================================
+    // 14. MODAL: MODIFICAR RUTA DEL VIAJE EN CURSO
+    // ==========================================
+    const btnOpenEditRouteModal = document.getElementById('btnOpenEditRouteModal');
+    const modalEditActiveTripRoute = document.getElementById('modalEditActiveTripRoute');
+    const btnCloseEditRouteModal = document.getElementById('btnCloseEditRouteModal');
+    const btnCancelEditRouteModal = document.getElementById('btnCancelEditRouteModal');
+    const btnConfirmEditRouteModal = document.getElementById('btnConfirmEditRouteModal');
+    const editTripOriginInput = document.getElementById('editTripOriginInput');
+    const editTripStopInput = document.getElementById('editTripStopInput');
+    const btnToggleStopInEdit = document.getElementById('btnToggleStopInEdit');
+    const editTripDestInput = document.getElementById('editTripDestInput');
+    const editTripCalcDist = document.getElementById('editTripCalcDist');
+    const editTripCalcFare = document.getElementById('editTripCalcFare');
+    const editTripFareDiff = document.getElementById('editTripFareDiff');
+
+    let isStopActiveInEdit = false;
+
+    function recalculateModifiedRouteFare() {
+        const trip = driverState.activeTrip;
+        if (!trip) return;
+
+        const originStr = editTripOriginInput ? editTripOriginInput.value.trim() : (trip.origen || '');
+        const stopStr = isStopActiveInEdit && editTripStopInput ? editTripStopInput.value.trim() : '';
+        const destStr = editTripDestInput ? editTripDestInput.value.trim() : (trip.destino || '');
+
+        const origCoords = resolveAddressCoords(originStr, { lat: -34.6037, lng: -58.3816 });
+        const destCoords = resolveAddressCoords(destStr, { lat: -34.8150, lng: -58.5348 });
+        const stopCoords = stopStr ? resolveAddressCoords(stopStr, { lat: -34.5889, lng: -58.4306 }) : null;
+
+        let straightDistKm = 0;
+        if (stopCoords) {
+            straightDistKm = calculateDistanceKm(origCoords.lat, origCoords.lng, stopCoords.lat, stopCoords.lng) +
+                             calculateDistanceKm(stopCoords.lat, stopCoords.lng, destCoords.lat, destCoords.lng);
+        } else {
+            straightDistKm = calculateDistanceKm(origCoords.lat, origCoords.lng, destCoords.lat, destCoords.lng);
         }
+
+        const estKm = Math.max(2, Math.round(straightDistKm * 1.32 * 10) / 10);
+        const baseFare = 12000;
+        const perKmRate = 1150;
+        const stopFee = stopCoords ? 4000 : 0;
+        const tollAmt = Number(trip.tollFare || trip.peajes || 0);
+
+        const calculatedFare = Math.max(15000, Math.round((baseFare + (estKm * perKmRate) + stopFee + tollAmt) / 500) * 500);
+        const originalFare = Number(trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0);
+        const diff = calculatedFare - originalFare;
+
+        if (editTripCalcDist) editTripCalcDist.textContent = `${estKm.toFixed(1)} km`;
+        if (editTripCalcFare) editTripCalcFare.textContent = `$${calculatedFare.toLocaleString('es-AR')}`;
+        if (editTripFareDiff) {
+            if (diff > 0) {
+                editTripFareDiff.textContent = `+$${diff.toLocaleString('es-AR')} (Aumento)`;
+                editTripFareDiff.style.color = '#38bdf8';
+            } else if (diff < 0) {
+                editTripFareDiff.textContent = `-$${Math.abs(diff).toLocaleString('es-AR')} (Disminución)`;
+                editTripFareDiff.style.color = '#34d399';
+            } else {
+                editTripFareDiff.textContent = '$0 (Sin cambios)';
+                editTripFareDiff.style.color = '#94a3b8';
+            }
+        }
+
+        return { estKm, calculatedFare, originStr, stopStr, destStr, origCoords, stopCoords, destCoords };
+    }
+
+    if (btnToggleStopInEdit) {
+        btnToggleStopInEdit.addEventListener('click', () => {
+            isStopActiveInEdit = !isStopActiveInEdit;
+            if (isStopActiveInEdit) {
+                if (editTripStopInput) {
+                    editTripStopInput.style.display = 'block';
+                    editTripStopInput.focus();
+                }
+                btnToggleStopInEdit.textContent = '- Quitar parada';
+                btnToggleStopInEdit.style.color = '#ef4444';
+            } else {
+                if (editTripStopInput) {
+                    editTripStopInput.style.display = 'none';
+                    editTripStopInput.value = '';
+                }
+                btnToggleStopInEdit.textContent = '+ Agregar parada';
+                btnToggleStopInEdit.style.color = '#38bdf8';
+            }
+            recalculateModifiedRouteFare();
+        });
+    }
+
+    [editTripOriginInput, editTripStopInput, editTripDestInput].forEach(inp => {
+        if (inp) {
+            inp.addEventListener('input', recalculateModifiedRouteFare);
+        }
+    });
+
+    if (btnOpenEditRouteModal) {
+        btnOpenEditRouteModal.addEventListener('click', () => {
+            const trip = driverState.activeTrip;
+            if (!trip) {
+                alert('No hay un viaje activo en curso para modificar.');
+                return;
+            }
+
+            if (editTripOriginInput) editTripOriginInput.value = trip.origen || trip.pickupAddress || '';
+            if (editTripDestInput) editTripDestInput.value = trip.destino || trip.dropoffAddress || '';
+            const existingStop = trip.parada || trip.stopAddress || '';
+            if (existingStop) {
+                isStopActiveInEdit = true;
+                if (editTripStopInput) {
+                    editTripStopInput.style.display = 'block';
+                    editTripStopInput.value = existingStop;
+                }
+                if (btnToggleStopInEdit) {
+                    btnToggleStopInEdit.textContent = '- Quitar parada';
+                    btnToggleStopInEdit.style.color = '#ef4444';
+                }
+            } else {
+                isStopActiveInEdit = false;
+                if (editTripStopInput) {
+                    editTripStopInput.style.display = 'none';
+                    editTripStopInput.value = '';
+                }
+                if (btnToggleStopInEdit) {
+                    btnToggleStopInEdit.textContent = '+ Agregar parada';
+                    btnToggleStopInEdit.style.color = '#38bdf8';
+                }
+            }
+
+            recalculateModifiedRouteFare();
+            if (modalEditActiveTripRoute) modalEditActiveTripRoute.classList.add('active');
+            playAlertSound('incoming');
+        });
+    }
+
+    function closeEditRouteModal() {
+        if (modalEditActiveTripRoute) modalEditActiveTripRoute.classList.remove('active');
+    }
+
+    if (btnCloseEditRouteModal) btnCloseEditRouteModal.addEventListener('click', closeEditRouteModal);
+    if (btnCancelEditRouteModal) btnCancelEditRouteModal.addEventListener('click', closeEditRouteModal);
+    if (modalEditActiveTripRoute) {
+        modalEditActiveTripRoute.addEventListener('click', (e) => {
+            if (e.target === modalEditActiveTripRoute) closeEditRouteModal();
+        });
+    }
+
+    if (btnConfirmEditRouteModal) {
+        btnConfirmEditRouteModal.addEventListener('click', () => {
+            const trip = driverState.activeTrip;
+            if (!trip) return;
+
+            const res = recalculateModifiedRouteFare();
+            if (!res || !res.originStr || !res.destStr) {
+                alert('Por favor indica un punto de origen y un destino válidos.');
+                return;
+            }
+
+            const updatedTrip = {
+                ...trip,
+                origen: res.originStr,
+                pickupAddress: res.originStr,
+                destino: res.destStr,
+                dropoffAddress: res.destStr,
+                parada: res.stopStr || null,
+                stopAddress: res.stopStr || null,
+                hasStop: !!res.stopStr,
+                distancia: `${res.estKm.toFixed(1)} km`,
+                distanceKm: res.estKm,
+                precioEstimado: res.calculatedFare,
+                precio: res.calculatedFare,
+                totalFare: res.calculatedFare,
+                monto: res.calculatedFare,
+                _originCoords: res.origCoords,
+                _stopCoords: res.stopCoords,
+                _destCoords: res.destCoords,
+                rutaModificadaEn: Date.now()
+            };
+
+            driverState.activeTrip = updatedTrip;
+            try {
+                localStorage.setItem('rutaprivada_driver_active_trip', JSON.stringify(updatedTrip));
+            } catch(e) {}
+
+            startActiveTrip(updatedTrip);
+            if (window.RutaSync) {
+                window.RutaSync.actualizarEstadoViaje(updatedTrip.etapa || 'en_camino', updatedTrip);
+            }
+
+            closeEditRouteModal();
+            showDriverToast(`✅ Ruta y tarifa actualizadas: $${res.calculatedFare.toLocaleString('es-AR')}`);
+            playAlertSound('success');
+        });
     }
 
     function restoreDriverActiveTripIfExists() {

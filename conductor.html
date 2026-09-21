@@ -27,17 +27,17 @@
 <body class="driver-body">
     <!-- BARRA SUPERIOR -->
     <header class="driver-header">
-        <div class="driver-profile-info">
+        <div class="driver-profile-info clickable-header-profile" id="btnOpenDriverProfile" style="cursor: pointer;" title="Toca para ver tu Perfil Partner y datos del vehículo">
             <div class="driver-avatar-wrap">
                 <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" alt="Conductor" class="driver-avatar" id="driverAvatar">
                 <span class="status-indicator" id="headerStatusDot"></span>
             </div>
             <div class="driver-meta">
-                <h2 class="driver-name" id="driverName">Martín G.</h2>
+                <h2 class="driver-name" id="driverName">Daniel Pabon</h2>
                 <div class="driver-rating">
-                    <i class="fa-solid fa-star"></i> <span>4.96</span>
+                    <i class="fa-solid fa-star text-gold"></i> <span id="driverRatingVal">4.98</span>
                     <span class="bullet">•</span>
-                    <span class="driver-car-badge" id="driverCarBadge">Toyota Corolla</span>
+                    <span class="driver-car-badge" id="driverCarBadge">Fiat Cronos · AE927CN</span>
                 </div>
             </div>
         </div>
@@ -130,13 +130,21 @@
                 </div>
 
                 <!-- Botones de Navegación GPS Externa (Justo debajo del mapa para acceso rápido) -->
-                <div class="navigation-apps-row" style="margin-top: 10px; margin-bottom: 12px;">
+                <div class="navigation-apps-row" style="margin-top: 10px; margin-bottom: 10px;">
                     <a href="#" class="btn-nav-app waze" id="btnOpenWaze" target="_blank">
                         <i class="fa-brands fa-waze"></i> Navegar en Waze
                     </a>
                     <a href="#" class="btn-nav-app gmaps" id="btnOpenGoogleMaps" target="_blank">
                         <i class="fa-solid fa-map-location-dot"></i> Google Maps
                     </a>
+                </div>
+
+                <!-- BOTÓN PRINCIPAL ELEVADO DE ACCIÓN (Siempre accesible arriba sin necesidad de scrollear) -->
+                <div class="trip-flow-controls elevated-flow-controls" style="margin-bottom: 14px;">
+                    <button class="btn-flow-action pulse-action-btn" id="btnNextTripState">
+                        <span id="btnNextTripText">Llegué al punto de recogida</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
                 </div>
 
                 <!-- Datos del Pasajero -->
@@ -163,8 +171,15 @@
                     </div>
                 </div>
 
-                <!-- Puntos de Ruta con soporte para Parada Intermedia -->
+                <!-- Puntos de Ruta con soporte para Modificación y Parada Intermedia -->
                 <div class="active-trip-route">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Itinerario del Viaje</span>
+                        <button type="button" class="btn-edit-route-trigger" id="btnOpenEditRouteModal" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;">
+                            <i class="fa-solid fa-pen-to-square"></i> Modificar Ruta
+                        </button>
+                    </div>
+
                     <div class="route-step">
                         <div class="route-icon origin"><i class="fa-solid fa-circle-dot"></i></div>
                         <div class="route-details">
@@ -206,12 +221,8 @@
                     </div>
                 </div>
 
-                <!-- Botón de avance de estado del viaje -->
-                <div class="trip-flow-controls">
-                    <button class="btn-flow-action" id="btnNextTripState">
-                        <span id="btnNextTripText">Llegué al punto de recogida</span>
-                        <i class="fa-solid fa-arrow-right"></i>
-                    </button>
+                <!-- Cancelación secundaria -->
+                <div style="text-align: center; margin-top: 10px;">
                     <button class="btn-cancel-trip" id="btnCancelActiveTrip">
                         <i class="fa-solid fa-xmark"></i> Cancelar viaje
                     </button>
@@ -261,7 +272,7 @@
                 </div>
             </div>
 
-            <!-- Pestañas de Período -->
+            <!-- Pestañas de Período (Hoy, Esta Semana, Este Mes) -->
             <div class="earnings-period-tabs">
                 <button type="button" class="period-tab-btn active" data-period="dia">
                     <i class="fa-regular fa-sun"></i> Hoy
@@ -271,9 +282,6 @@
                 </button>
                 <button type="button" class="period-tab-btn" data-period="mes">
                     <i class="fa-regular fa-calendar-days"></i> Este Mes
-                </button>
-                <button type="button" class="period-tab-btn" data-period="historial">
-                    <i class="fa-solid fa-clock-rotate-left"></i> Historial
                 </button>
             </div>
 
@@ -332,79 +340,10 @@
                 </div>
             </div>
         </div>
-
-        <!-- =========================================================
-             VISTA 4: PERFIL & AJUSTES
-             ========================================================= -->
-        <div class="driver-tab-view" id="viewPerfil">
-            <div class="section-title-wrap">
-                <div class="title-left">
-                    <h3><i class="fa-solid fa-id-card text-gold"></i> Mi Perfil Partner</h3>
-                    <p class="section-sub">Información del chofer, vehículo y accesos rápidos.</p>
-                </div>
-            </div>
-
-            <div class="profile-card">
-                <div class="profile-card-top">
-                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" alt="Conductor" class="profile-avatar-large">
-                    <div>
-                        <h3 id="profileFullName">Martín G.</h3>
-                        <p class="profile-role">Chofer Ejecutivo Certificado</p>
-                        <div class="driver-rating" style="margin-top: 4px;">
-                            <i class="fa-solid fa-star text-gold"></i> <strong>4.96</strong> (128 reseñas de 5 estrellas)
-                        </div>
-                    </div>
-                </div>
-
-                <div class="profile-info-grid">
-                    <div class="profile-info-item">
-                        <span class="info-lbl">Vehículo Asignado</span>
-                        <strong class="info-val">Toyota Corolla 2023</strong>
-                    </div>
-                    <div class="profile-info-item">
-                        <span class="info-lbl">Categoría</span>
-                        <strong class="info-val">Sedán Ejecutivo / Premium</strong>
-                    </div>
-                    <div class="profile-info-item">
-                        <span class="info-lbl">Zona Principal</span>
-                        <strong class="info-val">CABA, Aeroparque & Ezeiza</strong>
-                    </div>
-                    <div class="profile-info-item">
-                        <span class="info-lbl">Estado de Cuenta</span>
-                        <strong class="info-val text-emerald">Activo & Verificado</strong>
-                    </div>
-                </div>
-            </div>
-
-            <div class="profile-links-list">
-                <a href="agenda.html" class="profile-link-item">
-                    <div class="link-left">
-                        <i class="fa-solid fa-clipboard-list text-gold"></i>
-                        <div>
-                            <strong>Portal Partner & Finanzas</strong>
-                            <p>Liquidaciones, hoja de ruta y reportes</p>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-chevron-right"></i>
-                </a>
-
-                <button type="button" class="profile-link-item" id="btnTestSound">
-                    <div class="link-left">
-                        <i class="fa-solid fa-volume-high text-emerald"></i>
-                        <div>
-                            <strong>Probar Alerta Sonora</strong>
-                            <p>Verificar que el audio de viaje entrante funcione</p>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-play"></i>
-                </button>
-            </div>
-        </div>
-
     </main>
 
     <!-- =========================================================
-         BARRA DE NAVEGACIÓN INFERIOR (BOTTOM BAR MOBILE-FIRST)
+         BARRA DE NAVEGACIÓN INFERIOR (BOTTOM BAR MOBILE-FIRST: EN VIVO / RESERVAS / GANANCIAS)
          ========================================================= -->
     <nav class="driver-bottom-nav">
         <button type="button" class="bottom-nav-btn active" id="navBtnLive" data-target="viewLive">
@@ -422,11 +361,83 @@
             <i class="fa-solid fa-wallet"></i>
             <span>Ganancias</span>
         </button>
-        <button type="button" class="bottom-nav-btn" id="navBtnPerfil" data-target="viewPerfil">
-            <i class="fa-solid fa-user-tie"></i>
-            <span>Perfil</span>
-        </button>
     </nav>
+
+    <!-- =========================================================
+         MODAL / BOTTOM SHEET: MI PERFIL PARTNER
+         ========================================================= -->
+    <div class="driver-modal-overlay" id="modalDriverProfile">
+        <div class="driver-modal-sheet" style="max-height: 90vh; overflow-y: auto;">
+            <div class="modal-sheet-header">
+                <h3><i class="fa-solid fa-id-card text-gold"></i> Mi Perfil Partner</h3>
+                <button type="button" class="btn-close-modal" id="btnCloseDriverProfile" style="background:none; border:none; color:#94a3b8; font-size:1.4rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <div class="profile-card" style="margin-top: 10px; margin-bottom: 14px;">
+                <div class="profile-card-top">
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" alt="Conductor" class="profile-avatar-large" id="profileAvatarLarge">
+                    <div>
+                        <h3 id="profileFullName">Daniel Pabon</h3>
+                        <p class="profile-role">Chofer Ejecutivo Certificado</p>
+                        <div class="driver-rating" style="margin-top: 4px;">
+                            <i class="fa-solid fa-star text-gold"></i> <strong id="profileRatingNum">4.98</strong> (142 reseñas de 5 estrellas)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-info-grid">
+                    <div class="profile-info-item">
+                        <span class="info-lbl">Vehículo Asignado</span>
+                        <strong class="info-val" id="profileVehicleVal">Fiat Cronos Negro (Patente: AE927CN)</strong>
+                    </div>
+                    <div class="profile-info-item">
+                        <span class="info-lbl">Categoría</span>
+                        <strong class="info-val">Sedán Ejecutivo / Premium</strong>
+                    </div>
+                    <div class="profile-info-item">
+                        <span class="info-lbl">Teléfono de Contacto</span>
+                        <strong class="info-val" id="profilePhoneVal">+54 9 11 2255-8226</strong>
+                    </div>
+                    <div class="profile-info-item">
+                        <span class="info-lbl">Zona Principal</span>
+                        <strong class="info-val">CABA, Aeroparque & Ezeiza</strong>
+                    </div>
+                    <div class="profile-info-item" style="grid-column: 1 / -1;">
+                        <span class="info-lbl">Estado de Cuenta</span>
+                        <strong class="info-val text-emerald"><i class="fa-solid fa-circle-check"></i> Activo & Verificado para Traslados</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-links-list" style="margin-bottom: 14px;">
+                <a href="agenda.html" class="profile-link-item">
+                    <div class="link-left">
+                        <i class="fa-solid fa-clipboard-list text-gold"></i>
+                        <div>
+                            <strong>Portal Partner & Liquidaciones</strong>
+                            <p>Liquidaciones, hoja de ruta y reportes financieros</p>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right"></i>
+                </a>
+
+                <button type="button" class="profile-link-item" id="btnTestSound">
+                    <div class="link-left">
+                        <i class="fa-solid fa-volume-high text-emerald"></i>
+                        <div>
+                            <strong>Probar Alerta Sonora</strong>
+                            <p>Verificar que el audio de viaje entrante suene fuerte</p>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-play"></i>
+                </button>
+            </div>
+
+            <button type="button" class="btn-cancel-trip full-width" id="btnCerrarPerfilSheet" style="width: 100%; border-radius: 12px; justify-content: center; padding: 12px; font-size: 0.95rem;">
+                Cerrar Perfil
+            </button>
+        </div>
+    </div>
 
     <!-- MODAL / BOTTOM-SHEET: VIAJE ENTRANTE CON AUDIO Y CUENTA REGRESIVA -->
     <div class="incoming-trip-overlay" id="incomingTripModal">
@@ -656,7 +667,7 @@
         </div>
     </div>
 
-    <!-- MODAL: DETALLE EXPLÍCITO DEL VIAJE / TICKET COMPLETO -->
+    <!-- MODAL: DETALLE EXPLÍCITO DEL VIAJE / TICKET COMPLETO CON MAPA -->
     <div class="driver-modal-overlay" id="modalTripDetail">
         <div class="driver-modal-sheet" style="max-height: 90vh; overflow-y: auto;">
             <div class="modal-sheet-header">
@@ -665,6 +676,11 @@
             </div>
 
             <div class="trip-detail-modal-body" style="padding: 10px 0; text-align: left;">
+                <!-- Mapa Interactivo del Recorrido Real -->
+                <div id="tripDetailMapContainer" style="height: 185px; border-radius: 14px; overflow: hidden; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.15); position: relative; background: #0b1120;">
+                    <div id="tripDetailMap" style="width: 100%; height: 100%;"></div>
+                </div>
+
                 <!-- Monto e Identificador -->
                 <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 14px; padding: 14px; text-align: center; margin-bottom: 16px;">
                     <span style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; display: block;">Monto Total Cobrado</span>
@@ -723,6 +739,78 @@
         </div>
     </div>
 
+    <!-- MODAL: MODIFICAR RUTA DEL VIAJE EN CURSO (CONDUCTOR) -->
+    <div class="driver-modal-overlay" id="modalEditActiveTripRoute">
+        <div class="driver-modal-sheet" style="max-height: 90vh; overflow-y: auto;">
+            <div class="modal-sheet-header">
+                <h3><i class="fa-solid fa-route text-gold"></i> Modificar Ruta del Viaje</h3>
+                <button type="button" class="btn-close-modal" id="btnCloseEditRouteModal" style="background:none; border:none; color:#94a3b8; font-size:1.4rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <div style="padding: 10px 0; text-align: left;">
+                <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.8rem; color: #f59e0b; display: flex; gap: 8px; align-items: flex-start;">
+                    <i class="fa-solid fa-circle-info" style="margin-top: 2px;"></i>
+                    <span>Modifica el origen, agrega/quita paradas o cambia el destino a solicitud del pasajero. La tarifa y distancia se recalcularán automáticamente.</span>
+                </div>
+
+                <!-- Formulario de Ruta -->
+                <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px;">
+                    <div>
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #34d399; text-transform: uppercase; display: block; margin-bottom: 4px;">
+                            🟢 Punto de Partida / Origen:
+                        </label>
+                        <input type="text" id="editTripOriginInput" placeholder="Dirección o punto de recogida" style="width: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; color: #fff; padding: 10px 12px; font-size: 0.9rem; outline: none;" />
+                    </div>
+
+                    <!-- Parada Intermedia Opcional -->
+                    <div id="editTripStopWrap">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <label style="font-size: 0.75rem; font-weight: 700; color: #fbbf24; text-transform: uppercase;">
+                                🛑 Parada Intermedia:
+                            </label>
+                            <button type="button" id="btnToggleStopInEdit" style="background: none; border: none; color: #38bdf8; font-size: 0.75rem; font-weight: 700; cursor: pointer;">
+                                + Agregar parada
+                            </button>
+                        </div>
+                        <input type="text" id="editTripStopInput" placeholder="Ej: Palermo Soho o Av. Santa Fe 3000" style="width: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; color: #fff; padding: 10px 12px; font-size: 0.9rem; outline: none; display: none;" />
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.75rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; display: block; margin-bottom: 4px;">
+                            🏁 Punto de Destino Final:
+                        </label>
+                        <input type="text" id="editTripDestInput" placeholder="Dirección de destino" style="width: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; color: #fff; padding: 10px 12px; font-size: 0.9rem; outline: none;" />
+                    </div>
+                </div>
+
+                <!-- Recálculo Automático en Vivo -->
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 12px 14px; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 0.82rem; color: #94a3b8;">Nueva Distancia Estimada:</span>
+                        <strong id="editTripCalcDist" style="color: #fff; font-size: 0.95rem;">-- km</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 0.82rem; color: #94a3b8;">Nueva Tarifa Estimada:</span>
+                        <strong id="editTripCalcFare" style="color: #fbbf24; font-size: 1.25rem; font-weight: 800;">$--</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem;">
+                        <span style="color: #94a3b8;">Ajuste vs Tarifa Original:</span>
+                        <span id="editTripFareDiff" style="color: #34d399; font-weight: 700;">$0</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn-cancel-trip" id="btnCancelEditRouteModal" style="flex: 1; border-radius: 12px; padding: 12px; background: rgba(255,255,255,0.08); color: #fff;">
+                        Cancelar
+                    </button>
+                    <button type="button" class="btn-accept-trip" id="btnConfirmEditRouteModal" style="flex: 2; border-radius: 12px; justify-content: center; padding: 12px; font-size: 0.95rem;">
+                        <i class="fa-solid fa-check"></i> Aplicar y Notificar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase App & Cloud Firestore SDKs (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -731,7 +819,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- SCRIPTS -->
-    <script src="sync.js?v=49"></script>
-    <script src="conductor.js?v=49"></script>
+    <script src="sync.js?v=50"></script>
+    <script src="conductor.js?v=50"></script>
 </body>
 </html>
