@@ -4845,6 +4845,16 @@ function openInAppTripModal(trip) {
   if (pTripDestination) pTripDestination.textContent = trip.destino || trip.dropoffAddress || 'Destino seleccionado';
   if (pTripTotal) pTripTotal.textContent = '$' + tripFare.toLocaleString('es-AR');
 
+  const stopAddr = trip.parada || trip.stopAddress || trip.intermediateStop || (trip.hasStop && trip.stop ? trip.stop : null);
+  const pTripStopRow = document.getElementById('pTripStopRow');
+  const pTripStop = document.getElementById('pTripStop');
+  if (stopAddr) {
+    if (pTripStopRow) pTripStopRow.style.display = 'flex';
+    if (pTripStop) pTripStop.textContent = stopAddr;
+  } else {
+    if (pTripStopRow) pTripStopRow.style.display = 'none';
+  }
+
   // Estado inicial: Buscando
   if (pStateSearching) pStateSearching.classList.remove('hidden');
   if (pStateDriverAssigned) pStateDriverAssigned.classList.add('hidden');
@@ -5055,10 +5065,11 @@ if (btnPassengerCancelTrip) {
       const elapsedMin = Math.floor(elapsedSec / 60);
 
       if (elapsedMs > 2 * 60 * 1000) { // Pasados más de 2 minutos
-        montoPenalizacion = Math.round(Number(activeTrip.precio) * 0.5 || 3500);
+        const rawPriceNum = Number(activeTrip.precio || activeTrip.precioEstimado || activeTrip.totalFare || 0);
+        montoPenalizacion = Math.max(1500, Math.round(rawPriceNum * 0.10));
         const tarifaMinimaStr = '$' + montoPenalizacion.toLocaleString('es-AR');
         const driverName = (activeTrip.conductor && activeTrip.conductor.nombre) ? activeTrip.conductor.nombre : 'Daniel Pabon';
-        const msgPenalizacion = `⚠️ COBRO DE TARIFA MÍNIMA POR CANCELACIÓN:\n\nTu chofer asignado (${driverName}) ya se encuentra en camino hacia tu ubicación y han transcurrido más de 2 minutos (${elapsedMin} min) desde que tomó el servicio.\n\nPor políticas del servicio ejecutivo, cancelar este viaje aplicará el cobro de la TARIFA MÍNIMA (${tarifaMinimaStr}) como compensación al chofer.\n\n¿Deseas confirmar la cancelación del viaje?`;
+        const msgPenalizacion = `⚠️ COBRO DEL 10% POR CANCELACIÓN:\n\nTu chofer asignado (${driverName}) ya se encuentra en camino hacia tu ubicación y han transcurrido más de 2 minutos (${elapsedMin} min) desde que tomó el servicio.\n\nPor políticas del servicio ejecutivo, cancelar este viaje aplicará el cobro del 10% del total (${tarifaMinimaStr}) como compensación al chofer.\n\n¿Deseas confirmar la cancelación del viaje?`;
         
         if (!confirm(msgPenalizacion)) {
           return;
@@ -5859,6 +5870,35 @@ if (btnRecenterPassengerMap) {
     if (typeof updateCalculation === 'function') {
       updateCalculation();
     }
+  }
+
+  // ====================================================
+  // RECUPERACIÓN DE VIAJE ACTIVO AL RECARGAR PÁGINA
+  // ====================================================
+  function restorePassengerActiveTripIfExists() {
+    if (!window.RutaSync) return;
+    const trip = window.RutaSync.obtenerViajeActivo();
+    if (trip && trip.id && trip.estado && trip.estado !== 'cancelado' && trip.estado !== 'cancelado_por_pasajero' && trip.estado !== 'completado') {
+      openInAppTripModal(trip);
+      if (trip.estado === 'buscando_conductor' || trip.estado === 'solicitado') {
+        if (pStateSearching) pStateSearching.classList.remove('hidden');
+        if (pStateDriverAssigned) pStateDriverAssigned.classList.add('hidden');
+      } else if (trip.conductor) {
+        if (pStateSearching) pStateSearching.classList.add('hidden');
+        if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
+        if (pDriverName) pDriverName.textContent = trip.conductor.nombre || 'Daniel Pabon';
+        if (pDriverCar) pDriverCar.textContent = `${trip.conductor.auto || 'Fiat Cronos Negro'}${trip.conductor.patente ? ' · Patente: ' + trip.conductor.patente : ''}`;
+        if (pDriverRating) pDriverRating.textContent = trip.conductor.calificacion || '4.98';
+        initPassengerLiveMap(trip);
+        updatePassengerTripStage(trip.estado || trip.etapa || 'en_camino');
+      }
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', restorePassengerActiveTripIfExists);
+  } else {
+    restorePassengerActiveTripIfExists();
   }
 
 

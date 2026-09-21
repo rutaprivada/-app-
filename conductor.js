@@ -49,6 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
         isOnline: true,
         activeTrip: null,
         incomingTrip: null,
+        incomingQueue: [],
+        rejectedTrips: [],
         countdownTimer: null,
         countdownSecs: 15,
         audioContext: null,
@@ -65,6 +67,30 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         info: currentFleetDriver
     };
+
+    function toggleDriverStatusBar(show) {
+        const statusBar = document.querySelector('.status-bar-container');
+        if (statusBar) {
+            statusBar.style.display = show ? 'block' : 'none';
+        }
+    }
+
+    function showDriverToast(msg) {
+        let toast = document.getElementById('driverToastEl');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'driverToastEl';
+            toast.style.cssText = 'position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.95);color:#fff;padding:12px 20px;border-radius:30px;font-size:0.85rem;font-weight:600;box-shadow:0 10px 25px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);z-index:99999;pointer-events:none;transition:all 0.3s ease;opacity:0;';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(-50%) translateY(0)';
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(-50%) translateY(10px)';
+        }, 3500);
+    }
 
     // ==========================================
     // ELEMENTOS DEL DOM
@@ -155,6 +181,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     function switchTab(tabId) {
         driverState.currentTab = tabId;
+        try {
+            localStorage.setItem('rutaprivada_driver_active_tab', tabId);
+        } catch(e) {}
 
         // Ocultar todas las vistas y remover clase active
         tabViews.forEach(view => {
@@ -1261,10 +1290,50 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ==========================================
-    // 7. RADAR Y VIAJE ENTRANTE INMEDIATO
+    // 7. RADAR Y VIAJE ENTRANTE INMEDIATO (COLA FIFO & LOOP)
     // ==========================================
-    function showIncomingTrip(tripData) {
+    function enqueueIncomingTrip(tripData) {
         if (!driverState.isOnline || driverState.activeTrip) return;
+        if (!tripData || !tripData.id) return;
+
+        // Evitar duplicados en cola o en el modal activo
+        if (driverState.incomingTrip && driverState.incomingTrip.id === tripData.id) return;
+        if (driverState.incomingQueue.some(t => t.id === tripData.id)) return;
+
+        // Si estaba en rechazadas y vuelve a llegar, retirarla de rechazadas
+        driverState.rejectedTrips = driverState.rejectedTrips.filter(t => t.id !== tripData.id);
+
+        driverState.incomingQueue.push(tripData);
+
+        // Si no hay modal activo, mostrar la solicitud de inmediato
+        if (!driverState.incomingTrip) {
+            processNextIncomingTripFromQueue();
+        }
+    }
+
+    function processNextIncomingTripFromQueue() {
+        if (!driverState.isOnline || driverState.activeTrip) {
+            driverState.incomingQueue = [];
+            return;
+        }
+
+        if (driverState.incomingQueue.length === 0) {
+            // Si no quedan solicitudes nuevas pero hay solicitudes rechazadas esperando, ciclar/repetir
+            if (driverState.rejectedTrips.length > 0) {
+                driverState.incomingQueue = [...driverState.rejectedTrips];
+                driverState.rejectedTrips = [];
+            } else {
+                closeIncomingModal();
+                return;
+            }
+        }
+
+        const nextTrip = driverState.incomingQueue.shift();
+        showIncomingTrip(nextTrip);
+    }
+
+    function showIncomingTrip(tripData) {
+        if (!driverState.isOnline || driverState.activeTrip || !tripData) return;
 
         driverState.incomingTrip = tripData;
         const rawPrice = tripData.precioEstimado ?? tripData.precio ?? tripData.totalFare ?? tripData.monto;
@@ -1278,6 +1347,17 @@ document.addEventListener('DOMContentLoaded', () => {
         incomingDestination.textContent = tripData.destino || tripData.dropoffAddress || tripData.destination || 'Punto de destino';
         incomingDistance.textContent = tripData.distancia || '15 km';
         incomingDuration.textContent = tripData.duracion || '25 min';
+
+        // Parada intermedia si existe
+        const incomingStopRow = document.getElementById('incomingStopRow');
+        const incomingStop = document.getElementById('incomingStop');
+        const stopAddr = tripData.parada || tripData.stopAddress || tripData.intermediateStop || (tripData.hasStop && tripData.stop ? tripData.stop : null);
+        if (stopAddr) {
+            if (incomingStopRow) incomingStopRow.style.display = 'flex';
+            if (incomingStop) incomingStop.textContent = stopAddr;
+        } else {
+            if (incomingStopRow) incomingStopRow.style.display = 'none';
+        }
 
         incomingTripModal.classList.add('active');
         startAlertLoop();
@@ -1318,7 +1398,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function rejectIncomingTrip() {
+        if (driverState.incomingTrip) {
+            driverState.rejectedTrips.push(driverState.incomingTrip);
+        }
         closeIncomingModal();
+        // Procesar siguiente solicitud en la cola
+        setTimeout(() => {
+            processNextIncomingTripFromQueue();
+        }, 300);
     }
 
     btnRejectTrip.addEventListener('click', () => {
@@ -1331,6 +1418,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!driverState.incomingTrip) return;
 
         const trip = driverState.incomingTrip;
+        driverState.incomingQueue = [];
+        driverState.rejectedTrips = [];
         closeIncomingModal();
         playAlertSound('success');
 
@@ -1353,6 +1442,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     function startActiveTrip(trip) {
         stopAlertLoop();
+        toggleDriverStatusBar(false); // Ocultar barra superior "Estás en línea" para optimizar espacio
         const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0;
         const tripPrice = Number(rawPrice) || 0;
         const stopAddr = trip.parada || trip.stopAddress || trip.intermediateStop || (trip.hasStop && trip.stop ? trip.stop : null);
@@ -1363,8 +1453,12 @@ document.addEventListener('DOMContentLoaded', () => {
             parada: stopAddr,
             stopAddress: stopAddr,
             hasStop: !!stopAddr,
-            etapa: 'en_camino'
+            etapa: trip.etapa || 'en_camino'
         };
+
+        try {
+            localStorage.setItem('rutaprivada_driver_active_trip', JSON.stringify(driverState.activeTrip));
+        } catch(e) {}
 
         stateSearching.classList.remove('active');
         stateOffline.classList.remove('active');
@@ -1488,6 +1582,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             trip.etapa = 'en_origen';
             if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_origen');
+            try { localStorage.setItem('rutaprivada_driver_active_trip', JSON.stringify(driverState.activeTrip)); } catch(e) {}
             updateTripStageUI();
             playAlertSound('success');
         } else if (trip.etapa === 'en_origen') {
@@ -1498,6 +1593,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 trip.etapa = 'en_viaje';
                 if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_viaje');
             }
+            try { localStorage.setItem('rutaprivada_driver_active_trip', JSON.stringify(driverState.activeTrip)); } catch(e) {}
             updateTripStageUI();
             playAlertSound('success');
         } else if (trip.etapa === 'hacia_parada') {
@@ -1514,11 +1610,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             trip.etapa = 'en_parada';
             if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_parada');
+            try { localStorage.setItem('rutaprivada_driver_active_trip', JSON.stringify(driverState.activeTrip)); } catch(e) {}
             updateTripStageUI();
             playAlertSound('success');
         } else if (trip.etapa === 'en_parada') {
             trip.etapa = 'en_viaje';
             if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_viaje');
+            try { localStorage.setItem('rutaprivada_driver_active_trip', JSON.stringify(driverState.activeTrip)); } catch(e) {}
             updateTripStageUI();
             playAlertSound('success');
         } else if (trip.etapa === 'en_viaje') {
@@ -2208,6 +2306,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             tripPendingRating = { ...trip, montoGanado, metodoPago: driverSelectedPaymentMethod };
+            toggleDriverStatusBar(true);
+            try { localStorage.removeItem('rutaprivada_driver_active_trip'); } catch(e) {}
             driverState.activeTrip = null;
 
             if (modalDriverFareSummary) {
@@ -2316,17 +2416,38 @@ document.addEventListener('DOMContentLoaded', () => {
         const warningMsg = '⚠️ ADVERTENCIA DE CANCELACIÓN:\n\nAl cancelar este viaje, el servicio volverá a quedar disponible para que otro conductor de la flota lo acepte de inmediato.\n\n¿Estás seguro de que deseas cancelar el viaje?';
         if (confirm(warningMsg)) {
             stopDriverGpsTracking();
-            if (window.RutaSync) {
+            toggleDriverStatusBar(true);
+            try { localStorage.removeItem('rutaprivada_driver_active_trip'); } catch(e) {}
+
+            const cancelledTrip = driverState.activeTrip;
+            if (window.RutaSync && cancelledTrip) {
+                const reBroadcastTrip = {
+                    ...cancelledTrip,
+                    id: cancelledTrip.id || ('trip_' + Date.now()),
+                    estado: 'buscando_conductor',
+                    conductor: null,
+                    conductorAsignado: null,
+                    motivo: 'cancelado_por_conductor',
+                    ultimoEstadoEn: Date.now(),
+                    timestamp: Date.now()
+                };
+
+                // Notificar estado cambiado
                 window.RutaSync.actualizarEstadoViaje('buscando_conductor', {
                     motivo: 'cancelado_por_conductor',
                     conductor: null,
                     ultimoEstadoEn: Date.now()
                 });
+
+                // Re-solicitar para que todos los demás choferes reciban la solicitud en su radar
+                window.RutaSync.solicitarViaje(reBroadcastTrip);
             }
+
             driverState.activeTrip = null;
             stateActiveTrip.classList.remove('active');
             stateSearching.classList.add('active');
-            showDriverToast('ℹ️ Viaje cancelado. Has vuelto al modo de búsqueda en vivo.');
+            showDriverToast('ℹ️ Viaje cancelado. Solicitud re-enviada a otros choferes.');
+            playAlertSound('warning');
         }
     });
 
@@ -2450,7 +2571,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!driverState.isOnline) {
                     setOnlineStatus(true);
                 }
-                showIncomingTrip(viaje);
+                enqueueIncomingTrip(viaje);
             }
         });
 
@@ -2482,21 +2603,38 @@ document.addEventListener('DOMContentLoaded', () => {
             renderReservas();
             if (viaje && (viaje.estado === 'cancelado_por_pasajero' || viaje.estado === 'cancelado')) {
                 if (driverState.activeTrip) {
+                    const rawPrice = Number(driverState.activeTrip.precioEstimado || driverState.activeTrip.precio || driverState.activeTrip.totalFare || driverState.activeTrip.monto || 0);
                     const teniaPenalizacion = !!viaje.penalizacion;
-                    const monto = viaje.montoPenalizacion || Math.round(Number(driverState.activeTrip.precio) * 0.5 || 3500);
+                    const monto = viaje.montoPenalizacion || Math.max(1500, Math.round(rawPrice * 0.10));
                     const passName = driverState.activeTrip.nombrePasajero || driverState.activeTrip.clientName || 'El pasajero';
                     
                     let alertMsg = `🚨 VIAJE CANCELADO POR EL PASAJERO\n\n${passName} ha cancelado la solicitud del viaje.`;
                     if (teniaPenalizacion) {
-                        alertMsg += `\n\n💰 COMPENSACIÓN POR CANCELACIÓN:\nDado que transcurrieron más de 2 minutos desde que aceptaste el viaje, se acreditó la TARIFA MÍNIMA de compensación ($${monto.toLocaleString('es-AR')}) a tu favor.`;
-                        driverState.todayEarnings += monto;
-                        actualizarGananciasDriverUI();
+                        alertMsg += `\n\n💰 COMPENSACIÓN POR CANCELACIÓN:\nDado que transcurrieron más de 2 minutos desde la solicitud/aceptación, se acreditó la tarifa de cancelación del 10% ($${monto.toLocaleString('es-AR')}) a tu favor.`;
+                        
+                        const itemCancel = {
+                            id: 'cancel_' + Date.now(),
+                            fecha: getTodayKey(),
+                            hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            origen: driverState.activeTrip.origen || 'Origen',
+                            destino: 'Cancelado por Pasajero (10% Penalidad)',
+                            monto: monto,
+                            distancia: '0 km',
+                            metodoPago: 'Compensación Cancelación (10%)',
+                            categoria: driverState.activeTrip.categoria || 'Sedán Ejecutivo',
+                            estado: 'completado'
+                        };
+                        driverState.stats.historial.unshift(itemCancel);
+                        saveStats();
+                        updateEarningsUI();
                     } else {
                         alertMsg += `\n\n(Cancelación dentro de la ventana de cortesía de 2 minutos).`;
                     }
 
                     alert(alertMsg);
                     stopDriverGpsTracking();
+                    toggleDriverStatusBar(true);
+                    try { localStorage.removeItem('rutaprivada_driver_active_trip'); } catch(e) {}
                     driverState.activeTrip = null;
                     stateActiveTrip.classList.remove('active');
                     stateSearching.classList.add('active');
@@ -2576,7 +2714,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 13. INICIALIZACIÓN
+    // 13. INICIALIZACIÓN Y RESTAURACIÓN DE ESTADO
     // ==========================================
     function renderDriverProfileInfo() {
         const info = driverState.info;
@@ -2594,12 +2732,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function restoreDriverActiveTripIfExists() {
+        try {
+            let activeTrip = null;
+            if (window.RutaSync) {
+                const syncTrip = window.RutaSync.obtenerViajeActivo();
+                if (syncTrip && syncTrip.estado && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_conductor'].includes(syncTrip.estado)) {
+                    if (syncTrip.conductor && syncTrip.conductor.nombre === driverState.info.nombre) {
+                        activeTrip = syncTrip;
+                    }
+                }
+            }
+            if (!activeTrip) {
+                const raw = localStorage.getItem('rutaprivada_driver_active_trip');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && parsed.id) {
+                        activeTrip = parsed;
+                    }
+                }
+            }
+
+            if (activeTrip) {
+                setOnlineStatus(true);
+                switchTab('viewLive');
+                startActiveTrip(activeTrip);
+                if (activeTrip.etapa) {
+                    driverState.activeTrip.etapa = activeTrip.etapa;
+                    updateTripStageUI();
+                }
+                return true;
+            }
+        } catch(e) {
+            console.warn('Error al restaurar viaje activo del chofer:', e);
+        }
+        return false;
+    }
+
     // Limpieza de datos de prueba y arranque
     purgeTestBookings();
     renderDriverProfileInfo();
     loadSavedStats();
     initFirebaseConductor();
     renderReservas();
+
+    // Restaurar viaje activo si existe tras recarga o cierre
+    const hasRestoredTrip = restoreDriverActiveTripIfExists();
 
     // Iniciar siempre en Línea para recibir solicitudes al instante (estilo Uber/Cabify)
     try {
@@ -2611,6 +2789,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch(e) {
         setOnlineStatus(true);
+    }
+
+    // Si no había un viaje activo en curso, restaurar la pestaña donde estaba el chofer
+    if (!hasRestoredTrip) {
+        try {
+            const savedTab = localStorage.getItem('rutaprivada_driver_active_tab');
+            if (savedTab && document.getElementById(savedTab)) {
+                switchTab(savedTab);
+            }
+        } catch(e) {}
     }
 
     // Registro y actualización de Service Worker para la PWA de Chofer
