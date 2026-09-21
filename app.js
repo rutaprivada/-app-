@@ -4201,12 +4201,15 @@ function recordConfirmedReservation() {
       stop: stopStr,
       distanceKm: Number(state.distanceKm) || 0,
       durationMin: Number(state.durationMin || state.baseDurationMin) || 0,
+      fuelCostEst: Math.round((Number(state.distanceKm) || 0) * 210),
       totalFare: finalFare,
       price: finalFare,
       monto: finalFare,
       isRoundtrip: !!state.extras?.roundtrip,
       isPet: !!state.extras?.pet,
       tollFare: Number(b.tollCost || b.tollFare || 0),
+      tollActual: Number(b.tollCost || b.tollFare || 0),
+      peajes: Number(b.tollCost || b.tollFare || 0),
       status: 'pendiente',
       notes: passNotes,
       customerName: passName,
@@ -4921,13 +4924,17 @@ if (btnRequestInapp) {
       destino: destAddress,
       dropoffAddress: destAddress,
       distancia: `${(state.distanceKm || 0).toFixed(1)} km`,
+      distanceKm: Number(state.distanceKm) || 0,
       duracion: `${state.durationMin || state.baseDurationMin || 0} min`,
+      durationMin: Number(state.durationMin || state.baseDurationMin) || 0,
+      fuelCostEst: Math.round((Number(state.distanceKm) || 0) * 210),
       precioEstimado: calculatedFare,
       precio: calculatedFare,
       totalFare: calculatedFare,
       monto: calculatedFare,
       peajes: tollCostNum,
       tollFare: tollCostNum,
+      tollActual: tollCostNum,
       nombrePasajero: passName,
       clientName: passName,
       customerName: passName,
@@ -5271,6 +5278,9 @@ if (window.RutaSync) {
       }
 
       showToast('🌟 ¡Muchas gracias por tu calificación! Esperamos verte pronto.');
+
+      // Reseteo total de la cotización para dejar la pantalla en blanco
+      resetQuoteFormClean();
     });
   }
 
@@ -5279,7 +5289,104 @@ if (window.RutaSync) {
       modalPassengerTripCompleted.classList.add('hidden');
       modalPassengerTripCompleted.style.display = 'none';
       if (window.RutaSync) window.RutaSync.limpiarViajeActivo();
+      resetQuoteFormClean();
     });
+  }
+
+  function resetQuoteFormClean() {
+    // 1. Limpiar inputs de texto
+    const origInput = document.getElementById('origin-input');
+    const destInput = document.getElementById('destination-input');
+    const stopInput = document.getElementById('stop-input');
+    const passName = document.getElementById('passenger-name');
+    const passPhone = document.getElementById('passenger-phone');
+    const flightNum = document.getElementById('flight-number');
+    const extraNotes = document.getElementById('extra-notes');
+    const manualOverride = document.getElementById('manual-fare-override');
+
+    if (origInput) origInput.value = '';
+    if (destInput) destInput.value = '';
+    if (stopInput) stopInput.value = '';
+    if (passName) passName.value = '';
+    if (passPhone) passPhone.value = '';
+    if (flightNum) flightNum.value = '';
+    if (extraNotes) extraNotes.value = '';
+    if (manualOverride) manualOverride.value = '';
+
+    // 2. Limpiar sugerencias flotantes
+    document.querySelectorAll('.autocomplete-suggestions').forEach(el => {
+      el.innerHTML = '';
+      el.classList.add('hidden');
+    });
+
+    // 3. Resetear marcadores y trazado en el mapa
+    if (typeof originMarker !== 'undefined' && originMarker && typeof map !== 'undefined' && map) {
+      try { map.removeLayer(originMarker); } catch(e) {}
+      originMarker = null;
+    }
+    if (typeof destinationMarker !== 'undefined' && destinationMarker && typeof map !== 'undefined' && map) {
+      try { map.removeLayer(destinationMarker); } catch(e) {}
+      destinationMarker = null;
+    }
+    if (typeof stopMarker !== 'undefined' && stopMarker && typeof map !== 'undefined' && map) {
+      try { map.removeLayer(stopMarker); } catch(e) {}
+      stopMarker = null;
+    }
+    if (typeof routePolyline !== 'undefined' && routePolyline && typeof map !== 'undefined' && map) {
+      try { map.removeLayer(routePolyline); } catch(e) {}
+      routePolyline = null;
+    }
+
+    // 4. Centrar mapa en Buenos Aires
+    if (typeof map !== 'undefined' && map) {
+      try { map.setView([-34.6037, -58.3816], 12); } catch(e) {}
+    }
+
+    // 5. Resetear estado en memoria
+    if (typeof state !== 'undefined') {
+      state.origin = null;
+      state.destination = null;
+      state.stop = null;
+      state.hasStop = false;
+      state.distanceKm = 0;
+      state.durationMin = 0;
+      state.baseDurationMin = 0;
+      state.routeHasTolls = false;
+      state.tollDetails = [];
+      state.tollPlazas = 0;
+      state.tollRoadNames = [];
+      state.totalPrice = 0;
+      state.breakdown = {};
+      state.extras = { roundtrip: false, pet: false };
+    }
+
+    // 6. Limpiar checkboxes de extras
+    const chkRoundtrip = document.getElementById('extra-roundtrip');
+    const chkPet = document.getElementById('extra-pet');
+    if (chkRoundtrip) chkRoundtrip.checked = false;
+    if (chkPet) chkPet.checked = false;
+
+    // 7. Ocultar sección de parada intermedia
+    const stopFieldGroup = document.getElementById('stop-field-group');
+    if (stopFieldGroup) stopFieldGroup.classList.add('hidden');
+
+    // 8. Ocultar paneles de cotización / resetear totales en pantalla
+    const priceDisplay = document.getElementById('total-price-display');
+    if (priceDisplay) priceDisplay.textContent = '$0';
+    const kmDisplay = document.getElementById('total-distance-display');
+    if (kmDisplay) kmDisplay.textContent = '0.0 km';
+    const timeDisplay = document.getElementById('total-time-display');
+    if (timeDisplay) timeDisplay.textContent = '0 min';
+
+    // 9. Limpiar viaje activo en sincronización
+    if (window.RutaSync) {
+      window.RutaSync.limpiarViajeActivo();
+    }
+
+    // 10. Actualizar UI
+    if (typeof updateCalculation === 'function') {
+      updateCalculation();
+    }
   }
 }
 

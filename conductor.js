@@ -362,13 +362,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 4. CENTRO FINANCIERO: HOY, SEMANA, MES, HISTORIAL
+    // 4. CENTRO FINANCIERO: HOY, SEMANA, MES, HISTORIAL Y FECHA PERSONALIZADA
     // ==========================================
+    const driverCustomDateInput = document.getElementById('driverCustomDateInput');
+    if (driverCustomDateInput) {
+        driverCustomDateInput.value = getTodayKey();
+        driverCustomDateInput.addEventListener('change', (e) => {
+            if (e.target.value) {
+                periodTabBtns.forEach(b => b.classList.remove('active'));
+                driverState.currentEarningsPeriod = 'custom';
+                driverState.customDate = e.target.value;
+                updateFinancialView();
+            }
+        });
+    }
+
     periodTabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             periodTabBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             driverState.currentEarningsPeriod = btn.getAttribute('data-period') || 'dia';
+            if (driverCustomDateInput && driverState.currentEarningsPeriod === 'dia') {
+                driverCustomDateInput.value = getTodayKey();
+            }
             updateFinancialView();
         });
     });
@@ -390,7 +406,11 @@ document.addEventListener('DOMContentLoaded', () => {
         cardDesgloseSemanal.classList.add('hidden');
         cardDesgloseMensual.classList.add('hidden');
 
-        if (period === 'dia') {
+        if (period === 'custom' && driverState.customDate) {
+            heroLabel = `Total del Día (${driverState.customDate})`;
+            filteredTrips = allTrips.filter(t => t.fecha === driverState.customDate);
+            tripsListTitle.textContent = `Viajes del ${driverState.customDate}`;
+        } else if (period === 'dia') {
             heroLabel = 'Total Acumulado Hoy';
             filteredTrips = allTrips.filter(t => t.fecha === todayKey);
             tripsListTitle.textContent = 'Viajes Completados Hoy';
@@ -1225,7 +1245,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const todayKey = getTodayKey();
             const passName = trip.nombrePasajero || trip.clientName || trip.customerName || 'Pasajero';
 
-            // Guardar en estadísticas del chofer con el método seleccionado
+            let distanceKm = 0;
+            if (trip.distanceKm !== undefined && trip.distanceKm !== null && !isNaN(Number(trip.distanceKm))) {
+                distanceKm = Number(trip.distanceKm);
+            } else if (trip.distancia) {
+                const match = String(trip.distancia).replace(',', '.').match(/([\d\.]+)/);
+                if (match) distanceKm = parseFloat(match[1]) || 0;
+            }
+
+            let durationMin = 0;
+            if (trip.durationMin !== undefined && trip.durationMin !== null && !isNaN(Number(trip.durationMin))) {
+                durationMin = Number(trip.durationMin);
+            } else if (trip.duracion) {
+                const match = String(trip.duracion).match(/(\d+)/);
+                if (match) durationMin = parseInt(match[1], 10) || 0;
+            }
+
+            const tollAmt = Number(trip.tollActual !== undefined && trip.tollActual !== null ? trip.tollActual : (trip.tollFare || trip.peajes || 0)) || 0;
+            const fuelCostEst = (trip.fuelCostEst !== undefined && trip.fuelCostEst !== null && Number(trip.fuelCostEst) > 0)
+                ? Number(trip.fuelCostEst)
+                : Math.round(distanceKm * 210);
+            const netFare = Math.max(0, montoGanado - (tollAmt + fuelCostEst));
+
+            // Guardar en estadísticas del chofer con métricas operativas completas
             const nuevoHistorialItem = {
                 id: trip.id || ('trip_' + Date.now()),
                 fecha: todayKey,
@@ -1233,7 +1275,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 origen: trip.origen || trip.pickupAddress || trip.origin,
                 destino: trip.destino || trip.dropoffAddress || trip.destination,
                 monto: montoGanado,
-                distancia: trip.distancia || '18 km',
+                distancia: trip.distancia || `${distanceKm.toFixed(1)} km`,
+                distanceKm: distanceKm,
+                duracionMin: durationMin,
+                peajes: tollAmt,
+                tollFare: tollAmt,
+                tollActual: tollAmt,
+                combustibleEst: fuelCostEst,
+                fuelCostEst: fuelCostEst,
+                gananciaNeta: netFare,
+                netFare: netFare,
                 metodoPago: driverSelectedPaymentMethod,
                 categoria: trip.categoria || trip.category || 'Sedán Ejecutivo',
                 estado: 'completado'
@@ -1246,7 +1297,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.RutaSync) {
                 window.RutaSync.actualizarEstadoViaje('completado', {
                     totalCobrado: montoGanado,
-                    metodoPago: driverSelectedPaymentMethod
+                    metodoPago: driverSelectedPaymentMethod,
+                    distanceKm: distanceKm,
+                    durationMin: durationMin,
+                    tollFare: tollAmt,
+                    tollActual: tollAmt,
+                    peajes: tollAmt,
+                    fuelCostEst: fuelCostEst,
+                    netFare: netFare
                 });
             }
 

@@ -24,8 +24,12 @@ const DEFAULT_DRIVERS = [
 
 const state = {
   activeTab: 'tab-agenda',
-  activeFilter: 'all', // 'all', 'today', 'tomorrow', 'week', 'custom'
+  activeFilter: 'today', // 'today', 'tomorrow', 'week', 'all', 'custom'
   selectedDate: getTodayString(),
+  paymentFilter: 'today',
+  paymentSelectedDate: getTodayString(),
+  financeFilter: 'today',
+  financeSelectedDate: getTodayString(),
   bookings: [],
   drivers: [],
   editingBookingId: null,
@@ -638,6 +642,7 @@ function deleteBookingSync(bookingId) {
 // ==========================================
 
 function initDateFilters() {
+  // 1. Filtros Hoja de Ruta (Tab 1)
   const btnToday = document.getElementById('btn-filter-today');
   const btnTomorrow = document.getElementById('btn-filter-tomorrow');
   const btnWeek = document.getElementById('btn-filter-week');
@@ -650,7 +655,7 @@ function initDateFilters() {
       if (e.target.value) {
         state.activeFilter = 'custom';
         state.selectedDate = e.target.value;
-        setActivePill(null);
+        setActivePill(null, 'agenda');
         renderActiveTab();
       }
     });
@@ -661,7 +666,7 @@ function initDateFilters() {
       state.activeFilter = 'today';
       state.selectedDate = getTodayString();
       if (customInput) customInput.value = state.selectedDate;
-      setActivePill(btnToday);
+      setActivePill(btnToday, 'agenda');
       renderActiveTab();
     });
   }
@@ -671,7 +676,7 @@ function initDateFilters() {
       state.activeFilter = 'tomorrow';
       state.selectedDate = getTomorrowString();
       if (customInput) customInput.value = state.selectedDate;
-      setActivePill(btnTomorrow);
+      setActivePill(btnTomorrow, 'agenda');
       renderActiveTab();
     });
   }
@@ -679,7 +684,7 @@ function initDateFilters() {
   if (btnWeek) {
     btnWeek.addEventListener('click', () => {
       state.activeFilter = 'week';
-      setActivePill(btnWeek);
+      setActivePill(btnWeek, 'agenda');
       renderActiveTab();
     });
   }
@@ -687,22 +692,142 @@ function initDateFilters() {
   if (btnAll) {
     btnAll.addEventListener('click', () => {
       state.activeFilter = 'all';
-      setActivePill(btnAll);
+      setActivePill(btnAll, 'agenda');
       renderActiveTab();
+    });
+  }
+
+  // 2. Filtros Control de Pagos (Tab 2)
+  const btnPayToday = document.getElementById('btn-pay-filter-today');
+  const btnPayTomorrow = document.getElementById('btn-pay-filter-tomorrow');
+  const btnPayWeek = document.getElementById('btn-pay-filter-week');
+  const btnPayAll = document.getElementById('btn-pay-filter-all');
+  const customPayInput = document.getElementById('custom-pay-filter-date');
+
+  if (customPayInput) {
+    customPayInput.value = state.paymentSelectedDate;
+    customPayInput.addEventListener('change', (e) => {
+      if (e.target.value) {
+        state.paymentFilter = 'custom';
+        state.paymentSelectedDate = e.target.value;
+        setActivePill(null, 'payment');
+        renderPaymentsTab();
+      }
+    });
+  }
+
+  if (btnPayToday) {
+    btnPayToday.addEventListener('click', () => {
+      state.paymentFilter = 'today';
+      state.paymentSelectedDate = getTodayString();
+      if (customPayInput) customPayInput.value = state.paymentSelectedDate;
+      setActivePill(btnPayToday, 'payment');
+      renderPaymentsTab();
+    });
+  }
+
+  if (btnPayTomorrow) {
+    btnPayTomorrow.addEventListener('click', () => {
+      state.paymentFilter = 'tomorrow';
+      state.paymentSelectedDate = getTomorrowString();
+      if (customPayInput) customPayInput.value = state.paymentSelectedDate;
+      setActivePill(btnPayTomorrow, 'payment');
+      renderPaymentsTab();
+    });
+  }
+
+  if (btnPayWeek) {
+    btnPayWeek.addEventListener('click', () => {
+      state.paymentFilter = 'week';
+      setActivePill(btnPayWeek, 'payment');
+      renderPaymentsTab();
+    });
+  }
+
+  if (btnPayAll) {
+    btnPayAll.addEventListener('click', () => {
+      state.paymentFilter = 'all';
+      setActivePill(btnPayAll, 'payment');
+      renderPaymentsTab();
+    });
+  }
+
+  // 3. Filtros Finanzas (Tab 3)
+  const btnFinToday = document.getElementById('btn-fin-filter-today');
+  const btnFinTomorrow = document.getElementById('btn-fin-filter-tomorrow');
+  const btnFinWeek = document.getElementById('btn-fin-filter-week');
+  const btnFinAll = document.getElementById('btn-fin-filter-all');
+  const customFinInput = document.getElementById('custom-fin-filter-date');
+
+  if (customFinInput) {
+    customFinInput.value = state.financeSelectedDate;
+    customFinInput.addEventListener('change', (e) => {
+      if (e.target.value) {
+        state.financeFilter = 'custom';
+        state.financeSelectedDate = e.target.value;
+        setActivePill(null, 'finance');
+        renderFinancesTab();
+      }
+    });
+  }
+
+  if (btnFinToday) {
+    btnFinToday.addEventListener('click', () => {
+      state.financeFilter = 'today';
+      state.financeSelectedDate = getTodayString();
+      if (customFinInput) customFinInput.value = state.financeSelectedDate;
+      setActivePill(btnFinToday, 'finance');
+      renderFinancesTab();
+    });
+  }
+
+  if (btnFinTomorrow) {
+    btnFinTomorrow.addEventListener('click', () => {
+      state.financeFilter = 'tomorrow';
+      state.financeSelectedDate = getTomorrowString();
+      if (customFinInput) customFinInput.value = state.financeSelectedDate;
+      setActivePill(btnFinTomorrow, 'finance');
+      renderFinancesTab();
+    });
+  }
+
+  if (btnFinWeek) {
+    btnFinWeek.addEventListener('click', () => {
+      state.financeFilter = 'week';
+      setActivePill(btnFinWeek, 'finance');
+      renderFinancesTab();
+    });
+  }
+
+  if (btnFinAll) {
+    btnFinAll.addEventListener('click', () => {
+      state.financeFilter = 'all';
+      setActivePill(btnFinAll, 'finance');
+      renderFinancesTab();
     });
   }
 }
 
-function setActivePill(activeBtn) {
-  document.querySelectorAll('.date-pill-btn').forEach(b => b.classList.remove('active'));
+function setActivePill(activeBtn, scope = 'agenda') {
+  let selector = '#tab-agenda .date-pill-btn';
+  if (scope === 'payment') selector = '#tab-payments .date-pill-btn';
+  if (scope === 'finance') selector = '#tab-finances .date-pill-btn';
+
+  document.querySelectorAll(selector).forEach(b => b.classList.remove('active'));
   if (activeBtn) activeBtn.classList.add('active');
 }
 
+// HOJA DE RUTA: SOLO RESERVAS A REALIZAR (PENDIENTES / CONFIRMADAS / EN CURSO)
 function getFilteredBookings() {
   const today = getTodayString();
   const tomorrow = getTomorrowString();
 
   return state.bookings.filter(b => {
+    // REGLA: Excluir viajes completados o cancelados de la hoja de ruta
+    const isCompleted = b.status === 'Completada' || b.status === 'completada' || b.isCompleted;
+    const isCancelled = b.status === 'Cancelada' || b.status === 'cancelada';
+    if (isCompleted || isCancelled) return false;
+
     if (!b.date) return false;
     
     if (state.activeFilter === 'today') {
@@ -725,6 +850,66 @@ function getFilteredBookings() {
       return a.date.localeCompare(b.date);
     }
     return (a.time || '00:00').localeCompare(b.time || '00:00');
+  });
+}
+
+// CONTROL DE PAGOS: FILTRO POR DÍA (HOY POR DEFECTO, DÍAS PASADOS O TODO)
+function getFilteredPaymentsBookings() {
+  const today = getTodayString();
+  const tomorrow = getTomorrowString();
+
+  return state.bookings.filter(b => {
+    if (b.status === 'Cancelada' || b.status === 'cancelada') return false;
+    if (!b.date) return false;
+
+    if (state.paymentFilter === 'today') {
+      return b.date === today;
+    } else if (state.paymentFilter === 'tomorrow') {
+      return b.date === tomorrow;
+    } else if (state.paymentFilter === 'custom') {
+      return b.date === state.paymentSelectedDate;
+    } else if (state.paymentFilter === 'week') {
+      const now = new Date();
+      const tripDate = new Date(b.date + 'T00:00:00');
+      const diffDays = (tripDate - now) / (1000 * 60 * 60 * 24);
+      return diffDays >= -1 && diffDays <= 7;
+    } else if (state.paymentFilter === 'all') {
+      return true;
+    }
+    return true;
+  }).sort((a, b) => {
+    if (a.date !== b.date) return b.date.localeCompare(a.date);
+    return (b.time || '00:00').localeCompare(a.time || '00:00');
+  });
+}
+
+// FINANZAS: FILTRO POR DÍA (HOY POR DEFECTO, DÍAS PASADOS O TODO)
+function getFilteredFinanceBookings() {
+  const today = getTodayString();
+  const tomorrow = getTomorrowString();
+
+  return state.bookings.filter(b => {
+    const isCompleted = b.status === 'Completada' || b.status === 'completada';
+    const isPaid = b.paymentStatus === 'Pagado' || b.paymentStatus === 'paid' || isCompleted;
+    const isDeposit = b.paymentStatus === 'Señado';
+    if (!isCompleted && !isPaid && !isDeposit) return false;
+    if (!b.date) return false;
+
+    if (state.financeFilter === 'today') {
+      return b.date === today;
+    } else if (state.financeFilter === 'tomorrow') {
+      return b.date === tomorrow;
+    } else if (state.financeFilter === 'custom') {
+      return b.date === state.financeSelectedDate;
+    } else if (state.financeFilter === 'week') {
+      const now = new Date();
+      const tripDate = new Date(b.date + 'T00:00:00');
+      const diffDays = (tripDate - now) / (1000 * 60 * 60 * 24);
+      return diffDays >= -1 && diffDays <= 7;
+    } else if (state.financeFilter === 'all') {
+      return true;
+    }
+    return true;
   });
 }
 
@@ -1117,19 +1302,20 @@ Estaremos puntuales en el lugar de recogida. ¡Muchas gracias por tu confianza y
 
 function renderPaymentsTab() {
   const container = document.getElementById('payments-container');
+  const countBadge = document.getElementById('payments-count-badge');
   const kpiCollected = document.getElementById('kpi-pay-collected');
   const kpiPending = document.getElementById('kpi-pay-pending');
   const kpiDigital = document.getElementById('kpi-pay-digital');
   const kpiCash = document.getElementById('kpi-pay-cash');
+
+  const filtered = getFilteredPaymentsBookings();
 
   let totalCollected = 0;
   let totalPending = 0;
   let totalDigital = 0;
   let totalCash = 0;
 
-  state.bookings.forEach(b => {
-    if (b.status === 'Cancelada' || b.status === 'cancelada') return;
-
+  filtered.forEach(b => {
     const fare = Number(b.totalFare) || 0;
     const deposit = Number(b.depositAmount) || 0;
     const isPaid = b.paymentStatus === 'Pagado' || b.paymentStatus === 'paid' || b.status === 'Completada' || b.status === 'completada';
@@ -1153,26 +1339,34 @@ function renderPaymentsTab() {
   if (kpiPending) kpiPending.textContent = `$${totalPending.toLocaleString('es-AR')}`;
   if (kpiDigital) kpiDigital.textContent = `$${totalDigital.toLocaleString('es-AR')}`;
   if (kpiCash) kpiCash.textContent = `$${totalCash.toLocaleString('es-AR')}`;
+  if (countBadge) countBadge.textContent = `${filtered.length} ${filtered.length === 1 ? 'viaje' : 'viajes'}`;
 
   if (!container) return;
 
-  if (state.bookings.length === 0) {
+  if (filtered.length === 0) {
     container.innerHTML = `
       <div class="agenda-empty-state">
         <div class="empty-icon">💳</div>
-        <h3>No hay cobros registrados todavía</h3>
-        <p>A medida que ingresen reservas, podrás gestionar el estado de pago, señas y generar comprobantes.</p>
+        <h3>No hay cobros registrados para la fecha seleccionada</h3>
+        <p>Selecciona otra fecha o pulsa "📂 Todas" para visualizar todo el historial de viajes.</p>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = state.bookings.map(b => {
+  const FUEL_COST_PER_KM = 210; // $2.100 ARS por litro / 10 km por litro
+
+  container.innerHTML = filtered.map(b => {
     const fare = Number(b.totalFare) || 0;
     const deposit = Number(b.depositAmount) || 0;
     const isPaid = b.paymentStatus === 'Pagado' || b.paymentStatus === 'paid' || b.status === 'Completada' || b.status === 'completada';
     const isDeposit = b.paymentStatus === 'Señado';
     const pendingBalance = isPaid ? 0 : Math.max(0, fare - deposit);
+
+    const km = Number(b.distanceKm) || 0;
+    const toll = Number(b.tollActual !== undefined && b.tollActual !== null && b.tollActual !== '' ? b.tollActual : (b.tollFare || 0));
+    const fuel = b.fuelCostEst ? Number(b.fuelCostEst) : Math.round(km * FUEL_COST_PER_KM);
+    const netFare = Math.max(0, fare - (toll + fuel));
 
     const badgeClass = isPaid ? 'pagado' : (isDeposit ? 'señado' : 'pendiente');
     const badgeText = isPaid ? '🟢 Pagado 100%' : (isDeposit ? '🔵 Seña Recibida' : '🔴 Pendiente');
@@ -1185,7 +1379,7 @@ function renderPaymentsTab() {
               ${escapeHTML(b.origin)} ➔ ${escapeHTML(b.destination)}
             </div>
             <div style="font-size: 0.8rem; color: #94a3b8;">
-              📅 ${formatDatePretty(b.date)} • ⏰ ${b.time} hs • Pasajero: ${escapeHTML(b.customerName || 'No indicado')}
+              📅 ${formatDatePretty(b.date)} • ⏰ ${b.time} hs • Pasajero: <strong style="color:#fff;">${escapeHTML(b.customerName || b.clientName || 'No indicado')}</strong>
             </div>
           </div>
           <span class="payment-badge ${badgeClass}">${badgeText}</span>
@@ -1194,11 +1388,29 @@ function renderPaymentsTab() {
         <div class="payment-grid-info">
           <div class="payment-info-item">
             <span class="payment-info-label">Tarifa Total</span>
-            <span class="payment-info-val">$${fare.toLocaleString('es-AR')}</span>
+            <span class="payment-info-val text-gold">$${fare.toLocaleString('es-AR')}</span>
           </div>
           <div class="payment-info-item">
-            <span class="payment-info-label">Seña / Anticipo</span>
-            <span class="payment-info-val">$${deposit.toLocaleString('es-AR')}</span>
+            <span class="payment-info-label">Distancia</span>
+            <span class="payment-info-val" style="color: #38bdf8;">${km > 0 ? km.toFixed(1) + ' km' : 'Directo'}</span>
+          </div>
+          <div class="payment-info-item">
+            <span class="payment-info-label">Peajes Abonados</span>
+            <span class="payment-info-val" style="color: ${toll > 0 ? '#f59e0b' : '#94a3b8'};">
+              ${toll > 0 ? '$' + toll.toLocaleString('es-AR') : '$0'}
+            </span>
+          </div>
+          <div class="payment-info-item">
+            <span class="payment-info-label">Combustible Est.</span>
+            <span class="payment-info-val" style="color: #f87171;">
+              ${fuel > 0 ? '-$' + fuel.toLocaleString('es-AR') : '$0'}
+            </span>
+          </div>
+          <div class="payment-info-item">
+            <span class="payment-info-label">💎 Ganancia Neta</span>
+            <span class="payment-info-val" style="color: #34d399; font-weight:800;">
+              $${netFare.toLocaleString('es-AR')}
+            </span>
           </div>
           <div class="payment-info-item">
             <span class="payment-info-label">Saldo a Cobrar</span>
@@ -1206,19 +1418,20 @@ function renderPaymentsTab() {
               $${pendingBalance.toLocaleString('es-AR')}
             </span>
           </div>
-          <div class="payment-info-item">
-            <span class="payment-info-label">Método</span>
-            <span class="payment-info-val" style="font-size: 0.88rem;">${escapeHTML(b.paymentMethod || 'Efectivo')}</span>
-          </div>
         </div>
 
-        <div style="display:flex; justify-content:flex-end; gap:10px;">
-          <button type="button" class="btn btn-secondary btn-sm btn-quick-receipt" data-id="${b.id}">
-            🧾 Recibo WhatsApp
-          </button>
-          <button type="button" class="btn btn-primary btn-sm btn-open-pay-modal" data-id="${b.id}">
-            💳 Registrar Pago / Liquidar
-          </button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06);">
+          <div style="font-size:0.8rem; color:#94a3b8;">
+            Método: <strong style="color:#fff;">${escapeHTML(b.paymentMethod || 'Efectivo')}</strong>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn btn-secondary btn-sm btn-quick-receipt" data-id="${b.id}">
+              🧾 Recibo WhatsApp
+            </button>
+            <button type="button" class="btn btn-primary btn-sm btn-open-pay-modal" data-id="${b.id}">
+              💳 Registrar Pago / Liquidar
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -1250,6 +1463,8 @@ function renderFinancesTab() {
   const KM_PER_LITER = 10; // Rendimiento estimado promedio 10 km por litro ($210 / km)
   const FUEL_COST_PER_KM = FUEL_PRICE_PER_LITER / KM_PER_LITER; // 210 pesos/km
 
+  const filtered = getFilteredFinanceBookings();
+
   let grossTotal = 0;
   let tollsTotal = 0;
   let fuelTotal = 0;
@@ -1258,17 +1473,13 @@ function renderFinancesTab() {
   let totalHours = 0;
   let validTripsCount = 0;
 
-  state.bookings.forEach(b => {
-    // REGLA: Solo evaluar y tomar en cuenta reservas que ya estén COMPLETADAS o con PAGO REGISTRADO
-    const isCompleted = b.status === 'Completada' || b.status === 'completada';
-    const isPaid = b.paymentStatus === 'Pagado' || b.paymentStatus === 'paid' || isCompleted;
-    const isDeposit = b.paymentStatus === 'Señado';
-
-    if (!isCompleted && !isPaid && !isDeposit) return;
-
+  filtered.forEach(b => {
     validTripsCount++;
     const fare = Number(b.totalFare) || 0;
     const deposit = Number(b.depositAmount) || 0;
+    const isCompleted = b.status === 'Completada' || b.status === 'completada';
+    const isPaid = b.paymentStatus === 'Pagado' || b.paymentStatus === 'paid' || isCompleted;
+
     // Dinero efectivamente cobrado
     const collectedFare = (isPaid || isCompleted) ? fare : deposit;
 
@@ -1312,12 +1523,16 @@ function renderFinancesTab() {
   if (finMargin) {
     finMargin.textContent = validTripsCount > 0 
       ? `Margen operativo: ${marginPct}% (${validTripsCount} ${validTripsCount === 1 ? 'viaje liquidado' : 'viajes liquidados'})`
-      : 'Evaluando solo viajes Completados con cobro registrado';
+      : 'Sin viajes completados en este período';
   }
 
   if (finTolls) finTolls.textContent = `$${tollsTotal.toLocaleString('es-AR')}`;
   if (finFuel) finFuel.textContent = `$${fuelTotal.toLocaleString('es-AR')}`;
   if (finKm) finKm.textContent = `${kmTotal.toFixed(1)} km`;
+  if (finAvgTicket) finAvgTicket.textContent = `$${avgTicket.toLocaleString('es-AR')}`;
+  if (finAvgHourly) finAvgHourly.textContent = `$${avgHourly.toLocaleString('es-AR')} / hs`;
+  if (finTips) finTips.textContent = `$${tipsTotal.toLocaleString('es-AR')}`;
+}
   if (finAvgTicket) finAvgTicket.textContent = `$${avgTicket.toLocaleString('es-AR')}`;
   if (finAvgHourly) finAvgHourly.textContent = `$${avgHourly.toLocaleString('es-AR')} / hs`;
   if (finTips) finTips.textContent = `$${tipsTotal.toLocaleString('es-AR')}`;

@@ -2,11 +2,13 @@
  * Ruta Privada - Realtime Sync Layer (sync.js)
  * Sincronización en Tiempo Real Multi-Dispositivo (PC <-> Celular <-> Tablet)
  * 
- * Canales activos:
- * 1. Local Server REST Bus (/api/sync/emit y /api/sync/events en servidor local).
- * 2. Cloud WebSocket Relay (Conexión directa en la nube multi-dispositivo sin configuración).
- * 3. BroadcastChannel API (Sincronización instantánea de 0ms entre pestañas y PWAs locales).
- * 4. localStorage Storage Event Bus (Máxima resiliencia y persistencia de estado).
+ * Canales activos y redundantes:
+ * 1. Firebase Cloud Firestore (Sincronización multi-dispositivo en la nube ultra-rápida y garantizada).
+ * 2. Cloud SSE Bus (ntfy.sh - Multi-Red 0ms PC <-> Celular).
+ * 3. Cloud WebSocket Relay (Conexión directa en la nube multi-dispositivo).
+ * 4. Local Server REST Bus (/api/sync/emit y /api/sync/events en servidor local).
+ * 5. BroadcastChannel API (Sincronización instantánea de 0ms entre pestañas locales).
+ * 6. localStorage Storage Event Bus (Persistencia y resiliencia de estado).
  */
 
 class RutaSyncManager {
@@ -21,11 +23,103 @@ class RutaSyncManager {
         this.lastEventSeq = 0;
         this.processedEvents = new Set();
         this.deviceId = 'dev_' + Math.random().toString(36).substr(2, 9);
+        this.firestore = null;
 
+        this.initFirebaseSync();
         this.initLocalChannels();
         this.initCloudWebSocket();
         this.initNtfySseSync();
         this.initServerHttpSync();
+    }
+
+    // ==========================================
+    // 0. FIREBASE CLOUD FIRESTORE REALTIME SYNC
+    // ==========================================
+    initFirebaseSync() {
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
+            authDomain: "rutaprivada-app.firebaseapp.com",
+            projectId: "rutaprivada-app",
+            storageBucket: "rutaprivada-app.firebasestorage.app",
+            messagingSenderId: "349256222860",
+            appId: "1:349256222860:web:6bdac96975582de57093a9",
+            measurementId: "G-EXXS3VHD14"
+        };
+
+        const tryInit = () => {
+            if (typeof firebase !== 'undefined') {
+                try {
+                    if (!firebase.apps || !firebase.apps.length) {
+                        firebase.initializeApp(FIREBASE_CONFIG);
+                    }
+                    this.firestore = firebase.firestore();
+
+                    // Escuchar eventos en vivo emitidos en tiempo real
+                    const recentTime = Date.now() - (15 * 60 * 1000);
+                    this.firestore.collection('fleet_events')
+                        .where('timestamp', '>=', recentTime)
+                        .orderBy('timestamp', 'desc')
+                        .limit(25)
+                        .onSnapshot((snapshot) => {
+                            snapshot.docChanges().forEach((change) => {
+                                if (change.type === 'added' || change.type === 'modified') {
+                                    const data = change.doc.data();
+                                    if (data && data.senderId !== this.deviceId) {
+                                        this.handleIncoming(data);
+                                    }
+                                }
+                            });
+                        }, (err) => {
+                            console.warn('Firestore live events listener:', err);
+                        });
+
+                    // Escuchar estado del viaje activo global
+                    this.firestore.collection('live_trips').doc('current_active_trip')
+                        .onSnapshot((doc) => {
+                            if (doc.exists) {
+                                const data = doc.data();
+                                if (data && data.senderId !== this.deviceId) {
+                                    if (data.estado === 'buscando_conductor') {
+                                        this.handleIncoming({
+                                            id: 'fs_' + (data.id || Date.now()),
+                                            type: 'NUEVO_VIAJE_SOLICITADO',
+                                            payload: data,
+                                            senderId: data.senderId,
+                                            timestamp: data.timestamp || Date.now()
+                                        });
+                                    } else if (data.estado === 'aceptado') {
+                                        this.handleIncoming({
+                                            id: 'fs_acc_' + (data.id || Date.now()),
+                                            type: 'VIAJE_ACEPTADO',
+                                            payload: data,
+                                            senderId: data.senderId,
+                                            timestamp: data.timestamp || Date.now()
+                                        });
+                                    } else if (data.estado) {
+                                        this.handleIncoming({
+                                            id: 'fs_st_' + (data.id || Date.now()) + '_' + data.estado,
+                                            type: 'ESTADO_VIAJE_CAMBIADO',
+                                            payload: data,
+                                            senderId: data.senderId,
+                                            timestamp: data.timestamp || Date.now()
+                                        });
+                                    }
+                                }
+                            }
+                        }, (err) => {
+                            console.warn('Firestore active trip listener:', err);
+                        });
+                } catch (err) {
+                    console.warn('Firebase init error in sync.js:', err);
+                }
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', tryInit);
+        } else {
+            tryInit();
+        }
     }
 
     // ==========================================
@@ -76,7 +170,7 @@ class RutaSyncManager {
         };
 
         if (this.pollTimer) clearInterval(this.pollTimer);
-        this.pollTimer = setInterval(pollServer, 350);
+        this.pollTimer = setInterval(pollServer, 400);
     }
 
     // ==========================================
@@ -171,40 +265,54 @@ class RutaSyncManager {
 
         this.processedEvents.add(message.id);
 
-        // 1. Enviar al Servidor Local HTTP si está disponible
+        // 1. Firebase Firestore Cloud Sync
+        if (this.firestore) {
+            try {
+                this.firestore.collection('fleet_events').doc(message.id).set(message).catch(() => {});
+                if (type === 'NUEVO_VIAJE_SOLICITADO' || type === 'VIAJE_ACEPTADO' || type === 'ESTADO_VIAJE_CAMBIADO') {
+                    this.firestore.collection('live_trips').doc('current_active_trip').set({
+                        ...payload,
+                        senderId: this.deviceId,
+                        timestamp: now
+                    }).catch(() => {});
+                }
+            } catch (e) {}
+        }
+
+        // 2. Enviar al Servidor Local HTTP si está disponible
         fetch('/api/sync/emit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(message)
         }).catch(() => {});
 
-        // 2. Enviar a través de Cloud SSE Bus (ntfy.sh)
+        // 3. Enviar a través de Cloud SSE Bus (ntfy.sh)
         fetch('https://ntfy.sh/rutaprivada_fleet_sync_ar_v4', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Title': 'RutaPrivada Event', 'Priority': 'high' },
             body: JSON.stringify(message)
         }).catch(() => {});
 
-        // 3. Enviar a través de Cloud WebSocket
+        // 4. Enviar a través de Cloud WebSocket
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             try {
                 this.ws.send(JSON.stringify(message));
             } catch (e) {}
         }
 
-        // 4. Enviar a través de BroadcastChannel local
+        // 5. Enviar a través de BroadcastChannel local
         if (this.channel) {
             try {
                 this.channel.postMessage(message);
             } catch (e) {}
         }
 
-        // 5. Fallback localStorage local
+        // 6. Fallback localStorage local
         try {
             localStorage.setItem('rutaprivada_sync_event', JSON.stringify(message));
         } catch (e) {}
 
-        // 6. Procesar en la instancia actual
+        // 7. Procesar en la instancia actual
         this.handleIncoming(message, true);
     }
 
@@ -276,6 +384,35 @@ class RutaSyncManager {
             const today = new Date().toISOString().split('T')[0];
             const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+            // Extraer y normalizar kilómetros
+            let distanceKm = 0;
+            if (viaje.distanceKm !== undefined && viaje.distanceKm !== null && !isNaN(Number(viaje.distanceKm))) {
+                distanceKm = Number(viaje.distanceKm);
+            } else if (viaje.distancia) {
+                const match = String(viaje.distancia).replace(',', '.').match(/([\d\.]+)/);
+                if (match) distanceKm = parseFloat(match[1]) || 0;
+            }
+
+            // Extraer y normalizar duración en minutos
+            let durationMin = 0;
+            if (viaje.durationMin !== undefined && viaje.durationMin !== null && !isNaN(Number(viaje.durationMin))) {
+                durationMin = Number(viaje.durationMin);
+            } else if (viaje.duracion) {
+                const match = String(viaje.duracion).match(/(\d+)/);
+                if (match) durationMin = parseInt(match[1], 10) || 0;
+            }
+
+            // Extraer peajes abonados
+            const tollFare = Number(viaje.tollActual !== undefined && viaje.tollActual !== null ? viaje.tollActual : (viaje.tollFare || viaje.peajes || 0)) || 0;
+
+            // Gasto de combustible estimado automático: $2.100 por litro / 10 km por litro = $210 por km
+            const fuelCostEst = (viaje.fuelCostEst !== undefined && viaje.fuelCostEst !== null && Number(viaje.fuelCostEst) > 0)
+                ? Number(viaje.fuelCostEst)
+                : Math.round(distanceKm * 210);
+
+            // Ganancia neta real de bolsillo
+            const netFare = Math.max(0, fareNum - (tollFare + fuelCostEst));
+
             const completedBooking = {
                 id: viaje.id || ('live_' + Date.now()),
                 customerName: viaje.nombrePasajero || viaje.clientName || 'Pasajero',
@@ -295,6 +432,13 @@ class RutaSyncManager {
                 price: fareNum,
                 monto: fareNum,
                 paidAmount: fareNum,
+                distanceKm: distanceKm,
+                durationMin: durationMin,
+                tollFare: tollFare,
+                tollActual: tollFare,
+                peajes: tollFare,
+                fuelCostEst: fuelCostEst,
+                netFare: netFare,
                 paymentMethod: viaje.metodoPago || 'Efectivo',
                 paymentStatus: 'Pagado',
                 status: 'Completada',
@@ -320,30 +464,67 @@ class RutaSyncManager {
             }
 
             localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(bookings));
+
+            // Sincronizar en Firestore si está disponible
+            if (this.firestore) {
+                this.firestore.collection('fleet_bookings').doc(completedBooking.id).set(completedBooking).catch(() => {});
+            }
         } catch(e) {}
     }
 
     guardarReservaEnAgenda(reserva) {
         try {
+            let distanceKm = Number(reserva.distanceKm) || 0;
+            if (!distanceKm && reserva.distancia) {
+                const match = String(reserva.distancia).replace(',', '.').match(/([\d\.]+)/);
+                if (match) distanceKm = parseFloat(match[1]) || 0;
+            }
+            const tollFare = Number(reserva.tollFare || reserva.peajes || 0) || 0;
+            const fuelCostEst = Number(reserva.fuelCostEst) || Math.round(distanceKm * 210);
+
+            const enrichedReserva = {
+                ...reserva,
+                distanceKm: distanceKm,
+                tollFare: tollFare,
+                peajes: tollFare,
+                fuelCostEst: fuelCostEst
+            };
+
             let bookings = [];
             const raw = localStorage.getItem('rutaprivada_bookings_v1');
             if (raw) bookings = JSON.parse(raw);
 
-            if (!bookings.some(b => b.id === reserva.id)) {
-                bookings.unshift(reserva);
+            if (!bookings.some(b => b.id === enrichedReserva.id)) {
+                bookings.unshift(enrichedReserva);
                 localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(bookings));
+            }
+
+            if (this.firestore) {
+                this.firestore.collection('fleet_bookings').doc(enrichedReserva.id).set(enrichedReserva).catch(() => {});
             }
         } catch(e) {}
     }
 
     // ==========================================
-    // 5. MÉTODOS DE VIAJES EN VIVO
+    // 6. MÉTODOS DE VIAJES EN VIVO
     // ==========================================
     solicitarViaje(viajeData) {
+        let distanceKm = Number(viajeData.distanceKm) || 0;
+        if (!distanceKm && viajeData.distancia) {
+            const match = String(viajeData.distancia).replace(',', '.').match(/([\d\.]+)/);
+            if (match) distanceKm = parseFloat(match[1]) || 0;
+        }
+        const tollFare = Number(viajeData.tollFare || viajeData.peajes || 0) || 0;
+        const fuelCostEst = Number(viajeData.fuelCostEst) || Math.round(distanceKm * 210);
+
         const viaje = {
             id: 'trip_' + Date.now(),
             estado: 'buscando_conductor',
             creadoEn: Date.now(),
+            distanceKm: distanceKm,
+            tollFare: tollFare,
+            peajes: tollFare,
+            fuelCostEst: fuelCostEst,
             ...viajeData
         };
 
@@ -401,11 +582,14 @@ class RutaSyncManager {
             }
             this.limpiarChat('active_trip');
             localStorage.removeItem('rutaprivada_viaje_activo');
+            if (this.firestore) {
+                this.firestore.collection('live_trips').doc('current_active_trip').delete().catch(() => {});
+            }
         } catch (e) {}
     }
 
     // ==========================================
-    // 6. MÉTODOS DE CHAT EN VIVO DIRECTO
+    // 7. MÉTODOS DE CHAT EN VIVO DIRECTO
     // ==========================================
     enviarMensajeChat(param1, param2, param3) {
         let tripId = 'active_trip';

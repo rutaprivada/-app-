@@ -245,6 +245,12 @@
                 </button>
             </div>
 
+            <!-- Selector de Fecha Personalizada para consultar días pasados -->
+            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 8px 14px; margin-bottom: 14px;">
+                <span style="font-size: 0.8rem; color: #94a3b8; font-weight: 600;"><i class="fa-regular fa-calendar text-gold"></i> Elegir Fecha:</span>
+                <input type="date" id="driverCustomDateInput" style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; padding: 4px 10px; font-size: 0.85rem; outline: none;" />
+            </div>
+
             <!-- Tarjeta Hero de Ganancias -->
             <div class="earnings-hero-card">
                 <div class="period-hero-label" id="earningsHeroLabel">Total Acumulado Hoy</div>
@@ -678,8 +684,12 @@
         </div>
     </div>
 
+    <!-- Firebase App & Cloud Firestore SDKs (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
     <!-- SCRIPTS -->
-    <script src="sync.js?v=26"></script>
-    <script src="conductor.js?v=26"></script>
+    <script src="sync.js?v=27"></script>
+    <script src="conductor.js?v=27"></script>
 </body>
 </html>

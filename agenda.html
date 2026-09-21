@@ -246,12 +246,27 @@
         </div>
       </section>
 
+      <!-- Controls Bar (Date Filters para Control de Pagos) -->
+      <section class="agenda-controls-bar">
+        <div class="date-preset-group">
+          <button type="button" id="btn-pay-filter-today" class="date-pill-btn active">⚡ Hoy</button>
+          <button type="button" id="btn-pay-filter-tomorrow" class="date-pill-btn">📅 Mañana</button>
+          <button type="button" id="btn-pay-filter-week" class="date-pill-btn">🗓️ Esta Semana</button>
+          <button type="button" id="btn-pay-filter-all" class="date-pill-btn">📂 Todas</button>
+        </div>
+
+        <div class="custom-date-picker-wrap">
+          <label for="custom-pay-filter-date" style="font-size: 0.8rem; color: #94a3b8; font-weight: 700;">Fecha:</label>
+          <input type="date" id="custom-pay-filter-date" class="custom-date-input" />
+        </div>
+      </section>
+
       <!-- Payments Table & Cards -->
       <section class="partner-card-section">
         <div class="section-heading-row">
           <h2 class="section-heading-title">
             <span>Gestión de Cobranzas y Comprobantes</span>
-            <span class="badge-count">Liquidación de Viajes</span>
+            <span id="payments-count-badge" class="badge-count">0 viajes</span>
           </h2>
         </div>
 
@@ -266,6 +281,21 @@
          ======================================================== -->
     <div id="tab-finances" class="tab-pane hidden">
       
+      <!-- Controls Bar (Date Filters para Finanzas) -->
+      <section class="agenda-controls-bar">
+        <div class="date-preset-group">
+          <button type="button" id="btn-fin-filter-today" class="date-pill-btn active">⚡ Hoy</button>
+          <button type="button" id="btn-fin-filter-tomorrow" class="date-pill-btn">📅 Mañana</button>
+          <button type="button" id="btn-fin-filter-week" class="date-pill-btn">🗓️ Esta Semana</button>
+          <button type="button" id="btn-fin-filter-all" class="date-pill-btn">📂 Todas</button>
+        </div>
+
+        <div class="custom-date-picker-wrap">
+          <label for="custom-fin-filter-date" style="font-size: 0.8rem; color: #94a3b8; font-weight: 700;">Fecha:</label>
+          <input type="date" id="custom-fin-filter-date" class="custom-date-input" />
+        </div>
+      </section>
+
       <!-- Executive Profit Breakdown Cards -->
       <section class="finance-hero-grid">
         <div class="finance-hero-card gross">
@@ -630,7 +660,10 @@
   <!-- Toast Notification -->
   <div id="toast" class="toast hidden"></div>
 
+  <!-- Realtime Sync Layer -->
+  <script src="sync.js?v=27"></script>
+
   <!-- Partner App Script -->
-  <script src="agenda.js?v=34"></script>
+  <script src="agenda.js?v=35"></script>
 </body>
 </html>
