@@ -153,6 +153,18 @@
                     </div>
                 </div>
 
+                <!-- MAPA GPS EN VIVO DEL CONDUCTOR -->
+                <div class="driver-live-map-container" style="position: relative; height: 260px; border-radius: 14px; overflow: hidden; margin-bottom: 14px; border: 1px solid rgba(251, 191, 36, 0.35); box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+                    <div id="driverActiveMap" style="width: 100%; height: 100%; min-height: 260px;"></div>
+                    <div class="driver-map-floating-badge" id="driverMapEtaBadge" style="position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(10, 13, 20, 0.92); backdrop-filter: blur(8px); border: 1px solid rgba(251, 191, 36, 0.5); padding: 6px 12px; border-radius: 20px; font-size: 0.78rem; color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
+                        <span id="driverMapEtaText">GPS Activo · Calculando ruta...</span>
+                    </div>
+                    <button type="button" id="btnRecenterDriverMap" style="position: absolute; bottom: 12px; right: 12px; z-index: 1000; width: 38px; height: 38px; border-radius: 50%; background: #0f172a; border: 1px solid rgba(251, 191, 36, 0.5); color: #fbbf24; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.6); cursor: pointer; font-size: 1rem;">
+                        <i class="fa-solid fa-crosshairs"></i>
+                    </button>
+                </div>
+
                 <!-- Puntos de Ruta -->
                 <div class="active-trip-route">
                     <div class="route-step">
@@ -716,7 +728,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- SCRIPTS -->
-    <script src="sync.js?v=45"></script>
-    <script src="conductor.js?v=45"></script>
+    <script src="sync.js?v=46"></script>
+    <script src="conductor.js?v=46"></script>
 </body>
 </html>

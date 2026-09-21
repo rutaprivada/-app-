@@ -1126,8 +1126,55 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ==========================================
-    // 7. CAMBIO DE ESTADO (EN LÍNEA / DESCONECTADO)
+    // 7. CAMBIO DE ESTADO (EN LÍNEA / DESCONECTADO) Y GPS OBLIGATORIO
     // ==========================================
+    let globalDriverGpsWatchId = null;
+
+    function startGlobalGpsWatch() {
+        if (!navigator.geolocation) {
+            alert('⚠️ GPS NO COMPATIBLE:\n\nTu navegador o dispositivo no soporta geolocalización.');
+            setOnlineStatus(false);
+            return;
+        }
+
+        stopGlobalGpsWatch();
+
+        globalDriverGpsWatchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 38;
+                let heading = pos.coords.heading;
+
+                if (heading === null || isNaN(heading) || heading === undefined) {
+                    if (currentDriverCoords) {
+                        heading = calculateBearing(currentDriverCoords.lat, currentDriverCoords.lng, lat, lng);
+                    } else {
+                        heading = 0;
+                    }
+                }
+
+                driverState.currentRealGpsCoords = { lat, lng, heading, speed };
+                onDriverLocationUpdate(lat, lng, heading, speed);
+            },
+            (err) => {
+                console.warn('Fallo de señal GPS del Chofer:', err);
+                if (driverState.isOnline) {
+                    alert('⚠️ GPS DESCONECTADO O SIN SEÑAL:\n\nPara recibir viajes ejecutivos es obligatorio tener la ubicación GPS activa. Has pasado automáticamente a estado DESCONECTADO.');
+                    setOnlineStatus(false);
+                }
+            },
+            { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+        );
+    }
+
+    function stopGlobalGpsWatch() {
+        if (globalDriverGpsWatchId !== null && navigator.geolocation) {
+            navigator.geolocation.clearWatch(globalDriverGpsWatchId);
+            globalDriverGpsWatchId = null;
+        }
+    }
+
     function setOnlineStatus(online) {
         driverState.isOnline = online;
         try {
@@ -1147,6 +1194,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Mantener pantalla activa del celular
             requestWakeLock();
 
+            // Iniciar GPS continuo obligatorio
+            startGlobalGpsWatch();
+
             // Iniciar contador de tiempo en línea
             if (!driverState.onlineTimer) {
                 driverState.onlineTimer = setInterval(() => {
@@ -1165,6 +1215,7 @@ document.addEventListener('DOMContentLoaded', () => {
             stateActiveTrip.classList.remove('active');
             stateOffline.classList.add('active');
 
+            stopGlobalGpsWatch();
             releaseWakeLock();
             closeIncomingModal();
 
@@ -1180,7 +1231,33 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Tienes un viaje activo en curso. Debes finalizarlo antes de desconectarte.');
             return;
         }
-        setOnlineStatus(!driverState.isOnline);
+
+        if (!driverState.isOnline) {
+            // Validar encendido obligatorio de GPS antes de ponerse En Línea
+            if (!('geolocation' in navigator)) {
+                alert('⚠️ GPS NO DISPONIBLE:\n\nTu dispositivo no cuenta con servicio de localización GPS.');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    driverState.currentRealGpsCoords = {
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude,
+                        heading: pos.coords.heading || 0,
+                        speed: pos.coords.speed || 0
+                    };
+                    setOnlineStatus(true);
+                },
+                (err) => {
+                    alert('⚠️ GPS OBLIGATORIO:\n\nPara ponerte "En Línea" y recibir solicitudes de viaje ejecutivas, es obligatorio activar la ubicación GPS de tu celular.\n\nPor favor activa el GPS y otorga los permisos a la app.');
+                    setOnlineStatus(false);
+                },
+                { enableHighAccuracy: true, timeout: 8000 }
+            );
+        } else {
+            setOnlineStatus(false);
+        }
     });
 
     // ==========================================
@@ -1357,19 +1434,48 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Validación de cercanía obligatoria con GPS para avanzar de estado
     btnNextTripState.addEventListener('click', () => {
         const trip = driverState.activeTrip;
         if (!trip) return;
 
+        const currentPos = currentDriverCoords || driverState.currentRealGpsCoords || trip._originCoords;
+
         if (trip.etapa === 'en_camino') {
+            const origin = trip._originCoords || resolveAddressCoords(trip.origen, { lat: -34.6037, lng: -58.3816 });
+            let distM = 0;
+            if (currentPos && origin) {
+                distM = Math.round(calculateDistanceKm(currentPos.lat, currentPos.lng, origin.lat, origin.lng) * 1000);
+            }
+
+            // Validar distancia máxima permitida de 400 metros
+            if (distM > 400) {
+                alert(`⚠️ AÚN NO HAS LLEGADO AL ORIGEN\n\nTu ubicación GPS indica que estás a ${distM} metros del punto de recogida (${trip.origen || 'Origen'}).\n\nPor políticas de servicio y puntualidad ejecutiva, debes estar en la ubicación de recogida (a menos de 400 metros) para marcar tu llegada.`);
+                return;
+            }
+
             trip.etapa = 'en_origen';
             if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_origen');
             updateTripStageUI();
+            playAlertSound('success');
         } else if (trip.etapa === 'en_origen') {
             trip.etapa = 'en_viaje';
             if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_viaje');
             updateTripStageUI();
+            playAlertSound('success');
         } else if (trip.etapa === 'en_viaje') {
+            const dest = trip._destCoords || resolveAddressCoords(trip.destino, { lat: -34.8150, lng: -58.5348 });
+            let distM = 0;
+            if (currentPos && dest) {
+                distM = Math.round(calculateDistanceKm(currentPos.lat, currentPos.lng, dest.lat, dest.lng) * 1000);
+            }
+
+            if (distM > 500) {
+                if (!confirm(`⚠️ DESTINO A ${distM} METROS:\n\nTu GPS indica que aún no estás en el destino acordado (${trip.destino || 'Destino'}).\n\n¿El pasajero solicitó finalizar el viaje aquí o deseas terminar el servicio de todas formas?`)) {
+                    return;
+                }
+            }
+
             stopDriverGpsTracking();
             mostrarModalCobroViaje();
         }
@@ -1382,6 +1488,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let driverCarMarker = null;
     let driverTargetMarker = null;
     let driverSecondaryMarker = null;
+    let driverRoutePolylineGlow = null;
     let driverRoutePolyline = null;
     let gpsWatchId = null;
     let gpsSimInterval = null;
@@ -1464,10 +1571,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return L.divIcon({
             className: 'driver-car-marker-container',
             html: `
-                <div class="car-marker-pulse"></div>
-                <div class="car-marker-circle" style="transform: rotate(${Math.round(heading)}deg);">
-                    <div class="car-heading-arrow"></div>
-                    <span class="car-marker-emoji">🚘</span>
+                <div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+                    <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(251,191,36,0.28); animation: pulseRing 1.8s infinite ease-out;"></div>
+                    <div style="position: absolute; width: 36px; height: 36px; border-radius: 50%; background: #0f172a; border: 2px solid #fbbf24; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px rgba(251,191,36,0.7); transform: rotate(${Math.round(heading)}deg);">
+                        <div style="position: absolute; top: -5px; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 7px solid #fbbf24;"></div>
+                        <span style="font-size: 1.15rem;">🚘</span>
+                    </div>
                 </div>
             `,
             iconSize: [44, 44],
@@ -1475,18 +1584,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function createPointPinIcon(type = 'origin') {
+    function createPointPinIcon(type = 'origin', label = '') {
         const isOrigin = type === 'origin';
-        const iconClass = isOrigin ? 'fa-solid fa-circle-dot' : 'fa-solid fa-location-dot';
+        const isStop = type === 'stop';
+        const bgColor = isOrigin ? '#10b981' : (isStop ? '#f59e0b' : '#38bdf8');
+        const emoji = isOrigin ? '🟢' : (isStop ? '🛑' : '🏁');
+        const title = label || (isOrigin ? 'Recogida' : (isStop ? 'Parada' : 'Destino'));
         return L.divIcon({
             className: 'custom-map-pin',
             html: `
-                <div class="route-target-pin ${isOrigin ? 'origin' : 'destination'}">
-                    <i class="${iconClass}"></i>
+                <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto;">
+                    <div style="background: rgba(10,13,20,0.92); border: 2px solid ${bgColor}; color: #fff; padding: 2px 7px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.6); margin-bottom: 2px;">
+                        ${emoji} ${title}
+                    </div>
+                    <div style="width: 14px; height: 14px; background: ${bgColor}; border: 3px solid #ffffff; border-radius: 50%; box-shadow: 0 0 10px ${bgColor};"></div>
                 </div>
             `,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16]
+            iconSize: [80, 42],
+            iconAnchor: [40, 38]
         });
     }
 
@@ -1501,8 +1616,15 @@ document.addEventListener('DOMContentLoaded', () => {
         trip._originCoords = originCoords;
         trip._destCoords = destCoords;
 
-        // Posición inicial del chofer: ~1.2 km al norte/este del origen
-        if (!currentDriverCoords) {
+        // Si tenemos ubicación GPS real del chofer, utilizarla de inmediato
+        if (driverState.currentRealGpsCoords) {
+            currentDriverCoords = {
+                lat: driverState.currentRealGpsCoords.lat,
+                lng: driverState.currentRealGpsCoords.lng,
+                heading: driverState.currentRealGpsCoords.heading || 0,
+                speed: driverState.currentRealGpsCoords.speed || 35
+            };
+        } else if (!currentDriverCoords) {
             currentDriverCoords = {
                 lat: originCoords.lat + 0.011,
                 lng: originCoords.lng + 0.009,
@@ -1524,10 +1646,24 @@ document.addEventListener('DOMContentLoaded', () => {
             driverLiveMap.invalidateSize();
         }
 
+        // Botón reciente
+        const btnRecenter = document.getElementById('btnRecenterDriverMap');
+        if (btnRecenter && !btnRecenter._bound) {
+            btnRecenter._bound = true;
+            btnRecenter.addEventListener('click', () => {
+                if (driverLiveMap && currentDriverCoords) {
+                    driverLiveMap.setView([currentDriverCoords.lat, currentDriverCoords.lng], 15);
+                } else {
+                    fitDriverMapBounds();
+                }
+            });
+        }
+
         // Limpiar capas previas
         if (driverCarMarker) driverLiveMap.removeLayer(driverCarMarker);
         if (driverTargetMarker) driverLiveMap.removeLayer(driverTargetMarker);
         if (driverSecondaryMarker) driverLiveMap.removeLayer(driverSecondaryMarker);
+        if (driverRoutePolylineGlow) driverLiveMap.removeLayer(driverRoutePolylineGlow);
         if (driverRoutePolyline) driverLiveMap.removeLayer(driverRoutePolyline);
 
         // Crear Marcador del Auto
@@ -1536,16 +1672,16 @@ document.addEventListener('DOMContentLoaded', () => {
             zIndexOffset: 1000
         }).addTo(driverLiveMap);
 
-        // Crear Marcadores de Origen y Destino
+        // Crear Marcadores de Origen y Destino con Emojis Claros
         driverTargetMarker = L.marker([originCoords.lat, originCoords.lng], {
-            icon: createPointPinIcon('origin')
+            icon: createPointPinIcon('origin', 'Recogida')
         }).addTo(driverLiveMap);
 
         driverSecondaryMarker = L.marker([destCoords.lat, destCoords.lng], {
-            icon: createPointPinIcon('destination')
+            icon: createPointPinIcon('destination', 'Destino')
         }).addTo(driverLiveMap);
 
-        // Cargar trazado de ruta
+        // Cargar trazado de ruta de alto contraste
         await updateDriverRouteLine(currentDriverCoords, originCoords);
 
         setTimeout(() => {
@@ -1574,23 +1710,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } catch (e) {
-            // Generar puntos interpolados intermedios
             points = generateInterpolatedPoints(fromCoords, toCoords, 25);
         }
 
         driverCurrentRoutePoints = points;
         driverSimIndex = 0;
 
-        if (driverRoutePolyline) {
-            driverLiveMap.removeLayer(driverRoutePolyline);
-        }
+        if (driverRoutePolylineGlow) driverLiveMap.removeLayer(driverRoutePolylineGlow);
+        if (driverRoutePolyline) driverLiveMap.removeLayer(driverRoutePolyline);
 
-        driverRoutePolyline = L.polyline(points, {
-            color: '#fbbf24',
-            weight: 5,
+        // Capa 1: Borde exterior oscuro de contraste alto (9px)
+        driverRoutePolylineGlow = L.polyline(points, {
+            color: '#000000',
+            weight: 9,
             opacity: 0.85,
-            lineJoin: 'round',
-            dashArray: null
+            lineCap: 'round',
+            lineJoin: 'round'
+        }).addTo(driverLiveMap);
+
+        // Capa 2: Línea central Neón ultra-visible (5px)
+        driverRoutePolyline = L.polyline(points, {
+            color: '#06b6d4',
+            weight: 5,
+            opacity: 1.0,
+            lineCap: 'round',
+            lineJoin: 'round'
         }).addTo(driverLiveMap);
 
         fitDriverMapBounds();
@@ -1600,7 +1744,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const pts = [];
         for (let i = 0; i <= count; i++) {
             const t = i / count;
-            // Añadir una ligera curva realista
             const curve = Math.sin(t * Math.PI) * 0.003;
             pts.push([
                 start.lat + (end.lat - start.lat) * t + curve,
@@ -1615,9 +1758,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const group = [];
         if (driverCarMarker) group.push(driverCarMarker.getLatLng());
         if (driverTargetMarker) group.push(driverTargetMarker.getLatLng());
+        if (driverSecondaryMarker) group.push(driverSecondaryMarker.getLatLng());
         if (group.length > 0) {
             const bounds = L.latLngBounds(group);
-            driverLiveMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+            driverLiveMap.fitBounds(bounds, { padding: [35, 35], maxZoom: 16 });
         }
     }
 
@@ -1631,7 +1775,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const etaBadge = document.getElementById('driverMapEtaText');
 
         if (stage === 'en_camino') {
-            if (etaBadge) etaBadge.textContent = 'En camino al origen';
+            if (etaBadge) etaBadge.textContent = 'GPS Activo · Chofer en camino';
             await updateDriverRouteLine(currentDriverCoords || origin, origin);
         } else if (stage === 'en_origen') {
             currentDriverCoords = { lat: origin.lat, lng: origin.lng, heading: 0, speed: 0 };
@@ -1643,7 +1787,7 @@ document.addEventListener('DOMContentLoaded', () => {
             broadcastDriverPosition(origin.lat, origin.lng, 0, 0, 'en_origen', 0);
             fitDriverMapBounds();
         } else if (stage === 'en_viaje') {
-            if (etaBadge) etaBadge.textContent = 'En viaje hacia destino';
+            if (etaBadge) etaBadge.textContent = 'En viaje hacia el destino';
             await updateDriverRouteLine(currentDriverCoords || origin, dest);
         }
     }
@@ -1651,7 +1795,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function startDriverGpsTracking(trip) {
         stopDriverGpsTracking();
 
-        // 1. Intentar GPS real de alta precisión del dispositivo
         if (navigator.geolocation) {
             gpsWatchId = navigator.geolocation.watchPosition(
                 (pos) => {
@@ -1668,10 +1811,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
+                    driverState.currentRealGpsCoords = { lat, lng, heading, speed };
                     onDriverLocationUpdate(lat, lng, heading, speed);
                 },
                 () => {
-                    // Si el usuario no otorga permisos de GPS o está en PC, iniciar simulación suave en ruta
+                    // Simulación como respaldo si no hay GPS satelital en interiores
                     startRouteSimulation(trip);
                 },
                 { enableHighAccuracy: true, maximumAge: 1000, timeout: 8000 }
@@ -1693,7 +1837,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cur = driverCurrentRoutePoints[driverSimIndex];
                 const prev = driverCurrentRoutePoints[driverSimIndex - 1];
                 const heading = calculateBearing(prev[0], prev[1], cur[0], cur[1]);
-                const speed = 42; // km/h promedio
+                const speed = 42;
 
                 onDriverLocationUpdate(cur[0], cur[1], heading, speed);
             }
@@ -1703,7 +1847,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function onDriverLocationUpdate(lat, lng, heading, speed) {
         currentDriverCoords = { lat, lng, heading, speed };
 
-        if (driverCarMarker) {
+        if (driverCarMarker && driverLiveMap) {
             driverCarMarker.setLatLng([lat, lng]);
             driverCarMarker.setIcon(createDriverCarIcon(heading));
         }
@@ -1713,21 +1857,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetCoords = (stage === 'en_viaje') ? (trip ? trip._destCoords : null) : (trip ? trip._originCoords : null);
 
         let etaMin = 5;
+        let distKm = 3;
         if (targetCoords) {
-            const distKm = calculateDistanceKm(lat, lng, targetCoords.lat, targetCoords.lng);
+            distKm = calculateDistanceKm(lat, lng, targetCoords.lat, targetCoords.lng);
             etaMin = Math.max(1, Math.round((distKm / Math.max(25, speed)) * 60));
             const etaBadge = document.getElementById('driverMapEtaText');
             if (etaBadge) {
-                if (stage === 'en_camino') etaBadge.textContent = `Llegada en ~${etaMin} min`;
+                if (stage === 'en_camino') etaBadge.textContent = `Llegada en ~${etaMin} min (${distKm.toFixed(1)} km)`;
                 else if (stage === 'en_origen') etaBadge.textContent = `📍 En origen`;
-                else if (stage === 'en_viaje') etaBadge.textContent = `Destino en ~${etaMin} min`;
+                else if (stage === 'en_viaje') etaBadge.textContent = `Destino en ~${etaMin} min (${distKm.toFixed(1)} km)`;
             }
         }
 
-        broadcastDriverPosition(lat, lng, heading, speed, stage, etaMin);
+        broadcastDriverPosition(lat, lng, heading, speed, stage, etaMin, distKm);
     }
 
-    function broadcastDriverPosition(lat, lng, heading, speed, stage, etaMin) {
+    function broadcastDriverPosition(lat, lng, heading, speed, stage, etaMin, distKm = 0) {
         if (window.RutaSync) {
             const trip = driverState.activeTrip;
             window.RutaSync.actualizarUbicacionChofer({
@@ -1737,7 +1882,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 speed: Math.round(speed || 0),
                 stage: stage || 'en_camino',
                 tripId: trip ? trip.id : 'active_trip',
-                etaMin: etaMin || 5
+                etaMin: etaMin || 5,
+                distKm: Number(distKm || 0).toFixed(1)
             });
         }
     }

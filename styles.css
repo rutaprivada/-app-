@@ -4249,6 +4249,18 @@ body.is-app-mode .main-header {
   filter: drop-shadow(0 -1px 3px rgba(251, 191, 36, 0.8));
 }
 
+@keyframes pulseRing {
+  0% { transform: scale(0.9); opacity: 0.9; }
+  50% { transform: scale(1.6); opacity: 0.3; }
+  100% { transform: scale(2.0); opacity: 0; }
+}
+
+@keyframes carPulseWave {
+  0% { transform: scale(0.9); opacity: 0.9; }
+  50% { transform: scale(1.6); opacity: 0.3; }
+  100% { transform: scale(2.0); opacity: 0; }
+}
+
 
 
 

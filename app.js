@@ -5306,10 +5306,12 @@ function createPassengerCarIcon(heading = 0) {
   return L.divIcon({
     className: 'live-driver-car-marker',
     html: `
-      <div class="live-car-pulse-ring"></div>
-      <div class="live-car-body-circle" style="transform: rotate(${Math.round(heading)}deg);">
-        <div class="live-car-heading-arrow"></div>
-        <span>🚘</span>
+      <div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+        <div style="position: absolute; inset: 0; border-radius: 50%; background: rgba(251,191,36,0.28); animation: pulseRing 1.8s infinite ease-out;"></div>
+        <div style="position: absolute; width: 36px; height: 36px; border-radius: 50%; background: #0f172a; border: 2px solid #fbbf24; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px rgba(251,191,36,0.7); transform: rotate(${Math.round(heading)}deg);">
+          <div style="position: absolute; top: -5px; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 7px solid #fbbf24;"></div>
+          <span style="font-size: 1.15rem;">🚘</span>
+        </div>
       </div>
     `,
     iconSize: [44, 44],
@@ -5317,20 +5319,29 @@ function createPassengerCarIcon(heading = 0) {
   });
 }
 
-function createPassengerPointIcon(type = 'origin') {
+function createPassengerPointIcon(type = 'origin', label = '') {
   const isOrigin = type === 'origin';
-  const iconClass = isOrigin ? 'fa-solid fa-circle-dot' : 'fa-solid fa-location-dot';
+  const isStop = type === 'stop';
+  const bgColor = isOrigin ? '#10b981' : (isStop ? '#f59e0b' : '#38bdf8');
+  const emoji = isOrigin ? '🟢' : (isStop ? '🛑' : '🏁');
+  const title = label || (isOrigin ? 'Recogida' : (isStop ? 'Parada' : 'Destino'));
   return L.divIcon({
     className: 'custom-map-pin',
     html: `
-      <div class="route-target-pin ${isOrigin ? 'origin' : 'destination'}">
-        <i class="${iconClass}"></i>
+      <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto;">
+        <div style="background: rgba(10,13,20,0.92); border: 2px solid ${bgColor}; color: #fff; padding: 2px 7px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.6); margin-bottom: 2px;">
+          ${emoji} ${title}
+        </div>
+        <div style="width: 14px; height: 14px; background: ${bgColor}; border: 3px solid #ffffff; border-radius: 50%; box-shadow: 0 0 10px ${bgColor};"></div>
       </div>
     `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
+    iconSize: [80, 42],
+    iconAnchor: [40, 38]
   });
 }
+
+let pLiveRoutePolylineGlow = null;
+let pLiveStopMarker = null;
 
 async function initPassengerLiveMap(trip) {
   if (!trip || typeof L === 'undefined') return;
@@ -5338,9 +5349,11 @@ async function initPassengerLiveMap(trip) {
 
   const originCoords = trip.originCoords || (state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null) || resolvePassengerCoords(trip.origen || trip.pickupAddress, { lat: -34.6037, lng: -58.3816 });
   const destCoords = trip.destinationCoords || (state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null) || resolvePassengerCoords(trip.destino || trip.dropoffAddress, { lat: -34.8150, lng: -58.5348 });
+  const stopCoords = (trip.intermediateStop || (state.hasIntermediateStop && state.intermediateStop)) ? (trip.intermediateStop || state.intermediateStop) : null;
 
   pActiveTripData._originCoords = originCoords;
   pActiveTripData._destCoords = destCoords;
+  pActiveTripData._stopCoords = stopCoords;
 
   const initialDriverPos = pCurrentDriverCoords || {
     lat: originCoords.lat + 0.011,
@@ -5367,7 +5380,9 @@ async function initPassengerLiveMap(trip) {
   // Limpiar capas previas
   if (pLiveCarMarker) passengerLiveMap.removeLayer(pLiveCarMarker);
   if (pLiveOriginMarker) passengerLiveMap.removeLayer(pLiveOriginMarker);
+  if (pLiveStopMarker) passengerLiveMap.removeLayer(pLiveStopMarker);
   if (pLiveDestMarker) passengerLiveMap.removeLayer(pLiveDestMarker);
+  if (pLiveRoutePolylineGlow) passengerLiveMap.removeLayer(pLiveRoutePolylineGlow);
   if (pLiveRoutePolyline) passengerLiveMap.removeLayer(pLiveRoutePolyline);
 
   // Crear Marcador del Chofer
@@ -5376,14 +5391,21 @@ async function initPassengerLiveMap(trip) {
     zIndexOffset: 1000
   }).addTo(passengerLiveMap);
 
-  // Crear Marcador de Recogida
+  // Crear Marcador de Recogida (Verde)
   pLiveOriginMarker = L.marker([originCoords.lat, originCoords.lng], {
-    icon: createPassengerPointIcon('origin')
+    icon: createPassengerPointIcon('origin', 'Recogida')
   }).addTo(passengerLiveMap);
 
-  // Crear Marcador de Destino
+  // Crear Marcador de Parada Intermedia (Naranja) si existe
+  if (stopCoords && stopCoords.lat && stopCoords.lng) {
+    pLiveStopMarker = L.marker([stopCoords.lat, stopCoords.lng], {
+      icon: createPassengerPointIcon('stop', 'Parada')
+    }).addTo(passengerLiveMap);
+  }
+
+  // Crear Marcador de Destino (Cyan / Bandera)
   pLiveDestMarker = L.marker([destCoords.lat, destCoords.lng], {
-    icon: createPassengerPointIcon('destination')
+    icon: createPassengerPointIcon('destination', 'Destino')
   }).addTo(passengerLiveMap);
 
   await updatePassengerRoutePolyline(initialDriverPos, originCoords);
@@ -5414,7 +5436,6 @@ async function updatePassengerRoutePolyline(fromCoords, toCoords) {
       }
     }
   } catch(e) {
-    // Interpolated fallback
     const count = 20;
     points = [];
     for (let i = 0; i <= count; i++) {
@@ -5427,14 +5448,24 @@ async function updatePassengerRoutePolyline(fromCoords, toCoords) {
     }
   }
 
-  if (pLiveRoutePolyline) {
-    passengerLiveMap.removeLayer(pLiveRoutePolyline);
-  }
+  if (pLiveRoutePolylineGlow) passengerLiveMap.removeLayer(pLiveRoutePolylineGlow);
+  if (pLiveRoutePolyline) passengerLiveMap.removeLayer(pLiveRoutePolyline);
 
-  pLiveRoutePolyline = L.polyline(points, {
-    color: '#fbbf24',
-    weight: 5,
+  // Capa 1: Borde exterior oscuro de contraste alto (9px)
+  pLiveRoutePolylineGlow = L.polyline(points, {
+    color: '#000000',
+    weight: 9,
     opacity: 0.85,
+    lineCap: 'round',
+    lineJoin: 'round'
+  }).addTo(passengerLiveMap);
+
+  // Capa 2: Línea central Neón ultra-visible (5px)
+  pLiveRoutePolyline = L.polyline(points, {
+    color: '#06b6d4',
+    weight: 5,
+    opacity: 1.0,
+    lineCap: 'round',
     lineJoin: 'round'
   }).addTo(passengerLiveMap);
 
@@ -5446,6 +5477,8 @@ function fitPassengerMapBounds() {
   const group = [];
   if (pLiveCarMarker) group.push(pLiveCarMarker.getLatLng());
   if (pLiveOriginMarker) group.push(pLiveOriginMarker.getLatLng());
+  if (pLiveStopMarker) group.push(pLiveStopMarker.getLatLng());
+  if (pLiveDestMarker) group.push(pLiveDestMarker.getLatLng());
   if (group.length > 0) {
     const bounds = L.latLngBounds(group);
     passengerLiveMap.fitBounds(bounds, { padding: [35, 35], maxZoom: 16 });
@@ -5468,12 +5501,13 @@ function onPassengerReceivedDriverLocation(loc) {
 
   const etaText = document.getElementById('passengerMapEtaText');
   if (etaText) {
+    const distStr = loc.distKm ? ` (${loc.distKm} km)` : '';
     if (loc.stage === 'en_camino') {
-      etaText.textContent = `Chofer en camino · Llega en ~${loc.etaMin || 4} min`;
+      etaText.textContent = `🚘 Chofer en camino · Llega en ~${loc.etaMin || 4} min${distStr}`;
     } else if (loc.stage === 'en_origen') {
-      etaText.textContent = `📍 Chofer en el punto de recogida`;
+      etaText.textContent = `📍 ¡Tu chofer está en el punto de recogida!`;
     } else if (loc.stage === 'en_viaje') {
-      etaText.textContent = `En viaje · Destino en ~${loc.etaMin || 15} min`;
+      etaText.textContent = `🏁 En viaje hacia el destino · Llega en ~${loc.etaMin || 15} min${distStr}`;
     }
   }
 }
@@ -5491,17 +5525,17 @@ async function updatePassengerLiveMapForStage(stage) {
   const etaText = document.getElementById('passengerMapEtaText');
 
   if (stage === 'en_camino' || stage === 'aceptado') {
-    if (etaText) etaText.textContent = 'Chofer en camino · Calculando llegada...';
+    if (etaText) etaText.textContent = '🚘 Chofer en camino · Calculando llegada...';
     await updatePassengerRoutePolyline(pCurrentDriverCoords || origin, origin);
   } else if (stage === 'en_origen') {
     if (pLiveCarMarker) {
       pLiveCarMarker.setLatLng([origin.lat, origin.lng]);
       pLiveCarMarker.setIcon(createPassengerCarIcon(0));
     }
-    if (etaText) etaText.textContent = '📍 ¡Tu chofer está en el origen!';
+    if (etaText) etaText.textContent = '📍 ¡Tu chofer ha llegado al origen!';
     fitPassengerMapBounds();
   } else if (stage === 'en_viaje') {
-    if (etaText) etaText.textContent = 'En viaje hacia el destino...';
+    if (etaText) etaText.textContent = '🏁 En viaje hacia el destino...';
     await updatePassengerRoutePolyline(pCurrentDriverCoords || origin, dest);
   }
 }
@@ -5511,6 +5545,8 @@ if (btnRecenterPassengerMap) {
   btnRecenterPassengerMap.addEventListener('click', () => {
     if (passengerLiveMap && pCurrentDriverCoords) {
       passengerLiveMap.setView([pCurrentDriverCoords.lat, pCurrentDriverCoords.lng], 15);
+    } else {
+      fitPassengerMapBounds();
     }
   });
 }
