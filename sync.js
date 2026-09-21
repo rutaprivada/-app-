@@ -321,6 +321,35 @@ class RutaSyncManager {
             if (message.payload && message.payload.id) {
                 this.guardarReservaEnAgenda(message.payload);
             }
+        } else if (message.type === 'RESERVA_ACEPTADA') {
+            if (message.payload && message.payload.reservaId) {
+                this.actualizarReservaLocal(message.payload.reservaId, {
+                    status: 'aceptada',
+                    estado: 'aceptada',
+                    driverAssigned: (message.payload.conductor && message.payload.conductor.nombre) ? message.payload.conductor.nombre : 'Daniel Pabon',
+                    driverCar: (message.payload.conductor && message.payload.conductor.auto) ? message.payload.conductor.auto : 'Fiat Cronos Negro',
+                    driverPlate: (message.payload.conductor && message.payload.conductor.patente) ? message.payload.conductor.patente : 'AE927CN'
+                });
+            }
+        } else if (message.type === 'RESERVA_LIBERADA') {
+            if (message.payload && message.payload.reservaId) {
+                this.actualizarReservaLocal(message.payload.reservaId, {
+                    status: 'pendiente',
+                    estado: 'pendiente',
+                    driverAssigned: null,
+                    driverCar: null,
+                    driverPlate: null
+                });
+            }
+        } else if (message.type === 'RESERVA_COMPLETADA') {
+            if (message.payload && message.payload.id) {
+                this.actualizarReservaLocal(message.payload.id, {
+                    status: 'completada',
+                    estado: 'completada',
+                    isCompleted: true,
+                    completedAt: Date.now()
+                });
+            }
         } else if (message.type === 'CHAT_MENSAJE_ENVIADO') {
             if (message.payload && message.payload.texto) {
                 this.guardarMensajeChatLocal(message.payload);
@@ -468,6 +497,26 @@ class RutaSyncManager {
 
             if (this.firestore) {
                 this.firestore.collection('fleet_bookings').doc(enrichedReserva.id).set(enrichedReserva).catch(() => {});
+                this.firestore.collection('bookings').doc(enrichedReserva.id).set(enrichedReserva, { merge: true }).catch(() => {});
+            }
+        } catch(e) {}
+    }
+
+    actualizarReservaLocal(reservaId, fields = {}) {
+        try {
+            let bookings = [];
+            const raw = localStorage.getItem('rutaprivada_bookings_v1');
+            if (raw) bookings = JSON.parse(raw);
+
+            const item = bookings.find(b => b.id === reservaId);
+            if (item) {
+                Object.assign(item, fields);
+                localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(bookings));
+
+                if (this.firestore) {
+                    this.firestore.collection('bookings').doc(reservaId).set(item, { merge: true }).catch(() => {});
+                    this.firestore.collection('fleet_bookings').doc(reservaId).set(item, { merge: true }).catch(() => {});
+                }
             }
         } catch(e) {}
     }

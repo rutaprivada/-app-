@@ -86,7 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const stateActiveTrip = document.getElementById('stateActiveTrip');
     const statViajesHoy = document.getElementById('statViajesHoy');
     const statHorasOnline = document.getElementById('statHorasOnline');
-    const btnSimularViaje = document.getElementById('btnSimularViaje');
 
     // Elementos de Viaje Entrante (Radar)
     const incomingTripModal = document.getElementById('incomingTripModal');
@@ -122,7 +121,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const countDisponibles = document.getElementById('countDisponibles');
     const countTomadas = document.getElementById('countTomadas');
     const btnRefreshReservas = document.getElementById('btnRefreshReservas');
-    const btnSimularReserva = document.getElementById('btnSimularReserva');
     const reservaFilterBtns = document.querySelectorAll('.reserva-filter-btn');
 
     // Elementos de Ganancias y Finanzas
@@ -616,12 +614,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 5. BANDEJA DE RESERVAS PROGRAMADAS (DE PASAJEROS)
+    // 5. BANDEJA DE RESERVAS PROGRAMADAS (HOJA DE RUTA EJECUTIVA)
     // ==========================================
+    let firestoreDb = null;
+
+    function isTestBooking(b) {
+        if (!b) return true;
+        const id = String(b.id || '');
+        const name = String(b.clientName || b.customerName || b.nombrePasajero || '');
+        const notes = String(b.notes || '');
+        const origin = String(b.pickupAddress || b.origin || b.origen || '');
+
+        if (id.includes('_1') || id.includes('_2') || id.startsWith('mock_') || id.startsWith('test_')) {
+            if (name.includes('Alejandro Morales') || name.includes('Carla V.') || name.includes('Daniel Test')) return true;
+        }
+        if (name.toLowerCase().includes('simulación') || name.toLowerCase().includes('simulacion') ||
+            name.toLowerCase().includes('prueba') || name.toLowerCase().includes('test') ||
+            name.toLowerCase().includes('alejandro morales') || name.toLowerCase().includes('carla v.')) {
+            return true;
+        }
+        if (notes.toLowerCase().includes('simulación') || notes.toLowerCase().includes('simulacion') ||
+            notes.toLowerCase().includes('prueba') || notes.toLowerCase().includes('test')) {
+            return true;
+        }
+        if (origin.toLowerCase().includes('prueba') || origin.toLowerCase().includes('test')) {
+            return true;
+        }
+        return false;
+    }
+
+    function purgeTestBookings() {
+        try {
+            const raw = localStorage.getItem('rutaprivada_bookings_v1');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    const cleaned = parsed.filter(b => !isTestBooking(b));
+                    localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(cleaned));
+                }
+            }
+        } catch(e) {}
+    }
+
     function getStoredBookings() {
         try {
             const raw = localStorage.getItem('rutaprivada_bookings_v1');
-            return raw ? JSON.parse(raw) : [];
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return [];
+            return parsed.filter(b => !isTestBooking(b));
         } catch (e) {
             return [];
         }
@@ -629,65 +670,97 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function saveStoredBookings(bookings) {
         try {
-            localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(bookings));
+            const valid = (bookings || []).filter(b => !isTestBooking(b));
+            localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(valid));
         } catch (e) {}
     }
 
-    function seedSampleBookingsIfEmpty() {
-        let bookings = getStoredBookings();
-        if (bookings.length === 0) {
-            const now = new Date();
-            const tomorrow = new Date(now);
-            tomorrow.setDate(now.getDate() + 1);
+    function isReservaValidaHojaDeRuta(b) {
+        if (!b || isTestBooking(b)) return false;
 
-            const formatD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const status = String(b.status || b.estado || '').toLowerCase();
+        const isCompleted = status === 'completada' || status === 'completado' || b.isCompleted === true;
+        const isCancelled = status === 'cancelada' || status === 'cancelado';
+        if (isCompleted || isCancelled) return false;
 
-            bookings = [
-                {
-                    id: 'res_' + Date.now() + '_1',
-                    clientName: 'Alejandro Morales',
-                    clientPhone: '+5491144448888',
-                    pickupAddress: 'Av. del Libertador 4400, Belgrano',
-                    dropoffAddress: 'Aeropuerto Internacional de Ezeiza (EZE) - Terminal A',
-                    date: formatD(now),
-                    time: '18:30',
-                    category: 'Sedán Ejecutivo',
-                    price: 36500,
-                    paymentMethod: 'Transferencia Bancaria',
-                    status: 'pendiente', // pendiente | aceptada | completada
-                    notes: 'Lleva 2 valijas grandes y equipaje de mano. Vuelo internacional.'
-                },
-                {
-                    id: 'res_' + Date.now() + '_2',
-                    clientName: 'Carla V. & Asociados',
-                    clientPhone: '+5491166661111',
-                    pickupAddress: 'Puerto Madero (Juana Manso 1100)',
-                    dropoffAddress: 'Hotel Sheraton Pilar & Convention Center',
-                    date: formatD(tomorrow),
-                    time: '09:00',
-                    category: 'Ejecutivo Premium',
-                    price: 49000,
-                    paymentMethod: 'Efectivo al Conductor',
-                    status: 'pendiente',
-                    notes: 'Traslado corporativo puntual. Factura requerida por WhatsApp.'
-                }
-            ];
-            saveStoredBookings(bookings);
+        const dateStr = b.date || b.pickupDate;
+        if (!dateStr) return false;
+
+        const todayKey = getTodayKey();
+        // Mostrar reservas de hoy y reservas futuras
+        return dateStr >= todayKey;
+    }
+
+    function getReservationScheduledDate(dateStr, timeStr) {
+        if (!dateStr) return null;
+        try {
+            const [yyyy, mm, dd] = dateStr.split('-').map(Number);
+            const [hh, min] = (timeStr || '00:00').split(':').map(Number);
+            if (!yyyy || !mm || !dd) return null;
+            return new Date(yyyy, mm - 1, dd, hh || 0, min || 0, 0, 0);
+        } catch(e) {
+            return null;
         }
-        return bookings;
+    }
+
+    function puedeIniciarReserva(item) {
+        const dateStr = item.date || item.pickupDate;
+        const timeStr = item.time || item.pickupTime || '00:00';
+        const scheduled = getReservationScheduledDate(dateStr, timeStr);
+        if (!scheduled) return { permitido: true };
+
+        const now = new Date();
+        const diffMs = scheduled.getTime() - now.getTime();
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+        // Solo se permite iniciar si faltan 30 minutos o menos para la reserva
+        if (diffMinutes > 30) {
+            const unlockDate = new Date(scheduled.getTime() - (30 * 60 * 1000));
+            const unlockTimeStr = unlockDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const timeRemainingStr = diffMinutes >= 60
+                ? `${Math.floor(diffMinutes / 60)}h ${diffMinutes % 60} min`
+                : `${diffMinutes} minutos`;
+
+            return {
+                permitido: false,
+                timeStr,
+                dateStr,
+                unlockTimeStr,
+                timeRemainingStr,
+                diffMinutes
+            };
+        }
+
+        return { permitido: true };
     }
 
     function renderReservas() {
-        let bookings = getStoredBookings();
-        if (bookings.length === 0) {
-            bookings = seedSampleBookingsIfEmpty();
-        }
-
+        const allBookings = getStoredBookings();
         const filter = driverState.reservaFilter;
-        let filtered = [];
 
-        const disponibles = bookings.filter(b => b.status === 'pendiente' || !b.driverAssigned);
-        const tomadas = bookings.filter(b => b.status === 'aceptada' || b.driverAssigned === driverState.info.nombre);
+        // Filtrar exclusivamente reservas válidas que corresponden a Hoja de Ruta
+        const validFutureBookings = allBookings.filter(isReservaValidaHojaDeRuta);
+
+        const disponibles = validFutureBookings.filter(b => {
+            const status = String(b.status || b.estado || '').toLowerCase();
+            return (!b.driverAssigned || b.driverAssigned === '' || status === 'pendiente' || status === 'solicitada') &&
+                   status !== 'aceptada';
+        }).sort((a, b) => {
+            const dateA = a.date || a.pickupDate || '';
+            const dateB = b.date || b.pickupDate || '';
+            if (dateA !== dateB) return dateA.localeCompare(dateB);
+            return (a.time || a.pickupTime || '').localeCompare(b.time || b.pickupTime || '');
+        });
+
+        const tomadas = validFutureBookings.filter(b => {
+            const status = String(b.status || b.estado || '').toLowerCase();
+            return status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre;
+        }).sort((a, b) => {
+            const dateA = a.date || a.pickupDate || '';
+            const dateB = b.date || b.pickupDate || '';
+            if (dateA !== dateB) return dateA.localeCompare(dateB);
+            return (a.time || a.pickupTime || '').localeCompare(b.time || b.pickupTime || '');
+        });
 
         countDisponibles.textContent = disponibles.length;
         countTomadas.textContent = tomadas.length;
@@ -700,26 +773,23 @@ document.addEventListener('DOMContentLoaded', () => {
             navBadgeReservas.classList.remove('show');
         }
 
-        if (filter === 'tomadas') {
-            filtered = tomadas;
-        } else {
-            filtered = disponibles; // Solo 'disponibles' o 'tomadas'
-        }
+        const filtered = (filter === 'tomadas') ? tomadas : disponibles;
 
         if (filtered.length === 0) {
             reservasContainer.innerHTML = `
-                <div class="empty-history" style="text-align: center; padding: 32px 20px; background: rgba(18, 24, 38, 0.6); border-radius: 14px; border: 1px dashed rgba(255,255,255,0.1);">
-                    <i class="fa-solid fa-calendar-xmark" style="font-size: 2rem; color: #64748b; margin-bottom: 10px;"></i>
-                    <h4 style="font-size: 0.95rem; margin-bottom: 4px;">No hay reservas en esta sección</h4>
-                    <p style="font-size: 0.8rem; color: #94a3b8;">Los traslados solicitados por pasajeros aparecerán aquí para que los aceptes.</p>
+                <div class="empty-history" style="text-align: center; padding: 36px 20px; background: rgba(18, 24, 38, 0.6); border-radius: 14px; border: 1px dashed rgba(255,255,255,0.1);">
+                    <i class="fa-solid fa-calendar-check" style="font-size: 2.2rem; color: #64748b; margin-bottom: 12px; display: block;"></i>
+                    <h4 style="font-size: 1rem; margin-bottom: 6px; color: #e2e8f0;">No hay reservas ${filter === 'tomadas' ? 'agendadas en tu hoja de ruta' : 'disponibles por el momento'}</h4>
+                    <p style="font-size: 0.82rem; color: #94a3b8; line-height: 1.4;">Las reservas programadas a realizar se actualizarán automáticamente en tiempo real.</p>
                 </div>
             `;
             return;
         }
 
         reservasContainer.innerHTML = filtered.map(b => {
-            const isTomada = b.status === 'aceptada' || b.driverAssigned === driverState.info.nombre;
-            const clientName = b.clientName || b.customerName || b.nombrePasajero || 'Cliente';
+            const status = String(b.status || b.estado || '').toLowerCase();
+            const isTomada = status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre;
+            const clientName = b.clientName || b.customerName || b.nombrePasajero || 'Cliente Ejecutivo';
             const pickupAddr = b.pickupAddress || b.origin || b.origen || 'Punto de recogida';
             const dropoffAddr = b.dropoffAddress || b.destination || b.destino || 'Destino';
             const rawPhone = (b.clientPhone || b.customerPhone || b.telefono || '5491100000000').replace(/[^0-9]/g, '');
@@ -739,7 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="reserva-time-bold">⏰ ${timeStr} hs</span>
                         </div>
                         <span class="reserva-status-tag ${isTomada ? 'tomada' : 'disponible'}">
-                            ${isTomada ? '✓ Asignada a ti' : '⚡ Disponible'}
+                            ${isTomada ? '✓ Agendada en tu Hoja' : '⚡ Disponible'}
                         </span>
                     </div>
 
@@ -786,6 +856,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             <button type="button" class="btn-tomar-reserva btn-iniciar-reserva" data-id="${b.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;">
                                 <i class="fa-solid fa-play"></i> Iniciar Traslado en Vivo
                             </button>
+                            <button type="button" class="btn-cancelar-reserva btn-cancelar-reserva-action" data-id="${b.id}" title="Liberar reserva y devolver a disponibles">
+                                <i class="fa-solid fa-xmark"></i> Cancelar Reserva
+                            </button>
                         ` : `
                             <button type="button" class="btn-tomar-reserva btn-aceptar-reserva-action" data-id="${b.id}">
                                 <i class="fa-solid fa-check"></i> Aceptar & Agendar Reserva
@@ -807,11 +880,19 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Listeners para Iniciar Traslado
+        // Listeners para Iniciar Traslado (con validación de 30 min)
         document.querySelectorAll('.btn-iniciar-reserva').forEach(btn => {
             btn.addEventListener('click', () => {
                 const resId = btn.getAttribute('data-id');
                 iniciarViajeDesdeReserva(resId);
+            });
+        });
+
+        // Listeners para Cancelar / Liberar Reserva
+        document.querySelectorAll('.btn-cancelar-reserva-action').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const resId = btn.getAttribute('data-id');
+                cancelarYDevolverReserva(resId);
             });
         });
     }
@@ -838,11 +919,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!item) return;
 
         item.status = 'aceptada';
+        item.estado = 'aceptada';
         item.driverAssigned = driverState.info.nombre;
         item.driverCar = driverState.info.auto;
+        item.driverPlate = driverState.info.patente;
         item.acceptedAt = Date.now();
 
         saveStoredBookings(bookings);
+
+        // Sincronizar en Firestore
+        if (firestoreDb) {
+            firestoreDb.collection('bookings').doc(item.id).set(item, { merge: true }).catch(() => {});
+        }
+
         renderReservas();
         playAlertSound('success');
 
@@ -857,10 +946,60 @@ document.addEventListener('DOMContentLoaded', () => {
         alert(`¡Excelente!\nHas aceptado la reserva de ${item.clientName || item.customerName || 'Cliente'} para las ${item.time || item.pickupTime || '00:00'} hs.\nQuedó agendada en tu hoja de ruta.`);
     }
 
+    function cancelarYDevolverReserva(resId) {
+        const bookings = getStoredBookings();
+        const item = bookings.find(b => b.id === resId);
+        if (!item) return;
+
+        const passName = item.clientName || item.customerName || item.nombrePasajero || 'el pasajero';
+        const horaStr = item.time || item.pickupTime || '00:00';
+        const fechaStr = item.date || item.pickupDate || 'Hoy';
+
+        const confirmMsg = `¿Deseas cancelar y liberar esta reserva?\n\n👤 Pasajero: ${passName}\n📅 Fecha y Hora: ${fechaStr} a las ${horaStr} hs\n\nAl cancelarla, la reserva volverá a quedar disponible para que cualquier otro chofer de la flota la acepte.`;
+        if (!confirm(confirmMsg)) return;
+
+        item.status = 'pendiente';
+        item.estado = 'pendiente';
+        item.driverAssigned = null;
+        item.driverCar = null;
+        item.driverPlate = null;
+        item.acceptedAt = null;
+
+        saveStoredBookings(bookings);
+
+        // Sincronizar en Firestore
+        if (firestoreDb) {
+            firestoreDb.collection('bookings').doc(item.id).set(item, { merge: true }).catch(() => {});
+        }
+
+        if (window.RutaSync) {
+            window.RutaSync.emit('RESERVA_LIBERADA', {
+                reservaId: resId,
+                conductor: driverState.info
+            });
+        }
+
+        renderReservas();
+        playAlertSound('success');
+        alert(`✓ La reserva de las ${horaStr} hs fue liberada y ha vuelto a la lista de "Disponibles".`);
+    }
+
     function iniciarViajeDesdeReserva(resId) {
         const bookings = getStoredBookings();
         const item = bookings.find(b => b.id === resId);
         if (!item) return;
+
+        // Regla: No dejar iniciar una reserva sino solo 30 min antes del horario
+        const check = puedeIniciarReserva(item);
+        if (!check.permitido) {
+            alert(
+                `⏳ TRASLADO PROGRAMADO\n\n` +
+                `Esta reserva está pactada para las ${check.timeStr} hs (${check.dateStr}).\n\n` +
+                `Por política de servicio y puntualidad, los traslados programados solo se pueden iniciar 30 minutos antes del horario pactado (a partir de las ${check.unlockTimeStr} hs).\n\n` +
+                `Faltan ${check.timeRemainingStr} para habilitar el inicio del viaje.`
+            );
+            return;
+        }
 
         // Convertir a viaje activo
         const rawPrice = item.price || item.totalFare || item.monto || item.precioEstimado;
@@ -870,19 +1009,91 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const tripData = {
             id: 'trip_' + item.id,
+            reservaId: item.id,
             nombrePasajero: item.clientName || item.customerName || item.nombrePasajero || 'Pasajero',
             telefono: item.clientPhone || item.customerPhone || item.telefono || '+5491155551234',
             origen: item.pickupAddress || item.origin || item.origen || 'Punto de recogida',
             destino: item.dropoffAddress || item.destination || item.destino || 'Destino',
             precioEstimado: tripPrice,
             categoria: item.category || item.categoria || 'Sedán Ejecutivo',
-            distancia: item.distancia || '28 km',
+            distancia: item.distancia || (item.distanceKm ? `${item.distanceKm} km` : '28 km'),
+            distanceKm: item.distanceKm || 28,
+            tollFare: item.tollFare || item.peajes || 0,
+            peajes: item.tollFare || item.peajes || 0,
             metodoPago: item.paymentMethod || item.metodoPago || 'Efectivo / Transferencia'
         };
+
+        item.status = 'en_curso';
+        item.estado = 'en_curso';
+        saveStoredBookings(bookings);
+
+        if (firestoreDb) {
+            firestoreDb.collection('bookings').doc(item.id).set(item, { merge: true }).catch(() => {});
+        }
 
         setOnlineStatus(true);
         startActiveTrip(tripData);
         switchTab('viewLive');
+    }
+
+    // ==========================================
+    // SINCRONIZACIÓN CLOUD FIRESTORE EN TIEMPO REAL
+    // ==========================================
+    function initFirebaseConductor() {
+        try {
+            const FIREBASE_CONFIG = {
+                apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
+                authDomain: "rutaprivada-app.firebaseapp.com",
+                projectId: "rutaprivada-app",
+                storageBucket: "rutaprivada-app.firebasestorage.app",
+                messagingSenderId: "349256222860",
+                appId: "1:349256222860:web:6bdac96975582de57093a9",
+                measurementId: "G-EXXS3VHD14"
+            };
+
+            if (typeof firebase !== 'undefined') {
+                if (!firebase.apps || !firebase.apps.length) {
+                    firebase.initializeApp(FIREBASE_CONFIG);
+                }
+                firestoreDb = firebase.firestore();
+
+                // Escuchar colección 'bookings' en tiempo real
+                firestoreDb.collection('bookings')
+                    .orderBy('createdAt', 'desc')
+                    .limit(100)
+                    .onSnapshot((snapshot) => {
+                        const cloudBookings = [];
+                        snapshot.forEach((doc) => {
+                            const data = doc.data();
+                            data.id = doc.id;
+                            if (isTestBooking(data)) {
+                                firestoreDb.collection('bookings').doc(doc.id).delete().catch(() => {});
+                            } else {
+                                cloudBookings.push(data);
+                            }
+                        });
+
+                        const localBookings = getStoredBookings().filter(b => !isTestBooking(b));
+                        const map = new Map();
+                        localBookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
+                        cloudBookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
+
+                        const unified = Array.from(map.values()).sort((a, b) => {
+                            const dateA = a.date || a.pickupDate || '';
+                            const dateB = b.date || b.pickupDate || '';
+                            if (dateA !== dateB) return dateA.localeCompare(dateB);
+                            return (a.time || a.pickupTime || '').localeCompare(b.time || b.pickupTime || '');
+                        });
+
+                        saveStoredBookings(unified);
+                        renderReservas();
+                    }, (err) => {
+                        console.warn('Firestore bookings listener error in conductor.js:', err);
+                    });
+            }
+        } catch (e) {
+            console.warn('Firebase init error in conductor.js:', e);
+        }
     }
 
     // ==========================================
@@ -1293,6 +1504,50 @@ document.addEventListener('DOMContentLoaded', () => {
             driverState.stats.historial.unshift(nuevoHistorialItem);
             saveStats();
 
+            // Si este viaje provino de una reserva o coincide con una reserva tomada, marcarla como completada
+            try {
+                const resId = trip.reservaId || (trip.id ? trip.id.replace('trip_', '') : null);
+                let bookings = getStoredBookings();
+                let foundReserva = null;
+                if (resId) {
+                    foundReserva = bookings.find(b => b && b.id === resId);
+                }
+                if (!foundReserva) {
+                    foundReserva = bookings.find(b => 
+                        b && (b.status === 'aceptada' || b.status === 'en_curso' || b.driverAssigned === driverState.info.nombre) &&
+                        (b.pickupAddress === trip.origen || b.origin === trip.origen) &&
+                        (b.dropoffAddress === trip.destino || b.destination === trip.destino)
+                    );
+                }
+
+                if (foundReserva) {
+                    foundReserva.status = 'completada';
+                    foundReserva.estado = 'completada';
+                    foundReserva.isCompleted = true;
+                    foundReserva.completedAt = Date.now();
+                    foundReserva.totalFare = montoGanado;
+                    foundReserva.price = montoGanado;
+                    foundReserva.paidAmount = montoGanado;
+                    foundReserva.paymentMethod = driverSelectedPaymentMethod;
+                    foundReserva.paymentStatus = 'Pagado';
+                    foundReserva.driverAssigned = driverState.info.nombre;
+
+                    saveStoredBookings(bookings);
+
+                    if (firestoreDb) {
+                        firestoreDb.collection('bookings').doc(foundReserva.id).set(foundReserva, { merge: true }).catch(() => {});
+                    }
+
+                    if (window.RutaSync) {
+                        window.RutaSync.emit('RESERVA_COMPLETADA', foundReserva);
+                    }
+                }
+            } catch(e) {
+                console.warn('Error al marcar reserva como completada:', e);
+            }
+
+            renderReservas();
+
             // Notificar a toda la red sync que el viaje fue completado
             if (window.RutaSync) {
                 window.RutaSync.actualizarEstadoViaje('completado', {
@@ -1541,40 +1796,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // 10. ESCUCHAR SOLICITUDES Y CHAT DESDE sync.js
     // ==========================================
-    if (btnSimularViaje) {
-        btnSimularViaje.addEventListener('click', () => {
-            playAlertSound('incoming');
-            const mockTrip = {
-                id: 'trip_' + Date.now(),
-                nombrePasajero: 'Daniel Test (Simulación)',
-                cliente: 'Daniel Test (Simulación)',
-                telefono: '+54 9 11 2255-8226',
-                origen: 'Av. del Libertador 3500, Palermo',
-                destino: 'Aeropuerto Jorge Newbery (AEP)',
-                precioEstimado: 18500,
-                precio: 18500,
-                monto: 18500,
-                totalFare: 18500,
-                distancia: '7.8 km',
-                distanceKm: 7.8,
-                duracion: '18 min',
-                durationMin: 18,
-                peajes: 0,
-                tollFare: 0,
-                tollActual: 0,
-                fuelCostEst: 1638,
-                metodoPago: 'Efectivo',
-                categoria: 'Sedán Ejecutivo',
-                creado: new Date().toISOString()
-            };
-            if (window.RutaSync) {
-                window.RutaSync.solicitarViaje(mockTrip);
-            } else {
-                showIncomingTrip(mockTrip);
-            }
-        });
-    }
-
     if (window.RutaSync) {
         window.RutaSync.on('NUEVO_VIAJE_SOLICITADO', (viaje) => {
             if (!driverState.activeTrip) {
@@ -1586,7 +1807,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         window.RutaSync.on('RESERVA_CREADA', (reserva) => {
-            if (reserva && reserva.id) {
+            if (reserva && reserva.id && !isTestBooking(reserva)) {
                 let bookings = getStoredBookings();
                 if (!bookings.some(b => b.id === reserva.id)) {
                     bookings.unshift(reserva);
@@ -1595,6 +1816,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             renderReservas();
             playAlertSound('incoming');
+        });
+
+        window.RutaSync.on('RESERVA_ACEPTADA', () => {
+            renderReservas();
+        });
+
+        window.RutaSync.on('RESERVA_LIBERADA', () => {
+            renderReservas();
+        });
+
+        window.RutaSync.on('RESERVA_COMPLETADA', () => {
+            renderReservas();
+        });
+
+        window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', () => {
+            renderReservas();
         });
 
         window.RutaSync.on('CHAT_MENSAJE_ENVIADO', (msg) => {
@@ -1685,8 +1922,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Limpieza de datos de prueba y arranque
+    purgeTestBookings();
     renderDriverProfileInfo();
     loadSavedStats();
+    initFirebaseConductor();
     renderReservas();
 
     // Iniciar siempre en Línea para recibir solicitudes al instante (estilo Uber/Cabify)

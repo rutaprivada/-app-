@@ -59,7 +59,32 @@ document.addEventListener('DOMContentLoaded', () => {
   initSound();
   initCloudSync();
   initLiveCalculations();
+  initRutaSyncAgenda();
 });
+
+function initRutaSyncAgenda() {
+  if (window.RutaSync) {
+    window.RutaSync.on('RESERVA_ACEPTADA', (data) => {
+      loadBookings();
+      renderActiveTab();
+    });
+
+    window.RutaSync.on('RESERVA_LIBERADA', (data) => {
+      loadBookings();
+      renderActiveTab();
+    });
+
+    window.RutaSync.on('RESERVA_COMPLETADA', (data) => {
+      loadBookings();
+      renderActiveTab();
+    });
+
+    window.RutaSync.on('RESERVA_CREADA', (data) => {
+      loadBookings();
+      renderActiveTab();
+    });
+  }
+}
 
 function getTodayString() {
   const d = new Date();
@@ -536,21 +561,25 @@ function connectFirebase(configInput) {
         snapshot.forEach((doc) => {
           const data = doc.data();
           data.id = doc.id;
-          cloudBookings.push(data);
+          if (isTestBooking(data)) {
+            state.firestoreDb.collection('bookings').doc(doc.id).delete().catch(() => {});
+          } else {
+            cloudBookings.push(data);
+          }
         });
 
         // 1. Unificar reservas locales y remotas por ID único sin perder ninguna
         const bookingsMap = new Map();
         
-        // Cargar primero las que ya estaban en memoria / localStorage
+        // Cargar primero las que ya estaban en memoria / localStorage (filtrando pruebas)
         loadBookings();
         state.bookings.forEach(b => {
-          if (b && b.id) bookingsMap.set(b.id, b);
+          if (b && b.id && !isTestBooking(b)) bookingsMap.set(b.id, b);
         });
 
         // Combinar/actualizar con las que vienen de la nube
         cloudBookings.forEach(b => {
-          if (b && b.id) bookingsMap.set(b.id, b);
+          if (b && b.id && !isTestBooking(b)) bookingsMap.set(b.id, b);
         });
 
         // Ordenar cronológicamente (más recientes primero)
@@ -568,7 +597,7 @@ function connectFirebase(configInput) {
         // 2. Si hay reservas locales que aún no estaban en Firestore, subirlas para respaldarlas
         if (state.firestoreDb && initialLoad) {
           state.bookings.forEach(localB => {
-            if (localB && localB.id && !cloudBookings.some(cb => cb.id === localB.id)) {
+            if (localB && localB.id && !isTestBooking(localB) && !cloudBookings.some(cb => cb.id === localB.id)) {
               state.firestoreDb.collection('bookings').doc(localB.id).set(localB, { merge: true })
                 .catch(err => console.warn('Error subiendo respaldo local a Firestore:', err));
             }
@@ -603,11 +632,37 @@ function connectFirebase(configInput) {
 // 6. CARGA Y PERSISTENCIA DE DATOS
 // ==========================================
 
+function isTestBooking(b) {
+  if (!b) return true;
+  const id = String(b.id || '');
+  const name = String(b.customerName || b.clientName || b.nombrePasajero || '');
+  const notes = String(b.notes || '');
+  const origin = String(b.pickupAddress || b.origin || b.origen || '');
+
+  if (id.includes('_1') || id.includes('_2') || id.startsWith('mock_') || id.startsWith('test_')) {
+    if (name.includes('Alejandro Morales') || name.includes('Carla V.') || name.includes('Daniel Test')) return true;
+  }
+  if (name.toLowerCase().includes('simulación') || name.toLowerCase().includes('simulacion') ||
+      name.toLowerCase().includes('prueba') || name.toLowerCase().includes('test') ||
+      name.toLowerCase().includes('alejandro morales') || name.toLowerCase().includes('carla v.')) {
+    return true;
+  }
+  if (notes.toLowerCase().includes('simulación') || notes.toLowerCase().includes('simulacion') ||
+      notes.toLowerCase().includes('prueba') || notes.toLowerCase().includes('test')) {
+    return true;
+  }
+  if (origin.toLowerCase().includes('prueba') || origin.toLowerCase().includes('test')) {
+    return true;
+  }
+  return false;
+}
+
 function loadBookings() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      state.bookings = JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      state.bookings = Array.isArray(parsed) ? parsed.filter(b => !isTestBooking(b)) : [];
     } else {
       state.bookings = [];
     }
@@ -619,7 +674,8 @@ function loadBookings() {
 
 function saveBookingsLocal() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.bookings));
+    const valid = state.bookings.filter(b => !isTestBooking(b));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(valid));
   } catch (err) {
     console.error('Error al guardar reservas localmente:', err);
   }
