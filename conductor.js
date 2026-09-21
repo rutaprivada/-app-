@@ -649,7 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
             attributionControl: false
         }).setView([originCoords.lat, originCoords.lng], 13);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19
         }).addTo(tripDetailMapInstance);
 
@@ -673,18 +673,42 @@ document.addEventListener('DOMContentLoaded', () => {
             icon: createPointIcon('destination', 'Destino')
         }).addTo(tripDetailMapInstance);
 
-        // Trazar línea de ruta
-        const routePoints = stopCoords 
-            ? [[originCoords.lat, originCoords.lng], [stopCoords.lat, stopCoords.lng], [destCoords.lat, destCoords.lng]]
-            : [[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]];
+        // Trazar línea de ruta real con OSRM
+        const osrmCoordStr = stopCoords
+            ? `${originCoords.lng},${originCoords.lat};${stopCoords.lng},${stopCoords.lat};${destCoords.lng},${destCoords.lat}`
+            : `${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}`;
 
-        L.polyline(routePoints, {
-            color: '#f59e0b',
-            weight: 5,
-            opacity: 0.85
-        }).addTo(tripDetailMapInstance);
+        fetch(`https://router.project-osrm.org/route/v1/driving/${osrmCoordStr}?overview=full&geometries=geojson`)
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.routes && data.routes[0] && data.routes[0].geometry && tripDetailMapInstance) {
+                    const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                    const osrmLine = L.polyline(coords, {
+                        color: '#f59e0b',
+                        weight: 5,
+                        opacity: 0.9
+                    }).addTo(tripDetailMapInstance);
+                    tripDetailMapInstance.fitBounds(osrmLine.getBounds(), { padding: [25, 25] });
+                } else {
+                    fallbackDetailPolyline();
+                }
+            })
+            .catch(() => fallbackDetailPolyline());
 
-        tripDetailMapInstance.fitBounds(bounds, { padding: [25, 25] });
+        function fallbackDetailPolyline() {
+            if (!tripDetailMapInstance) return;
+            const routePoints = stopCoords 
+                ? [[originCoords.lat, originCoords.lng], [stopCoords.lat, stopCoords.lng], [destCoords.lat, destCoords.lng]]
+                : [[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]];
+
+            L.polyline(routePoints, {
+                color: '#f59e0b',
+                weight: 5,
+                opacity: 0.85
+            }).addTo(tripDetailMapInstance);
+            tripDetailMapInstance.fitBounds(bounds, { padding: [25, 25] });
+        }
+
         setTimeout(() => {
             if (tripDetailMapInstance) tripDetailMapInstance.invalidateSize();
         }, 150);
@@ -1388,46 +1412,148 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ==========================================
-    // 7. RADAR Y VIAJE ENTRANTE INMEDIATO (COLA FIFO & LOOP)
+    // 7. RADAR, LISTA DE VIAJES DISPONIBLES Y VIAJE ENTRANTE
     // ==========================================
+    driverState.availableTrips = [];
+    let driverRejectRecycleTimers = {};
+
+    function renderAvailableTripsList() {
+        const container = document.getElementById('availableTripsList');
+        const section = document.getElementById('availableTripsSection');
+        const countBadge = document.getElementById('availableTripsCount');
+        if (!container || !section) return;
+
+        if (!driverState.isOnline || driverState.activeTrip || !driverState.availableTrips || driverState.availableTrips.length === 0) {
+            section.style.display = 'none';
+            container.innerHTML = '';
+            if (countBadge) countBadge.textContent = '0';
+            return;
+        }
+
+        const driverGps = driverState.currentRealGpsCoords || { lat: -34.6037, lng: -58.3816 };
+
+        // Calcular distancia desde el conductor a cada viaje y ordenar de menor a mayor
+        driverState.availableTrips.forEach(trip => {
+            const orig = trip._originCoords || trip.originCoords || resolveAddressCoords(trip.origen || trip.pickupAddress, { lat: -34.6037, lng: -58.3816 });
+            trip._distFromDriverKm = haversineDistance(driverGps.lat, driverGps.lng, orig.lat, orig.lng);
+        });
+
+        driverState.availableTrips.sort((a, b) => (a._distFromDriverKm || 0) - (b._distFromDriverKm || 0));
+
+        if (countBadge) countBadge.textContent = driverState.availableTrips.length;
+        section.style.display = 'block';
+
+        container.innerHTML = driverState.availableTrips.map(trip => {
+            const rawPrice = trip.precioEstimado ?? trip.precio ?? trip.totalFare ?? trip.monto ?? 0;
+            const fareStr = '$' + Number(rawPrice).toLocaleString('es-AR');
+            const distPickup = (trip._distFromDriverKm || 1.2).toFixed(1);
+            const stopAddr = trip.parada || trip.stopAddress || trip.intermediateStop || '';
+
+            return `
+                <div class="available-trip-card" data-id="${trip.id}" style="background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 14px; padding: 12px 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.75rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 3px 8px; border-radius: 6px;">
+                            📍 a ${distPickup} km de ti
+                        </span>
+                        <span style="font-size: 1.15rem; font-weight: 800; color: #fbbf24;">
+                            ${fareStr}
+                        </span>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; margin: 2px 0;">
+                        <div style="color: #cbd5e1; display: flex; gap: 6px; align-items: center;">
+                            <span style="color: #34d399;">🟢</span>
+                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${trip.origen || trip.pickupAddress || 'Origen'}</span>
+                        </div>
+                        ${stopAddr ? `
+                        <div style="color: #fbbf24; display: flex; gap: 6px; align-items: center;">
+                            <span>🛑</span>
+                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${stopAddr}</span>
+                        </div>` : ''}
+                        <div style="color: #cbd5e1; display: flex; gap: 6px; align-items: center;">
+                            <span style="color: #38bdf8;">🏁</span>
+                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${trip.destino || trip.dropoffAddress || 'Destino'}</span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">
+                        <span style="font-size: 0.75rem; color: #94a3b8;">
+                            ${trip.distancia || '15 km'} · ${trip.duracion || '25 min'}
+                        </span>
+                        <button type="button" class="btn-accept-available-trip" data-id="${trip.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                            <i class="fa-solid fa-check"></i> Aceptar
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.querySelectorAll('.btn-accept-available-trip').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tripId = btn.getAttribute('data-id');
+                const targetTrip = driverState.availableTrips.find(t => t.id === tripId);
+                if (targetTrip) {
+                    acceptSelectedTrip(targetTrip);
+                }
+            });
+        });
+    }
+
+    function acceptSelectedTrip(trip) {
+        stopAlertLoop();
+        driverState.availableTrips = [];
+        closeIncomingModal();
+        playAlertSound('success');
+
+        if (window.RutaSync) {
+            window.RutaSync.aceptarViaje(trip.id, {
+                nombre: driverState.info.nombre,
+                auto: driverState.info.auto,
+                patente: driverState.info.patente,
+                calificacion: driverState.info.calificacion,
+                telefono: driverState.info.telefono
+            });
+        }
+
+        const tripRecord = {
+            ...trip,
+            etapa: 'en_camino',
+            estado: 'en_camino',
+            horaAceptado: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            conductor: {
+                nombre: driverState.info.nombre,
+                auto: driverState.info.auto,
+                patente: driverState.info.patente,
+                calificacion: driverState.info.calificacion,
+                telefono: driverState.info.telefono
+            }
+        };
+
+        driverState.activeTrip = tripRecord;
+        try {
+            localStorage.setItem('rutaprivada_driver_active_trip', JSON.stringify(tripRecord));
+        } catch(e) {}
+
+        renderAvailableTripsList();
+        startActiveTrip(tripRecord);
+        showDriverToast('🚗 ¡Viaje Aceptado! Dirígete al punto de recogida.');
+    }
+
     function enqueueIncomingTrip(tripData) {
         if (!driverState.isOnline || driverState.activeTrip) return;
         if (!tripData || !tripData.id) return;
 
-        // Evitar duplicados en cola o en el modal activo
-        if (driverState.incomingTrip && driverState.incomingTrip.id === tripData.id) return;
-        if (driverState.incomingQueue.some(t => t.id === tripData.id)) return;
+        // Agregar o actualizar en la lista de disponibles
+        if (!driverState.availableTrips.some(t => t.id === tripData.id)) {
+            driverState.availableTrips.push(tripData);
+        }
 
-        // Si estaba en rechazadas y vuelve a llegar, retirarla de rechazadas
-        driverState.rejectedTrips = driverState.rejectedTrips.filter(t => t.id !== tripData.id);
+        renderAvailableTripsList();
 
-        driverState.incomingQueue.push(tripData);
-
-        // Si no hay modal activo, mostrar la solicitud de inmediato
+        // Si no hay modal activo, mostrar la solicitud entrante
         if (!driverState.incomingTrip) {
-            processNextIncomingTripFromQueue();
+            showIncomingTrip(tripData);
         }
-    }
-
-    function processNextIncomingTripFromQueue() {
-        if (!driverState.isOnline || driverState.activeTrip) {
-            driverState.incomingQueue = [];
-            return;
-        }
-
-        if (driverState.incomingQueue.length === 0) {
-            // Si no quedan solicitudes nuevas pero hay solicitudes rechazadas esperando, ciclar/repetir
-            if (driverState.rejectedTrips.length > 0) {
-                driverState.incomingQueue = [...driverState.rejectedTrips];
-                driverState.rejectedTrips = [];
-            } else {
-                closeIncomingModal();
-                return;
-            }
-        }
-
-        const nextTrip = driverState.incomingQueue.shift();
-        showIncomingTrip(nextTrip);
     }
 
     function showIncomingTrip(tripData) {
@@ -1495,18 +1621,15 @@ document.addEventListener('DOMContentLoaded', () => {
         driverState.incomingTrip = null;
     }
 
-    let driverRejectRecycleTimers = {};
-
     function rejectIncomingTrip() {
         const trip = driverState.incomingTrip;
         closeIncomingModal();
         if (!trip) return;
 
-        if (!driverState.rejectedTrips.some(t => t.id === trip.id)) {
-            driverState.rejectedTrips.push(trip);
-        }
+        // Mantener el viaje en availableTrips para que el chofer lo pueda elegir en la lista
+        renderAvailableTripsList();
 
-        // Programar re-intento tras 12 segundos si la solicitud continúa sin ser tomada
+        // Programar re-intento tras 30 SEGUNDOS si la solicitud continúa sin ser tomada por nadie
         if (driverRejectRecycleTimers[trip.id]) clearTimeout(driverRejectRecycleTimers[trip.id]);
         driverRejectRecycleTimers[trip.id] = setTimeout(() => {
             if (driverState.isOnline && !driverState.activeTrip) {
@@ -1515,18 +1638,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const active = window.RutaSync.obtenerViajeActivo();
                     if (!active || active.id !== trip.id || (active.estado !== 'buscando_conductor' && active.estado !== 'solicitado')) {
                         sigueBuscando = false;
+                        driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== trip.id);
+                        renderAvailableTripsList();
                     }
                 }
-                if (sigueBuscando) {
-                    enqueueIncomingTrip(trip);
+                if (sigueBuscando && !driverState.incomingTrip) {
+                    showIncomingTrip(trip);
                 }
             }
-        }, 12000);
-
-        // Procesar siguiente solicitud en la cola
-        setTimeout(() => {
-            processNextIncomingTripFromQueue();
-        }, 300);
+        }, 30000); // Re-notificar cada 30 segundos
     }
 
     btnRejectTrip.addEventListener('click', () => {
@@ -1537,25 +1657,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnAcceptTrip.addEventListener('click', () => {
         stopAlertLoop();
         if (!driverState.incomingTrip) return;
-
-        const trip = driverState.incomingTrip;
-        driverState.incomingQueue = [];
-        driverState.rejectedTrips = [];
-        closeIncomingModal();
-        playAlertSound('success');
-
-        // Notificar al sistema sync que el viaje fue aceptado por este chofer
-        if (window.RutaSync) {
-            window.RutaSync.aceptarViaje(trip.id, {
-                nombre: driverState.info.nombre,
-                auto: driverState.info.auto,
-                patente: driverState.info.patente,
-                calificacion: driverState.info.calificacion,
-                telefono: driverState.info.telefono
-            });
-        }
-
-        startActiveTrip(trip);
+        acceptSelectedTrip(driverState.incomingTrip);
     });
 
     // ==========================================
@@ -2921,6 +3023,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editTripFareDiff = document.getElementById('editTripFareDiff');
 
     let isStopActiveInEdit = false;
+    let editRouteCoords = { origin: null, stop: null, dest: null };
 
     function recalculateModifiedRouteFare() {
         const trip = driverState.activeTrip;
@@ -2930,9 +3033,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const stopStr = isStopActiveInEdit && editTripStopInput ? editTripStopInput.value.trim() : '';
         const destStr = editTripDestInput ? editTripDestInput.value.trim() : (trip.destino || '');
 
-        const origCoords = resolveAddressCoords(originStr, { lat: -34.6037, lng: -58.3816 });
-        const destCoords = resolveAddressCoords(destStr, { lat: -34.8150, lng: -58.5348 });
-        const stopCoords = stopStr ? resolveAddressCoords(stopStr, { lat: -34.5889, lng: -58.4306 }) : null;
+        const origCoords = editRouteCoords.origin || resolveAddressCoords(originStr, { lat: -34.6037, lng: -58.3816 });
+        const destCoords = editRouteCoords.dest || resolveAddressCoords(destStr, { lat: -34.8150, lng: -58.5348 });
+        const stopCoords = stopStr ? (editRouteCoords.stop || resolveAddressCoords(stopStr, { lat: -34.5889, lng: -58.4306 })) : null;
 
         let straightDistKm = 0;
         if (stopCoords) {
@@ -2943,17 +3046,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const estKm = Math.max(2, Math.round(straightDistKm * 1.32 * 10) / 10);
-        const baseFare = 12000;
-        const perKmRate = 1150;
-        const stopFee = stopCoords ? 4000 : 0;
+        const estDurationMin = Math.max(5, Math.round(estKm * 2.2));
         const tollAmt = Number(trip.tollFare || trip.peajes || 0);
 
-        const calculatedFare = Math.max(15000, Math.round((baseFare + (estKm * perKmRate) + stopFee + tollAmt) / 500) * 500);
+        // Usar el motor de cálculo oficial dinámico por día, horario y distancia
+        let dynamic = null;
+        if (window.RutaSync && typeof window.RutaSync.calcularTarifaDinamica === 'function') {
+            dynamic = window.RutaSync.calcularTarifaDinamica({
+                date: trip.fecha || getTodayKey(),
+                time: trip.hora || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+                distanceKm: estKm,
+                durationMin: estDurationMin,
+                hasStop: !!stopCoords,
+                stopFee: 4000,
+                tollCost: tollAmt
+            });
+        } else {
+            const base = 2500;
+            const kmR = 850;
+            const minR = 80;
+            const tot = base + Math.round(estKm * kmR) + Math.round(estDurationMin * minR) + (stopCoords ? 4000 : 0) + tollAmt;
+            dynamic = {
+                baseFare: base,
+                kmRate: kmR,
+                minRate: minR,
+                stopFee: stopCoords ? 4000 : 0,
+                tollCost: tollAmt,
+                totalFare: tot,
+                slotLabel: 'Tarifa Habitual',
+                dayLabel: 'Día Hábil'
+            };
+        }
+
+        const calculatedFare = dynamic.totalFare;
         const originalFare = Number(trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0);
         const diff = calculatedFare - originalFare;
 
-        if (editTripCalcDist) editTripCalcDist.textContent = `${estKm.toFixed(1)} km`;
+        if (editTripCalcDist) editTripCalcDist.textContent = `${estKm.toFixed(1)} km (~${estDurationMin} min)`;
         if (editTripCalcFare) editTripCalcFare.textContent = `$${calculatedFare.toLocaleString('es-AR')}`;
+
+        // Desglose de chips
+        const chipBase = document.getElementById('chipTarifaBase');
+        const chipKm = document.getElementById('chipKmRate');
+        const chipMin = document.getElementById('chipMinRate');
+        const chipStop = document.getElementById('chipStopFee');
+        const slotLabelEl = document.getElementById('editTripSlotLabel');
+
+        if (chipBase) chipBase.textContent = `Base: $${dynamic.baseFare.toLocaleString('es-AR')}`;
+        if (chipKm) chipKm.textContent = `Km: $${dynamic.kmRate.toLocaleString('es-AR')}`;
+        if (chipMin) chipMin.textContent = `Min: $${dynamic.minRate.toLocaleString('es-AR')}`;
+        if (chipStop) {
+            chipStop.style.display = stopCoords ? 'inline-block' : 'none';
+            chipStop.textContent = `Parada: $${(dynamic.stopFee || 4000).toLocaleString('es-AR')}`;
+        }
+        if (slotLabelEl) {
+            slotLabelEl.textContent = `${dynamic.dayLabel} · ${dynamic.slotLabel}`;
+        }
+
         if (editTripFareDiff) {
             if (diff > 0) {
                 editTripFareDiff.textContent = `+$${diff.toLocaleString('es-AR')} (Aumento)`;
@@ -2967,8 +3116,87 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        return { estKm, calculatedFare, originStr, stopStr, destStr, origCoords, stopCoords, destCoords };
+        return { estKm, estDurationMin, calculatedFare, originStr, stopStr, destStr, origCoords, stopCoords, destCoords, dynamic };
     }
+
+    // Configuración del autocompletado en los inputs de modificación de ruta
+    function setupRouteAutocomplete(inputEl, suggestionsEl, typeKey) {
+        if (!inputEl || !suggestionsEl) return;
+        let debounceTimer = null;
+
+        inputEl.addEventListener('input', () => {
+            const query = inputEl.value.trim();
+            if (debounceTimer) clearTimeout(debounceTimer);
+
+            if (!query || query.length < 3) {
+                suggestionsEl.style.display = 'none';
+                suggestionsEl.innerHTML = '';
+                recalculateModifiedRouteFare();
+                return;
+            }
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=-34.6037&lon=-58.3816&limit=5`;
+                    const res = await fetch(url);
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (!data || !data.features || data.features.length === 0) {
+                        suggestionsEl.style.display = 'none';
+                        return;
+                    }
+
+                    suggestionsEl.innerHTML = data.features.map((f, idx) => {
+                        const [lon, lat] = f.geometry.coordinates;
+                        const p = f.properties || {};
+                        const title = p.name || p.street || query;
+                        const sub = [
+                            p.housenumber ? `Altura ${p.housenumber}` : '',
+                            p.district || p.locality || p.city || '',
+                            p.state || 'Buenos Aires'
+                        ].filter(Boolean).join(', ');
+
+                        const fullText = sub ? `${title}, ${sub}` : title;
+                        return `
+                            <div class="route-autocomplete-item" data-idx="${idx}" data-lat="${lat}" data-lon="${lon}" data-text="${fullText.replace(/"/g, '&quot;')}" style="padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #f1f5f9;">
+                                <span style="font-size: 1rem; color: #f59e0b;">📍</span>
+                                <div style="overflow: hidden;">
+                                    <div style="font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}</div>
+                                    <div style="font-size: 0.72rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${sub}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    suggestionsEl.style.display = 'block';
+
+                    suggestionsEl.querySelectorAll('.route-autocomplete-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const lat = parseFloat(item.getAttribute('data-lat'));
+                            const lon = parseFloat(item.getAttribute('data-lon'));
+                            const text = item.getAttribute('data-text');
+                            inputEl.value = text;
+                            suggestionsEl.style.display = 'none';
+                            editRouteCoords[typeKey] = { lat, lng: lon };
+                            recalculateModifiedRouteFare();
+                        });
+                    });
+                } catch(e) {
+                    console.warn('Error autocomplete Photon:', e);
+                }
+            }, 250);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!inputEl.contains(e.target) && !suggestionsEl.contains(e.target)) {
+                suggestionsEl.style.display = 'none';
+            }
+        });
+    }
+
+    setupRouteAutocomplete(editTripOriginInput, document.getElementById('editOriginSuggestions'), 'origin');
+    setupRouteAutocomplete(editTripStopInput, document.getElementById('editStopSuggestions'), 'stop');
+    setupRouteAutocomplete(editTripDestInput, document.getElementById('editDestSuggestions'), 'dest');
 
     if (btnToggleStopInEdit) {
         btnToggleStopInEdit.addEventListener('click', () => {
@@ -2985,18 +3213,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     editTripStopInput.style.display = 'none';
                     editTripStopInput.value = '';
                 }
+                editRouteCoords.stop = null;
                 btnToggleStopInEdit.textContent = '+ Agregar parada';
                 btnToggleStopInEdit.style.color = '#38bdf8';
             }
             recalculateModifiedRouteFare();
         });
     }
-
-    [editTripOriginInput, editTripStopInput, editTripDestInput].forEach(inp => {
-        if (inp) {
-            inp.addEventListener('input', recalculateModifiedRouteFare);
-        }
-    });
 
     if (btnOpenEditRouteModal) {
         btnOpenEditRouteModal.addEventListener('click', () => {
@@ -3005,6 +3228,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('No hay un viaje activo en curso para modificar.');
                 return;
             }
+
+            editRouteCoords = {
+                origin: trip._originCoords || null,
+                stop: trip._stopCoords || null,
+                dest: trip._destCoords || null
+            };
 
             if (editTripOriginInput) editTripOriginInput.value = trip.origen || trip.pickupAddress || '';
             if (editTripDestInput) editTripDestInput.value = trip.destino || trip.dropoffAddress || '';
@@ -3039,6 +3268,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function closeEditRouteModal() {
         if (modalEditActiveTripRoute) modalEditActiveTripRoute.classList.remove('active');
+        const s1 = document.getElementById('editOriginSuggestions');
+        const s2 = document.getElementById('editStopSuggestions');
+        const s3 = document.getElementById('editDestSuggestions');
+        if (s1) s1.style.display = 'none';
+        if (s2) s2.style.display = 'none';
+        if (s3) s3.style.display = 'none';
     }
 
     if (btnCloseEditRouteModal) btnCloseEditRouteModal.addEventListener('click', closeEditRouteModal);
@@ -3071,6 +3306,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 hasStop: !!res.stopStr,
                 distancia: `${res.estKm.toFixed(1)} km`,
                 distanceKm: res.estKm,
+                duracion: `${res.estDurationMin} min`,
+                durationMin: res.estDurationMin,
                 precioEstimado: res.calculatedFare,
                 precio: res.calculatedFare,
                 totalFare: res.calculatedFare,
@@ -3078,6 +3315,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 _originCoords: res.origCoords,
                 _stopCoords: res.stopCoords,
                 _destCoords: res.destCoords,
+                motivo: 'modificacion_ruta',
                 rutaModificadaEn: Date.now()
             };
 

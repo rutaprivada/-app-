@@ -623,6 +623,207 @@ class RutaSyncManager {
     }
 
     // ==========================================
+    // 6. MOTOR DE CÁLCULO DE TARIFA DINÁMICA OFICIAL
+    // ==========================================
+    calcularTarifaDinamica(params = {}) {
+        const dateStr = params.date || new Date().toISOString().split('T')[0];
+        const timeStr = params.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        const km = Math.max(0, Number(params.distanceKm || params.km || 0));
+        const estimatedMin = params.durationMin !== undefined ? Number(params.durationMin) : Math.max(5, Math.round(km * 2.2));
+        const min = Math.max(0, estimatedMin);
+        const hasStop = Boolean(params.hasStop || params.hasIntermediateStop || params.parada || params.stopAddress);
+        const stopFee = hasStop ? Number(params.stopFee || 4000) : 0;
+        const tollCost = Number(params.tollCost || params.peajes || params.tollFare || 0);
+
+        // Determinación de día de semana
+        let dayOfWeek = 1;
+        if (dateStr) {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                dayOfWeek = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getDay();
+            }
+        } else {
+            dayOfWeek = new Date().getDay();
+        }
+
+        const isSunday = (dayOfWeek === 0);
+        const isSaturday = (dayOfWeek === 6);
+        const isFriday = (dayOfWeek === 5);
+        const isWeekday = (!isSunday && !isSaturday && !isFriday);
+
+        // Minutos del día (0 a 1440)
+        let totalMin = 840; // 14:00 por defecto
+        if (timeStr) {
+            const [hh, mm] = timeStr.split(':').map(Number);
+            totalMin = (hh || 0) * 60 + (mm || 0);
+        }
+
+        // Bracket de Distancia
+        let distBracket = 'long';
+        if (km <= 5) distBracket = 'short';
+        else if (km <= 10) distBracket = 'medium';
+        else distBracket = 'long';
+
+        // Bracket de Duración
+        let durBracket = 'long';
+        if (min <= 10) durBracket = 'short';
+        else if (min <= 20) durBracket = 'medium';
+        else durBracket = 'long';
+
+        let baseRates = { short: 1500, medium: 2000, long: 3000 };
+        let kmRates = { short: 900, medium: 850, long: 800 };
+        let minRates = { short: 120, medium: 90, long: 60 };
+        let slotLabel = 'Tarifa Habitual';
+        let dayLabel = 'Día Hábil (Lun-Jue)';
+
+        if (isSunday) {
+            dayLabel = 'Domingo / Feriado';
+            if (totalMin < 120) {
+                slotLabel = 'Pico Madrugada Finde (00-02hs)';
+                baseRates = { short: 2000, medium: 3000, long: 3500 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 120, long: 90 };
+            } else if (totalMin < 240) {
+                slotLabel = 'Valle Madrugada Finde (02-04hs)';
+                baseRates = { short: 1500, medium: 2000, long: 3000 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 110, long: 70 };
+            } else if (totalMin < 420) {
+                slotLabel = 'Pico Mañana Finde (04-07hs)';
+                baseRates = { short: 2000, medium: 3000, long: 3500 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 120, long: 90 };
+            } else if (totalMin < 960) {
+                slotLabel = 'Valle Día Finde (07-16hs)';
+                baseRates = { short: 1500, medium: 2000, long: 3000 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 110, long: 70 };
+            } else if (totalMin <= 1200) {
+                slotLabel = 'Retorno Dominical (16-20hs)';
+                baseRates = { short: 2000, medium: 3000, long: 3500 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 120, long: 90 };
+            } else if (totalMin <= 1320) {
+                slotLabel = 'Pico Noche Finde (20-22hs)';
+                baseRates = { short: 2000, medium: 3000, long: 3500 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 120, long: 90 };
+            } else {
+                slotLabel = 'Nocturno Finde (22-24hs)';
+                baseRates = { short: 1500, medium: 2000, long: 3000 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 110, long: 70 };
+            }
+        } else if (isSaturday) {
+            dayLabel = 'Sábado';
+            if (totalMin < 360) {
+                slotLabel = 'Madrugada Sábado (00-06hs)';
+                baseRates = { short: 1500, medium: 2000, long: 3000 };
+                kmRates = { short: 900, medium: 850, long: 800 };
+                minRates = { short: 120, medium: 90, long: 60 };
+            } else if (totalMin < 720) {
+                slotLabel = 'Valle Mañana Sábado (06-12hs)';
+                baseRates = { short: 1500, medium: 2000, long: 3000 };
+                kmRates = { short: 900, medium: 850, long: 800 };
+                minRates = { short: 120, medium: 90, long: 60 };
+            } else if (totalMin < 1200) {
+                slotLabel = 'Tarde Sábado (12-20hs)';
+                baseRates = { short: 1500, medium: 2000, long: 3000 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 110, long: 70 };
+            } else if (totalMin <= 1320) {
+                slotLabel = 'Pico Gastronomía Sábado (20-22hs)';
+                baseRates = { short: 2000, medium: 3000, long: 3500 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 120, long: 90 };
+            } else {
+                slotLabel = 'Nocturno Sábado (22-24hs)';
+                baseRates = { short: 1500, medium: 2000, long: 3000 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 110, long: 70 };
+            }
+        } else if (isFriday) {
+            dayLabel = 'Viernes';
+            if (totalMin >= 360 && totalMin < 600) {
+                slotLabel = 'Pico Mañana Viernes (06-10hs)';
+                baseRates = { short: 2000, medium: 3000, long: 3500 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 120, long: 90 };
+            } else if (totalMin >= 930 && totalMin <= 1230) {
+                slotLabel = 'Éxodo Fin de Semana Viernes (15:30-20:30hs)';
+                baseRates = { short: 2000, medium: 3000, long: 3500 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 120, long: 90 };
+            } else if (totalMin > 1230) {
+                slotLabel = 'Pico Noche Viernes (20:30-24hs)';
+                baseRates = { short: 2000, medium: 3000, long: 3500 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 120, long: 90 };
+            } else {
+                slotLabel = 'Valle Diurno Viernes';
+                baseRates = { short: 1200, medium: 1800, long: 2500 };
+                kmRates = { short: 850, medium: 800, long: 750 };
+                minRates = { short: 100, medium: 80, long: 50 };
+            }
+        } else {
+            // Lunes a Jueves
+            dayLabel = 'Lunes a Jueves';
+            if (totalMin < 360) {
+                slotLabel = 'Madrugada Hábil (00-06hs)';
+                baseRates = { short: 1500, medium: 2000, long: 3000 };
+                kmRates = { short: 900, medium: 850, long: 800 };
+                minRates = { short: 120, medium: 90, long: 60 };
+            } else if (totalMin < 600) {
+                slotLabel = 'Hora Pico Mañana (06-10hs)';
+                baseRates = { short: 2000, medium: 3000, long: 3500 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 120, long: 90 };
+            } else if (totalMin < 960) {
+                slotLabel = 'Horario Valle Día (10-16hs)';
+                baseRates = { short: 1200, medium: 1800, long: 2500 };
+                kmRates = { short: 850, medium: 800, long: 750 };
+                minRates = { short: 100, medium: 80, long: 50 };
+            } else if (totalMin <= 1200) {
+                slotLabel = 'Hora Pico Tarde (16-20hs)';
+                baseRates = { short: 2000, medium: 3000, long: 3500 };
+                kmRates = { short: 950, medium: 900, long: 870 };
+                minRates = { short: 150, medium: 120, long: 90 };
+            } else {
+                slotLabel = 'Horario Nocturno (20-24hs)';
+                baseRates = { short: 1500, medium: 2000, long: 3000 };
+                kmRates = { short: 900, medium: 850, long: 800 };
+                minRates = { short: 120, medium: 90, long: 60 };
+            }
+        }
+
+        const baseFare = baseRates[distBracket] || 2500;
+        const kmRate = kmRates[distBracket] || 850;
+        const minRate = minRates[durBracket] || 80;
+
+        const distanceCost = Math.round(km * kmRate);
+        const durationCost = Math.round(min * minRate);
+        const totalFare = baseFare + distanceCost + durationCost + stopFee + tollCost;
+
+        return {
+            baseFare,
+            kmRate,
+            minRate,
+            distanceCost,
+            durationCost,
+            stopFee,
+            tollCost,
+            totalFare,
+            slotLabel,
+            dayLabel,
+            date: dateStr,
+            time: timeStr,
+            distanceKm: km,
+            durationMin: min,
+            hasStop
+        };
+    }
+
+    // ==========================================
     // 6.1 UBICACIÓN Y TELEMETRÍA GPS DEL CHOFER EN TIEMPO REAL
     // ==========================================
     actualizarUbicacionChofer(coords) {

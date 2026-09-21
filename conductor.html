@@ -104,6 +104,18 @@
                 <h3 class="pulse-text">Buscando viajes cercanos...</h3>
                 <p class="radar-subtext">Te notificaremos inmediatamente cuando un pasajero solicite un viaje en tu radio.</p>
                 
+                <!-- LISTA DE VIAJES DISPONIBLES / SUGERIDOS -->
+                <div class="available-trips-section" id="availableTripsSection" style="margin-top: 18px; width: 100%; text-align: left; display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 4px;">
+                        <span style="font-size: 0.85rem; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.5px;">
+                            <i class="fa-solid fa-bolt"></i> Viajes Disponibles (<span id="availableTripsCount">0</span>)
+                        </span>
+                        <span style="font-size: 0.75rem; color: #94a3b8;"><i class="fa-solid fa-arrow-down-short-wide"></i> Por cercanía</span>
+                    </div>
+                    <div class="available-trips-list" id="availableTripsList" style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Inyectado dinámicamente -->
+                    </div>
+                </div>
             </section>
 
             <!-- ESTADO 3: VIAJE ACTIVO EN CURSO -->
@@ -755,15 +767,16 @@
 
                 <!-- Formulario de Ruta -->
                 <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px;">
-                    <div>
+                    <div style="position: relative;">
                         <label style="font-size: 0.75rem; font-weight: 700; color: #34d399; text-transform: uppercase; display: block; margin-bottom: 4px;">
                             🟢 Punto de Partida / Origen:
                         </label>
-                        <input type="text" id="editTripOriginInput" placeholder="Dirección o punto de recogida" style="width: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; color: #fff; padding: 10px 12px; font-size: 0.9rem; outline: none;" />
+                        <input type="text" id="editTripOriginInput" placeholder="Escribe calle, altura, esquina o lugar..." autocomplete="off" style="width: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; color: #fff; padding: 10px 12px; font-size: 0.9rem; outline: none;" />
+                        <div id="editOriginSuggestions" class="route-autocomplete-list" style="display:none; position:absolute; top:100%; left:0; right:0; background:#0f172a; border:1px solid rgba(245,158,11,0.4); border-radius:10px; z-index:1000; max-height:210px; overflow-y:auto; box-shadow:0 10px 25px rgba(0,0,0,0.6); margin-top:4px;"></div>
                     </div>
 
                     <!-- Parada Intermedia Opcional -->
-                    <div id="editTripStopWrap">
+                    <div id="editTripStopWrap" style="position: relative;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                             <label style="font-size: 0.75rem; font-weight: 700; color: #fbbf24; text-transform: uppercase;">
                                 🛑 Parada Intermedia:
@@ -772,29 +785,43 @@
                                 + Agregar parada
                             </button>
                         </div>
-                        <input type="text" id="editTripStopInput" placeholder="Ej: Palermo Soho o Av. Santa Fe 3000" style="width: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; color: #fff; padding: 10px 12px; font-size: 0.9rem; outline: none; display: none;" />
+                        <input type="text" id="editTripStopInput" placeholder="Escribe calle o lugar de la parada..." autocomplete="off" style="width: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; color: #fff; padding: 10px 12px; font-size: 0.9rem; outline: none; display: none;" />
+                        <div id="editStopSuggestions" class="route-autocomplete-list" style="display:none; position:absolute; top:100%; left:0; right:0; background:#0f172a; border:1px solid rgba(245,158,11,0.4); border-radius:10px; z-index:1000; max-height:210px; overflow-y:auto; box-shadow:0 10px 25px rgba(0,0,0,0.6); margin-top:4px;"></div>
                     </div>
 
-                    <div>
+                    <div style="position: relative;">
                         <label style="font-size: 0.75rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; display: block; margin-bottom: 4px;">
                             🏁 Punto de Destino Final:
                         </label>
-                        <input type="text" id="editTripDestInput" placeholder="Dirección de destino" style="width: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; color: #fff; padding: 10px 12px; font-size: 0.9rem; outline: none;" />
+                        <input type="text" id="editTripDestInput" placeholder="Escribe destino o punto de llegada..." autocomplete="off" style="width: 100%; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; color: #fff; padding: 10px 12px; font-size: 0.9rem; outline: none;" />
+                        <div id="editDestSuggestions" class="route-autocomplete-list" style="display:none; position:absolute; top:100%; left:0; right:0; background:#0f172a; border:1px solid rgba(245,158,11,0.4); border-radius:10px; z-index:1000; max-height:210px; overflow-y:auto; box-shadow:0 10px 25px rgba(0,0,0,0.6); margin-top:4px;"></div>
                     </div>
                 </div>
 
-                <!-- Recálculo Automático en Vivo -->
+                <!-- Recálculo Automático en Vivo con Tarifario Oficial -->
                 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 12px 14px; margin-bottom: 16px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="font-size: 0.82rem; color: #94a3b8;">Nueva Distancia Estimada:</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; color: #94a3b8;">Nueva Distancia:</span>
                         <strong id="editTripCalcDist" style="color: #fff; font-size: 0.95rem;">-- km</strong>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="font-size: 0.82rem; color: #94a3b8;">Nueva Tarifa Estimada:</span>
-                        <strong id="editTripCalcFare" style="color: #fbbf24; font-size: 1.25rem; font-weight: 800;">$--</strong>
+
+                    <!-- Desglose de Factores Aplicados -->
+                    <div id="editTripRateChips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
+                        <span id="chipTarifaBase" style="font-size: 0.72rem; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,0.06); color: #cbd5e1;">Base: $...</span>
+                        <span id="chipKmRate" style="font-size: 0.72rem; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,0.06); color: #cbd5e1;">Km: $...</span>
+                        <span id="chipMinRate" style="font-size: 0.72rem; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,0.06); color: #cbd5e1;">Min: $...</span>
+                        <span id="chipStopFee" style="font-size: 0.72rem; padding: 3px 7px; border-radius: 6px; background: rgba(245,158,11,0.12); color: #fbbf24; display: none;">Parada: $4.000</span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 8px;">
+                        <div>
+                            <span style="font-size: 0.82rem; color: #94a3b8; display: block;">Nueva Tarifa Calculada:</span>
+                            <span id="editTripSlotLabel" style="font-size: 0.7rem; color: #38bdf8;">Horario habitual</span>
+                        </div>
+                        <strong id="editTripCalcFare" style="color: #fbbf24; font-size: 1.3rem; font-weight: 800;">$--</strong>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem;">
-                        <span style="color: #94a3b8;">Ajuste vs Tarifa Original:</span>
+                        <span style="color: #94a3b8;">Ajuste vs Tarifa Inicial:</span>
                         <span id="editTripFareDiff" style="color: #34d399; font-weight: 700;">$0</span>
                     </div>
                 </div>
@@ -819,7 +846,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- SCRIPTS -->
-    <script src="sync.js?v=50"></script>
-    <script src="conductor.js?v=50"></script>
+    <script src="sync.js?v=51"></script>
+    <script src="conductor.js?v=51"></script>
 </body>
 </html>

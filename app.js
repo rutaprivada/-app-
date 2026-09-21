@@ -4833,6 +4833,45 @@ const pLine1 = document.getElementById('pLine1');
 const pLine2 = document.getElementById('pLine2');
 const pLine3 = document.getElementById('pLine3');
 
+let passengerSearchTimeoutTimer = null;
+
+function startPassengerSearchTimeout(trip) {
+  clearPassengerSearchTimeout();
+  
+  // 5 minutos de tiempo límite de búsqueda sin aceptación
+  const TIMEOUT_MS = 5 * 60 * 1000;
+  const tripCreatedAt = trip.creadoEn || trip.timestamp || Date.now();
+  const elapsed = Date.now() - tripCreatedAt;
+  const remaining = Math.max(1000, TIMEOUT_MS - elapsed);
+
+  passengerSearchTimeoutTimer = setTimeout(() => {
+    const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+    if (activeTrip && (activeTrip.estado === 'buscando_conductor' || activeTrip.estado === 'solicitado')) {
+      if (window.RutaSync) {
+        window.RutaSync.actualizarEstadoViaje('cancelado_por_sistema', {
+          motivo: 'timeout_5min',
+          mensaje: 'Tiempo de espera agotado sin aceptación de choferes.'
+        });
+        setTimeout(() => {
+          if (window.RutaSync) window.RutaSync.limpiarViajeActivo();
+        }, 1200);
+      }
+      closeInAppTripModal();
+      closePassengerChatModal();
+      playPassengerTone('arrived');
+      alert('⏱️ TIEMPO DE ESPERA AGOTADO:\n\nNingún conductor disponible pudo tomar el viaje en este momento.\n\nPor favor vuelve a solicitar el servicio o intenta nuevamente en unos minutos.');
+      showToast('⚠️ Solicitud cancelada por tiempo de espera. Por favor vuelve a solicitar.');
+    }
+  }, remaining);
+}
+
+function clearPassengerSearchTimeout() {
+  if (passengerSearchTimeoutTimer) {
+    clearTimeout(passengerSearchTimeoutTimer);
+    passengerSearchTimeoutTimer = null;
+  }
+}
+
 function openInAppTripModal(trip) {
   if (!inappTripModal) return;
 
@@ -4860,10 +4899,12 @@ function openInAppTripModal(trip) {
   if (pStateDriverAssigned) pStateDriverAssigned.classList.add('hidden');
   if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Buscando Chofer Ejecutivo...';
 
+  startPassengerSearchTimeout(trip);
   inappTripModal.classList.remove('hidden');
 }
 
 function closeInAppTripModal() {
+  clearPassengerSearchTimeout();
   if (inappTripModal) {
     inappTripModal.classList.add('hidden');
   }
@@ -5304,6 +5345,7 @@ document.querySelectorAll('.chat-quick-replies .quick-chip-btn').forEach(btn => 
 // Sincronización en tiempo real de eventos
 if (window.RutaSync) {
   window.RutaSync.on('VIAJE_ACEPTADO', (viaje) => {
+    clearPassengerSearchTimeout();
     if (viaje && viaje.conductor) {
       if (pStateSearching) pStateSearching.classList.add('hidden');
       if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
