@@ -744,15 +744,15 @@ let routePolyline = null;
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  initDateTimeControls();
-  initMap();
-  initEventListeners();
-  initRatingSystem();
-  setupModalDismissals();
-  loadConfigToModal();
-  fetchRealtimeWeather();
-  updateCalculation();
-  initPwa();
+  try { initDateTimeControls(); } catch (e) { console.error('Error initDateTimeControls:', e); }
+  try { initMap(); } catch (e) { console.error('Error initMap:', e); }
+  try { initEventListeners(); } catch (e) { console.error('Error initEventListeners:', e); }
+  try { initRatingSystem(); } catch (e) { console.error('Error initRatingSystem:', e); }
+  try { setupModalDismissals(); } catch (e) { console.error('Error setupModalDismissals:', e); }
+  try { loadConfigToModal(); } catch (e) { console.error('Error loadConfigToModal:', e); }
+  try { fetchRealtimeWeather(); } catch (e) { console.error('Error fetchRealtimeWeather:', e); }
+  try { updateCalculation(); } catch (e) { console.error('Error updateCalculation:', e); }
+  try { initPwa(); } catch (e) { console.error('Error initPwa:', e); }
 });
 
 function loadConfig() {
@@ -834,24 +834,28 @@ function initDateTimeControls() {
   const selectMinute = document.getElementById('select-minute');
 
   // 1. Población de opciones de hora (00 a 23)
-  selectHour.innerHTML = '';
-  for (let h = 0; h < 24; h++) {
-    const val = String(h).padStart(2, '0');
-    const opt = document.createElement('option');
-    opt.value = val;
-    opt.textContent = `${val} hs`;
-    selectHour.appendChild(opt);
+  if (selectHour) {
+    selectHour.innerHTML = '';
+    for (let h = 0; h < 24; h++) {
+      const val = String(h).padStart(2, '0');
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = `${val} hs`;
+      selectHour.appendChild(opt);
+    }
   }
 
   // 2. Población de minutos con salto estricto cada 5 minutos
-  selectMinute.innerHTML = '';
-  const minuteSteps = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
-  minuteSteps.forEach(m => {
-    const opt = document.createElement('option');
-    opt.value = m;
-    opt.textContent = `${m} min`;
-    selectMinute.appendChild(opt);
-  });
+  if (selectMinute) {
+    selectMinute.innerHTML = '';
+    const minuteSteps = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+    minuteSteps.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = `${m} min`;
+      selectMinute.appendChild(opt);
+    });
+  }
 
   // 3. Fecha inicial (Hoy)
   const now = new Date();
@@ -859,8 +863,10 @@ function initDateTimeControls() {
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
   const todayStr = `${yyyy}-${mm}-${dd}`;
-  dateInput.value = todayStr;
-  dateInput.min = todayStr;
+  if (dateInput) {
+    dateInput.value = todayStr;
+    dateInput.min = todayStr;
+  }
   state.date = todayStr;
   updateDateDisplay();
 
@@ -873,31 +879,33 @@ function initDateTimeControls() {
   const initialH = String(now.getHours()).padStart(2, '0');
   const initialM = String(now.getMinutes()).padStart(2, '0');
 
-  selectHour.value = initialH;
-  selectMinute.value = initialM;
-  timeInput.value = `${initialH}:${initialM}`;
+  if (selectHour) selectHour.value = initialH;
+  if (selectMinute) selectMinute.value = initialM;
+  if (timeInput) timeInput.value = `${initialH}:${initialM}`;
   state.time = `${initialH}:${initialM}`;
 
   // Sincronización al cambiar selects
   function syncFromSelects() {
-    const h = selectHour.value;
-    const m = selectMinute.value;
+    const h = selectHour ? selectHour.value : '12';
+    const m = selectMinute ? selectMinute.value : '00';
     const timeStr = `${h}:${m}`;
-    timeInput.value = timeStr;
+    if (timeInput) timeInput.value = timeStr;
     state.time = timeStr;
     evaluateTimeRate(state.time, state.date);
     updateCalculation();
   }
 
-  selectHour.addEventListener('change', syncFromSelects);
-  selectMinute.addEventListener('change', syncFromSelects);
+  if (selectHour) selectHour.addEventListener('change', syncFromSelects);
+  if (selectMinute) selectMinute.addEventListener('change', syncFromSelects);
 
-  dateInput.addEventListener('change', (e) => {
-    state.date = e.target.value;
-    updateDateDisplay();
-    evaluateTimeRate(state.time, state.date);
-    updateCalculation();
-  });
+  if (dateInput) {
+    dateInput.addEventListener('change', (e) => {
+      state.date = e.target.value;
+      updateDateDisplay();
+      evaluateTimeRate(state.time, state.date);
+      updateCalculation();
+    });
+  }
 
   // Atajos de fecha: Hoy / Mañana / Fin de Semana
   const btnToday = document.getElementById('btn-date-today');
@@ -940,36 +948,52 @@ function initDateTimeControls() {
   initCustomCalendar();
 
   // Stepper botones (-5 min / +5 min)
-  document.getElementById('btn-time-minus').addEventListener('click', () => {
-    adjustTimeByMinutes(-5);
-  });
+  const btnTimeMinus = document.getElementById('btn-time-minus');
+  if (btnTimeMinus) {
+    btnTimeMinus.addEventListener('click', () => {
+      adjustTimeByMinutes(-5);
+    });
+  }
 
-  document.getElementById('btn-time-plus').addEventListener('click', () => {
-    adjustTimeByMinutes(5);
-  });
+  const btnTimePlus = document.getElementById('btn-time-plus');
+  if (btnTimePlus) {
+    btnTimePlus.addEventListener('click', () => {
+      adjustTimeByMinutes(5);
+    });
+  }
 
   // Atajos de hora: Ahora / +30 min / +1 hora
-  document.getElementById('btn-time-now').addEventListener('click', () => {
-    const fresh = new Date();
-    const rMin = Math.ceil(fresh.getMinutes() / 5) * 5;
-    fresh.setMinutes(rMin);
-    setTimeFromDate(fresh);
-    showToast('Hora actualizada a este momento.');
-  });
+  const btnTimeNow = document.getElementById('btn-time-now');
+  if (btnTimeNow) {
+    btnTimeNow.addEventListener('click', () => {
+      const fresh = new Date();
+      const rMin = Math.ceil(fresh.getMinutes() / 5) * 5;
+      fresh.setMinutes(rMin);
+      setTimeFromDate(fresh);
+      showToast('Hora actualizada a este momento.');
+    });
+  }
 
-  document.getElementById('btn-time-plus30').addEventListener('click', () => {
-    adjustTimeByMinutes(30);
-    showToast('Hora ajustada: +30 minutos.');
-  });
+  const btnTimePlus30 = document.getElementById('btn-time-plus30');
+  if (btnTimePlus30) {
+    btnTimePlus30.addEventListener('click', () => {
+      adjustTimeByMinutes(30);
+      showToast('Hora ajustada: +30 minutos.');
+    });
+  }
 
-  document.getElementById('btn-time-plus60').addEventListener('click', () => {
-    adjustTimeByMinutes(60);
-    showToast('Hora ajustada: +1 hora.');
-  });
+  const btnTimePlus60 = document.getElementById('btn-time-plus60');
+  if (btnTimePlus60) {
+    btnTimePlus60.addEventListener('click', () => {
+      adjustTimeByMinutes(60);
+      showToast('Hora ajustada: +1 hora.');
+    });
+  }
 
   function adjustTimeByMinutes(deltaMin) {
-    const curH = parseInt(selectHour.value, 10);
-    const curM = parseInt(selectMinute.value, 10);
+    if (!selectHour || !selectMinute) return;
+    const curH = parseInt(selectHour.value, 10) || 0;
+    const curM = parseInt(selectMinute.value, 10) || 0;
     let totalMins = curH * 60 + curM + deltaMin;
 
     if (totalMins < 0) totalMins += 24 * 60;
@@ -984,6 +1008,7 @@ function initDateTimeControls() {
   }
 
   function setTimeFromDate(d) {
+    if (!selectHour || !selectMinute) return;
     const h = String(d.getHours()).padStart(2, '0');
     const m = String(d.getMinutes()).padStart(2, '0');
     selectHour.value = h;
@@ -2976,48 +3001,57 @@ function initEventListeners() {
   }
 
   // Botón ubicación actual
-  document.getElementById('btn-use-location').addEventListener('click', () => {
-    if (!('geolocation' in navigator)) {
-      showToast('Tu navegador no tiene activada la geolocalización.');
-      return;
-    }
-    showToast('Obteniendo tu ubicación actual...');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const address = await reverseGeocode(latitude, longitude);
-        document.getElementById('origin-input').value = address;
-        setOrigin(latitude, longitude, address);
-        map.setView([latitude, longitude], 14);
-        showToast('📍 Origen fijado en tu ubicación.');
-      },
-      () => {
-        showToast('No se pudo acceder a tu ubicación. Escribe la dirección.');
+  const btnUseLocation = document.getElementById('btn-use-location');
+  if (btnUseLocation) {
+    btnUseLocation.addEventListener('click', () => {
+      if (!('geolocation' in navigator)) {
+        showToast('Tu navegador no tiene activada la geolocalización.');
+        return;
       }
-    );
-  });
+      showToast('Obteniendo tu ubicación actual...');
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          const address = await reverseGeocode(latitude, longitude);
+          const origInp = document.getElementById('origin-input');
+          if (origInp) origInp.value = address;
+          setOrigin(latitude, longitude, address);
+          if (map) map.setView([latitude, longitude], 14);
+          showToast('📍 Origen fijado en tu ubicación.');
+        },
+        () => {
+          showToast('No se pudo acceder a tu ubicación. Escribe la dirección.');
+        }
+      );
+    });
+  }
 
   // Invertir origen y destino
-  document.getElementById('btn-swap-route').addEventListener('click', () => {
-    if (!state.origin && !state.destination) return;
-    
-    const tempOrigin = state.origin;
-    const tempDest = state.destination;
+  const btnSwapRoute = document.getElementById('btn-swap-route');
+  if (btnSwapRoute) {
+    btnSwapRoute.addEventListener('click', () => {
+      if (!state.origin && !state.destination) return;
+      
+      const tempOrigin = state.origin;
+      const tempDest = state.destination;
 
-    const originInput = document.getElementById('origin-input');
-    const destInput = document.getElementById('destination-input');
-    const tempVal = originInput.value;
-    originInput.value = destInput.value;
-    destInput.value = tempVal;
+      const originInput = document.getElementById('origin-input');
+      const destInput = document.getElementById('destination-input');
+      const tempVal = originInput ? originInput.value : '';
+      if (originInput && destInput) {
+        originInput.value = destInput.value;
+        destInput.value = tempVal;
+      }
 
-    state.origin = null;
-    state.destination = null;
+      state.origin = null;
+      state.destination = null;
 
-    if (tempDest) setOrigin(tempDest.lat, tempDest.lng, tempDest.address);
-    if (tempOrigin) setDestination(tempOrigin.lat, tempOrigin.lng, tempOrigin.address);
+      if (tempDest) setOrigin(tempDest.lat, tempDest.lng, tempDest.address);
+      if (tempOrigin) setDestination(tempOrigin.lat, tempOrigin.lng, tempOrigin.address);
 
-    showToast('Ruta invertida.');
-  });
+      showToast('Ruta invertida.');
+    });
+  }
 
   // Control de parada intermedia en itinerario
   const btnToggleStop = document.getElementById('btn-toggle-stop');
@@ -3030,7 +3064,7 @@ function initEventListeners() {
     btnToggleStop.addEventListener('click', () => {
       state.hasIntermediateStop = true;
       stopFieldWrap.classList.remove('hidden');
-      stopToggleWrap.classList.add('hidden');
+      if (stopToggleWrap) stopToggleWrap.classList.add('hidden');
       if (stopInput) stopInput.focus();
       updateCalculation();
     });
@@ -3041,7 +3075,7 @@ function initEventListeners() {
       state.hasIntermediateStop = false;
       state.intermediateStop = null;
       if (stopInput) stopInput.value = '';
-      if (stopMarker) {
+      if (stopMarker && map) {
         map.removeLayer(stopMarker);
         stopMarker = null;
       }
@@ -3084,9 +3118,14 @@ function initEventListeners() {
   }
 
   // Acciones principales
-  document.getElementById('btn-reserve-whatsapp').addEventListener('click', sendWhatsAppReservation);
-  document.getElementById('btn-print-quote').addEventListener('click', prepareAndPrintQuote);
-  document.getElementById('btn-copy-quote').addEventListener('click', copyQuoteToClipboard);
+  const btnReserveWa = document.getElementById('btn-reserve-whatsapp');
+  if (btnReserveWa) btnReserveWa.addEventListener('click', sendWhatsAppReservation);
+
+  const btnPrintQuote = document.getElementById('btn-print-quote');
+  if (btnPrintQuote) btnPrintQuote.addEventListener('click', prepareAndPrintQuote);
+
+  const btnCopyQuote = document.getElementById('btn-copy-quote');
+  if (btnCopyQuote) btnCopyQuote.addEventListener('click', copyQuoteToClipboard);
 
   // Botones de formatos de WhatsApp
   document.querySelectorAll('.wa-pill[data-format]').forEach(pill => {
@@ -3153,8 +3192,10 @@ function initEventListeners() {
         const phone = getFormattedWhatsAppNumber();
         const newUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
         const newWeb = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
-        document.getElementById('res-link-wame').href = newUrl;
-        document.getElementById('res-link-web').href = newWeb;
+        const linkWame = document.getElementById('res-link-wame');
+        const linkWeb = document.getElementById('res-link-web');
+        if (linkWame) linkWame.href = newUrl;
+        if (linkWeb) linkWeb.href = newWeb;
         window.open(newUrl, '_blank');
         showToast(`Probando con +${phone}...`);
       } else {
@@ -3167,62 +3208,85 @@ function initEventListeners() {
   const authModal = document.getElementById('admin-auth-modal');
   const configModal = document.getElementById('config-modal');
   const pinInput = document.getElementById('admin-pin-input');
+  const openConfigBtn = document.getElementById('open-config-btn');
 
-  document.getElementById('open-config-btn').addEventListener('click', () => {
-    pinInput.value = '';
-    authModal.classList.remove('hidden');
-    setTimeout(() => pinInput.focus(), 150);
-  });
+  if (openConfigBtn) {
+    openConfigBtn.addEventListener('click', () => {
+      if (pinInput) pinInput.value = '';
+      if (authModal) authModal.classList.remove('hidden');
+      if (pinInput) setTimeout(() => pinInput.focus(), 150);
+    });
+  }
 
-  document.getElementById('close-auth-btn').addEventListener('click', () => {
-    authModal.classList.add('hidden');
-  });
+  const closeAuthBtn = document.getElementById('close-auth-btn');
+  if (closeAuthBtn && authModal) {
+    closeAuthBtn.addEventListener('click', () => {
+      authModal.classList.add('hidden');
+    });
+  }
 
-  document.getElementById('btn-cancel-auth').addEventListener('click', () => {
-    authModal.classList.add('hidden');
-  });
+  const btnCancelAuth = document.getElementById('btn-cancel-auth');
+  if (btnCancelAuth && authModal) {
+    btnCancelAuth.addEventListener('click', () => {
+      authModal.classList.add('hidden');
+    });
+  }
 
   // Validar clave de administrador
-  document.getElementById('admin-auth-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const enteredPin = pinInput.value.trim();
-    const currentPin = state.config.adminPin || '1234';
+  const adminAuthForm = document.getElementById('admin-auth-form');
+  if (adminAuthForm) {
+    adminAuthForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const enteredPin = pinInput ? pinInput.value.trim() : '';
+      const currentPin = state.config.adminPin || '1234';
 
-    if (enteredPin === currentPin) {
-      authModal.classList.add('hidden');
-      loadConfigToModal();
-      configModal.classList.remove('hidden');
-      showToast('🔓 Acceso de administrador concedido.');
-    } else {
-      showToast('❌ Clave incorrecta. Acceso restringido.');
-      pinInput.value = '';
-      pinInput.focus();
-    }
-  });
+      if (enteredPin === currentPin) {
+        if (authModal) authModal.classList.add('hidden');
+        loadConfigToModal();
+        if (configModal) configModal.classList.remove('hidden');
+        showToast('🔓 Acceso de administrador concedido.');
+      } else {
+        showToast('❌ Clave incorrecta. Acceso restringido.');
+        if (pinInput) {
+          pinInput.value = '';
+          pinInput.focus();
+        }
+      }
+    });
+  }
 
   // Cerrar modal de configuración
-  document.getElementById('close-config-btn').addEventListener('click', () => {
-    configModal.classList.add('hidden');
-  });
+  const closeConfigBtn = document.getElementById('close-config-btn');
+  if (closeConfigBtn && configModal) {
+    closeConfigBtn.addEventListener('click', () => {
+      configModal.classList.add('hidden');
+    });
+  }
 
   // Guardar configuración (solo admin)
-  document.getElementById('config-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    saveModalConfig();
-    configModal.classList.add('hidden');
-    updateCalculation();
-    showToast('Tarifas y configuración actualizadas.');
-  });
-
-  document.getElementById('btn-reset-config').addEventListener('click', () => {
-    if (confirm('¿Deseas restablecer las tarifas a los valores predeterminados?')) {
-      state.config = { ...DEFAULT_CONFIG };
-      saveConfig(DEFAULT_CONFIG);
-      loadConfigToModal();
+  const configForm = document.getElementById('config-form');
+  if (configForm) {
+    configForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveModalConfig();
+      if (configModal) configModal.classList.add('hidden');
       updateCalculation();
-      showToast('Tarifas restablecidas.');
-    }
-  });
+      showToast('Tarifas y configuración actualizadas.');
+    });
+  }
+
+  const btnResetConfig = document.getElementById('btn-reset-config');
+  if (btnResetConfig) {
+    btnResetConfig.addEventListener('click', () => {
+      if (confirm('¿Deseas restablecer las tarifas a los valores predeterminados?')) {
+        state.config = { ...DEFAULT_CONFIG };
+        saveConfig(DEFAULT_CONFIG);
+        loadConfigToModal();
+        updateCalculation();
+        showToast('Tarifas restablecidas.');
+      }
+    });
+  }
 }
 
 // ==========================================
@@ -5677,7 +5741,6 @@ if (btnRecenterPassengerMap) {
       updateCalculation();
     }
   }
-}
 
 
 
