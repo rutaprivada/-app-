@@ -5449,39 +5449,7 @@ if (btnRecenterPassengerMap) {
       passengerLiveMap.setView([pCurrentDriverCoords.lat, pCurrentDriverCoords.lng], 15);
     }
   });
-}e('en_camino');
-      showToast(`🚗 ¡Conductor Asignado! ${driverName} aceptó tu viaje y está en camino.`);
-    }
-  });
-
-  window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', (viaje) => {
-    if (viaje) {
-      updatePassengerTripStage(viaje.estado);
-      if (viaje.estado === 'en_origen') {
-        showToast(`📍 Tu conductor ha llegado al punto de recogida.`);
-      } else if (viaje.estado === 'en_viaje') {
-        showToast(`🚀 Viaje iniciado. ¡Que tengas un excelente traslado!`);
-      } else if (viaje.estado === 'completado') {
-        // Cerrar chat y modal de seguimiento
-        closePassengerChatModal();
-        if (passengerTripModal) {
-          passengerTripModal.classList.add('hidden');
-        }
-
-        // Abrir Modal de Cierre de Viaje y Calificación del Conductor
-        showPassengerCompletionModal(viaje);
-      }
-    }
-  });
-
-  window.RutaSync.on('CHAT_MENSAJE_ENVIADO', (msg) => {
-    if (msg) {
-      renderPassengerChatMessages();
-      if (msg.remitente === 'conductor' || msg.remitente === 'driver') {
-        showToast(`💬 Mensaje del chofer: "${msg.texto}"`);
-      }
-    }
-  });
+}
 
   // ====================================================
   // MODAL FINAL DE VIAJE Y CALIFICACIÓN AL CHOFER
