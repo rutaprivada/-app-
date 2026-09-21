@@ -1355,11 +1355,15 @@ document.addEventListener('DOMContentLoaded', () => {
         stopAlertLoop();
         const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0;
         const tripPrice = Number(rawPrice) || 0;
+        const stopAddr = trip.parada || trip.stopAddress || trip.intermediateStop || (trip.hasStop && trip.stop ? trip.stop : null);
 
         driverState.activeTrip = {
             ...trip,
             precioEstimado: tripPrice,
-            etapa: 'en_camino' // en_camino -> en_origen -> en_viaje
+            parada: stopAddr,
+            stopAddress: stopAddr,
+            hasStop: !!stopAddr,
+            etapa: 'en_camino'
         };
 
         stateSearching.classList.remove('active');
@@ -1373,6 +1377,19 @@ document.addEventListener('DOMContentLoaded', () => {
         activeTripDistance.textContent = trip.distancia || 'Calculando';
         activeTripEarnings.textContent = '$' + tripPrice.toLocaleString('es-AR');
         activeTripPayment.innerHTML = `<i class="fa-solid fa-money-bill-wave"></i> ${trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia'}`;
+
+        // Mostrar u ocultar Parada Intermedia
+        const activeTripStopStep = document.getElementById('activeTripStopStep');
+        const activeTripStop = document.getElementById('activeTripStop');
+        const routeConnectorStop = document.getElementById('routeConnectorStop');
+        if (stopAddr) {
+            if (activeTripStopStep) activeTripStopStep.style.display = 'flex';
+            if (routeConnectorStop) routeConnectorStop.style.display = 'block';
+            if (activeTripStop) activeTripStop.textContent = stopAddr;
+        } else {
+            if (activeTripStopStep) activeTripStopStep.style.display = 'none';
+            if (routeConnectorStop) routeConnectorStop.style.display = 'none';
+        }
 
         // Mostrar Peajes según corresponda en el viaje
         const activeTripTolls = document.getElementById('activeTripTolls');
@@ -1394,9 +1411,6 @@ document.addEventListener('DOMContentLoaded', () => {
             driverChatUnreadDot.classList.add('hidden');
         }
 
-        // Configurar enlaces GPS
-        updateGpsLinks(trip.origen || trip.pickupAddress || trip.origin);
-
         // Configurar contacto pasajero
         const telPasajero = (trip.telefono || trip.clientPhone || trip.customerPhone || '5491100000000').replace(/[^0-9]/g, '');
         btnCallPassenger.href = `tel:${telPasajero}`;
@@ -1415,6 +1429,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateTripStageUI() {
         const trip = driverState.activeTrip;
         if (!trip) return;
+        const hasStop = !!(trip.parada || trip.hasStop);
 
         if (trip.etapa === 'en_camino') {
             tripStageTitle.textContent = '1. EN CAMINO AL ORIGEN';
@@ -1422,13 +1437,29 @@ document.addEventListener('DOMContentLoaded', () => {
             updateGpsLinks(trip.origen || trip.pickupAddress || trip.origin);
             updateDriverMapForStage('en_camino');
         } else if (trip.etapa === 'en_origen') {
-            tripStageTitle.textContent = '2. EN EL ORIGEN (Esperando Pasajero)';
-            btnNextTripText.textContent = 'Iniciar viaje (Pasajero a bordo)';
-            updateGpsLinks(trip.destino || trip.dropoffAddress || trip.destination);
+            if (hasStop) {
+                tripStageTitle.textContent = '2. EN EL ORIGEN (Esperando Pasajero)';
+                btnNextTripText.textContent = 'Iniciar viaje hacia parada intermedia';
+                updateGpsLinks(trip.parada || trip.stopAddress);
+            } else {
+                tripStageTitle.textContent = '2. EN EL ORIGEN (Esperando Pasajero)';
+                btnNextTripText.textContent = 'Iniciar viaje (Pasajero a bordo)';
+                updateGpsLinks(trip.destino || trip.dropoffAddress || trip.destination);
+            }
             updateDriverMapForStage('en_origen');
+        } else if (trip.etapa === 'hacia_parada') {
+            tripStageTitle.textContent = '3. EN CAMINO A PARADA INTERMEDIA';
+            btnNextTripText.textContent = 'Llegué a la parada intermedia';
+            updateGpsLinks(trip.parada || trip.stopAddress);
+            updateDriverMapForStage('hacia_parada');
+        } else if (trip.etapa === 'en_parada') {
+            tripStageTitle.textContent = '4. EN PARADA INTERMEDIA (Esperando)';
+            btnNextTripText.textContent = 'Continuar viaje al destino final';
+            updateGpsLinks(trip.destino || trip.dropoffAddress || trip.destination);
+            updateDriverMapForStage('en_parada');
         } else if (trip.etapa === 'en_viaje') {
-            tripStageTitle.textContent = '3. EN VIAJE HACIA EL DESTINO';
-            btnNextTripText.textContent = 'Finalizar viaje y cobrar';
+            tripStageTitle.textContent = hasStop ? '5. EN VIAJE HACIA EL DESTINO' : '3. EN VIAJE HACIA EL DESTINO';
+            btnNextTripText.textContent = 'Llegué al destino / Finalizar viaje';
             updateGpsLinks(trip.destino || trip.dropoffAddress || trip.destination);
             updateDriverMapForStage('en_viaje');
         }
@@ -1440,6 +1471,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!trip) return;
 
         const currentPos = currentDriverCoords || driverState.currentRealGpsCoords || trip._originCoords;
+        const hasStop = !!(trip.parada || trip.hasStop);
 
         if (trip.etapa === 'en_camino') {
             const origin = trip._originCoords || resolveAddressCoords(trip.origen, { lat: -34.6037, lng: -58.3816 });
@@ -1459,6 +1491,32 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTripStageUI();
             playAlertSound('success');
         } else if (trip.etapa === 'en_origen') {
+            if (hasStop) {
+                trip.etapa = 'hacia_parada';
+                if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('hacia_parada');
+            } else {
+                trip.etapa = 'en_viaje';
+                if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_viaje');
+            }
+            updateTripStageUI();
+            playAlertSound('success');
+        } else if (trip.etapa === 'hacia_parada') {
+            const stop = trip._stopCoords || resolveAddressCoords(trip.parada, { lat: -34.5889, lng: -58.4306 });
+            let distM = 0;
+            if (currentPos && stop) {
+                distM = Math.round(calculateDistanceKm(currentPos.lat, currentPos.lng, stop.lat, stop.lng) * 1000);
+            }
+
+            if (distM > 400) {
+                alert(`⚠️ AÚN NO HAS LLEGADO A LA PARADA\n\nTu ubicación GPS indica que estás a ${distM} metros de la parada intermedia (${trip.parada || 'Parada'}).\n\nDebes estar en la ubicación (a menos de 400 metros) para marcar tu llegada.`);
+                return;
+            }
+
+            trip.etapa = 'en_parada';
+            if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_parada');
+            updateTripStageUI();
+            playAlertSound('success');
+        } else if (trip.etapa === 'en_parada') {
             trip.etapa = 'en_viaje';
             if (window.RutaSync) window.RutaSync.actualizarEstadoViaje('en_viaje');
             updateTripStageUI();
@@ -1487,6 +1545,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let driverLiveMap = null;
     let driverCarMarker = null;
     let driverTargetMarker = null;
+    let driverStopMarker = null;
     let driverSecondaryMarker = null;
     let driverRoutePolylineGlow = null;
     let driverRoutePolyline = null;
@@ -1495,6 +1554,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentDriverCoords = null;
     let driverCurrentRoutePoints = [];
     let driverSimIndex = 0;
+    let lastRouteFetchTime = 0;
+    let lastRouteFetchCoords = null;
 
     const BUE_LANDMARKS = {
         'ezeiza': { lat: -34.8150, lng: -58.5348 },
@@ -1612,9 +1673,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const originCoords = trip.originCoords || resolveAddressCoords(trip.origen || trip.pickupAddress || trip.origin, { lat: -34.6037, lng: -58.3816 });
         const destCoords = trip.destinationCoords || resolveAddressCoords(trip.destino || trip.dropoffAddress || trip.destination, { lat: -34.8150, lng: -58.5348 });
+        const stopCoords = trip.stopCoords || (trip.parada ? resolveAddressCoords(trip.parada, null) : null);
 
         trip._originCoords = originCoords;
         trip._destCoords = destCoords;
+        trip._stopCoords = stopCoords;
 
         // Si tenemos ubicación GPS real del chofer, utilizarla de inmediato
         if (driverState.currentRealGpsCoords) {
@@ -1662,6 +1725,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Limpiar capas previas
         if (driverCarMarker) driverLiveMap.removeLayer(driverCarMarker);
         if (driverTargetMarker) driverLiveMap.removeLayer(driverTargetMarker);
+        if (driverStopMarker) driverLiveMap.removeLayer(driverStopMarker);
         if (driverSecondaryMarker) driverLiveMap.removeLayer(driverSecondaryMarker);
         if (driverRoutePolylineGlow) driverLiveMap.removeLayer(driverRoutePolylineGlow);
         if (driverRoutePolyline) driverLiveMap.removeLayer(driverRoutePolyline);
@@ -1672,17 +1736,23 @@ document.addEventListener('DOMContentLoaded', () => {
             zIndexOffset: 1000
         }).addTo(driverLiveMap);
 
-        // Crear Marcadores de Origen y Destino con Emojis Claros
+        // Crear Marcadores de Origen, Parada (si existe) y Destino
         driverTargetMarker = L.marker([originCoords.lat, originCoords.lng], {
             icon: createPointPinIcon('origin', 'Recogida')
         }).addTo(driverLiveMap);
+
+        if (stopCoords && stopCoords.lat && stopCoords.lng) {
+            driverStopMarker = L.marker([stopCoords.lat, stopCoords.lng], {
+                icon: createPointPinIcon('stop', 'Parada')
+            }).addTo(driverLiveMap);
+        }
 
         driverSecondaryMarker = L.marker([destCoords.lat, destCoords.lng], {
             icon: createPointPinIcon('destination', 'Destino')
         }).addTo(driverLiveMap);
 
-        // Cargar trazado de ruta de alto contraste
-        await updateDriverRouteLine(currentDriverCoords, originCoords);
+        // Cargar trazado de ruta de alto contraste y ETA realista
+        await updateDriverRouteLineAndETA(currentDriverCoords, originCoords, 'en_camino');
 
         setTimeout(() => {
             if (driverLiveMap) {
@@ -1692,27 +1762,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 200);
     }
 
-    async function updateDriverRouteLine(fromCoords, toCoords) {
+    async function updateDriverRouteLineAndETA(fromCoords, toCoords, stage = 'en_camino') {
         if (!driverLiveMap || !fromCoords || !toCoords) return;
 
         let points = [
             [fromCoords.lat, fromCoords.lng],
             [toCoords.lat, toCoords.lng]
         ];
+        let distKm = calculateDistanceKm(fromCoords.lat, fromCoords.lng, toCoords.lat, toCoords.lng);
+        let etaMin = Math.max(2, Math.round((distKm / 20) * 60)); // Estimado base ciudad (20 km/h)
 
         try {
             const url = `https://router.project-osrm.org/route/v1/driving/${fromCoords.lng},${fromCoords.lat};${toCoords.lng},${toCoords.lat}?overview=full&geometries=geojson`;
             const resp = await fetch(url);
             if (resp.ok) {
                 const data = await resp.json();
-                if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
-                    points = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                if (data.routes && data.routes.length > 0) {
+                    const route = data.routes[0];
+                    if (route.geometry) {
+                        points = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                    }
+                    if (route.distance) {
+                        distKm = route.distance / 1000;
+                    }
+                    if (route.duration) {
+                        // En CABA con semáforos y tráfico real, OSRM free-flow suele ser muy bajo.
+                        // Aplicamos factor urbano 1.35x para coincidir con Waze/Google Maps.
+                        etaMin = Math.max(1, Math.ceil((route.duration * 1.35) / 60));
+                    }
                 }
             }
         } catch (e) {
             points = generateInterpolatedPoints(fromCoords, toCoords, 25);
         }
 
+        lastRouteFetchTime = Date.now();
+        lastRouteFetchCoords = { lat: fromCoords.lat, lng: fromCoords.lng };
         driverCurrentRoutePoints = points;
         driverSimIndex = 0;
 
@@ -1737,6 +1822,18 @@ document.addEventListener('DOMContentLoaded', () => {
             lineJoin: 'round'
         }).addTo(driverLiveMap);
 
+        // Actualizar Badge de ETA en Conductor
+        const etaBadge = document.getElementById('driverMapEtaText');
+        if (etaBadge) {
+            const distStr = `${distKm.toFixed(1)} km`;
+            if (stage === 'en_camino') etaBadge.textContent = `Llegada en ~${etaMin} min (${distStr})`;
+            else if (stage === 'en_origen') etaBadge.textContent = `📍 En el punto de recogida`;
+            else if (stage === 'hacia_parada') etaBadge.textContent = `Parada en ~${etaMin} min (${distStr})`;
+            else if (stage === 'en_parada') etaBadge.textContent = `🛑 En la parada intermedia`;
+            else if (stage === 'en_viaje') etaBadge.textContent = `Destino en ~${etaMin} min (${distStr})`;
+        }
+
+        broadcastDriverPosition(fromCoords.lat, fromCoords.lng, fromCoords.heading || 0, fromCoords.speed || 30, stage, etaMin, distKm);
         fitDriverMapBounds();
     }
 
@@ -1758,6 +1855,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const group = [];
         if (driverCarMarker) group.push(driverCarMarker.getLatLng());
         if (driverTargetMarker) group.push(driverTargetMarker.getLatLng());
+        if (driverStopMarker) group.push(driverStopMarker.getLatLng());
         if (driverSecondaryMarker) group.push(driverSecondaryMarker.getLatLng());
         if (group.length > 0) {
             const bounds = L.latLngBounds(group);
@@ -1770,13 +1868,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!trip || !driverLiveMap) return;
 
         const origin = trip._originCoords || resolveAddressCoords(trip.origen, { lat: -34.6037, lng: -58.3816 });
+        const stop = trip._stopCoords;
         const dest = trip._destCoords || resolveAddressCoords(trip.destino, { lat: -34.8150, lng: -58.5348 });
 
         const etaBadge = document.getElementById('driverMapEtaText');
 
         if (stage === 'en_camino') {
-            if (etaBadge) etaBadge.textContent = 'GPS Activo · Chofer en camino';
-            await updateDriverRouteLine(currentDriverCoords || origin, origin);
+            await updateDriverRouteLineAndETA(currentDriverCoords || origin, origin, 'en_camino');
         } else if (stage === 'en_origen') {
             currentDriverCoords = { lat: origin.lat, lng: origin.lng, heading: 0, speed: 0 };
             if (driverCarMarker) {
@@ -1786,9 +1884,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (etaBadge) etaBadge.textContent = '📍 En el punto de recogida';
             broadcastDriverPosition(origin.lat, origin.lng, 0, 0, 'en_origen', 0);
             fitDriverMapBounds();
+        } else if (stage === 'hacia_parada' && stop) {
+            await updateDriverRouteLineAndETA(currentDriverCoords || origin, stop, 'hacia_parada');
+        } else if (stage === 'en_parada' && stop) {
+            currentDriverCoords = { lat: stop.lat, lng: stop.lng, heading: 0, speed: 0 };
+            if (driverCarMarker) {
+                driverCarMarker.setLatLng([stop.lat, stop.lng]);
+                driverCarMarker.setIcon(createDriverCarIcon(0));
+            }
+            if (etaBadge) etaBadge.textContent = '🛑 En la parada intermedia';
+            broadcastDriverPosition(stop.lat, stop.lng, 0, 0, 'en_parada', 0);
+            fitDriverMapBounds();
         } else if (stage === 'en_viaje') {
-            if (etaBadge) etaBadge.textContent = 'En viaje hacia el destino';
-            await updateDriverRouteLine(currentDriverCoords || origin, dest);
+            await updateDriverRouteLineAndETA(currentDriverCoords || stop || origin, dest, 'en_viaje');
         }
     }
 
@@ -1800,7 +1908,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 (pos) => {
                     const lat = pos.coords.latitude;
                     const lng = pos.coords.longitude;
-                    const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 38;
+                    const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 35;
                     let heading = pos.coords.heading;
 
                     if (heading === null || isNaN(heading) || heading === undefined) {
@@ -1815,7 +1923,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     onDriverLocationUpdate(lat, lng, heading, speed);
                 },
                 () => {
-                    // Simulación como respaldo si no hay GPS satelital en interiores
                     startRouteSimulation(trip);
                 },
                 { enableHighAccuracy: true, maximumAge: 1000, timeout: 8000 }
@@ -1829,7 +1936,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gpsSimInterval) clearInterval(gpsSimInterval);
 
         gpsSimInterval = setInterval(() => {
-            if (!driverState.activeTrip || driverState.activeTrip.etapa === 'en_origen') return;
+            if (!driverState.activeTrip || driverState.activeTrip.etapa === 'en_origen' || driverState.activeTrip.etapa === 'en_parada') return;
             if (!driverCurrentRoutePoints || driverCurrentRoutePoints.length === 0) return;
 
             if (driverSimIndex < driverCurrentRoutePoints.length - 1) {
@@ -1837,7 +1944,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cur = driverCurrentRoutePoints[driverSimIndex];
                 const prev = driverCurrentRoutePoints[driverSimIndex - 1];
                 const heading = calculateBearing(prev[0], prev[1], cur[0], cur[1]);
-                const speed = 42;
+                const speed = 36;
 
                 onDriverLocationUpdate(cur[0], cur[1], heading, speed);
             }
@@ -1853,23 +1960,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const trip = driverState.activeTrip;
-        const stage = trip ? trip.etapa : 'en_camino';
-        const targetCoords = (stage === 'en_viaje') ? (trip ? trip._destCoords : null) : (trip ? trip._originCoords : null);
+        if (!trip) return;
+        const stage = trip.etapa || 'en_camino';
 
-        let etaMin = 5;
-        let distKm = 3;
-        if (targetCoords) {
-            distKm = calculateDistanceKm(lat, lng, targetCoords.lat, targetCoords.lng);
-            etaMin = Math.max(1, Math.round((distKm / Math.max(25, speed)) * 60));
-            const etaBadge = document.getElementById('driverMapEtaText');
-            if (etaBadge) {
-                if (stage === 'en_camino') etaBadge.textContent = `Llegada en ~${etaMin} min (${distKm.toFixed(1)} km)`;
-                else if (stage === 'en_origen') etaBadge.textContent = `📍 En origen`;
-                else if (stage === 'en_viaje') etaBadge.textContent = `Destino en ~${etaMin} min (${distKm.toFixed(1)} km)`;
-            }
+        let targetCoords = trip._originCoords;
+        if (stage === 'hacia_parada' && trip._stopCoords) targetCoords = trip._stopCoords;
+        else if (stage === 'en_viaje' && trip._destCoords) targetCoords = trip._destCoords;
+
+        // Recalcular ruta y ETA dinámico si el chofer se desplazó más de 30 metros o pasaron 8 segundos
+        const shouldRecalc = !lastRouteFetchCoords || 
+            (calculateDistanceKm(lat, lng, lastRouteFetchCoords.lat, lastRouteFetchCoords.lng) > 0.03) ||
+            (Date.now() - lastRouteFetchTime > 8000);
+
+        if (shouldRecalc && targetCoords) {
+            updateDriverRouteLineAndETA(currentDriverCoords, targetCoords, stage);
         }
-
-        broadcastDriverPosition(lat, lng, heading, speed, stage, etaMin, distKm);
     }
 
     function broadcastDriverPosition(lat, lng, heading, speed, stage, etaMin, distKm = 0) {
@@ -2208,17 +2313,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     btnCancelActiveTrip.addEventListener('click', () => {
-        const warningMsg = '⚠️ ADVERTENCIA DE CANCELACIÓN:\n\nAl cancelar un viaje que ya has aceptado, disminuye tu tasa de aceptación y cumplimiento, lo cual afectará tu prioridad para recibir traslados de la flota.\n\n¿Estás seguro de que deseas cancelar este viaje?';
+        const warningMsg = '⚠️ ADVERTENCIA DE CANCELACIÓN:\n\nAl cancelar este viaje, el servicio volverá a quedar disponible para que otro conductor de la flota lo acepte de inmediato.\n\n¿Estás seguro de que deseas cancelar el viaje?';
         if (confirm(warningMsg)) {
             stopDriverGpsTracking();
             if (window.RutaSync) {
-                window.RutaSync.actualizarEstadoViaje('cancelado');
-                window.RutaSync.limpiarViajeActivo();
-                window.RutaSync.limpiarChat();
+                window.RutaSync.actualizarEstadoViaje('buscando_conductor', {
+                    motivo: 'cancelado_por_conductor',
+                    conductor: null,
+                    ultimoEstadoEn: Date.now()
+                });
             }
             driverState.activeTrip = null;
             stateActiveTrip.classList.remove('active');
             stateSearching.classList.add('active');
+            showDriverToast('ℹ️ Viaje cancelado. Has vuelto al modo de búsqueda en vivo.');
         }
     });
 
@@ -2370,8 +2478,32 @@ document.addEventListener('DOMContentLoaded', () => {
             renderReservas();
         });
 
-        window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', () => {
+        window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', (viaje) => {
             renderReservas();
+            if (viaje && (viaje.estado === 'cancelado_por_pasajero' || viaje.estado === 'cancelado')) {
+                if (driverState.activeTrip) {
+                    const teniaPenalizacion = !!viaje.penalizacion;
+                    const monto = viaje.montoPenalizacion || Math.round(Number(driverState.activeTrip.precio) * 0.5 || 3500);
+                    const passName = driverState.activeTrip.nombrePasajero || driverState.activeTrip.clientName || 'El pasajero';
+                    
+                    let alertMsg = `🚨 VIAJE CANCELADO POR EL PASAJERO\n\n${passName} ha cancelado la solicitud del viaje.`;
+                    if (teniaPenalizacion) {
+                        alertMsg += `\n\n💰 COMPENSACIÓN POR CANCELACIÓN:\nDado que transcurrieron más de 2 minutos desde que aceptaste el viaje, se acreditó la TARIFA MÍNIMA de compensación ($${monto.toLocaleString('es-AR')}) a tu favor.`;
+                        driverState.todayEarnings += monto;
+                        actualizarGananciasDriverUI();
+                    } else {
+                        alertMsg += `\n\n(Cancelación dentro de la ventana de cortesía de 2 minutos).`;
+                    }
+
+                    alert(alertMsg);
+                    stopDriverGpsTracking();
+                    driverState.activeTrip = null;
+                    stateActiveTrip.classList.remove('active');
+                    stateSearching.classList.add('active');
+                    showDriverToast('🚨 El pasajero canceló el viaje.');
+                    playAlertSound('warning');
+                }
+            }
         });
 
         window.RutaSync.on('CHAT_MENSAJE_ENVIADO', (msg) => {

@@ -110,7 +110,7 @@
             <section class="driver-state-card" id="stateActiveTrip">
                 <div class="trip-stage-header" id="tripStageBadge">
                     <i class="fa-solid fa-route"></i>
-                    <span id="tripStageTitle">EN CAMINO AL ORIGEN</span>
+                    <span id="tripStageTitle">1. EN CAMINO AL ORIGEN</span>
                 </div>
 
                 <!-- MAPA GPS EN TIEMPO REAL (VISTA CHOFER) -->
@@ -127,6 +127,16 @@
                     <button type="button" class="btn-driver-map-recenter" id="btnRecenterDriverMap" title="Re-centrar en mi vehículo">
                         <i class="fa-solid fa-location-crosshairs"></i>
                     </button>
+                </div>
+
+                <!-- Botones de Navegación GPS Externa (Justo debajo del mapa para acceso rápido) -->
+                <div class="navigation-apps-row" style="margin-top: 10px; margin-bottom: 12px;">
+                    <a href="#" class="btn-nav-app waze" id="btnOpenWaze" target="_blank">
+                        <i class="fa-brands fa-waze"></i> Navegar en Waze
+                    </a>
+                    <a href="#" class="btn-nav-app gmaps" id="btnOpenGoogleMaps" target="_blank">
+                        <i class="fa-solid fa-map-location-dot"></i> Google Maps
+                    </a>
                 </div>
 
                 <!-- Datos del Pasajero -->
@@ -153,25 +163,21 @@
                     </div>
                 </div>
 
-                <!-- MAPA GPS EN VIVO DEL CONDUCTOR -->
-                <div class="driver-live-map-container" style="position: relative; height: 260px; border-radius: 14px; overflow: hidden; margin-bottom: 14px; border: 1px solid rgba(251, 191, 36, 0.35); box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-                    <div id="driverActiveMap" style="width: 100%; height: 100%; min-height: 260px;"></div>
-                    <div class="driver-map-floating-badge" id="driverMapEtaBadge" style="position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(10, 13, 20, 0.92); backdrop-filter: blur(8px); border: 1px solid rgba(251, 191, 36, 0.5); padding: 6px 12px; border-radius: 20px; font-size: 0.78rem; color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 6px;">
-                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
-                        <span id="driverMapEtaText">GPS Activo · Calculando ruta...</span>
-                    </div>
-                    <button type="button" id="btnRecenterDriverMap" style="position: absolute; bottom: 12px; right: 12px; z-index: 1000; width: 38px; height: 38px; border-radius: 50%; background: #0f172a; border: 1px solid rgba(251, 191, 36, 0.5); color: #fbbf24; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.6); cursor: pointer; font-size: 1rem;">
-                        <i class="fa-solid fa-crosshairs"></i>
-                    </button>
-                </div>
-
-                <!-- Puntos de Ruta -->
+                <!-- Puntos de Ruta con soporte para Parada Intermedia -->
                 <div class="active-trip-route">
                     <div class="route-step">
                         <div class="route-icon origin"><i class="fa-solid fa-circle-dot"></i></div>
                         <div class="route-details">
                             <span class="step-label">RECOGIDA</span>
                             <p class="step-address" id="activeTripOrigin">Av. 9 de Julio 1200, CABA</p>
+                        </div>
+                    </div>
+                    <div class="route-connector-line" id="routeConnectorStop" style="display: none;"></div>
+                    <div class="route-step" id="activeTripStopStep" style="display: none;">
+                        <div class="route-icon stop" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b;"><i class="fa-solid fa-hand"></i></div>
+                        <div class="route-details">
+                            <span class="step-label" style="color: #f59e0b;">🛑 PARADA INTERMEDIA</span>
+                            <p class="step-address" id="activeTripStop">Parada en camino</p>
                         </div>
                     </div>
                     <div class="route-connector-line"></div>
@@ -198,16 +204,6 @@
                         <span class="m-label">Peajes</span>
                         <span class="m-val" id="activeTripTolls">Incluidos</span>
                     </div>
-                </div>
-
-                <!-- Botones de Navegación GPS Externa -->
-                <div class="navigation-apps-row">
-                    <a href="#" class="btn-nav-app waze" id="btnOpenWaze" target="_blank">
-                        <i class="fa-brands fa-waze"></i> Navegar en Waze
-                    </a>
-                    <a href="#" class="btn-nav-app gmaps" id="btnOpenGoogleMaps" target="_blank">
-                        <i class="fa-solid fa-map-location-dot"></i> Google Maps
-                    </a>
                 </div>
 
                 <!-- Botón de avance de estado del viaje -->
@@ -728,7 +724,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- SCRIPTS -->
-    <script src="sync.js?v=46"></script>
-    <script src="conductor.js?v=46"></script>
+    <script src="sync.js?v=47"></script>
+    <script src="conductor.js?v=47"></script>
 </body>
 </html>

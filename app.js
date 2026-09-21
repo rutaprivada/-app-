@@ -4983,6 +4983,10 @@ if (btnRequestInapp) {
     const b = state.breakdown || {};
     const originAddress = (state.origin && (state.origin.address || state.origin.name)) ? (state.origin.address || state.origin.name) : originVal;
     const destAddress = (state.destination && (state.destination.address || state.destination.name)) ? (state.destination.address || state.destination.name) : destVal;
+    const stopInput = document.getElementById('stop-input');
+    const stopVal = stopInput ? stopInput.value.trim() : '';
+    const stopAddress = (state.stop && (state.stop.address || state.stop.name)) ? (state.stop.address || state.stop.name) : (state.hasIntermediateStop ? stopVal : '');
+    const hasIntermediateStop = !!(state.hasIntermediateStop && (stopAddress || stopVal));
     const tollCostNum = Number(b.tollCost || b.tollFare || 0);
 
     const tripData = {
@@ -4991,6 +4995,11 @@ if (btnRequestInapp) {
       pickupAddress: originAddress,
       destino: destAddress,
       dropoffAddress: destAddress,
+      parada: hasIntermediateStop ? stopAddress : null,
+      stopAddress: hasIntermediateStop ? stopAddress : null,
+      hasStop: hasIntermediateStop,
+      hasIntermediateStop: hasIntermediateStop,
+      stopFee: Number(state.stopFee || b.stopFee || 0),
       distancia: `${(state.distanceKm || 0).toFixed(1)} km`,
       distanceKm: Number(state.distanceKm) || 0,
       duracion: `${state.durationMin || state.baseDurationMin || 0} min`,
@@ -5014,7 +5023,8 @@ if (btnRequestInapp) {
       fecha: state.date || new Date().toISOString().split('T')[0],
       hora: state.time || '12:00',
       originCoords: state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null,
-      destinationCoords: state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null
+      destinationCoords: state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null,
+      stopCoords: (hasIntermediateStop && state.stop && state.stop.lat) ? { lat: state.stop.lat, lng: state.stop.lng } : null
     };
 
     if (window.RutaSync) {
@@ -5034,6 +5044,8 @@ if (closeInappTripBtn) {
 if (btnPassengerCancelTrip) {
   btnPassengerCancelTrip.addEventListener('click', () => {
     const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+    let tienePenalizacion = false;
+    let montoPenalizacion = 0;
     
     // Si el viaje ya fue asignado o aceptado por un chofer
     if (activeTrip && activeTrip.estado && activeTrip.estado !== 'buscando_conductor' && activeTrip.estado !== 'solicitado') {
@@ -5043,13 +5055,15 @@ if (btnPassengerCancelTrip) {
       const elapsedMin = Math.floor(elapsedSec / 60);
 
       if (elapsedMs > 2 * 60 * 1000) { // Pasados más de 2 minutos
-        const tarifaMinimaStr = activeTrip.precio ? ('$' + Math.round(Number(activeTrip.precio) * 0.5 || 3500).toLocaleString('es-AR')) : '$3.500';
+        montoPenalizacion = Math.round(Number(activeTrip.precio) * 0.5 || 3500);
+        const tarifaMinimaStr = '$' + montoPenalizacion.toLocaleString('es-AR');
         const driverName = (activeTrip.conductor && activeTrip.conductor.nombre) ? activeTrip.conductor.nombre : 'Daniel Pabon';
-        const msgPenalizacion = `⚠️ COBRO DE TARIFA MÍNIMA POR CANCELACIÓN:\n\nTu chofer asignado (${driverName}) ya se encuentra en camino hacia tu ubicación y han transcurrido más de 2 minutos (${elapsedMin} min) desde que tomó el servicio.\n\nPor políticas del servicio ejecutivo, cancelar este viaje aplicará el cobro de la TARIFA MÍNIMA (${tarifaMinimaStr}) como penalización por el desplazamiento y tiempo del chofer.\n\n¿Deseas confirmar la cancelación del viaje?`;
+        const msgPenalizacion = `⚠️ COBRO DE TARIFA MÍNIMA POR CANCELACIÓN:\n\nTu chofer asignado (${driverName}) ya se encuentra en camino hacia tu ubicación y han transcurrido más de 2 minutos (${elapsedMin} min) desde que tomó el servicio.\n\nPor políticas del servicio ejecutivo, cancelar este viaje aplicará el cobro de la TARIFA MÍNIMA (${tarifaMinimaStr}) como compensación al chofer.\n\n¿Deseas confirmar la cancelación del viaje?`;
         
         if (!confirm(msgPenalizacion)) {
           return;
         }
+        tienePenalizacion = true;
       } else {
         const segRestantes = Math.max(0, 120 - elapsedSec);
         const msgAviso = `¿Deseas cancelar la solicitud de viaje?\n\n(Aviso: Quedan ${segRestantes}s antes de que aplique penalización de tarifa mínima por chofer en camino).`;
@@ -5064,13 +5078,22 @@ if (btnPassengerCancelTrip) {
     }
 
     if (window.RutaSync) {
-      window.RutaSync.actualizarEstadoViaje('cancelado');
-      window.RutaSync.limpiarViajeActivo();
-      window.RutaSync.limpiarChat();
+      window.RutaSync.actualizarEstadoViaje('cancelado_por_pasajero', {
+        motivo: 'cancelado_por_pasajero',
+        penalizacion: tienePenalizacion,
+        montoPenalizacion: montoPenalizacion,
+        canceladoEn: Date.now()
+      });
+      setTimeout(() => {
+        if (window.RutaSync) {
+          window.RutaSync.limpiarViajeActivo();
+          window.RutaSync.limpiarChat();
+        }
+      }, 1500);
     }
     closeInAppTripModal();
     closePassengerChatModal();
-    showToast('❌ Solicitud de viaje cancelada.');
+    showToast(tienePenalizacion ? '❌ Viaje cancelado con penalización de tarifa mínima.' : '❌ Solicitud de viaje cancelada.');
   });
 }
 
@@ -5211,22 +5234,34 @@ if (window.RutaSync) {
   });
 
   window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', (viaje) => {
-    if (viaje) {
-      updatePassengerTripStage(viaje.estado);
-      if (viaje.estado === 'en_origen') {
-        showToast(`📍 Tu conductor ha llegado al punto de recogida.`);
-      } else if (viaje.estado === 'en_viaje') {
-        showToast(`🚀 Viaje iniciado. ¡Que tengas un excelente traslado!`);
-      } else if (viaje.estado === 'completado') {
-        // Cerrar chat y modal de seguimiento
-        closePassengerChatModal();
-        if (passengerTripModal) {
-          passengerTripModal.classList.add('hidden');
-        }
-
-        // Abrir Modal de Cierre de Viaje y Calificación del Conductor
-        showPassengerCompletionModal(viaje);
+    if (!viaje) return;
+    
+    // Si el chofer canceló el viaje y volvió a quedar en búsqueda de otro chofer
+    if (viaje.estado === 'buscando_conductor' || viaje.estado === 'cancelado_por_conductor') {
+      if (pStateDriverAssigned && !pStateDriverAssigned.classList.contains('hidden')) {
+        pStateDriverAssigned.classList.add('hidden');
+        if (pStateSearching) pStateSearching.classList.remove('hidden');
+        showToast('⚠️ Tu conductor asignado no pudo continuar. Reanudando búsqueda de chofer...');
+        alert('⚠️ AVISO:\n\nTu conductor asignado tuvo un inconveniente y canceló el servicio.\n\nEl sistema está buscando automáticamente otro conductor disponible en la zona para atender tu viaje de inmediato.');
       }
+      return;
+    }
+
+    updatePassengerTripStage(viaje.estado);
+    if (viaje.estado === 'en_origen') {
+      showToast(`📍 Tu conductor ha llegado al punto de recogida.`);
+    } else if (viaje.estado === 'hacia_parada') {
+      showToast(`🛑 En viaje hacia la parada intermedia.`);
+    } else if (viaje.estado === 'en_parada') {
+      showToast(`📍 Tu conductor ha llegado a la parada intermedia.`);
+    } else if (viaje.estado === 'en_viaje') {
+      showToast(`🚀 Viaje en curso hacia el destino.`);
+    } else if (viaje.estado === 'completado') {
+      closePassengerChatModal();
+      if (passengerTripModal) {
+        passengerTripModal.classList.add('hidden');
+      }
+      showPassengerCompletionModal(viaje);
     }
   });
 
@@ -5238,6 +5273,24 @@ if (window.RutaSync) {
       }
     }
   });
+}
+
+function updatePassengerTripStage(stage) {
+  const badge = document.getElementById('passengerTripStagePill');
+  if (badge) {
+    if (stage === 'en_camino' || stage === 'aceptado') {
+      badge.textContent = 'En camino a tu ubicación';
+    } else if (stage === 'en_origen') {
+      badge.textContent = 'Chofer en el punto de recogida';
+    } else if (stage === 'hacia_parada') {
+      badge.textContent = 'En viaje a parada intermedia';
+    } else if (stage === 'en_parada') {
+      badge.textContent = 'En parada intermedia';
+    } else if (stage === 'en_viaje') {
+      badge.textContent = 'En viaje hacia el destino';
+    }
+  }
+  updatePassengerLiveMapForStage(stage);
 }
 
 // ==========================================
@@ -5349,7 +5402,7 @@ async function initPassengerLiveMap(trip) {
 
   const originCoords = trip.originCoords || (state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null) || resolvePassengerCoords(trip.origen || trip.pickupAddress, { lat: -34.6037, lng: -58.3816 });
   const destCoords = trip.destinationCoords || (state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null) || resolvePassengerCoords(trip.destino || trip.dropoffAddress, { lat: -34.8150, lng: -58.5348 });
-  const stopCoords = (trip.intermediateStop || (state.hasIntermediateStop && state.intermediateStop)) ? (trip.intermediateStop || state.intermediateStop) : null;
+  const stopCoords = trip.stopCoords || (trip.parada ? resolvePassengerCoords(trip.parada, null) : null) || (state.hasIntermediateStop && state.stop ? { lat: state.stop.lat, lng: state.stop.lng } : null);
 
   pActiveTripData._originCoords = originCoords;
   pActiveTripData._destCoords = destCoords;
@@ -5506,8 +5559,27 @@ function onPassengerReceivedDriverLocation(loc) {
       etaText.textContent = `🚘 Chofer en camino · Llega en ~${loc.etaMin || 4} min${distStr}`;
     } else if (loc.stage === 'en_origen') {
       etaText.textContent = `📍 ¡Tu chofer está en el punto de recogida!`;
+    } else if (loc.stage === 'hacia_parada') {
+      etaText.textContent = `🛑 En camino a parada intermedia · ~${loc.etaMin || 6} min${distStr}`;
+    } else if (loc.stage === 'en_parada') {
+      etaText.textContent = `🛑 En la parada intermedia`;
     } else if (loc.stage === 'en_viaje') {
       etaText.textContent = `🏁 En viaje hacia el destino · Llega en ~${loc.etaMin || 15} min${distStr}`;
+    }
+  }
+
+  // Redibujar polyline de forma adaptativa hacia el objetivo de la etapa
+  if (pActiveTripData && passengerLiveMap) {
+    const origin = pActiveTripData._originCoords;
+    const stop = pActiveTripData._stopCoords;
+    const dest = pActiveTripData._destCoords;
+
+    if (loc.stage === 'en_camino' && origin) {
+      updatePassengerRoutePolyline(loc, origin);
+    } else if (loc.stage === 'hacia_parada' && stop) {
+      updatePassengerRoutePolyline(loc, stop);
+    } else if (loc.stage === 'en_viaje' && dest) {
+      updatePassengerRoutePolyline(loc, dest);
     }
   }
 }
@@ -5520,6 +5592,7 @@ async function updatePassengerLiveMapForStage(stage) {
   if (!passengerLiveMap || !pActiveTripData) return;
 
   const origin = pActiveTripData._originCoords || (state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null) || resolvePassengerCoords(pActiveTripData.origen, { lat: -34.6037, lng: -58.3816 });
+  const stop = pActiveTripData._stopCoords;
   const dest = pActiveTripData._destCoords || (state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null) || resolvePassengerCoords(pActiveTripData.destino, { lat: -34.8150, lng: -58.5348 });
 
   const etaText = document.getElementById('passengerMapEtaText');
@@ -5534,9 +5607,19 @@ async function updatePassengerLiveMapForStage(stage) {
     }
     if (etaText) etaText.textContent = '📍 ¡Tu chofer ha llegado al origen!';
     fitPassengerMapBounds();
+  } else if (stage === 'hacia_parada' && stop) {
+    if (etaText) etaText.textContent = '🛑 En camino a parada intermedia...';
+    await updatePassengerRoutePolyline(pCurrentDriverCoords || origin, stop);
+  } else if (stage === 'en_parada' && stop) {
+    if (pLiveCarMarker) {
+      pLiveCarMarker.setLatLng([stop.lat, stop.lng]);
+      pLiveCarMarker.setIcon(createPassengerCarIcon(0));
+    }
+    if (etaText) etaText.textContent = '🛑 En la parada intermedia';
+    fitPassengerMapBounds();
   } else if (stage === 'en_viaje') {
     if (etaText) etaText.textContent = '🏁 En viaje hacia el destino...';
-    await updatePassengerRoutePolyline(pCurrentDriverCoords || origin, dest);
+    await updatePassengerRoutePolyline(pCurrentDriverCoords || stop || origin, dest);
   }
 }
 
