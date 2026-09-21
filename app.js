@@ -4869,14 +4869,76 @@ function closeInAppTripModal() {
   }
 }
 
+let passengerAudioCtx = null;
+function playPassengerTone(type = 'chime') {
+  try {
+    if (!passengerAudioCtx) {
+      passengerAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (passengerAudioCtx.state === 'suspended') {
+      passengerAudioCtx.resume();
+    }
+    const ctx = passengerAudioCtx;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    if (type === 'arrived') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.setValueAtTime(1174.66, now + 0.12);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.35);
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    } else if (type === 'completed') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.setValueAtTime(659.25, now + 0.12);
+      osc.frequency.setValueAtTime(783.99, now + 0.24);
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.5);
+      if (navigator.vibrate) navigator.vibrate([150, 80, 250]);
+    } else {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(659.25, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.18);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.28);
+      if (navigator.vibrate) navigator.vibrate(120);
+    }
+  } catch(e) {}
+}
+
 function updatePassengerTripStage(stage) {
-  // Reset
+  // 1. Resetear indicadores del stepper
   [pStepAssigned, pStepEnCamino, pStepEnOrigen, pStepEnViaje].forEach(el => el && el.classList.remove('active'));
   [pLine1, pLine2, pLine3].forEach(el => el && el.classList.remove('active'));
 
+  // 2. Gestionar visibilidad del botón de cancelar viaje
+  if (btnPassengerCancelTrip) {
+    if (['hacia_parada', 'en_parada', 'en_viaje'].includes(stage)) {
+      btnPassengerCancelTrip.style.display = 'none';
+    } else {
+      btnPassengerCancelTrip.style.display = 'block';
+    }
+  }
+
+  // 3. Actualizar textos, banner superior y pasos activos
   if (stage === 'aceptado') {
     if (pStepAssigned) pStepAssigned.classList.add('active');
-    if (pStageBannerText) pStageBannerText.textContent = '¡Chofer confirmado! Preparando salida.';
+    if (pStageBannerText) pStageBannerText.textContent = '¡Chofer confirmado! Preparando salida hacia tu ubicación.';
     if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Chofer Asignado';
     updatePassengerLiveMapForStage('aceptado');
   } else if (stage === 'en_camino') {
@@ -4892,9 +4954,27 @@ function updatePassengerTripStage(stage) {
     if (pStepEnCamino) pStepEnCamino.classList.add('active');
     if (pLine2) pLine2.classList.add('active');
     if (pStepEnOrigen) pStepEnOrigen.classList.add('active');
-    if (pStageBannerText) pStageBannerText.textContent = '📍 ¡Tu chofer ha llegado al origen y te está esperando!';
+    if (pStageBannerText) pStageBannerText.textContent = '📍 ¡Tu conductor ha llegado al origen y te está esperando!';
     if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Chofer en el Origen';
     updatePassengerLiveMapForStage('en_origen');
+  } else if (stage === 'hacia_parada') {
+    if (pStepAssigned) pStepAssigned.classList.add('active');
+    if (pLine1) pLine1.classList.add('active');
+    if (pStepEnCamino) pStepEnCamino.classList.add('active');
+    if (pLine2) pLine2.classList.add('active');
+    if (pStepEnOrigen) pStepEnOrigen.classList.add('active');
+    if (pStageBannerText) pStageBannerText.textContent = '🛑 En viaje hacia la parada intermedia.';
+    if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Hacia Parada Intermedia';
+    updatePassengerLiveMapForStage('hacia_parada');
+  } else if (stage === 'en_parada') {
+    if (pStepAssigned) pStepAssigned.classList.add('active');
+    if (pLine1) pLine1.classList.add('active');
+    if (pStepEnCamino) pStepEnCamino.classList.add('active');
+    if (pLine2) pLine2.classList.add('active');
+    if (pStepEnOrigen) pStepEnOrigen.classList.add('active');
+    if (pStageBannerText) pStageBannerText.textContent = '📍 Conductor en la parada intermedia.';
+    if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'En Parada Intermedia';
+    updatePassengerLiveMapForStage('en_parada');
   } else if (stage === 'en_viaje') {
     if (pStepAssigned) pStepAssigned.classList.add('active');
     if (pLine1) pLine1.classList.add('active');
@@ -4903,16 +4983,12 @@ function updatePassengerTripStage(stage) {
     if (pStepEnOrigen) pStepEnOrigen.classList.add('active');
     if (pLine3) pLine3.classList.add('active');
     if (pStepEnViaje) pStepEnViaje.classList.add('active');
-    if (pStageBannerText) pStageBannerText.textContent = '🚀 Viaje en curso hacia el destino. ¡Buen viaje!';
-    if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'En Viaje';
+    if (pStageBannerText) pStageBannerText.textContent = '🚀 Viaje en curso hacia el destino final. ¡Buen viaje!';
+    if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'En Viaje al Destino';
     updatePassengerLiveMapForStage('en_viaje');
   } else if (stage === 'completado') {
     if (pStageBannerText) pStageBannerText.textContent = '✨ ¡Has llegado a tu destino! Gracias por viajar con RutaPrivada.';
     if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Viaje Completado';
-    setTimeout(() => {
-      closeInAppTripModal();
-      showToast('✨ Viaje finalizado con éxito.');
-    }, 4000);
   }
 }
 
@@ -5274,18 +5350,21 @@ if (window.RutaSync) {
 
     updatePassengerTripStage(viaje.estado);
     if (viaje.estado === 'en_origen') {
+      playPassengerTone('arrived');
       showToast(`📍 Tu conductor ha llegado al punto de recogida.`);
     } else if (viaje.estado === 'hacia_parada') {
+      playPassengerTone('chime');
       showToast(`🛑 En viaje hacia la parada intermedia.`);
     } else if (viaje.estado === 'en_parada') {
+      playPassengerTone('arrived');
       showToast(`📍 Tu conductor ha llegado a la parada intermedia.`);
     } else if (viaje.estado === 'en_viaje') {
-      showToast(`🚀 Viaje en curso hacia el destino.`);
+      playPassengerTone('chime');
+      showToast(`🚀 Viaje en curso hacia el destino final.`);
     } else if (viaje.estado === 'completado') {
+      playPassengerTone('completed');
       closePassengerChatModal();
-      if (passengerTripModal) {
-        passengerTripModal.classList.add('hidden');
-      }
+      closeInAppTripModal();
       showPassengerCompletionModal(viaje);
     }
   });
@@ -5304,38 +5383,11 @@ if (window.RutaSync) {
             pChatUnreadBadge.classList.remove('hidden');
           }
         }
+        playPassengerTone('chime');
         showToast(`💬 Mensaje de tu chofer: "${msg.texto}"`);
       }
     }
   });
-}
-
-function updatePassengerTripStage(stage) {
-  const badge = document.getElementById('passengerTripStagePill');
-  if (badge) {
-    if (stage === 'en_camino' || stage === 'aceptado') {
-      badge.textContent = 'En camino a tu ubicación';
-    } else if (stage === 'en_origen') {
-      badge.textContent = 'Chofer en el punto de recogida';
-    } else if (stage === 'hacia_parada') {
-      badge.textContent = 'En viaje a parada intermedia';
-    } else if (stage === 'en_parada') {
-      badge.textContent = 'En parada intermedia';
-    } else if (stage === 'en_viaje') {
-      badge.textContent = 'En viaje hacia el destino';
-    }
-  }
-
-  // Ocultar botón de cancelar si el viaje ya está en curso con el pasajero a bordo
-  if (btnPassengerCancelTrip) {
-    if (['hacia_parada', 'en_parada', 'en_viaje'].includes(stage)) {
-      btnPassengerCancelTrip.style.display = 'none';
-    } else {
-      btnPassengerCancelTrip.style.display = 'block';
-    }
-  }
-
-  updatePassengerLiveMapForStage(stage);
 }
 
 // ==========================================
@@ -5710,7 +5762,7 @@ if (btnRecenterPassengerMap) {
     if (pFinalPaymentMethod) pFinalPaymentMethod.textContent = paymentMethodStr;
     if (pFinalDriverName) pFinalDriverName.textContent = driverNameStr;
 
-    setPassengerStarRating(0);
+    setPassengerStarRating(5);
     document.querySelectorAll('#passengerComplimentsRow .compliment-tag').forEach(t => t.classList.remove('selected'));
     if (passengerRatingComment) passengerRatingComment.value = '';
     modalPassengerTripCompleted.classList.remove('hidden');

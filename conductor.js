@@ -1217,10 +1217,13 @@ document.addEventListener('DOMContentLoaded', () => {
             statusSubtext.textContent = 'Recibiendo viajes en tiempo real. Toca para pausar.';
 
             stateOffline.classList.remove('active');
-            stateActiveTrip.classList.remove('active');
-            stateSearching.classList.add('active');
-
-            if (!driverState.activeTrip) {
+            if (driverState.activeTrip) {
+                stateSearching.classList.remove('active');
+                stateActiveTrip.classList.add('active');
+                toggleDriverStatusBar(false);
+            } else {
+                stateActiveTrip.classList.remove('active');
+                stateSearching.classList.add('active');
                 toggleDriverStatusBar(true);
             }
 
@@ -1244,11 +1247,14 @@ document.addEventListener('DOMContentLoaded', () => {
             statusText.textContent = 'ESTÁS DESCONECTADO';
             statusSubtext.textContent = 'Toca para conectarte y recibir viajes';
 
-            stateSearching.classList.remove('active');
-            stateActiveTrip.classList.remove('active');
-            stateOffline.classList.add('active');
-
-            if (!driverState.activeTrip) {
+            if (driverState.activeTrip) {
+                stateSearching.classList.remove('active');
+                stateActiveTrip.classList.add('active');
+                toggleDriverStatusBar(false);
+            } else {
+                stateSearching.classList.remove('active');
+                stateActiveTrip.classList.remove('active');
+                stateOffline.classList.add('active');
                 toggleDriverStatusBar(true);
             }
 
@@ -2645,7 +2651,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', (viaje) => {
             renderReservas();
-            if (viaje && (viaje.estado === 'cancelado_por_pasajero' || viaje.estado === 'cancelado')) {
+            if (!viaje) return;
+
+            if (viaje.estado === 'cancelado_por_pasajero' || viaje.estado === 'cancelado') {
                 if (driverState.activeTrip) {
                     const rawPrice = Number(driverState.activeTrip.precioEstimado || driverState.activeTrip.precio || driverState.activeTrip.totalFare || driverState.activeTrip.monto || 0);
                     const teniaPenalizacion = !!viaje.penalizacion;
@@ -2684,6 +2692,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     stateSearching.classList.add('active');
                     showDriverToast('🚨 El pasajero canceló el viaje.');
                     playAlertSound('warning');
+                }
+            } else if (['aceptado', 'asignado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(viaje.estado)) {
+                // Si el conductor no tenía el viaje en memoria (por reconexión o recarga), restaurarlo
+                if (!driverState.activeTrip) {
+                    restoreDriverActiveTripIfExists();
+                } else if (viaje.id === driverState.activeTrip.id) {
+                    driverState.activeTrip.etapa = viaje.etapa || viaje.estado;
+                    updateTripStageUI();
                 }
             }
         });
@@ -2784,32 +2800,44 @@ document.addEventListener('DOMContentLoaded', () => {
     function restoreDriverActiveTripIfExists() {
         try {
             let activeTrip = null;
-            if (window.RutaSync) {
-                const syncTrip = window.RutaSync.obtenerViajeActivo();
-                if (syncTrip && syncTrip.estado && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_conductor'].includes(syncTrip.estado)) {
-                    if (syncTrip.conductor && syncTrip.conductor.nombre === driverState.info.nombre) {
-                        activeTrip = syncTrip;
-                    }
+
+            // 1. Prioridad: viaje activo persistido en localStorage local de la app del chofer
+            const raw = localStorage.getItem('rutaprivada_driver_active_trip');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.id && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_conductor'].includes(parsed.estado)) {
+                    activeTrip = parsed;
                 }
             }
-            if (!activeTrip) {
-                const raw = localStorage.getItem('rutaprivada_driver_active_trip');
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    if (parsed && parsed.id) {
-                        activeTrip = parsed;
-                    }
+
+            // 2. Si no estaba en localStorage, verificar el estado de sincronización global
+            if (!activeTrip && window.RutaSync) {
+                const syncTrip = window.RutaSync.obtenerViajeActivo();
+                if (syncTrip && syncTrip.id && syncTrip.estado && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_conductor', 'buscando_conductor', 'solicitado'].includes(syncTrip.estado)) {
+                    activeTrip = syncTrip;
                 }
             }
 
             if (activeTrip) {
+                driverState.activeTrip = activeTrip;
+                driverState.isOnline = true;
                 setOnlineStatus(true);
                 switchTab('viewLive');
                 startActiveTrip(activeTrip);
+
                 if (activeTrip.etapa) {
                     driverState.activeTrip.etapa = activeTrip.etapa;
-                    updateTripStageUI();
+                } else if (activeTrip.estado && activeTrip.estado !== 'aceptado') {
+                    driverState.activeTrip.etapa = activeTrip.estado;
                 }
+                updateTripStageUI();
+
+                // Asegurar que la pantalla de viaje activo esté 100% visible
+                stateSearching.classList.remove('active');
+                stateOffline.classList.remove('active');
+                stateActiveTrip.classList.add('active');
+                toggleDriverStatusBar(false);
+
                 return true;
             }
         } catch(e) {
@@ -2825,22 +2853,22 @@ document.addEventListener('DOMContentLoaded', () => {
     initFirebaseConductor();
     renderReservas();
 
-    // Restaurar viaje activo si existe tras recarga o cierre
-    const hasRestoredTrip = restoreDriverActiveTripIfExists();
-
-    // Iniciar siempre en Línea para recibir solicitudes al instante (estilo Uber/Cabify)
+    // 1. Iniciar estado online base
     try {
         const savedOnline = localStorage.getItem('rutaprivada_driver_is_online');
-        if (savedOnline !== 'false') {
-            setOnlineStatus(true);
-        } else {
+        if (savedOnline === 'false') {
             setOnlineStatus(false);
+        } else {
+            setOnlineStatus(true);
         }
     } catch(e) {
         setOnlineStatus(true);
     }
 
-    // Si no había un viaje activo en curso, restaurar la pestaña donde estaba el chofer
+    // 2. Restaurar viaje activo si existe (tiene máxima prioridad sobre cualquier otra vista)
+    const hasRestoredTrip = restoreDriverActiveTripIfExists();
+
+    // 3. Si no había un viaje activo en curso, restaurar la pestaña donde estaba el chofer
     if (!hasRestoredTrip) {
         try {
             const savedTab = localStorage.getItem('rutaprivada_driver_active_tab');
