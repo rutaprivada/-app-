@@ -1417,9 +1417,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // 7. RADAR, LISTA DE VIAJES DISPONIBLES Y VIAJE ENTRANTE
     // ==========================================
-    driverState.availableTrips = [];
-    let driverRejectRecycleTimers = {};
-
     function haversineDistance(lat1, lon1, lat2, lon2) {
         return calculateDistanceKm(lat1, lon1, lat2, lon2);
     }
