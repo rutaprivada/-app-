@@ -5381,13 +5381,15 @@ if (window.RutaSync) {
     
     // Si el chofer canceló el viaje y volvió a quedar en búsqueda de otro chofer
     if (viaje.estado === 'buscando_conductor' || viaje.estado === 'cancelado_por_conductor') {
-      if (pStateDriverAssigned && !pStateDriverAssigned.classList.contains('hidden')) {
-        pStateDriverAssigned.classList.add('hidden');
-        if (pStateSearching) pStateSearching.classList.remove('hidden');
-        showToast('⚠️ Tu conductor asignado no pudo continuar. Reanudando búsqueda de chofer...');
-        alert('⚠️ AVISO:\n\nTu conductor asignado tuvo un inconveniente y canceló el servicio.\n\nEl sistema está buscando automáticamente otro conductor disponible en la zona para atender tu viaje de inmediato.');
+      if (viaje.motivo !== 'modificacion_ruta') {
+        if (pStateDriverAssigned && !pStateDriverAssigned.classList.contains('hidden')) {
+          pStateDriverAssigned.classList.add('hidden');
+          if (pStateSearching) pStateSearching.classList.remove('hidden');
+          showToast('⚠️ Tu conductor asignado no pudo continuar. Reanudando búsqueda de chofer...');
+          alert('⚠️ AVISO:\n\nTu conductor asignado tuvo un inconveniente y canceló el servicio.\n\nEl sistema está buscando automáticamente otro conductor disponible en la zona para atender tu viaje de inmediato.');
+        }
+        return;
       }
-      return;
     }
 
     // Actualizar datos de ruta y precio en vivo en caso de modificación
@@ -5408,8 +5410,25 @@ if (window.RutaSync) {
       if (pTripStopRow) pTripStopRow.style.display = 'none';
     }
 
+    pActiveTripData = { ...(pActiveTripData || {}), ...viaje };
+
     if (viaje.motivo === 'modificacion_ruta') {
-      initPassengerLiveMap(viaje);
+      if (viaje.originCoords || viaje._originCoords) {
+        state.origin = { ...(state.origin || {}), ...(viaje.originCoords || viaje._originCoords), address: viaje.origen };
+      }
+      if (viaje.destinationCoords || viaje._destCoords) {
+        state.destination = { ...(state.destination || {}), ...(viaje.destinationCoords || viaje._destCoords), address: viaje.destino };
+      }
+      if (viaje.stopCoords || viaje._stopCoords) {
+        state.stop = { ...(state.stop || {}), ...(viaje.stopCoords || viaje._stopCoords), address: viaje.parada };
+        state.hasIntermediateStop = true;
+      } else if (viaje.parada === null || viaje.parada === '') {
+        state.stop = null;
+        state.hasIntermediateStop = false;
+      }
+
+      initPassengerLiveMap(pActiveTripData);
+      updatePassengerLiveMapForStage(viaje.estado || pActiveTripData.estado || 'en_camino');
       playPassengerTone('chime');
       showToast(`🔄 Ruta actualizada por el chofer. Nuevo total: $${Number(rawPrice || 0).toLocaleString('es-AR')}`);
     }
@@ -5563,10 +5582,10 @@ async function initPassengerLiveMap(trip) {
   if (!trip || typeof L === 'undefined') return;
   pActiveTripData = trip;
 
-  const originCoords = trip.originCoords || (state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null) || resolvePassengerCoords(trip.origen || trip.pickupAddress, { lat: -34.6037, lng: -58.3816 });
-  const destCoords = trip.destinationCoords || (state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null) || resolvePassengerCoords(trip.destino || trip.dropoffAddress, { lat: -34.8150, lng: -58.5348 });
+  const originCoords = trip.originCoords || trip._originCoords || resolvePassengerCoords(trip.origen || trip.pickupAddress, (state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : { lat: -34.6037, lng: -58.3816 }));
+  const destCoords = trip.destinationCoords || trip._destCoords || resolvePassengerCoords(trip.destino || trip.dropoffAddress, (state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : { lat: -34.8150, lng: -58.5348 }));
   const stopAddressStr = trip.parada || trip.stopAddress || (state.hasIntermediateStop && state.stop ? state.stop.address : null);
-  const stopCoords = trip.stopCoords || (stopAddressStr ? resolvePassengerCoords(stopAddressStr, {
+  const stopCoords = trip.stopCoords || trip._stopCoords || (stopAddressStr ? resolvePassengerCoords(stopAddressStr, {
     lat: (originCoords.lat + destCoords.lat) / 2 + 0.005,
     lng: (originCoords.lng + destCoords.lng) / 2 + 0.005
   }) : null) || (state.hasIntermediateStop && state.stop ? { lat: state.stop.lat, lng: state.stop.lng } : null);

@@ -1417,6 +1417,10 @@ document.addEventListener('DOMContentLoaded', () => {
     driverState.availableTrips = [];
     let driverRejectRecycleTimers = {};
 
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+        return calculateDistanceKm(lat1, lon1, lat2, lon2);
+    }
+
     function renderAvailableTripsList() {
         const container = document.getElementById('availableTripsList');
         const section = document.getElementById('availableTripsSection');
@@ -1626,24 +1630,34 @@ document.addEventListener('DOMContentLoaded', () => {
         closeIncomingModal();
         if (!trip) return;
 
-        // Mantener el viaje en availableTrips para que el chofer lo pueda elegir en la lista
+        // Asegurar que el viaje permanezca en la lista de viajes disponibles del radar
+        if (!driverState.availableTrips.some(t => t.id === trip.id)) {
+            driverState.availableTrips.push(trip);
+        }
         renderAvailableTripsList();
 
         // Programar re-intento tras 30 SEGUNDOS si la solicitud continúa sin ser tomada por nadie
         if (driverRejectRecycleTimers[trip.id]) clearTimeout(driverRejectRecycleTimers[trip.id]);
         driverRejectRecycleTimers[trip.id] = setTimeout(() => {
             if (driverState.isOnline && !driverState.activeTrip) {
-                let sigueBuscando = true;
+                const tripCreatedAt = trip.creadoEn || trip.timestamp || Date.now();
+                const isWithin5Min = (Date.now() - tripCreatedAt) < (5 * 60 * 1000);
+
+                let sigueBuscando = isWithin5Min;
                 if (window.RutaSync) {
                     const active = window.RutaSync.obtenerViajeActivo();
-                    if (!active || active.id !== trip.id || (active.estado !== 'buscando_conductor' && active.estado !== 'solicitado')) {
+                    if (active && active.id === trip.id && !['buscando_conductor', 'solicitado'].includes(active.estado)) {
                         sigueBuscando = false;
-                        driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== trip.id);
-                        renderAvailableTripsList();
                     }
                 }
-                if (sigueBuscando && !driverState.incomingTrip) {
-                    showIncomingTrip(trip);
+
+                if (sigueBuscando) {
+                    if (!driverState.incomingTrip) {
+                        showIncomingTrip(trip);
+                    }
+                } else {
+                    driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== trip.id);
+                    renderAvailableTripsList();
                 }
             }
         }, 30000); // Re-notificar cada 30 segundos
@@ -2799,12 +2813,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     if (window.RutaSync) {
         window.RutaSync.on('NUEVO_VIAJE_SOLICITADO', (viaje) => {
-            if (!driverState.activeTrip) {
+            if (!driverState.activeTrip && viaje && viaje.id) {
                 if (!driverState.isOnline) {
                     setOnlineStatus(true);
                 }
                 enqueueIncomingTrip(viaje);
             }
+        });
+
+        window.RutaSync.on('VIAJE_ACEPTADO', (viaje) => {
+            if (!viaje || !viaje.id) return;
+            // Si el viaje fue tomado por otro chofer
+            if (driverState.incomingTrip && driverState.incomingTrip.id === viaje.id) {
+                closeIncomingModal();
+                showDriverToast('ℹ️ El viaje fue tomado por otro chofer de la flota.');
+            }
+            if (driverRejectRecycleTimers[viaje.id]) {
+                clearTimeout(driverRejectRecycleTimers[viaje.id]);
+                delete driverRejectRecycleTimers[viaje.id];
+            }
+            driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== viaje.id);
+            renderAvailableTripsList();
         });
 
         window.RutaSync.on('RESERVA_CREADA', (reserva) => {
@@ -2835,8 +2864,21 @@ document.addEventListener('DOMContentLoaded', () => {
             renderReservas();
             if (!viaje) return;
 
-            if (viaje.estado === 'cancelado_por_pasajero' || viaje.estado === 'cancelado') {
-                if (driverState.activeTrip) {
+            // Si el viaje fue cancelado por el pasajero o por el sistema
+            if (viaje.estado === 'cancelado_por_pasajero' || viaje.estado === 'cancelado' || viaje.estado === 'cancelado_por_sistema') {
+                if (viaje.id) {
+                    if (driverRejectRecycleTimers[viaje.id]) {
+                        clearTimeout(driverRejectRecycleTimers[viaje.id]);
+                        delete driverRejectRecycleTimers[viaje.id];
+                    }
+                    if (driverState.incomingTrip && driverState.incomingTrip.id === viaje.id) {
+                        closeIncomingModal();
+                    }
+                    driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== viaje.id);
+                    renderAvailableTripsList();
+                }
+
+                if (driverState.activeTrip && (viaje.id === driverState.activeTrip.id || !viaje.id)) {
                     const rawPrice = Number(driverState.activeTrip.precioEstimado || driverState.activeTrip.precio || driverState.activeTrip.totalFare || driverState.activeTrip.monto || 0);
                     const teniaPenalizacion = !!viaje.penalizacion;
                     const monto = viaje.montoPenalizacion || Math.max(1500, Math.round(rawPrice * 0.10));
@@ -2880,8 +2922,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!driverState.activeTrip) {
                     restoreDriverActiveTripIfExists();
                 } else if (viaje.id === driverState.activeTrip.id) {
-                    driverState.activeTrip.etapa = viaje.etapa || viaje.estado;
-                    updateTripStageUI();
+                    if (viaje.motivo === 'modificacion_ruta') {
+                        driverState.activeTrip = { ...driverState.activeTrip, ...viaje };
+                        try { localStorage.setItem('rutaprivada_driver_active_trip', JSON.stringify(driverState.activeTrip)); } catch(e) {}
+                        initDriverLiveMap(driverState.activeTrip);
+                        updateDriverMapForStage(driverState.activeTrip.etapa || 'en_camino');
+                    } else {
+                        driverState.activeTrip.etapa = viaje.etapa || viaje.estado;
+                        updateTripStageUI();
+                    }
                 }
             }
         });
@@ -3312,6 +3361,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 precio: res.calculatedFare,
                 totalFare: res.calculatedFare,
                 monto: res.calculatedFare,
+                originCoords: res.origCoords,
+                destinationCoords: res.destCoords,
+                stopCoords: res.stopCoords,
                 _originCoords: res.origCoords,
                 _stopCoords: res.stopCoords,
                 _destCoords: res.destCoords,
@@ -3325,6 +3377,14 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch(e) {}
 
             startActiveTrip(updatedTrip);
+            if (updatedTrip.etapa) {
+                updateDriverMapForStage(updatedTrip.etapa);
+            }
+
+            // Actualizar enlaces GPS (Waze / Google Maps)
+            const targetDest = (updatedTrip.etapa === 'hacia_parada' && updatedTrip.parada) ? updatedTrip.parada : ((updatedTrip.etapa === 'en_camino') ? updatedTrip.origen : updatedTrip.destino);
+            updateGpsLinks(targetDest);
+
             if (window.RutaSync) {
                 window.RutaSync.actualizarEstadoViaje(updatedTrip.etapa || 'en_camino', updatedTrip);
             }
