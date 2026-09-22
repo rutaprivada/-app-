@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isOnline: true,
         activeTrip: null,
         incomingTrip: null,
+        availableTrips: [],
         incomingQueue: [],
         rejectedTrips: [],
         countdownTimer: null,
@@ -67,6 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         info: currentFleetDriver
     };
+
+    const driverRejectRecycleTimers = {};
 
     function toggleDriverStatusBar(show) {
         const statusBar = document.querySelector('.status-bar-container');
@@ -3404,7 +3407,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (parsed && parsed.id && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_conductor'].includes(parsed.estado)) {
-                    activeTrip = parsed;
+                    // Evitar que viajes de prueba viejos (más de 3 horas) bloqueen la consola
+                    const tripTime = parsed.timestamp || parsed.creadoEn || parsed.aceptadoEn || 0;
+                    if (tripTime && (Date.now() - tripTime > 3 * 3600 * 1000)) {
+                        localStorage.removeItem('rutaprivada_driver_active_trip');
+                    } else {
+                        activeTrip = parsed;
+                    }
                 }
             }
 
@@ -3412,7 +3421,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!activeTrip && window.RutaSync) {
                 const syncTrip = window.RutaSync.obtenerViajeActivo();
                 if (syncTrip && syncTrip.id && syncTrip.estado && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_conductor', 'buscando_conductor', 'solicitado'].includes(syncTrip.estado)) {
-                    activeTrip = syncTrip;
+                    const tripTime = syncTrip.timestamp || syncTrip.creadoEn || syncTrip.aceptadoEn || 0;
+                    if (tripTime && (Date.now() - tripTime > 3 * 3600 * 1000)) {
+                        window.RutaSync.limpiarViajeActivo();
+                    } else {
+                        activeTrip = syncTrip;
+                    }
                 }
             }
 
@@ -3474,6 +3488,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 switchTab(savedTab);
             }
         } catch(e) {}
+
+        // 4. Si hay un viaje recién solicitado en espera en la red (menos de 5 minutos), cargarlo en el radar de inmediato
+        setTimeout(() => {
+            if (window.RutaSync && !driverState.activeTrip) {
+                const activeTrip = window.RutaSync.obtenerViajeActivo();
+                if (activeTrip && activeTrip.id && (activeTrip.estado === 'buscando_conductor' || activeTrip.estado === 'solicitado')) {
+                    const tripAge = Date.now() - (activeTrip.creadoEn || activeTrip.timestamp || Date.now());
+                    if (tripAge < 5 * 60 * 1000) {
+                        enqueueIncomingTrip(activeTrip);
+                    }
+                }
+            }
+        }, 500);
     }
 
     // Registro y actualización de Service Worker para la PWA de Chofer

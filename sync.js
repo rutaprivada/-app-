@@ -43,6 +43,7 @@ class RutaSyncManager {
             measurementId: "G-EXXS3VHD14"
         };
 
+        let retryCount = 0;
         const tryInit = () => {
             if (typeof firebase !== 'undefined') {
                 try {
@@ -103,6 +104,9 @@ class RutaSyncManager {
                 } catch (err) {
                     console.warn('Firebase init error in sync.js:', err);
                 }
+            } else if (retryCount < 10) {
+                retryCount++;
+                setTimeout(tryInit, 300);
             }
         };
 
@@ -119,7 +123,7 @@ class RutaSyncManager {
     initNtfySseSync() {
         const topic = 'rutaprivada_fleet_sync_ar_v4';
 
-        // 1. SSE Stream en tiempo real
+        // 1. SSE Stream en tiempo real con reconexión automática
         try {
             if (window.EventSource) {
                 if (this.sse) {
@@ -139,6 +143,15 @@ class RutaSyncManager {
                             this.handleIncoming(msgData);
                         }
                     } catch (e) {}
+                };
+                this.sse.onerror = () => {
+                    try { if (this.sse) this.sse.close(); } catch(e) {}
+                    if (!this._sseReconnectTimer) {
+                        this._sseReconnectTimer = setTimeout(() => {
+                            this._sseReconnectTimer = null;
+                            this.initNtfySseSync();
+                        }, 4000);
+                    }
                 };
             }
         } catch (err) {}
