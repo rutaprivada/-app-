@@ -1425,14 +1425,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('availableTripsList');
         const section = document.getElementById('availableTripsSection');
         const countBadge = document.getElementById('availableTripsCount');
-        if (!container || !section) return;
+        const radarAnim = document.getElementById('radarAnimationContainer');
+        const radarTitle = document.getElementById('radarSearchingTitle');
+        const radarSubtext = document.getElementById('radarSearchingSubtext');
 
-        if (!driverState.isOnline || driverState.activeTrip || !driverState.availableTrips || driverState.availableTrips.length === 0) {
-            section.style.display = 'none';
-            container.innerHTML = '';
+        if (!Array.isArray(driverState.availableTrips)) driverState.availableTrips = [];
+
+        if (!driverState.isOnline || driverState.activeTrip || driverState.availableTrips.length === 0) {
+            if (section) section.style.display = 'none';
+            if (container) container.innerHTML = '';
             if (countBadge) countBadge.textContent = '0';
+            if (radarAnim) radarAnim.style.display = 'flex';
+            if (radarTitle) radarTitle.style.display = 'block';
+            if (radarSubtext) radarSubtext.style.display = 'block';
             return;
         }
+
+        // Si hay viajes en lista: Ocultar el radar visual y mostrar la lista como contenido principal
+        if (radarAnim) radarAnim.style.display = 'none';
+        if (radarTitle) radarTitle.style.display = 'none';
+        if (radarSubtext) radarSubtext.style.display = 'none';
 
         const driverGps = driverState.currentRealGpsCoords || { lat: -34.6037, lng: -58.3816 };
 
@@ -1445,7 +1457,7 @@ document.addEventListener('DOMContentLoaded', () => {
         driverState.availableTrips.sort((a, b) => (a._distFromDriverKm || 0) - (b._distFromDriverKm || 0));
 
         if (countBadge) countBadge.textContent = driverState.availableTrips.length;
-        section.style.display = 'block';
+        if (section) section.style.display = 'block';
 
         container.innerHTML = driverState.availableTrips.map(trip => {
             const rawPrice = trip.precioEstimado ?? trip.precio ?? trip.totalFare ?? trip.monto ?? 0;
@@ -1454,38 +1466,38 @@ document.addEventListener('DOMContentLoaded', () => {
             const stopAddr = trip.parada || trip.stopAddress || trip.intermediateStop || '';
 
             return `
-                <div class="available-trip-card" data-id="${trip.id}" style="background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 14px; padding: 12px 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); display: flex; flex-direction: column; gap: 8px;">
+                <div class="available-trip-card" data-id="${trip.id}" style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 14px; padding: 14px 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 0.75rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 3px 8px; border-radius: 6px;">
+                        <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.15); padding: 4px 10px; border-radius: 8px;">
                             📍 a ${distPickup} km de ti
                         </span>
-                        <span style="font-size: 1.15rem; font-weight: 800; color: #fbbf24;">
+                        <span style="font-size: 1.25rem; font-weight: 800; color: #fbbf24;">
                             ${fareStr}
                         </span>
                     </div>
 
-                    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; margin: 2px 0;">
-                        <div style="color: #cbd5e1; display: flex; gap: 6px; align-items: center;">
+                    <div style="display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; margin: 2px 0;">
+                        <div style="color: #cbd5e1; display: flex; gap: 8px; align-items: center;">
                             <span style="color: #34d399;">🟢</span>
-                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${trip.origen || trip.pickupAddress || 'Origen'}</span>
+                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;">${trip.origen || trip.pickupAddress || 'Origen'}</span>
                         </div>
                         ${stopAddr ? `
-                        <div style="color: #fbbf24; display: flex; gap: 6px; align-items: center;">
+                        <div style="color: #fbbf24; display: flex; gap: 8px; align-items: center;">
                             <span>🛑</span>
                             <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${stopAddr}</span>
                         </div>` : ''}
-                        <div style="color: #cbd5e1; display: flex; gap: 6px; align-items: center;">
+                        <div style="color: #cbd5e1; display: flex; gap: 8px; align-items: center;">
                             <span style="color: #38bdf8;">🏁</span>
-                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${trip.destino || trip.dropoffAddress || 'Destino'}</span>
+                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;">${trip.destino || trip.dropoffAddress || 'Destino'}</span>
                         </div>
                     </div>
 
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">
-                        <span style="font-size: 0.75rem; color: #94a3b8;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">
+                        <span style="font-size: 0.78rem; color: #94a3b8;">
                             ${trip.distancia || '15 km'} · ${trip.duracion || '25 min'}
                         </span>
-                        <button type="button" class="btn-accept-available-trip" data-id="${trip.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px;">
-                            <i class="fa-solid fa-check"></i> Aceptar
+                        <button type="button" class="btn-accept-available-trip" data-id="${trip.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 0.88rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);">
+                            <i class="fa-solid fa-check"></i> Aceptar Traslado
                         </button>
                     </div>
                 </div>
