@@ -1612,56 +1612,62 @@ function initMap() {
 }
 
 function setOrigin(lat, lng, address) {
-  state.origin = { lat, lng, address };
+  state.origin = { lat: parseFloat(lat), lng: parseFloat(lng), address };
   
-  if (originMarker) map.removeLayer(originMarker);
-
-  const originIcon = L.divIcon({
-    className: 'custom-map-pin origin-marker-pin',
-    html: '<div style="background:#10b981; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
-    iconSize: [22, 22],
-    iconAnchor: [11, 11]
-  });
-
-  originMarker = L.marker([lat, lng], { icon: originIcon }).addTo(map);
-  originMarker.bindPopup(`<strong>Origen:</strong><br>${address}`).openPopup();
+  if (map) {
+    try {
+      if (originMarker) map.removeLayer(originMarker);
+      const originIcon = L.divIcon({
+        className: 'custom-map-pin origin-marker-pin',
+        html: '<div style="background:#10b981; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+      originMarker = L.marker([lat, lng], { icon: originIcon }).addTo(map);
+      originMarker.bindPopup(`<strong>Origen:</strong><br>${address}`).openPopup();
+    } catch(e) {}
+  }
 
   checkAndRoute();
 }
 
 function setIntermediateStop(lat, lng, address) {
-  state.intermediateStop = { lat, lng, address };
+  state.intermediateStop = { lat: parseFloat(lat), lng: parseFloat(lng), address };
   state.hasIntermediateStop = true;
 
-  if (stopMarker) map.removeLayer(stopMarker);
-
-  const stopIcon = L.divIcon({
-    className: 'custom-map-pin stop-marker-pin',
-    html: '<div style="background:#f59e0b; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
-    iconSize: [22, 22],
-    iconAnchor: [11, 11]
-  });
-
-  stopMarker = L.marker([lat, lng], { icon: stopIcon }).addTo(map);
-  stopMarker.bindPopup(`<strong>Parada Intermedia:</strong><br>${address}`).openPopup();
+  if (map) {
+    try {
+      if (stopMarker) map.removeLayer(stopMarker);
+      const stopIcon = L.divIcon({
+        className: 'custom-map-pin stop-marker-pin',
+        html: '<div style="background:#f59e0b; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+      stopMarker = L.marker([lat, lng], { icon: stopIcon }).addTo(map);
+      stopMarker.bindPopup(`<strong>Parada Intermedia:</strong><br>${address}`).openPopup();
+    } catch(e) {}
+  }
 
   checkAndRoute();
 }
 
 function setDestination(lat, lng, address) {
-  state.destination = { lat, lng, address };
+  state.destination = { lat: parseFloat(lat), lng: parseFloat(lng), address };
 
-  if (destinationMarker) map.removeLayer(destinationMarker);
-
-  const destinationIcon = L.divIcon({
-    className: 'custom-map-pin dest-marker-pin',
-    html: '<div style="background:#ef4444; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
-    iconSize: [22, 22],
-    iconAnchor: [11, 11]
-  });
-
-  destinationMarker = L.marker([lat, lng], { icon: destinationIcon }).addTo(map);
-  destinationMarker.bindPopup(`<strong>Destino:</strong><br>${address}`).openPopup();
+  if (map) {
+    try {
+      if (destinationMarker) map.removeLayer(destinationMarker);
+      const destinationIcon = L.divIcon({
+        className: 'custom-map-pin dest-marker-pin',
+        html: '<div style="background:#ef4444; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+      destinationMarker = L.marker([lat, lng], { icon: destinationIcon }).addTo(map);
+      destinationMarker.bindPopup(`<strong>Destino:</strong><br>${address}`).openPopup();
+    } catch(e) {}
+  }
 
   checkAndRoute();
 }
@@ -2012,26 +2018,30 @@ async function checkAndRoute() {
     state.tollDetails = tollAnalysis.details;
     state.tollRoadNames = tollAnalysis.roadNames;
 
-    if (routePolyline) map.removeLayer(routePolyline);
-    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-    
-    let routeColor = '#10b981';
-    if (state.trafficEngine === 'mapbox') {
-      if (state.trafficCongestion === 'heavy') routeColor = '#ef4444';
-      else if (state.trafficCongestion === 'moderate') routeColor = '#f59e0b';
-      else routeColor = state.routeHasTolls ? '#f59e0b' : '#10b981';
-    } else {
-      routeColor = state.routeHasTolls ? '#f59e0b' : '#10b981';
+    if (map) {
+      try {
+        if (routePolyline) map.removeLayer(routePolyline);
+        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+        
+        let routeColor = '#10b981';
+        if (state.trafficEngine === 'mapbox') {
+          if (state.trafficCongestion === 'heavy') routeColor = '#ef4444';
+          else if (state.trafficCongestion === 'moderate') routeColor = '#f59e0b';
+          else routeColor = state.routeHasTolls ? '#f59e0b' : '#10b981';
+        } else {
+          routeColor = state.routeHasTolls ? '#f59e0b' : '#10b981';
+        }
+
+        routePolyline = L.polyline(coords, {
+          color: routeColor,
+          weight: 5,
+          opacity: 0.9,
+          lineJoin: 'round'
+        }).addTo(map);
+
+        map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+      } catch(e) {}
     }
-
-    routePolyline = L.polyline(coords, {
-      color: routeColor,
-      weight: 5,
-      opacity: 0.9,
-      lineJoin: 'round'
-    }).addTo(map);
-
-    map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
 
     // Actualizar pills de estado
     if (trafficPill) {
