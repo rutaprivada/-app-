@@ -1,0 +1,15 @@
+{
+  "name": "rutaprivada",
+  "version": "1.0.0",
+  "description": "RutaPrivada Web & Mobile Native Apps",
+  "main": "app.js",
+  "scripts": {
+    "build:passenger": "npx cap copy android --config capacitor.passenger.json && npx cap open android --config capacitor.passenger.json",
+    "build:driver": "npx cap copy android --config capacitor.driver.json && npx cap open android --config capacitor.driver.json"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0"
+  }
+}
