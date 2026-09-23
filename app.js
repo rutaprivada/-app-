@@ -2776,66 +2776,18 @@ function updateCalculation() {
 // 7. RENDERIZADO VISUAL
 // ==========================================
 
-// Estado inicial: aún no se consultó ninguna ruta, no mostramos tarifa de ejemplo
+// Estado inicial: calcular inmediatamente tarifa base predeterminada ($3.500 ARS) sin mostrar guiones
 function renderEmptyQuote() {
-  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-
-  setText('metric-distance', '— km');
-  setText('metric-duration', '— min');
-  setText('metric-arrival', '--:--');
-
-  const totalEl = document.getElementById('quote-total-amount');
-  if (totalEl) totalEl.textContent = '—';
-  setText('quote-currency-symbol', '$');
-  setText('quote-currency-code', 'ARS');
-
-  const guaranteeNote = document.getElementById('quote-guarantee-note');
-  if (guaranteeNote) {
-    guaranteeNote.textContent = '';
-    guaranteeNote.classList.add('hidden');
-  }
-
-  // Ocultamos filas de desglose que no aplican todavía
-  ['row-surge-line', 'row-roundtrip-leg-line', 'row-roundtrip-discount-line', 'row-long-distance-discount-line', 'row-toll-line']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
-
-  setText('row-base-fare', '—');
-  setText('row-distance-fare', '—');
-  setText('row-duration-fare', '—');
-  setText('row-extras-fare', '—');
-  setText('row-total-fare', '—');
-
-  const tollBox = document.getElementById('toll-status-box');
-  const tollBadge = document.getElementById('toll-status-badge');
-  const tollTitle = document.getElementById('toll-status-title');
-  const tollDesc = document.getElementById('toll-status-desc');
-  if (tollBox) tollBox.className = 'toll-status-box';
-  if (tollBadge) { tollBadge.className = 'toll-badge badge-no-toll'; tollBadge.textContent = 'Pendiente de cálculo'; }
-  if (tollTitle) tollTitle.textContent = 'Esperando itinerario';
-  if (tollDesc) tollDesc.textContent = 'Los peajes se calculan al consultar la ruta.';
-
-  const trafficPill = document.getElementById('traffic-indicator-pill');
-  if (trafficPill) {
-    trafficPill.className = 'traffic-indicator-pill';
-    trafficPill.textContent = '⏱️ Tráfico programable';
-  }
-
-  const banner = document.getElementById('traffic-live-banner');
-  if (banner) {
-    banner.className = 'traffic-live-banner';
-    const bTitle = document.getElementById('traffic-banner-title');
-    const bBadge = document.getElementById('traffic-banner-badge');
-    const bDesc = document.getElementById('traffic-banner-desc');
-    const bIcon = document.getElementById('traffic-banner-icon');
-    if (bTitle) bTitle.textContent = `Tráfico Estimado por Horario (${state.time || '14:00'} hs)`;
-    if (bBadge) bBadge.textContent = 'Programado';
-    if (bDesc) bDesc.textContent = 'El tiempo del viaje se calculará según las condiciones de tránsito reales para el horario de recogida que elijas.';
-    if (bIcon) bIcon.textContent = '🚦';
+  if (typeof updateCalculation === 'function') {
+    updateCalculation();
   }
 }
 
 function renderQuote() {
-  const b = state.breakdown;
+  if (!state.breakdown && typeof updateCalculation === 'function') {
+    updateCalculation();
+  }
+  const b = state.breakdown || {};
 
   // Métricas
   document.getElementById('metric-distance').textContent = `${state.distanceKm.toFixed(1)} km`;
