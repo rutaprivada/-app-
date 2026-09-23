@@ -53,16 +53,58 @@ const DEFAULT_CONFIG = {
 // ==========================================
 let currentWizardStep = 1;
 
-function goToWizardStep(step) {
+async function goToWizardStep(step) {
   if (step < 1 || step > 5) return;
 
-  // Validar direcciones en el paso 3 antes de avanzar al paso 4 o 5
+  // Validar y geocodificar direcciones en el paso 3 antes de avanzar al paso 4 o 5
   if (step > 3 && currentWizardStep <= 3) {
     const originVal = document.getElementById('origin-input')?.value.trim();
     const destVal = document.getElementById('destination-input')?.value.trim();
     if (!originVal || !destVal) {
       alert('⚠️ Por favor ingresa el Origen y el Destino de tu viaje antes de continuar al mapa o cotización.');
       return;
+    }
+
+    // Geocodificar Origen si aún no se han fijado las coordenadas
+    if (!state.origin || !state.origin.lat) {
+      if (typeof searchLocations === 'function') {
+        try {
+          const results = await searchLocations(originVal);
+          if (results && results.length > 0) {
+            setOrigin(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
+          }
+        } catch(e){}
+      }
+    }
+
+    // Geocodificar Destino si aún no se han fijado las coordenadas
+    if (!state.destination || !state.destination.lat) {
+      if (typeof searchLocations === 'function') {
+        try {
+          const results = await searchLocations(destVal);
+          if (results && results.length > 0) {
+            setDestination(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
+          }
+        } catch(e){}
+      }
+    }
+
+    // Geocodificar Parada Intermedia si aplica
+    const stopVal = document.getElementById('stop-input')?.value.trim();
+    if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
+      if (typeof searchLocations === 'function') {
+        try {
+          const results = await searchLocations(stopVal);
+          if (results && results.length > 0) {
+            setIntermediateStop(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
+          }
+        } catch(e){}
+      }
+    }
+
+    // Calcular trazado completo de la ruta por autopistas / calles
+    if (typeof checkAndRoute === 'function') {
+      try { await checkAndRoute(); } catch(e){}
     }
   }
 
@@ -110,16 +152,16 @@ function goToWizardStep(step) {
       }
       if (typeof checkAndRoute === 'function') {
         try { checkAndRoute(); } catch(e){}
-      } else if (typeof calculateRouteAndFare === 'function') {
-        try { calculateRouteAndFare(); } catch(e){}
       }
     }, 100);
   }
 
-  // Si se entra al Paso 5 (Cotización), calcular cotización final y renderizar
+  // Si se entra al Paso 5 (Cotización), recalcular tarifa y renderizar desglose
   if (step === 5) {
-    if (typeof calculateRouteAndFare === 'function') {
-      try { calculateRouteAndFare(); } catch(e){}
+    if (typeof checkAndRoute === 'function' && state.origin && state.destination) {
+      try { await checkAndRoute(); } catch(e){}
+    } else if (typeof updateCalculation === 'function') {
+      try { updateCalculation(); } catch(e){}
     }
     if (typeof renderQuote === 'function') {
       try { renderQuote(); } catch(e){}
@@ -3065,17 +3107,39 @@ function initEventListeners() {
     setDestination(place.lat, place.lon, place.display_name);
   });
 
-  // Recálculo dinámico al escribir direcciones (detecta Ezeiza en tiempo real)
+  // Recálculo dinámico y geocodificación al escribir/salir de las direcciones
   const destInputEl = document.getElementById('destination-input');
   if (destInputEl) {
     destInputEl.addEventListener('input', () => {
       updateCalculation();
+    });
+    destInputEl.addEventListener('blur', async () => {
+      const val = destInputEl.value.trim();
+      if (val && (!state.destination || !state.destination.lat)) {
+        try {
+          const results = await searchLocations(val);
+          if (results && results.length > 0) {
+            setDestination(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
+          }
+        } catch(e){}
+      }
     });
   }
   const originInputEl = document.getElementById('origin-input');
   if (originInputEl) {
     originInputEl.addEventListener('input', () => {
       updateCalculation();
+    });
+    originInputEl.addEventListener('blur', async () => {
+      const val = originInputEl.value.trim();
+      if (val && (!state.origin || !state.origin.lat)) {
+        try {
+          const results = await searchLocations(val);
+          if (results && results.length > 0) {
+            setOrigin(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
+          }
+        } catch(e){}
+      }
     });
   }
 
