@@ -46,8 +46,105 @@ const DEFAULT_CONFIG = {
   rushSurgePercent: 10,            // Ajuste alta demanda (06:00 a 10:00 y 16:00 a 20:00: +10%)
   mapboxToken: atob('cGsuZXlKMWlqb2ljblYwWVMxd2NtbDJaV1JoSWl3aVlTSTZJbU50ZEd4d2VqTnNjakF3WTJFeWRrWjJkbXM1Y1hnM2QyOGlmUS5fWWtNRC1HZ1NJaHRrcFVjZG9fcGRn'),
   googleMapsApiKey: '',            // Clave opcional de Google Maps Platform (Directions / Routes API)
-  currency: 'ARS'
 };
+
+// ==========================================
+// 1.2 MULTI-STEP WIZARD CONTROLLER (PASO A PASO PASAJERO)
+// ==========================================
+let currentWizardStep = 1;
+
+function goToWizardStep(step) {
+  if (step < 1 || step > 5) return;
+
+  // Validar direcciones en el paso 3 antes de avanzar al paso 4 o 5
+  if (step > 3 && currentWizardStep <= 3) {
+    const originVal = document.getElementById('origin-input')?.value.trim();
+    const destVal = document.getElementById('destination-input')?.value.trim();
+    if (!originVal || !destVal) {
+      alert('⚠️ Por favor ingresa el Origen y el Destino de tu viaje antes de continuar al mapa o cotización.');
+      return;
+    }
+  }
+
+  currentWizardStep = step;
+
+  // Actualizar paneles visibles
+  for (let i = 1; i <= 5; i++) {
+    const panel = document.getElementById(`wizard-step-panel-${i}`);
+    const indicator = document.getElementById(`wizard-step-indicator-${i}`);
+    if (panel) {
+      if (i === step) {
+        panel.classList.remove('hidden');
+        panel.classList.add('active-wizard-step');
+      } else {
+        panel.classList.add('hidden');
+        panel.classList.remove('active-wizard-step');
+      }
+    }
+    if (indicator) {
+      if (i === step) {
+        indicator.classList.add('active');
+        indicator.classList.remove('completed');
+      } else if (i < step) {
+        indicator.classList.remove('active');
+        indicator.classList.add('completed');
+      } else {
+        indicator.classList.remove('active', 'completed');
+      }
+    }
+  }
+
+  // Actualizar la barra de progreso superior
+  const progressFill = document.getElementById('wizard-progress-fill');
+  if (progressFill) {
+    progressFill.style.width = `${step * 20}%`;
+  }
+
+  // Al entrar al Paso 4 (Mapa), forzar refresco de renderizado de Leaflet
+  if (step === 4) {
+    setTimeout(() => {
+      if (window.passengerMap) {
+        try { window.passengerMap.invalidateSize(); } catch(e){}
+      }
+      if (typeof calculateRouteAndFare === 'function') {
+        try { calculateRouteAndFare(); } catch(e){}
+      }
+    }, 150);
+  }
+
+  // Si se entra al Paso 5 (Cotización), calcular cotización final
+  if (step === 5) {
+    if (typeof calculateRouteAndFare === 'function') {
+      try { calculateRouteAndFare(); } catch(e){}
+    }
+  }
+
+  // Scroll suave al inicio del contenedor
+  const container = document.getElementById('passenger-wizard-container');
+  if (container) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function selectTripMode(mode) {
+  const btnLive = document.getElementById('btn-mode-live');
+  const btnSchedule = document.getElementById('btn-mode-schedule');
+  const btnTimeNow = document.getElementById('btn-time-now');
+  const btnDateToday = document.getElementById('btn-date-today');
+
+  if (mode === 'live') {
+    if (btnLive) btnLive.classList.add('active');
+    if (btnSchedule) btnSchedule.classList.remove('active');
+    if (btnTimeNow) btnTimeNow.click();
+    if (btnDateToday) btnDateToday.click();
+  } else {
+    if (btnSchedule) btnSchedule.classList.add('active');
+    if (btnLive) btnLive.classList.remove('active');
+  }
+}
+
+window.goToWizardStep = goToWizardStep;
+window.selectTripMode = selectTripMode;
 
 // ==========================================
 // 1.1 FERIADOS NACIONALES Y DÍAS FESTIVOS (ARGENTINA)

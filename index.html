@@ -163,100 +163,71 @@
     </div>
   </header>
 
-  <!-- Main Hero / Calculator Section -->
+  <!-- Main Hero / Multi-Step Wizard Calculator Section -->
   <main class="container main-layout">
     
-    <!-- Left Column: Interactive Trip Form -->
-    <section class="calculator-panel">
-      <div class="section-title-wrap">
-        <h2>Cotiza tu Traslado</h2>
-        <p class="section-desc">Selecciona tu punto de origen y destino en el mapa o buscador para calcular la tarifa exacta en tiempo real.</p>
+    <div id="passenger-wizard-container" class="passenger-wizard-wrapper">
+      
+      <!-- WIZARD STEP PROGRESS BAR -->
+      <div class="wizard-progress-bar-wrap">
+        <div class="wizard-progress-track">
+          <div class="wizard-progress-fill" id="wizard-progress-fill" style="width: 20%;"></div>
+        </div>
+        <div class="wizard-steps-list">
+          <button type="button" class="wizard-step-item active" id="wizard-step-indicator-1" onclick="goToWizardStep(1)">
+            <span class="step-badge">1</span>
+            <span class="step-title">Fecha</span>
+          </button>
+          <button type="button" class="wizard-step-item" id="wizard-step-indicator-2" onclick="goToWizardStep(2)">
+            <span class="step-badge">2</span>
+            <span class="step-title">Horario</span>
+          </button>
+          <button type="button" class="wizard-step-item" id="wizard-step-indicator-3" onclick="goToWizardStep(3)">
+            <span class="step-badge">3</span>
+            <span class="step-title">Direcciones</span>
+          </button>
+          <button type="button" class="wizard-step-item" id="wizard-step-indicator-4" onclick="goToWizardStep(4)">
+            <span class="step-badge">4</span>
+            <span class="step-title">Mapa</span>
+          </button>
+          <button type="button" class="wizard-step-item" id="wizard-step-indicator-5" onclick="goToWizardStep(5)">
+            <span class="step-badge">5</span>
+            <span class="step-title">Cotización</span>
+          </button>
+        </div>
       </div>
 
-      <!-- Route Inputs -->
-      <div class="card route-card">
-        <div class="card-header">
-          <span class="step-num">1</span>
-          <h3>Itinerario del Viaje</h3>
+      <!-- ==================================================== -->
+      <!-- PASO 1: TIPO DE VIAJE Y SELECCIÓN DE DÍA -->
+      <!-- ==================================================== -->
+      <div class="wizard-step-panel active-wizard-step" id="wizard-step-panel-1">
+        <div class="wizard-step-header">
+          <span class="wizard-step-badge-num">Paso 1 de 5</span>
+          <h2>¿Cuándo deseas realizar tu traslado?</h2>
+          <p>Selecciona si necesitas un chofer en vivo ahora mismo o si deseas agendar un viaje programado.</p>
         </div>
 
-        <div class="route-inputs-group">
-          <!-- Origin -->
-          <div class="input-field-wrap">
-            <div class="input-icon-pin origin-pin" title="Punto de Origen"></div>
-            <div class="field-body">
-              <label for="origin-input">Punto de Partida (Origen)</label>
-              <input type="text" id="origin-input" placeholder="Ej: Aeropuerto Ezeiza, Obelisco o calle y número..." autocomplete="off" />
-              <div id="origin-suggestions" class="suggestions-list hidden"></div>
-            </div>
-            <button id="btn-use-location" class="location-btn" title="Usar mi ubicación actual" aria-label="Usar mi ubicación">
-              📍
-            </button>
-          </div>
-
-          <!-- Add Intermediate Stop Toggle Button -->
-          <div class="stop-toggle-wrapper" id="stop-toggle-wrapper">
-            <button type="button" id="btn-toggle-stop" class="btn-toggle-stop">
-              <span class="plus-icon">➕</span>
-              <span>Agregar Parada Intermedia</span>
-            </button>
-          </div>
-
-          <!-- Intermediate Stop (Optional) -->
-          <div id="stop-field-wrap" class="input-field-wrap stop-field-wrap hidden">
-            <div class="input-icon-pin stop-pin" title="Parada Intermedia"></div>
-            <div class="field-body">
-              <div class="field-label-row">
-                <label for="stop-input">Parada Intermedia</label>
-                <span id="stop-rate-badge" class="stop-rate-badge">+$500 (En camino)</span>
+        <div class="card schedule-card">
+          <!-- Selection mode toggle -->
+          <div class="wizard-mode-selector">
+            <button type="button" class="wizard-mode-btn active" id="btn-mode-live" onclick="selectTripMode('live')">
+              <span class="mode-icon">⚡</span>
+              <div>
+                <strong>Viaje Inmediato / En Vivo</strong>
+                <small>Chofer disponible para recogerte ahora mismo</small>
               </div>
-              <input type="text" id="stop-input" placeholder="Ej: Calle y número o lugar de la parada..." autocomplete="off" />
-              <div id="stop-suggestions" class="suggestions-list hidden"></div>
-            </div>
-            <button type="button" id="btn-remove-stop" class="remove-stop-btn" title="Quitar parada intermedia" aria-label="Quitar parada">
-              ✕
+            </button>
+            <button type="button" class="wizard-mode-btn" id="btn-mode-schedule" onclick="selectTripMode('schedule')">
+              <span class="mode-icon">📅</span>
+              <div>
+                <strong>Reserva Programada</strong>
+                <small>Agendar día y hora para viaje futuro</small>
+              </div>
             </button>
           </div>
 
-          <!-- Swap Button -->
-          <div class="swap-wrapper">
-            <button id="btn-swap-route" class="swap-btn" title="Invertir origen y destino" aria-label="Invertir origen y destino">
-              ⇅
-            </button>
-          </div>
-
-          <!-- Destination -->
-          <div class="input-field-wrap">
-            <div class="input-icon-pin destination-pin" title="Punto de Destino"></div>
-            <div class="field-body">
-              <label for="destination-input">Punto de Destino Final</label>
-              <input type="text" id="destination-input" placeholder="Ej: Hotel Hilton, Puerto Madero, Nordelta, Aeroparque..." autocomplete="off" />
-              <div id="destination-suggestions" class="suggestions-list hidden"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="route-instruction-note">
-          <span>💡 <strong>Cálculo Real:</strong> La distancia y duración se calculan mediante el trazado vehicular real por calles transitables y autopistas oficiales.</span>
-        </div>
-      </div>
-
-      <!-- Schedule & Time Inputs (5-Minute Oscillation & Executive Style) -->
-      <div class="card schedule-card">
-        <div class="card-header flex-between-header">
-          <div class="header-left-title">
-            <span class="step-num">2</span>
-            <h3>Fecha y Horario de Recogida</h3>
-          </div>
-          <div id="weather-status-pill" class="weather-status-pill" title="Evaluación meteorológica automática en tiempo real">
-            <span id="weather-icon">☀️</span>
-            <span id="weather-text">Clima Óptimo</span>
-          </div>
-        </div>
-
-        <div class="schedule-stylish-wrapper">
           <!-- Date Section -->
-          <div class="schedule-block" id="schedule-date-block">
+          <div class="schedule-block" id="schedule-date-block" style="margin-top: 15px;">
             <div class="block-header">
               <span class="block-label">📅 Seleccionar Día del Viaje</span>
               <div class="quick-preset-pills">
@@ -276,12 +247,6 @@
                       <line x1="16" y1="2" x2="16" y2="6" />
                       <line x1="8" y1="2" x2="8" y2="6" />
                       <line x1="3" y1="10" x2="21" y2="10" />
-                      <circle cx="8" cy="14" r="1.2" fill="currentColor" />
-                      <circle cx="12" cy="14" r="1.2" fill="currentColor" />
-                      <circle cx="16" cy="14" r="1.2" fill="currentColor" />
-                      <circle cx="8" cy="18" r="1.2" fill="currentColor" />
-                      <circle cx="12" cy="18" r="1.2" fill="currentColor" />
-                      <circle cx="16" cy="18" r="1.2" fill="currentColor" />
                     </svg>
                   </div>
                   <div>
@@ -299,23 +264,19 @@
             <!-- Custom Dark-Mode Glassmorphism Interactive Calendar -->
             <div id="custom-calendar-dropdown" class="custom-calendar-dropdown hidden" role="dialog" aria-modal="true" aria-label="Selector interactivo de fecha">
               <div class="cal-dropdown-header">
-                <button type="button" id="cal-prev-month" class="cal-nav-btn" title="Mes anterior" aria-label="Mes anterior">‹</button>
-                
+                <button type="button" id="cal-prev-month" class="cal-nav-btn" title="Mes anterior">‹</button>
                 <div class="cal-header-selectors">
                   <select id="cal-select-month" class="cal-header-select" aria-label="Seleccionar mes"></select>
                   <select id="cal-select-year" class="cal-header-select" aria-label="Seleccionar año"></select>
                 </div>
-
-                <button type="button" id="cal-next-month" class="cal-nav-btn" title="Mes siguiente" aria-label="Mes siguiente">›</button>
+                <button type="button" id="cal-next-month" class="cal-nav-btn" title="Mes siguiente">›</button>
               </div>
 
               <div class="cal-weekdays-grid">
                 <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span class="we-label">Sá</span><span class="we-label">Do</span>
               </div>
 
-              <div id="cal-days-grid" class="cal-days-grid">
-                <!-- Injected dynamically by JS -->
-              </div>
+              <div id="cal-days-grid" class="cal-days-grid"></div>
 
               <div class="cal-dropdown-footer">
                 <div class="cal-footer-shortcuts">
@@ -327,244 +288,305 @@
               </div>
             </div>
           </div>
-
-          <!-- Time Section (Oscilación estricta cada 5 minutos) -->
-          <div class="schedule-block">
-            <div class="block-header">
-              <span class="block-label">🕒 Hora de Recogida (Cada 5 min)</span>
-              <div class="quick-preset-pills">
-                <button type="button" class="preset-pill" id="btn-time-now">⚡ Ahora</button>
-                <button type="button" class="preset-pill" id="btn-time-plus30">+30 min</button>
-                <button type="button" class="preset-pill" id="btn-time-plus60">+1 hora</button>
-              </div>
-            </div>
-
-            <div class="stepper-time-wrapper">
-              <button type="button" class="stepper-btn" id="btn-time-minus" title="Restar 5 minutos" aria-label="Restar 5 minutos">−5m</button>
-              
-              <div class="dual-time-selectors">
-                <div class="time-select-unit">
-                  <label for="select-hour">Hora</label>
-                  <select id="select-hour" class="time-select" aria-label="Hora"></select>
-                </div>
-                <span class="time-colon">:</span>
-                <div class="time-select-unit">
-                  <label for="select-minute">Minutos</label>
-                  <select id="select-minute" class="time-select" aria-label="Minutos"></select>
-                </div>
-              </div>
-
-              <button type="button" class="stepper-btn" id="btn-time-plus" title="Sumar 5 minutos" aria-label="Sumar 5 minutos">+5m</button>
-            </div>
-
-            <!-- Input time hidden for compatibility -->
-            <input type="time" id="trip-time" step="300" class="hidden" />
-          </div>
         </div>
 
-        <div class="schedule-service-note">
-          <span class="note-icon">🕒</span>
-          <span>Horario programable en intervalos de 5 minutos. La reserva anticipada garantiza chofer puntual asignado.</span>
-        </div>
-      </div>
-
-      <!-- Vehicle Fleet Selection (Single Executive Fleet) -->
-      <div class="card vehicle-card">
-        <div class="card-header">
-          <span class="step-num">3</span>
-          <h3>Flota y Confort</h3>
-        </div>
-
-        <div class="single-fleet-card">
-          <div class="fleet-icon-wrapper">
-            <span class="fleet-icon">🚘</span>
-          </div>
-          <div class="fleet-info">
-            <div class="fleet-header-row">
-              <h4>Sedán Ejecutivo & Confort</h4>
-              <span class="fleet-badge">Flota Oficial</span>
-            </div>
-            <p class="fleet-desc">Vehículo moderno de categoría ejecutiva para traslados urbanos y viajes de media/larga distancia. Chofer profesional con vestimenta formal y trato cordial.</p>
-            <div class="fleet-specs">
-              <span class="spec-pill">👥 Hasta 4 Pasajeros</span>
-              <span class="spec-pill">🧳 3 Valijas Grandes</span>
-              <span class="spec-pill">❄️ Climatizado</span>
-              <span class="spec-pill">⚡ Cargador & Agua</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Extras & Preferences -->
-      <div class="card extras-card">
-        <div class="card-header">
-          <span class="step-num">4</span>
-          <h3>Opciones del Traslado & Peajes</h3>
-        </div>
-
-        <!-- Dynamic Toll Status Indicator (Automated, official government highway rates) -->
-        <div class="toll-status-box" id="toll-status-box">
-          <span class="toll-icon" id="toll-status-icon">🛣️</span>
-          <div class="toll-info">
-            <span class="toll-title" id="toll-status-title">Detección Inteligente de Peajes</span>
-            <span class="toll-desc" id="toll-status-desc">El peaje se calcula según las tarifas obligatorias oficiales de cada autopista (AUSA, Riccheri, Panamericana, Acceso Oeste, La Plata).</span>
-          </div>
-          <span class="toll-badge badge-no-toll" id="toll-status-badge">Sin peaje ($0)</span>
-        </div>
-
-        <div class="extras-grid">
-          <!-- Roundtrip -->
-          <label class="extra-item" id="item-extra-roundtrip">
-            <input type="checkbox" id="extra-roundtrip" />
-            <div class="extra-content">
-              <span class="extra-title">🔄 Viaje Ida y Vuelta</span>
-              <span class="extra-desc" id="extra-roundtrip-desc">Retorno programado con <strong>15% de descuento especial</strong> (o <strong>20% de descuento</strong> en viajes > $20.000)</span>
-            </div>
-            <span class="extra-benefit-tag" id="extra-roundtrip-badge">-15% Vuelta</span>
-          </label>
-
-          <!-- Pet Friendly -->
-          <label class="extra-item">
-            <input type="checkbox" id="extra-pet" />
-            <div class="extra-content">
-              <span class="extra-title">🐾 Traslado de Mascota (Pet Friendly)</span>
-              <span class="extra-desc">Mascota con manta protectora o canil en asiento trasero (+$4.000)</span>
-            </div>
-          </label>
-        </div>
-      </div>
-    </section>
-
-    <!-- Right Column: Interactive Map & Live Fare Quotation -->
-    <section class="summary-panel">
-      <!-- Interactive Map Card -->
-      <div class="card map-card">
-        <div class="map-header">
-          <div class="map-header-left">
-            <h3>Trazado de Ruta</h3>
-            <span id="traffic-indicator-pill" class="traffic-indicator-pill">⏱️ Tráfico estimado</span>
-          </div>
-          <span id="route-calc-status" class="status-indicator">Listo para cotizar</span>
-        </div>
-        
-        <div id="map-container" class="map-container">
-          <!-- Leaflet Map attaches here -->
-        </div>
-
-        <!-- Dynamic Traffic Forecast Banner (Based on selected reservation schedule) -->
-        <div id="traffic-live-banner" class="traffic-live-banner">
-          <div class="traffic-banner-icon-wrap">
-            <span class="traffic-pulse-dot" id="traffic-pulse-dot"></span>
-            <span id="traffic-banner-icon" class="traffic-banner-icon">🚦</span>
-          </div>
-          <div class="traffic-banner-text">
-            <div class="traffic-banner-title-row">
-              <strong id="traffic-banner-title">Tráfico Estimado por Horario</strong>
-              <span id="traffic-banner-badge" class="traffic-banner-badge">Programado</span>
-            </div>
-            <span id="traffic-banner-desc" class="traffic-banner-desc">El tiempo del viaje se calcula según el estado del tránsito histórico y real del horario seleccionado.</span>
-          </div>
-        </div>
-
-        <div class="route-metrics-bar">
-          <div class="metric-box">
-            <span class="metric-label">Distancia</span>
-            <span class="metric-value" id="metric-distance">0.0 km</span>
-          </div>
-          <div class="metric-divider"></div>
-          <div class="metric-box">
-            <span class="metric-label">Duración</span>
-            <span class="metric-value" id="metric-duration">0 min</span>
-          </div>
-          <div class="metric-divider"></div>
-          <div class="metric-box">
-            <span class="metric-label">Llegada Estimada</span>
-            <span class="metric-value" id="metric-arrival">--:--</span>
-          </div>
-        </div>
-        <p class="map-hint">💡 Trazado vehicular en tiempo real optimizado por calles transitables y autopistas.</p>
-      </div>
-
-      <!-- Live Fare Quotation Card -->
-      <div class="card fare-quote-card" id="fare-quote-box">
-        <div class="quote-header">
-          <span class="quote-badge">Cotización del Traslado</span>
-          <span class="live-pulse" title="Actualizado en tiempo real">● Tarifa en tiempo real</span>
-        </div>
-
-        <!-- Total Price -->
-        <div class="price-display-wrapper">
-          <span class="price-currency" id="quote-currency-symbol">$</span>
-          <span class="price-amount" id="quote-total-amount">3.500</span>
-          <span class="price-code" id="quote-currency-code">ARS</span>
-        </div>
-        <p class="price-guarantee hidden" id="quote-guarantee-note"></p>
-
-        <!-- Detailed Breakdown -->
-        <div class="breakdown-container">
-          <button type="button" class="breakdown-toggle-btn" id="toggle-breakdown">
-            <span>Ver detalles de la tarifa</span>
-            <span class="arrow">▼</span>
+        <div class="wizard-nav-footer">
+          <div></div>
+          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(2)">
+            Siguiente: Elegir Horario ➔
           </button>
+        </div>
+      </div>
 
-          <div class="breakdown-details" id="breakdown-content">
-            <div class="breakdown-row">
-              <span id="row-base-label">Servicio Base & Despacho:</span>
-              <span id="row-base-fare">$3.500</span>
-            </div>
-            <div class="breakdown-row">
-              <span id="row-distance-label">Distancia de trayecto:</span>
-              <span id="row-distance-fare">$0</span>
-            </div>
-            <div class="breakdown-row">
-              <span id="row-duration-label">Tiempo estimado de viaje:</span>
-              <span id="row-duration-fare">$0</span>
-            </div>
-            <div class="breakdown-row" id="row-surge-line">
-              <span id="row-surge-label">Ajuste Horario:</span>
-              <span id="row-surge-fare">0% (Sin recargo)</span>
-            </div>
-            <div class="breakdown-row" id="row-toll-line">
-              <span id="row-toll-label">Peajes Oficiales de Autopista:</span>
-              <span id="row-toll-fare">$0</span>
-            </div>
-            
-            <!-- Roundtrip Details (Visible when roundtrip active) -->
-            <div class="breakdown-row hidden" id="row-roundtrip-leg-line">
-              <span>Tramo de Regreso:</span>
-              <span id="row-roundtrip-leg-fare">$0</span>
-            </div>
-            <div class="breakdown-row discount-row hidden" id="row-roundtrip-discount-line">
-              <span>✨ Descuento Ida y Vuelta (-15% regreso):</span>
-              <strong id="row-roundtrip-discount-fare">-$0</strong>
-            </div>
-            <div class="breakdown-row discount-row hidden" id="row-long-distance-discount-line">
-              <span>✨ Descuento Larga Distancia (>200 km: -40%):</span>
-              <strong id="row-long-distance-discount-fare">-$0</strong>
-            </div>
+      <!-- ==================================================== -->
+      <!-- PASO 2: HORARIO DE RECOGIDA -->
+      <!-- ==================================================== -->
+      <div class="wizard-step-panel hidden" id="wizard-step-panel-2">
+        <div class="wizard-step-header">
+          <span class="wizard-step-badge-num">Paso 2 de 5</span>
+          <h2>Selecciona la Hora de Recogida</h2>
+          <p>Indica la hora exacta en la que tu chofer debe estar esperándote.</p>
+        </div>
 
-            <div class="breakdown-row" id="row-extras-line">
-              <span id="row-extras-label">Opciones adicionales:</span>
-              <span id="row-extras-fare">$0</span>
+        <div class="card schedule-card">
+          <div class="card-header flex-between-header">
+            <div class="header-left-title">
+              <h3>🕒 Hora de Salida (Cada 5 min)</h3>
             </div>
-            <div class="breakdown-divider"></div>
-            <div class="breakdown-row breakdown-total-row">
-              <strong>Total a Pagar:</strong>
-              <strong id="row-total-fare">$3.500</strong>
+            <div id="weather-status-pill" class="weather-status-pill" title="Evaluación meteorológica automática en tiempo real">
+              <span id="weather-icon">☀️</span>
+              <span id="weather-text">Clima Óptimo</span>
+            </div>
+          </div>
+
+          <div class="schedule-stylish-wrapper">
+            <div class="schedule-block">
+              <div class="block-header">
+                <span class="block-label">Opciones Rápidas de Horario</span>
+                <div class="quick-preset-pills">
+                  <button type="button" class="preset-pill" id="btn-time-now">⚡ Ahora</button>
+                  <button type="button" class="preset-pill" id="btn-time-plus30">+30 min</button>
+                  <button type="button" class="preset-pill" id="btn-time-plus60">+1 hora</button>
+                </div>
+              </div>
+
+              <div class="stepper-time-wrapper">
+                <button type="button" class="stepper-btn" id="btn-time-minus" title="Restar 5 minutos">−5m</button>
+                
+                <div class="dual-time-selectors">
+                  <div class="time-select-unit">
+                    <label for="select-hour">Hora</label>
+                    <select id="select-hour" class="time-select" aria-label="Hora"></select>
+                  </div>
+                  <span class="time-colon">:</span>
+                  <div class="time-select-unit">
+                    <label for="select-minute">Minutos</label>
+                    <select id="select-minute" class="time-select" aria-label="Minutos"></select>
+                  </div>
+                </div>
+
+                <button type="button" class="stepper-btn" id="btn-time-plus" title="Sumar 5 minutos">+5m</button>
+              </div>
+
+              <input type="time" id="trip-time" step="300" class="hidden" />
             </div>
           </div>
         </div>
 
-        <!-- Booking & Action Buttons -->
-        <div class="quote-actions">
+        <div class="wizard-nav-footer">
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(1)">
+            ‹ Atrás
+          </button>
+          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(3)">
+            Siguiente: Direcciones ➔
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================================================== -->
+      <!-- PASO 3: DIRECCIONES (ORIGEN, PARADA, DESTINO) -->
+      <!-- ==================================================== -->
+      <div class="wizard-step-panel hidden" id="wizard-step-panel-3">
+        <div class="wizard-step-header">
+          <span class="wizard-step-badge-num">Paso 3 de 5</span>
+          <h2>Ingresa las Direcciones del Traslado</h2>
+          <p>Indica el punto de partida, paradas intermedias (si aplica) y el destino final.</p>
+        </div>
+
+        <div class="card route-card">
+          <div class="card-header">
+            <h3>📍 Itinerario de Ruta</h3>
+          </div>
+
+          <div class="route-inputs-group">
+            <!-- Origin -->
+            <div class="input-field-wrap">
+              <div class="input-icon-pin origin-pin" title="Punto de Origen"></div>
+              <div class="field-body">
+                <label for="origin-input">Punto de Partida (Origen) *</label>
+                <input type="text" id="origin-input" placeholder="Ej: Aeropuerto Ezeiza, Obelisco o calle y número..." autocomplete="off" />
+                <div id="origin-suggestions" class="suggestions-list hidden"></div>
+              </div>
+              <button id="btn-use-location" class="location-btn" title="Usar mi ubicación actual">📍</button>
+            </div>
+
+            <!-- Add Intermediate Stop Toggle Button -->
+            <div class="stop-toggle-wrapper" id="stop-toggle-wrapper">
+              <button type="button" id="btn-toggle-stop" class="btn-toggle-stop">
+                <span class="plus-icon">➕</span>
+                <span>Agregar Parada Intermedia (Opcional)</span>
+              </button>
+            </div>
+
+            <!-- Intermediate Stop (Optional) -->
+            <div id="stop-field-wrap" class="input-field-wrap stop-field-wrap hidden">
+              <div class="input-icon-pin stop-pin" title="Parada Intermedia"></div>
+              <div class="field-body">
+                <div class="field-label-row">
+                  <label for="stop-input">Parada Intermedia</label>
+                  <span id="stop-rate-badge" class="stop-rate-badge">+$500 (En camino)</span>
+                </div>
+                <input type="text" id="stop-input" placeholder="Ej: Calle y número o lugar de la parada..." autocomplete="off" />
+                <div id="stop-suggestions" class="suggestions-list hidden"></div>
+              </div>
+              <button type="button" id="btn-remove-stop" class="remove-stop-btn" title="Quitar parada intermedia">✕</button>
+            </div>
+
+            <!-- Swap Button -->
+            <div class="swap-wrapper">
+              <button id="btn-swap-route" class="swap-btn" title="Invertir origen y destino">⇅</button>
+            </div>
+
+            <!-- Destination -->
+            <div class="input-field-wrap">
+              <div class="input-icon-pin destination-pin" title="Punto de Destino"></div>
+              <div class="field-body">
+                <label for="destination-input">Punto de Destino Final *</label>
+                <input type="text" id="destination-input" placeholder="Ej: Hotel Hilton, Puerto Madero, Nordelta, Aeroparque..." autocomplete="off" />
+                <div id="destination-suggestions" class="suggestions-list hidden"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav-footer">
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(2)">
+            ‹ Atrás
+          </button>
+          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(4)">
+            Siguiente: Ver Mapa ➔
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================================================== -->
+      <!-- PASO 4: MAPA DE RUTA Y VERIFICACIÓN -->
+      <!-- ==================================================== -->
+      <div class="wizard-step-panel hidden" id="wizard-step-panel-4">
+        <div class="wizard-step-header">
+          <span class="wizard-step-badge-num">Paso 4 de 5</span>
+          <h2>Verificación de la Ruta en el Mapa</h2>
+          <p>Comprueba que el trazado por calles y autopistas sea el correcto antes de ver la cotización.</p>
+        </div>
+
+        <div class="card map-card">
+          <div class="map-header">
+            <div class="map-header-left">
+              <h3>Trazado de Ruta Oficial</h3>
+              <span id="traffic-indicator-pill" class="traffic-indicator-pill">⏱️ Tráfico estimado</span>
+            </div>
+            <span id="route-calc-status" class="status-indicator">Calculando trazado...</span>
+          </div>
           
+          <div id="map-container" class="map-container" style="height: 380px;"></div>
+
+          <div id="traffic-live-banner" class="traffic-live-banner">
+            <div class="traffic-banner-icon-wrap">
+              <span class="traffic-pulse-dot" id="traffic-pulse-dot"></span>
+              <span id="traffic-banner-icon" class="traffic-banner-icon">🚦</span>
+            </div>
+            <div class="traffic-banner-text">
+              <div class="traffic-banner-title-row">
+                <strong id="traffic-banner-title">Tráfico Estimado por Horario</strong>
+                <span id="traffic-banner-badge" class="traffic-banner-badge">Programado</span>
+              </div>
+              <span id="traffic-banner-desc" class="traffic-banner-desc">El tiempo del viaje se calcula según el estado del tránsito del horario seleccionado.</span>
+            </div>
+          </div>
+
+          <div class="route-metrics-bar">
+            <div class="metric-box">
+              <span class="metric-label">Distancia</span>
+              <span class="metric-value" id="metric-distance">0.0 km</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-box">
+              <span class="metric-label">Duración</span>
+              <span class="metric-value" id="metric-duration">0 min</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-box">
+              <span class="metric-label">Llegada Estimada</span>
+              <span class="metric-value" id="metric-arrival">--:--</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav-footer">
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(3)">
+            ‹ Modificar Direcciones
+          </button>
+          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(5)">
+            Siguiente: Ver Cotización ➔
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================================================== -->
+      <!-- PASO 5: COTIZACIÓN COMPLETA Y CONFIRMACIÓN -->
+      <!-- ==================================================== -->
+      <div class="wizard-step-panel hidden" id="wizard-step-panel-5">
+        <div class="wizard-step-header">
+          <span class="wizard-step-badge-num">Paso 5 de 5</span>
+          <h2>Cotización de Tarifa & Confirmación</h2>
+          <p>Revisa el desglose completo del precio y confirma la solicitud de tu chofer ejecutivo.</p>
+        </div>
+
+        <div class="card fare-quote-card" id="fare-quote-box">
+          <div class="quote-header">
+            <span class="quote-badge">Cotización del Traslado</span>
+            <span class="live-pulse">● Tarifa Confirmada</span>
+          </div>
+
+          <!-- Total Price -->
+          <div class="price-display-wrapper">
+            <span class="price-currency" id="quote-currency-symbol">$</span>
+            <span class="price-amount" id="quote-total-amount">3.500</span>
+            <span class="price-code" id="quote-currency-code">ARS</span>
+          </div>
+          <p class="price-guarantee hidden" id="quote-guarantee-note"></p>
+
+          <!-- Detailed Breakdown -->
+          <div class="breakdown-container">
+            <button type="button" class="breakdown-toggle-btn" id="toggle-breakdown">
+              <span>Ver detalles de la tarifa</span>
+              <span class="arrow">▼</span>
+            </button>
+
+            <div class="breakdown-details" id="breakdown-content">
+              <div class="breakdown-row">
+                <span id="row-base-label">Servicio Base & Despacho:</span>
+                <span id="row-base-fare">$3.500</span>
+              </div>
+              <div class="breakdown-row">
+                <span id="row-distance-label">Distancia de trayecto:</span>
+                <span id="row-distance-fare">$0</span>
+              </div>
+              <div class="breakdown-row">
+                <span id="row-duration-label">Tiempo estimado de viaje:</span>
+                <span id="row-duration-fare">$0</span>
+              </div>
+              <div class="breakdown-row" id="row-surge-line">
+                <span id="row-surge-label">Ajuste Horario:</span>
+                <span id="row-surge-fare">0% (Sin recargo)</span>
+              </div>
+              <div class="breakdown-row" id="row-toll-line">
+                <span id="row-toll-label">Peajes Oficiales de Autopista:</span>
+                <span id="row-toll-fare">$0</span>
+              </div>
+              
+              <div class="breakdown-row hidden" id="row-roundtrip-leg-line">
+                <span>Tramo de Regreso:</span>
+                <span id="row-roundtrip-leg-fare">$0</span>
+              </div>
+              <div class="breakdown-row discount-row hidden" id="row-roundtrip-discount-line">
+                <span>✨ Descuento Ida y Vuelta:</span>
+                <strong id="row-roundtrip-discount-fare">-$0</strong>
+              </div>
+              <div class="breakdown-row discount-row hidden" id="row-long-distance-discount-line">
+                <span>✨ Descuento Larga Distancia:</span>
+                <strong id="row-long-distance-discount-fare">-$0</strong>
+              </div>
+
+              <div class="breakdown-row" id="row-extras-line">
+                <span id="row-extras-label">Opciones adicionales:</span>
+                <span id="row-extras-fare">$0</span>
+              </div>
+              <div class="breakdown-divider"></div>
+              <div class="breakdown-row breakdown-total-row">
+                <strong>Total a Pagar:</strong>
+                <strong id="row-total-fare">$3.500</strong>
+              </div>
+            </div>
+          </div>
+
           <!-- Passenger Details for Reservation Card -->
-          <div class="passenger-booking-fields-card">
+          <div class="passenger-booking-fields-card" style="margin-top: 15px;">
             <div class="passenger-fields-header">
               <span class="passenger-fields-icon">👤</span>
               <div>
                 <h4>Datos del Pasajero para la Reserva</h4>
-                <p>Indica el nombre y WhatsApp de quien viaja para coordinar el viaje</p>
+                <p>Indica el nombre y WhatsApp para coordinar el viaje</p>
               </div>
             </div>
             <div class="passenger-fields-grid">
@@ -583,51 +605,41 @@
             </div>
           </div>
 
-          <!-- In-App Dispatch Direct Action Button -->
-          <button id="btn-request-inapp" class="btn btn-primary full-width btn-inapp-trip-action">
-            <span class="btn-icon">⚡</span>
-            <span class="btn-text">
-              <strong>Pedir Chofer en Vivo (In-App)</strong>
-              <small>Búsqueda inmediata y seguimiento en tiempo real</small>
-            </span>
-          </button>
-
-          <button id="btn-reserve-whatsapp" class="btn btn-whatsapp web-only">
-            <span class="btn-icon">💬</span>
-            <span class="btn-text">
-              <strong>Confirmar y Reservar por WhatsApp</strong>
-              <small>Envía los datos de tu viaje con 1 clic</small>
-            </span>
-          </button>
-
-          <!-- Mensaje de Privacidad y Confidencialidad de Número -->
-          <div class="privacy-guarantee-note">
-            <span class="privacy-lock-icon">🔒</span>
-            <p><strong>Tu número es privado:</strong> No se comparte con terceros. Comunicación directa y protegida dentro del servicio.</p>
-          </div>
-
-          <div class="secondary-actions">
-            <button id="btn-print-quote" class="btn btn-secondary" title="Imprimir o guardar comprobante en PDF">
-              🖨️ Imprimir / Guardar PDF
+          <!-- Booking & Action Buttons -->
+          <div class="quote-actions" style="margin-top: 15px;">
+            <button id="btn-request-inapp" class="btn btn-primary full-width btn-inapp-trip-action">
+              <span class="btn-icon">🚀</span>
+              <span class="btn-text">
+                <strong>SOLICITAR CHOFER EJECUTIVO</strong>
+                <small>Búsqueda inmediata y seguimiento en tiempo real</small>
+              </span>
             </button>
-            <button id="btn-copy-quote" class="btn btn-secondary" title="Copiar resumen al portapapeles">
-              📋 Copiar Resumen
+
+            <button id="btn-reserve-whatsapp" class="btn btn-whatsapp web-only" style="margin-top: 8px;">
+              <span class="btn-icon">💬</span>
+              <span class="btn-text">
+                <strong>Reservar por WhatsApp</strong>
+                <small>Envía los datos de tu viaje con 1 clic</small>
+              </span>
             </button>
+
+            <div class="privacy-guarantee-note">
+              <span class="privacy-lock-icon">🔒</span>
+              <p><strong>Tu número es privado:</strong> Comunicación protegida dentro del servicio.</p>
+            </div>
           </div>
         </div>
 
-        <!-- Trust Features Footer -->
-        <div class="quote-footer-features">
-          <div class="feature-item">
-            <span>🛡️</span>
-            <span>Seguro de Pasajero</span>
-          </div>
-          <div class="feature-item">
-            <span>💳</span>
-            <span>Efectivo o Transferencia</span>
-          </div>
-          <div class="feature-item">
-            <span>⭐</span>
+        <div class="wizard-nav-footer">
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(4)">
+            ‹ Volver al Mapa
+          </button>
+          <div></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
             <span>Puntualidad 100%</span>
           </div>
         </div>
