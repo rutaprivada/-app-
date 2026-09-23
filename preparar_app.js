@@ -60,7 +60,18 @@ if (mode === 'conductor') {
 }
 
 const resDir = path.join(__dirname, 'android', 'app', 'src', 'main', 'res');
-const mipmapFolders = ['mipmap-hdpi', 'mipmap-mdpi', 'mipmap-xhdpi', 'mipmap-xxhdpi', 'mipmap-xxxhdpi', 'mipmap-anydpi-v26'];
+const mipmapFolders = ['mipmap-hdpi', 'mipmap-mdpi', 'mipmap-xhdpi', 'mipmap-xxhdpi', 'mipmap-xxxhdpi'];
+
+// Clean up any png icons mistakenly copied to mipmap-anydpi-v26 (which causes "Duplicate resources" error in Android Studio)
+const anydpiDir = path.join(resDir, 'mipmap-anydpi-v26');
+if (fs.existsSync(anydpiDir)) {
+    ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png'].forEach(pngFile => {
+        const fullPngPath = path.join(anydpiDir, pngFile);
+        if (fs.existsSync(fullPngPath)) {
+            try { fs.unlinkSync(fullPngPath); } catch(e){}
+        }
+    });
+}
 
 if (chosenIcon && fs.existsSync(chosenIcon) && fs.existsSync(resDir)) {
     mipmapFolders.forEach(folder => {
