@@ -7,6 +7,22 @@ const androidBuildDir = path.join(__dirname, 'android', 'app', 'build');
 const buildGradlePath = path.join(__dirname, 'android', 'app', 'build.gradle');
 const stringsXmlPath = path.join(__dirname, 'android', 'app', 'src', 'main', 'res', 'values', 'strings.xml');
 
+// Copy exact user uploaded logos
+const userUploadedDir = 'C:\\Users\\daniel\\.gemini\\antigravity-ide\\brain\\74630162-6221-4fb8-ab2f-5ac43b640c3c\\.user_uploaded';
+const fileChoferUploaded = path.join(userUploadedDir, 'media_1790190043516.png');
+const filePasajeroUploaded = path.join(userUploadedDir, 'media_1790190074835.png');
+
+const iconChoferPng = path.join(__dirname, 'icon_chofer.png');
+const iconPasajeroPng = path.join(__dirname, 'icon_pasajero.png');
+
+if (fs.existsSync(fileChoferUploaded)) {
+    try { fs.copyFileSync(fileChoferUploaded, iconChoferPng); } catch(e){}
+}
+
+if (fs.existsSync(filePasajeroUploaded)) {
+    try { fs.copyFileSync(filePasajeroUploaded, iconPasajeroPng); } catch(e){}
+}
+
 console.log(`==========================================`);
 console.log(` Configurando App Android: [ ${mode.toUpperCase()} ]`);
 console.log(`==========================================`);
@@ -32,13 +48,32 @@ if (fs.existsSync(stringsXmlPath)) {
     console.log(` Nombre de App configurado: ${appName}`);
 }
 
-// 2. Clean assets directory
+// 2. Configure Android App Icons (Mipmaps)
+const chosenIcon = (mode === 'conductor' && fs.existsSync(iconChoferPng)) ? iconChoferPng : (fs.existsSync(iconPasajeroPng) ? iconPasajeroPng : path.join(__dirname, 'icon-512.png'));
+const resDir = path.join(__dirname, 'android', 'app', 'src', 'main', 'res');
+const mipmapFolders = ['mipmap-hdpi', 'mipmap-mdpi', 'mipmap-xhdpi', 'mipmap-xxhdpi', 'mipmap-xxxhdpi'];
+
+if (fs.existsSync(chosenIcon) && fs.existsSync(resDir)) {
+    mipmapFolders.forEach(folder => {
+        const folderPath = path.join(resDir, folder);
+        if (fs.existsSync(folderPath)) {
+            ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png'].forEach(iconName => {
+                try {
+                    fs.copyFileSync(chosenIcon, path.join(folderPath, iconName));
+                } catch(e){}
+            });
+        }
+    });
+    console.log(` Icono oficial de [ ${mode.toUpperCase()} ] asignado a los recursos nativos.`);
+}
+
+// 3. Clean assets directory
 if (fs.existsSync(targetDir)) {
     fs.rmSync(targetDir, { recursive: true, force: true });
 }
 fs.mkdirSync(targetDir, { recursive: true });
 
-// 3. Clean Android build folder to force fresh compilation
+// 4. Clean Android build folder to force fresh compilation
 if (fs.existsSync(androidBuildDir)) {
     try {
         fs.rmSync(androidBuildDir, { recursive: true, force: true });
@@ -48,7 +83,7 @@ if (fs.existsSync(androidBuildDir)) {
     }
 }
 
-// 4. Copy web files
+// 5. Copy web files
 const allowedExtensions = ['.html', '.js', '.css', '.svg', '.png', '.jpg', '.jpeg', '.json', '.webp', '.ico'];
 const files = fs.readdirSync(__dirname);
 
@@ -62,7 +97,7 @@ files.forEach(file => {
     }
 });
 
-// 5. Configure entry point (index.html)
+// 6. Configure entry point (index.html)
 if (mode === 'conductor') {
     const conductorPath = path.join(__dirname, 'conductor.html');
     const destIndexPath = path.join(targetDir, 'index.html');

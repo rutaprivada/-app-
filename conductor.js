@@ -1381,7 +1381,14 @@ document.addEventListener('DOMContentLoaded', () => {
             (err) => {
                 console.warn('Fallo de señal GPS del Chofer:', err);
                 if (driverState.isOnline) {
-                    alert('⚠️ GPS DESCONECTADO O SIN SEÑAL:\n\nPara recibir viajes ejecutivos es obligatorio tener la ubicación GPS activa. Has pasado automáticamente a estado DESCONECTADO.');
+                    if (err.code === 1) { // PERMISSION_DENIED
+                        alert('⚠️ PERMISO DE UBICACIÓN REQUERIDO:\n\nPara ponerte EN LÍNEA y recibir viajes, debes conceder el permiso de Ubicación.\n\nVe a Ajustes de tu teléfono > Aplicaciones > RutaPrivada Chofer > Permisos > Ubicación > Permitir siempre.');
+                        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation) {
+                            try { window.Capacitor.Plugins.Geolocation.requestPermissions(); } catch(e){}
+                        }
+                    } else {
+                        alert('⚠️ GPS DESCONECTADO O SIN SEÑAL:\n\nVerifica que la ubicación/GPS de tu celular esté encendida para recibir viajes ejecutivos.');
+                    }
                     setOnlineStatus(false);
                 }
             },
