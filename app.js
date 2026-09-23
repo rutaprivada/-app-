@@ -3607,6 +3607,26 @@ const STRATEGIC_LANDMARKS = [
     isPoi: true
   },
   {
+    regex: /(abasto|shopping.*abasto|abasto.*shopping)/i,
+    lat: '-34.6035',
+    lon: '-58.4108',
+    mainTitle: 'Abasto Shopping',
+    subTitle: 'Av. Corrientes 3247, Balvanera, CABA',
+    icon: '🛍️',
+    badge: 'Centro Comercial',
+    isPoi: true
+  },
+  {
+    regex: /(alto.*palermo|shopping.*alto.*palermo)/i,
+    lat: '-34.5878',
+    lon: '-58.4103',
+    mainTitle: 'Alto Palermo Shopping',
+    subTitle: 'Av. Santa Fe 3253, Palermo, CABA',
+    icon: '🛍️',
+    badge: 'Centro Comercial',
+    isPoi: true
+  },
+  {
     regex: /(ezeiza|aeropuerto.*ezeiza|pistarini|ministro.*pistarini|eze\b)/i,
     lat: '-34.8222',
     lon: '-58.5358',
@@ -4102,14 +4122,16 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     const cleanSub = place._subTitle || cleanAddressDisplay(place.display_name);
     const mainTitle = place._mainTitle || (place.display_name ? place.display_name.split(',')[0] : '');
     
-    // Al seleccionar, colocamos el nombre claro y profesional del lugar en el campo de texto
+    // Al seleccionar, colocamos la dirección completa y exacta para el chofer y la cotización
     let cleanName = place.display_name || mainTitle;
-    if (place._isPoi && mainTitle) {
+    if (mainTitle && cleanSub) {
+      if (mainTitle.toLowerCase().includes(cleanSub.toLowerCase())) {
+        cleanName = mainTitle;
+      } else {
+        cleanName = `${mainTitle}, ${cleanSub}`;
+      }
+    } else if (mainTitle) {
       cleanName = mainTitle;
-    } else if (isCorner && place._cornerTitle) {
-      cleanName = cleanSub ? `${place._cornerTitle}, ${cleanSub}` : place._cornerTitle;
-    } else if (mainTitle && cleanSub && !cleanSub.toLowerCase().includes(mainTitle.toLowerCase())) {
-      cleanName = `${mainTitle}, ${cleanSub}`;
     }
 
     input.value = cleanName;
@@ -4117,9 +4139,12 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     list.classList.add('hidden');
     currentResults = [];
 
+    const pLat = parseFloat(place.lat || place.latitude);
+    const pLon = parseFloat(place.lon || place.lng || place.longitude);
+
     onSelect({
-      lat: parseFloat(place.lat),
-      lon: parseFloat(place.lon),
+      lat: pLat,
+      lon: pLon,
       display_name: cleanName
     });
   }
