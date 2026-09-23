@@ -17,6 +17,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getFleetDriverInfo() {
+        let docs = null;
+        try {
+            const rawDocs = localStorage.getItem('rutaprivada_driver_docs_v1');
+            if (rawDocs) docs = JSON.parse(rawDocs);
+        } catch(e) {}
+
+        const defaultPhoto = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+
         try {
             const raw = localStorage.getItem('rutaprivada_drivers_v1');
             if (raw) {
@@ -24,21 +32,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (Array.isArray(list) && list.length > 0) {
                     const d = list[0];
                     return {
-                        nombre: d.name || 'Daniel Pabon',
-                        auto: d.vehicle || 'Fiat Cronos Negro',
-                        patente: d.plate || 'AE927CN',
+                        nombre: docs ? docs.nombre : (d.name || 'Daniel Pabon'),
+                        auto: docs ? `${docs.autoMarcaModelo} ${docs.color}` : (d.vehicle || 'Fiat Cronos Negro'),
+                        patente: docs ? docs.patente : (d.plate || 'AE927CN'),
                         calificacion: 4.98,
-                        telefono: d.phone ? ('+54 9 ' + d.phone.replace(/^(\+?54\s?9?|\+)/, '')) : '+54 9 11 2255-8226'
+                        telefono: docs ? docs.telefono : (d.phone ? ('+54 9 ' + d.phone.replace(/^(\+?54\s?9?|\+)/, '')) : '+54 9 11 2255-8226'),
+                        fotoPerfil: (docs && docs.fotoPerfil) ? docs.fotoPerfil : defaultPhoto,
+                        categoria: docs ? docs.categoria : 'Sedán Ejecutivo / Premium'
                     };
                 }
             }
         } catch(e) {}
+
         return {
-            nombre: 'Daniel Pabon',
-            auto: 'Fiat Cronos Negro · Sedán Ejecutivo',
-            patente: 'AE927CN',
+            nombre: docs ? docs.nombre : 'Daniel Pabon',
+            auto: docs ? `${docs.autoMarcaModelo} ${docs.color}` : 'Fiat Cronos Negro',
+            patente: docs ? docs.patente : 'AE927CN',
             calificacion: 4.98,
-            telefono: '+54 9 11 2255-8226'
+            telefono: docs ? docs.telefono : '+54 9 11 2255-8226',
+            fotoPerfil: (docs && docs.fotoPerfil) ? docs.fotoPerfil : defaultPhoto,
+            categoria: docs ? docs.categoria : 'Sedán Ejecutivo / Premium'
         };
     }
 
@@ -3203,7 +3216,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (avatarLargeEl) avatarLargeEl.src = photoStr;
 
-        document.querySelectorAll('.header-profile-avatar img, .profile-avatar-small').forEach(img => {
+        document.querySelectorAll('.header-profile-avatar img, .profile-avatar-small, .driver-avatar, #driverAvatar').forEach(img => {
             img.src = photoStr;
         });
 
