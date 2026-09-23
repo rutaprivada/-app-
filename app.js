@@ -5354,11 +5354,15 @@ if (window.RutaSync) {
       const driverCar = viaje.conductor.auto || 'Fiat Cronos Negro';
       const driverPlate = viaje.conductor.patente ? ` · Patente: ${viaje.conductor.patente}` : (!driverCar.includes('Patente') ? ' · Patente: AE927CN' : '');
       const driverRating = viaje.conductor.calificacion || '4.98';
+      const driverPhoto = viaje.conductor.fotoPerfil || viaje.conductor.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
 
       if (pDriverName) pDriverName.textContent = driverName;
       if (pDriverCar) pDriverCar.textContent = `${driverCar}${driverPlate}`;
       if (pDriverRating) pDriverRating.textContent = driverRating;
       if (pChatDriverName) pChatDriverName.textContent = `${driverName} (Chofer)`;
+      if (pDriverAvatar) pDriverAvatar.src = driverPhoto;
+      const pChatDriverAvatar = document.getElementById('pChatDriverAvatar');
+      if (pChatDriverAvatar) pChatDriverAvatar.src = driverPhoto;
 
       if (btnPassengerCallDriver) {
         btnPassengerCallDriver.href = `tel:${viaje.conductor.telefono || '+5491122558226'}`;
@@ -5368,6 +5372,16 @@ if (window.RutaSync) {
       updatePassengerTripStage('en_camino');
       showToast(`🚗 ¡Conductor Asignado! ${driverName} aceptó tu viaje y está en camino.`);
     }
+  });
+
+  window.RutaSync.on('CONDUCTOR_DATOS_ACTUALIZADOS', (data) => {
+    if (!data) return;
+    const driverPhoto = data.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+    if (pDriverName && data.nombre) pDriverName.textContent = data.nombre;
+    if (pDriverCar && data.auto) pDriverCar.textContent = `${data.auto}${data.patente ? ' · Patente: ' + data.patente : ''}`;
+    if (pDriverAvatar) pDriverAvatar.src = driverPhoto;
+    const pChatDriverAvatar = document.getElementById('pChatDriverAvatar');
+    if (pChatDriverAvatar) pChatDriverAvatar.src = driverPhoto;
   });
 
   window.RutaSync.on('UBICACION_CHOFER_ACTUALIZADA', (locationData) => {
@@ -6064,6 +6078,10 @@ if (btnRecenterPassengerMap) {
         if (pDriverName) pDriverName.textContent = trip.conductor.nombre || 'Daniel Pabon';
         if (pDriverCar) pDriverCar.textContent = `${trip.conductor.auto || 'Fiat Cronos Negro'}${trip.conductor.patente ? ' · Patente: ' + trip.conductor.patente : ''}`;
         if (pDriverRating) pDriverRating.textContent = trip.conductor.calificacion || '4.98';
+        const driverPhoto = trip.conductor.fotoPerfil || trip.conductor.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+        if (pDriverAvatar) pDriverAvatar.src = driverPhoto;
+        const pChatDriverAvatar = document.getElementById('pChatDriverAvatar');
+        if (pChatDriverAvatar) pChatDriverAvatar.src = driverPhoto;
         initPassengerLiveMap(trip);
         updatePassengerTripStage(trip.estado || trip.etapa || 'en_camino');
       }

@@ -2381,6 +2381,74 @@ body.is-app-mode .web-only {
     color: #ffffff;
 }
 
+/* WIDGET FLOTANTE TIPO CABIFY / UBER */
+.driver-floating-widget {
+    position: fixed;
+    bottom: 95px;
+    right: 18px;
+    z-index: 9999;
+    background: linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%);
+    border: 1.5px solid #fbbf24;
+    border-radius: 30px;
+    padding: 8px 16px 8px 10px;
+    box-shadow: 0 8px 25px rgba(109, 40, 217, 0.6), 0 0 15px rgba(251, 191, 36, 0.35);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    user-select: none;
+}
+.driver-floating-widget:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 12px 30px rgba(109, 40, 217, 0.8), 0 0 20px rgba(251, 191, 36, 0.6);
+}
+.driver-floating-widget:active {
+    transform: scale(0.95);
+}
+.floating-widget-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.floating-icon-box {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #fbbf24;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.floating-text-box {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+.floating-text-box .f-status {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #34d399;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.floating-text-box .f-pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 8px #34d399;
+    animation: pulseDot 1.5s infinite;
+}
+.floating-text-box .f-brand {
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: #ffffff;
+}
+
 
 
 

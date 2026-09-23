@@ -650,43 +650,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Marcador Origen
         L.marker([originCoords.lat, originCoords.lng], {
-            icon: createPointIcon('origin', 'Partida')
+            icon: createPointPinIcon('origin', 'Partida')
         }).addTo(tripDetailMapInstance);
 
         // Marcador Parada si existe
         if (stopCoords) {
             bounds.extend([stopCoords.lat, stopCoords.lng]);
             L.marker([stopCoords.lat, stopCoords.lng], {
-                icon: createPointIcon('stop', 'Parada')
+                icon: createPointPinIcon('stop', 'Parada')
             }).addTo(tripDetailMapInstance);
         }
 
         // Marcador Destino
         L.marker([destCoords.lat, destCoords.lng], {
-            icon: createPointIcon('destination', 'Destino')
+            icon: createPointPinIcon('destination', 'Destino')
         }).addTo(tripDetailMapInstance);
 
-        // Trazar línea de ruta real con OSRM
-        const osrmCoordStr = stopCoords
-            ? `${originCoords.lng},${originCoords.lat};${stopCoords.lng},${stopCoords.lat};${destCoords.lng},${destCoords.lat}`
-            : `${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}`;
+        // Si el viaje tiene grabado el recorrido real de puntos GPS realizado por el chofer, renderizarlo
+        if (trip.recorridoReal && Array.isArray(trip.recorridoReal) && trip.recorridoReal.length >= 2) {
+            const realPolyline = L.polyline(trip.recorridoReal, {
+                color: '#fbbf24',
+                weight: 5,
+                opacity: 0.95
+            }).addTo(tripDetailMapInstance);
+            tripDetailMapInstance.fitBounds(realPolyline.getBounds(), { padding: [25, 25] });
+        } else {
+            // Trazar línea de ruta estimada con OSRM
+            const osrmCoordStr = stopCoords
+                ? `${originCoords.lng},${originCoords.lat};${stopCoords.lng},${stopCoords.lat};${destCoords.lng},${destCoords.lat}`
+                : `${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}`;
 
-        fetch(`https://router.project-osrm.org/route/v1/driving/${osrmCoordStr}?overview=full&geometries=geojson`)
-            .then(res => res.json())
-            .then(data => {
-                if (data && data.routes && data.routes[0] && data.routes[0].geometry && tripDetailMapInstance) {
-                    const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                    const osrmLine = L.polyline(coords, {
-                        color: '#f59e0b',
-                        weight: 5,
-                        opacity: 0.9
-                    }).addTo(tripDetailMapInstance);
-                    tripDetailMapInstance.fitBounds(osrmLine.getBounds(), { padding: [25, 25] });
-                } else {
-                    fallbackDetailPolyline();
-                }
-            })
-            .catch(() => fallbackDetailPolyline());
+            fetch(`https://router.project-osrm.org/route/v1/driving/${osrmCoordStr}?overview=full&geometries=geojson`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.routes && data.routes[0] && data.routes[0].geometry && tripDetailMapInstance) {
+                        const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                        const osrmLine = L.polyline(coords, {
+                            color: '#f59e0b',
+                            weight: 5,
+                            opacity: 0.9
+                        }).addTo(tripDetailMapInstance);
+                        tripDetailMapInstance.fitBounds(osrmLine.getBounds(), { padding: [25, 25] });
+                    } else {
+                        fallbackDetailPolyline();
+                    }
+                })
+                .catch(() => fallbackDetailPolyline());
+        }
 
         function fallbackDetailPolyline() {
             if (!tripDetailMapInstance) return;
@@ -1192,6 +1202,12 @@ document.addEventListener('DOMContentLoaded', () => {
             ? Number(rawPrice)
             : 35000;
 
+        // Resolver coordenadas precisas de origen, parada y destino para el mapa y navegación GPS
+        const originCoords = item._originCoords || item.originCoords || resolveAddressCoords(item.pickupAddress || item.origin || item.origen, { lat: -34.5682, lng: -58.4371 });
+        const destCoords = item._destCoords || item.destinationCoords || resolveAddressCoords(item.dropoffAddress || item.destination || item.destino, { lat: -34.5658, lng: -58.4340 });
+        const stopAddr = item.parada || item.stopAddress;
+        const stopCoords = stopAddr ? (item._stopCoords || item.stopCoords || resolveAddressCoords(stopAddr, { lat: -34.5889, lng: -58.4306 })) : null;
+
         const tripData = {
             id: 'trip_' + item.id,
             reservaId: item.id,
@@ -1199,13 +1215,20 @@ document.addEventListener('DOMContentLoaded', () => {
             telefono: item.clientPhone || item.customerPhone || item.telefono || '+5491155551234',
             origen: item.pickupAddress || item.origin || item.origen || 'Punto de recogida',
             destino: item.dropoffAddress || item.destination || item.destino || 'Destino',
+            parada: stopAddr,
             precioEstimado: tripPrice,
             categoria: item.category || item.categoria || 'Sedán Ejecutivo',
-            distancia: item.distancia || (item.distanceKm ? `${item.distanceKm} km` : '28 km'),
-            distanceKm: item.distanceKm || 28,
+            distancia: item.distancia || (item.distanceKm ? `${item.distanceKm} km` : '15 km'),
+            distanceKm: item.distanceKm || 15,
             tollFare: item.tollFare || item.peajes || 0,
             peajes: item.tollFare || item.peajes || 0,
-            metodoPago: item.paymentMethod || item.metodoPago || 'Efectivo / Transferencia'
+            metodoPago: item.paymentMethod || item.metodoPago || 'Efectivo / Transferencia',
+            _originCoords: originCoords,
+            _destCoords: destCoords,
+            _stopCoords: stopCoords,
+            originCoords: originCoords,
+            destinationCoords: destCoords,
+            stopCoords: stopCoords
         };
 
         item.status = 'en_curso';
@@ -1397,11 +1420,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     statHorasOnline.textContent = `${hrs}h`;
                 }, 1000);
             }
+
+            const quickWidget = document.getElementById('driverOnlineQuickWidget');
+            if (quickWidget) quickWidget.style.display = 'flex';
         } else {
             btnToggleStatus.className = 'driver-status-toggle offline';
             headerStatusDot.className = 'status-indicator';
             statusText.textContent = 'ESTÁS DESCONECTADO';
             statusSubtext.textContent = 'Toca para conectarte y recibir viajes';
+
+            const quickWidget = document.getElementById('driverOnlineQuickWidget');
+            if (quickWidget) quickWidget.style.display = 'none';
 
             if (driverState.activeTrip) {
                 stateSearching.classList.remove('active');
@@ -1423,6 +1452,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 driverState.onlineTimer = null;
             }
         }
+    }
+
+    const driverOnlineQuickWidget = document.getElementById('driverOnlineQuickWidget');
+    if (driverOnlineQuickWidget) {
+        driverOnlineQuickWidget.addEventListener('click', () => {
+            switchTab('viewLive');
+            if (driverLiveMap && currentDriverCoords) {
+                driverLiveMap.setView([currentDriverCoords.lat, currentDriverCoords.lng], 15);
+            }
+            showDriverToast('🚗 RP Conductor En Línea');
+        });
     }
 
     btnToggleStatus.addEventListener('click', () => {
@@ -1999,6 +2039,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'aeroparque': { lat: -34.5580, lng: -58.4173 },
         'aeroparque jorge newbery': { lat: -34.5580, lng: -58.4173 },
         'aep': { lat: -34.5580, lng: -58.4173 },
+        'ezeiza': { lat: -34.8150, lng: -58.5348 },
+        'aeropuerto ezeiza': { lat: -34.8150, lng: -58.5348 },
         'obelisco': { lat: -34.6037, lng: -58.3816 },
         'centro': { lat: -34.6037, lng: -58.3816 },
         '9 de julio': { lat: -34.6037, lng: -58.3816 },
@@ -2006,6 +2048,14 @@ document.addEventListener('DOMContentLoaded', () => {
         'corrientes': { lat: -34.6037, lng: -58.3816 },
         'puerto madero': { lat: -34.6118, lng: -58.3644 },
         'palermo': { lat: -34.5889, lng: -58.4306 },
+        'campos': { lat: -34.5682, lng: -58.4371 },
+        'luis m. av': { lat: -34.5682, lng: -58.4371 },
+        'luis maria campos': { lat: -34.5682, lng: -58.4371 },
+        'kansas': { lat: -34.5658, lng: -58.4340 },
+        'libertador': { lat: -34.5658, lng: -58.4340 },
+        'del libertador': { lat: -34.5658, lng: -58.4340 },
+        'las cañitas': { lat: -34.5694, lng: -58.4336 },
+        'cañitas': { lat: -34.5694, lng: -58.4336 },
         'recoleta': { lat: -34.5875, lng: -58.3974 },
         'belgrano': { lat: -34.5614, lng: -58.4563 },
         'nuñez': { lat: -34.5448, lng: -58.4632 },
