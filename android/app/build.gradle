@@ -4,7 +4,7 @@ android {
     namespace "com.rutaprivada.app"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.rutaprivada.app"
+        applicationId "com.rutaprivada.pasajero"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
