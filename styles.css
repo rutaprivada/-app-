@@ -4642,9 +4642,113 @@ html, body {
   }
 }
 
+/* ---------------- Compact Wizard Header & Step Badges ---------------- */
+.compact-wizard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(18, 24, 36, 0.8);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+}
 
+.compact-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
+.compact-step-tag {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
 
+.compact-step-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+}
 
+.step-summary-badge {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.25));
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 3px 10px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+  white-space: nowrap;
+}
 
+.selected-time-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  margin-top: 14px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
 
+.selected-time-highlight {
+  color: #f59e0b;
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+/* Sleek Golden Time Selector Dropdown Overrides */
+.time-select {
+  background: #0f172a !important;
+  border: 1.5px solid #f59e0b !important;
+  color: #f59e0b !important;
+  border-radius: 12px !important;
+  font-size: 1.6rem !important;
+  font-weight: 800 !important;
+  padding: 6px 14px !important;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25) !important;
+  text-align: center !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+.time-select:focus {
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5) !important;
+}
+
+.stepper-btn {
+  background: linear-gradient(135deg, #1e293b, #0f172a) !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  color: #fbbf24 !important;
+  font-weight: 800 !important;
+  font-size: 0.95rem !important;
+  border-radius: 10px !important;
+  padding: 8px 14px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.stepper-btn:hover {
+  background: rgba(245, 158, 11, 0.2) !important;
+  border-color: #f59e0b !important;
+  transform: scale(1.05) !important;
+}

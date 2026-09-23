@@ -122,11 +122,12 @@
   <!-- Google Fonts: Plus Jakarta Sans -->
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Leaflet CSS for Map -->
+  <!-- Leaflet CSS & JS for Map -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=16" />
+  <link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body>
 
@@ -168,43 +169,13 @@
     
     <div id="passenger-wizard-container" class="passenger-wizard-wrapper">
       
-      <!-- WIZARD STEP PROGRESS BAR -->
-      <div class="wizard-progress-bar-wrap">
-        <div class="wizard-progress-track">
-          <div class="wizard-progress-fill" id="wizard-progress-fill" style="width: 20%;"></div>
-        </div>
-        <div class="wizard-steps-list">
-          <button type="button" class="wizard-step-item active" id="wizard-step-indicator-1" onclick="goToWizardStep(1)">
-            <span class="step-badge">1</span>
-            <span class="step-title">Fecha</span>
-          </button>
-          <button type="button" class="wizard-step-item" id="wizard-step-indicator-2" onclick="goToWizardStep(2)">
-            <span class="step-badge">2</span>
-            <span class="step-title">Horario</span>
-          </button>
-          <button type="button" class="wizard-step-item" id="wizard-step-indicator-3" onclick="goToWizardStep(3)">
-            <span class="step-badge">3</span>
-            <span class="step-title">Direcciones</span>
-          </button>
-          <button type="button" class="wizard-step-item" id="wizard-step-indicator-4" onclick="goToWizardStep(4)">
-            <span class="step-badge">4</span>
-            <span class="step-title">Mapa</span>
-          </button>
-          <button type="button" class="wizard-step-item" id="wizard-step-indicator-5" onclick="goToWizardStep(5)">
-            <span class="step-badge">5</span>
-            <span class="step-title">Cotización</span>
-          </button>
-        </div>
-      </div>
-
       <!-- ==================================================== -->
       <!-- PASO 1: TIPO DE VIAJE Y SELECCIÓN DE DÍA -->
       <!-- ==================================================== -->
       <div class="wizard-step-panel active-wizard-step" id="wizard-step-panel-1">
-        <div class="wizard-step-header">
-          <span class="wizard-step-badge-num">Paso 1 de 5</span>
-          <h2>¿Cuándo deseas realizar tu traslado?</h2>
-          <p>Selecciona si necesitas un chofer en vivo ahora mismo o si deseas agendar un viaje programado.</p>
+        <div class="compact-wizard-header">
+          <div class="compact-step-tag">Paso 1 de 5</div>
+          <h2 class="compact-step-title">📅 ¿Cuándo deseas realizar tu traslado?</h2>
         </div>
 
         <div class="card schedule-card">
@@ -302,16 +273,18 @@
       <!-- PASO 2: HORARIO DE RECOGIDA -->
       <!-- ==================================================== -->
       <div class="wizard-step-panel hidden" id="wizard-step-panel-2">
-        <div class="wizard-step-header">
-          <span class="wizard-step-badge-num">Paso 2 de 5</span>
-          <h2>Selecciona la Hora de Recogida</h2>
-          <p>Indica la hora exacta en la que tu chofer debe estar esperándote.</p>
+        <div class="compact-wizard-header">
+          <div class="compact-header-left">
+            <span class="compact-step-tag">Paso 2 de 5</span>
+            <h2 class="compact-step-title">🕒 Hora de Recogida</h2>
+          </div>
+          <div id="step-datetime-summary-step2" class="step-summary-badge">📅 Hoy</div>
         </div>
 
         <div class="card schedule-card">
           <div class="card-header flex-between-header">
             <div class="header-left-title">
-              <h3>🕒 Hora de Salida (Cada 5 min)</h3>
+              <h3>🕒 Ajustar Horario Exacto</h3>
             </div>
             <div id="weather-status-pill" class="weather-status-pill" title="Evaluación meteorológica automática en tiempo real">
               <span id="weather-icon">☀️</span>
@@ -348,6 +321,11 @@
                 <button type="button" class="stepper-btn" id="btn-time-plus" title="Sumar 5 minutos">+5m</button>
               </div>
 
+              <div class="selected-time-box">
+                <span>Horario Confirmado:</span>
+                <strong id="selected-time-highlight" class="selected-time-highlight">--:-- hs</strong>
+              </div>
+
               <input type="time" id="trip-time" step="300" class="hidden" />
             </div>
           </div>
@@ -367,10 +345,12 @@
       <!-- PASO 3: DIRECCIONES (ORIGEN, PARADA, DESTINO) -->
       <!-- ==================================================== -->
       <div class="wizard-step-panel hidden" id="wizard-step-panel-3">
-        <div class="wizard-step-header">
-          <span class="wizard-step-badge-num">Paso 3 de 5</span>
-          <h2>Ingresa las Direcciones del Traslado</h2>
-          <p>Indica el punto de partida, paradas intermedias (si aplica) y el destino final.</p>
+        <div class="compact-wizard-header">
+          <div class="compact-header-left">
+            <span class="compact-step-tag">Paso 3 de 5</span>
+            <h2 class="compact-step-title">📍 Direcciones del Traslado</h2>
+          </div>
+          <div id="step-datetime-summary-step3" class="step-summary-badge">📅 Hoy • 🕒 --:--</div>
         </div>
 
         <div class="card route-card">
@@ -443,10 +423,12 @@
       <!-- PASO 4: MAPA DE RUTA Y VERIFICACIÓN -->
       <!-- ==================================================== -->
       <div class="wizard-step-panel hidden" id="wizard-step-panel-4">
-        <div class="wizard-step-header">
-          <span class="wizard-step-badge-num">Paso 4 de 5</span>
-          <h2>Verificación de la Ruta en el Mapa</h2>
-          <p>Comprueba que el trazado por calles y autopistas sea el correcto antes de ver la cotización.</p>
+        <div class="compact-wizard-header">
+          <div class="compact-header-left">
+            <span class="compact-step-tag">Paso 4 de 5</span>
+            <h2 class="compact-step-title">🗺️ Verificación en el Mapa</h2>
+          </div>
+          <div id="step-datetime-summary-step4" class="step-summary-badge">📅 Hoy • 🕒 --:--</div>
         </div>
 
         <div class="card map-card">
@@ -458,7 +440,7 @@
             <span id="route-calc-status" class="status-indicator">Calculando trazado...</span>
           </div>
           
-          <div id="map-container" class="map-container" style="height: 380px;"></div>
+          <div id="map-container" class="map-container" style="height: 260px;"></div>
 
           <div id="traffic-live-banner" class="traffic-live-banner">
             <div class="traffic-banner-icon-wrap">
@@ -506,10 +488,12 @@
       <!-- PASO 5: COTIZACIÓN COMPLETA Y CONFIRMACIÓN -->
       <!-- ==================================================== -->
       <div class="wizard-step-panel hidden" id="wizard-step-panel-5">
-        <div class="wizard-step-header">
-          <span class="wizard-step-badge-num">Paso 5 de 5</span>
-          <h2>Cotización de Tarifa & Confirmación</h2>
-          <p>Revisa el desglose completo del precio y confirma la solicitud de tu chofer ejecutivo.</p>
+        <div class="compact-wizard-header">
+          <div class="compact-header-left">
+            <span class="compact-step-tag">Paso 5 de 5</span>
+            <h2 class="compact-step-title">💳 Cotización Final & Confirmación</h2>
+          </div>
+          <div id="step-datetime-summary-step5" class="step-summary-badge">📅 Hoy • 🕒 --:--</div>
         </div>
 
         <div class="card fare-quote-card" id="fare-quote-box">

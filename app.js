@@ -94,28 +94,35 @@ function goToWizardStep(step) {
     }
   }
 
-  // Actualizar la barra de progreso superior
-  const progressFill = document.getElementById('wizard-progress-fill');
-  if (progressFill) {
-    progressFill.style.width = `${step * 20}%`;
+  // Actualizar insignias de resumen de Fecha y Hora en todos los pasos
+  if (typeof updateStepDateTimeBadges === 'function') {
+    updateStepDateTimeBadges();
   }
 
-  // Al entrar al Paso 4 (Mapa), forzar refresco de renderizado de Leaflet
+  // Al entrar al Paso 4 (Mapa), forzar inicialización y refresco de Leaflet
   if (step === 4) {
     setTimeout(() => {
-      if (window.passengerMap) {
-        try { window.passengerMap.invalidateSize(); } catch(e){}
+      if (!map && typeof initMap === 'function') {
+        try { initMap(); } catch(e){}
       }
-      if (typeof calculateRouteAndFare === 'function') {
+      if (map) {
+        try { map.invalidateSize(); } catch(e){}
+      }
+      if (typeof checkAndRoute === 'function') {
+        try { checkAndRoute(); } catch(e){}
+      } else if (typeof calculateRouteAndFare === 'function') {
         try { calculateRouteAndFare(); } catch(e){}
       }
-    }, 150);
+    }, 100);
   }
 
-  // Si se entra al Paso 5 (Cotización), calcular cotización final
+  // Si se entra al Paso 5 (Cotización), calcular cotización final y renderizar
   if (step === 5) {
     if (typeof calculateRouteAndFare === 'function') {
       try { calculateRouteAndFare(); } catch(e){}
+    }
+    if (typeof renderQuote === 'function') {
+      try { renderQuote(); } catch(e){}
     }
   }
 
@@ -123,6 +130,22 @@ function goToWizardStep(step) {
   const container = document.getElementById('passenger-wizard-container');
   if (container) {
     container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function updateStepDateTimeBadges() {
+  const dateFormatted = (typeof formatDateWithWeekday === 'function' && state.date) ? formatDateWithWeekday(state.date) : 'Hoy';
+  const timeStr = state.time ? `${state.time} hs` : 'Ahora';
+  const badgeText = `📅 ${dateFormatted} • 🕒 ${timeStr}`;
+
+  ['step-datetime-summary-step2', 'step-datetime-summary-step3', 'step-datetime-summary-step4', 'step-datetime-summary-step5'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = badgeText;
+  });
+
+  const selectedTimeDisplay = document.getElementById('selected-time-highlight');
+  if (selectedTimeDisplay) {
+    selectedTimeDisplay.textContent = timeStr;
   }
 }
 
@@ -989,6 +1012,7 @@ function initDateTimeControls() {
     if (timeInput) timeInput.value = timeStr;
     state.time = timeStr;
     evaluateTimeRate(state.time, state.date);
+    updateStepDateTimeBadges();
     updateCalculation();
   }
 
@@ -1508,6 +1532,8 @@ function updateDateDisplay() {
       }
     }
   }
+
+  updateStepDateTimeBadges();
 }
 
 // ==========================================
