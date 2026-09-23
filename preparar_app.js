@@ -48,13 +48,26 @@ if (fs.existsSync(stringsXmlPath)) {
     console.log(` Nombre App: ${appName}`);
 }
 
-// 3. Configure Android App Icons (Mipmaps)
+// Generate safe padded icons if script exists
+const { execSync } = require('child_process');
+const psScript = path.join(__dirname, 'generar_iconos_padded.ps1');
+if (fs.existsSync(psScript)) {
+    try {
+        execSync(`powershell -ExecutionPolicy Bypass -File "${psScript}"`, { stdio: 'ignore' });
+    } catch(e){}
+}
+
+const iconChoferPadded = path.join(__dirname, 'icon_chofer_padded.png');
+const iconPasajeroPadded = path.join(__dirname, 'icon_pasajero_padded.png');
+
 let chosenIcon = null;
 if (mode === 'conductor') {
-    if (fs.existsSync(iconChoferPng)) chosenIcon = iconChoferPng;
+    if (fs.existsSync(iconChoferPadded)) chosenIcon = iconChoferPadded;
+    else if (fs.existsSync(iconChoferPng)) chosenIcon = iconChoferPng;
     else if (fs.existsSync(fileChoferUploaded)) chosenIcon = fileChoferUploaded;
 } else {
-    if (fs.existsSync(iconPasajeroPng)) chosenIcon = iconPasajeroPng;
+    if (fs.existsSync(iconPasajeroPadded)) chosenIcon = iconPasajeroPadded;
+    else if (fs.existsSync(iconPasajeroPng)) chosenIcon = iconPasajeroPng;
     else if (fs.existsSync(filePasajeroUploaded)) chosenIcon = filePasajeroUploaded;
     else chosenIcon = path.join(__dirname, 'icon-512.png');
 }

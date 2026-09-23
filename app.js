@@ -5165,7 +5165,13 @@ if (btnRequestInapp) {
 }
 
 if (closeInappTripBtn) {
-  closeInappTripBtn.addEventListener('click', closeInAppTripModal);
+  closeInappTripBtn.addEventListener('click', () => {
+    if (btnPassengerCancelTrip) {
+      btnPassengerCancelTrip.click();
+    } else {
+      closeInAppTripModal();
+    }
+  });
 }
 
 if (btnPassengerCancelTrip) {

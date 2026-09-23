@@ -1450,7 +1450,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const quickWidget = document.getElementById('driverOnlineQuickWidget');
-            if (quickWidget) quickWidget.style.display = 'flex';
+            if (quickWidget) quickWidget.style.display = 'none';
+
+            // Solicitar permisos de Notificaciones emergentes (Heads-up) al conectarse
+            if ('Notification' in window && Notification.permission === 'default') {
+                try { Notification.requestPermission(); } catch(e){}
+            }
         } else {
             btnToggleStatus.className = 'driver-status-toggle offline';
             headerStatusDot.className = 'status-indicator';
@@ -1756,6 +1761,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
         incomingTripModal.classList.add('active');
         startAlertLoop();
+
+        // 1. Notificación Emergente de Alta Prioridad (Heads-Up Alert por encima de otras apps)
+        if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+                const rawP = tripData.precioEstimado || tripData.precio || tripData.totalFare || tripData.monto || 0;
+                const fareStr = '$' + (Number(rawP)).toLocaleString('es-AR');
+                const origStr = tripData.origen || tripData.pickupAddress || tripData.origin || 'Origen';
+                const destStr = tripData.destino || tripData.dropoffAddress || tripData.destination || 'Destino';
+                const notif = new Notification(`🚖 ¡NUEVO VIAJE ENTRANTE! (${fareStr})`, {
+                    body: `📍 Origen: ${origStr}\n🏁 Destino: ${destStr}\n⚡ Toca aquí para abrir la app y aceptar el viaje.`,
+                    icon: 'icon_chofer.png',
+                    tag: 'incoming-trip-alert',
+                    requireInteraction: true,
+                    silent: false
+                });
+                notif.onclick = () => {
+                    try { window.focus(); } catch(e){}
+                    if (pipWindowInstance) { try { pipWindowInstance.focus(); } catch(e){} }
+                    notif.close();
+                };
+            } catch(e) {}
+        }
+
+        // 2. Patrón de Vibración Intensa para llamada entrante
+        if ('vibrate' in navigator) {
+            try { navigator.vibrate([600, 200, 600, 200, 1000]); } catch(e){}
+        }
+
+        // 3. Actualizar la Ventana Flotante (PiP) si está abierta fuera de la app
+        if (typeof renderPipWindowContent === 'function') {
+            try { renderPipWindowContent(); } catch(e){}
+        }
 
         // Iniciar cuenta regresiva de 15 segundos
         driverState.countdownSecs = 15;
