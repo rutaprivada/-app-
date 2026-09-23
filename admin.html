@@ -708,6 +708,27 @@
                 loadDriversData();
             });
 
+            let cloudDriversList = [];
+
+            function initFirestoreRealtimeSync() {
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                    try {
+                        const db = firebase.firestore();
+                        db.collection('drivers').onSnapshot((snapshot) => {
+                            cloudDriversList = [];
+                            snapshot.forEach(doc => {
+                                if (doc.exists) {
+                                    cloudDriversList.push(doc.data());
+                                }
+                            });
+                            loadDriversData();
+                        }, (err) => console.warn('Firestore admin listener warning:', err));
+                    } catch(e) {}
+                }
+            }
+
+            initFirestoreRealtimeSync();
+
             // 2. CARGA DE DATOS REALES DE CONDUCTORES EN TIEMPO REAL
             function loadDriversData() {
                 let activeDocs = null;
@@ -729,9 +750,34 @@
 
                 let drivers = [];
 
-                // 1. Incorporar el Conductor Real Activo si ya ha registrado datos o cargado documentos
-                if (activeDocs) {
-                    drivers.push({
+                // A. Incorporar conductores recibidos desde Firebase Cloud Firestore (Nube)
+                if (Array.isArray(cloudDriversList) && cloudDriversList.length > 0) {
+                    cloudDriversList.forEach(c => {
+                        drivers.push({
+                            id: c.id || ('drv_' + Math.random().toString(36).substr(2, 6)),
+                            nombre: c.nombre || 'Conductor Registrado',
+                            dni: c.dni || 'S/D',
+                            telefono: c.telefono || 'Sin teléfono',
+                            autoMarcaModelo: c.autoMarcaModelo || 'Vehículo',
+                            patente: c.patente || 'S/P',
+                            color: c.color || 'Negro',
+                            categoria: c.categoria || 'Sedán Ejecutivo / Premium',
+                            fotoPerfil: c.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                            estadoVerificacion: c.estadoVerificacion || 'pendiente',
+                            isOnline: !!c.isOnline,
+                            banco: c.banco || 'Mercado Pago / Banco Galicia',
+                            cbu: c.cbu || 'Sin registrar',
+                            titularCuenta: c.titularCuenta || c.nombre || 'Sin registrar',
+                            docsImages: c.docsImages || {},
+                            observaciones: c.observaciones || '',
+                            updatedAt: c.updatedAt || Date.now()
+                        });
+                    });
+                }
+
+                // B. Incorporar el Conductor Real Activo Local si ya ha registrado datos
+                if (activeDocs && !drivers.some(d => d.nombre === activeDocs.nombre || d.dni === activeDocs.dni)) {
+                    drivers.unshift({
                         id: 'drv_active_user',
                         nombre: activeDocs.nombre || 'Conductor Registrado',
                         dni: activeDocs.dni || 'S/D',
@@ -752,7 +798,7 @@
                     });
                 }
 
-                // 2. Agregar otros conductores almacenados
+                // C. Agregar otros conductores almacenados localmente
                 if (Array.isArray(storedDrivers) && storedDrivers.length > 0) {
                     storedDrivers.forEach(d => {
                         const driverName = d.nombre || d.name;

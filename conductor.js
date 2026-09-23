@@ -3415,7 +3415,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(updatedDocs));
+                window.dispatchEvent(new Event('storage'));
             } catch(e) {}
+
+            // Sincronizar en tiempo real con Firebase Cloud Firestore
+            if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                try {
+                    const db = firebase.firestore();
+                    const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '') || String(Date.now());
+                    const docId = 'drv_' + cleanDni;
+                    db.collection('drivers').doc(docId).set({
+                        id: docId,
+                        ...updatedDocs,
+                        isOnline: driverState.isOnline,
+                        timestamp: Date.now()
+                    }, { merge: true }).catch(err => console.warn('Firestore driver sync warn:', err));
+                } catch(e) {}
+            }
 
             try {
                 const driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
