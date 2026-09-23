@@ -3640,6 +3640,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+
+        if (window.RutaSync) {
+            window.RutaSync.on('ESTADO_CONDUCTOR_ACTUALIZADO', (data) => {
+                if (!data) return;
+                const localDocs = loadDocsData();
+                const cleanDniLocal = (localDocs.dni || '').replace(/\D/g, '');
+                const cleanDniIncoming = (data.dni || data.id || '').replace(/\D/g, '');
+                
+                // Si la actualización corresponde a este chofer o es global
+                if (!cleanDniIncoming || cleanDniIncoming === cleanDniLocal || data.id === 'driver_local' || data.id === ('drv_' + cleanDniLocal)) {
+                    const newStatus = data.estadoVerificacion || data.estado || 'aprobado';
+                    localDocs.estadoVerificacion = newStatus;
+                    if (data.observaciones) localDocs.observaciones = data.observaciones;
+                    
+                    try {
+                        localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
+                    } catch(e){}
+                    
+                    updateDocsStatusBanner(newStatus);
+                    
+                    if (newStatus === 'aprobado') {
+                        showDriverToast('🎉 ¡Tu documentación ha sido APROBADA por el Administrador!');
+                        try { playAlertSound('success'); } catch(e){}
+                    } else if (newStatus === 'rechazado') {
+                        showDriverToast('⚠️ Tu documentación tiene observaciones o fue rechazada por el Administrador.');
+                    }
+                }
+            });
+        }
     }
 
     initDocsUploadModule();

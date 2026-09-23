@@ -101,6 +101,26 @@ class RutaSyncManager {
                         }, (err) => {
                             console.warn('Firestore latest event listener warning:', err);
                         });
+
+                    // Escuchar colección de conductores y documentos para sync en tiempo real con Administración
+                    this.firestore.collection('drivers')
+                        .onSnapshot((snapshot) => {
+                            snapshot.docChanges().forEach((change) => {
+                                if (change.type === 'modified' || change.type === 'added') {
+                                    const data = change.doc.data();
+                                    if (data) {
+                                        this.handleIncoming({
+                                            id: 'drv_upd_' + change.doc.id + '_' + (data.actualizadoEn || Date.now()),
+                                            type: 'ESTADO_CONDUCTOR_ACTUALIZADO',
+                                            payload: data,
+                                            timestamp: Date.now()
+                                        });
+                                    }
+                                }
+                            });
+                        }, (err) => {
+                            console.warn('Firestore drivers collection listener warning:', err);
+                        });
                 } catch (err) {
                     console.warn('Firebase init error in sync.js:', err);
                 }
@@ -959,7 +979,30 @@ class RutaSyncManager {
             try { localStorage.removeItem(k); } catch (e) {}
         });
     }
+
+    guardarDocumentosConductor(docsData) {
+        if (!docsData) return;
+        try {
+            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(docsData));
+        } catch(e){}
+
+        const driverId = docsData.id || docsData.dni || docsData.telefono || 'driver_local';
+        const payload = {
+            ...docsData,
+            id: driverId,
+            actualizadoEn: Date.now()
+        };
+
+        if (this.firestore) {
+            try {
+                this.firestore.collection('drivers').doc(driverId).set(payload, { merge: true });
+            } catch(e){}
+        }
+
+        this.emit('DOCUMENTOS_CONDUCTOR_ACTUALIZADOS', payload);
+    }
 }
 
-// Instancia global
+// Instancia global (soportando ambas variantes de mayúsculas/minúsculas)
 window.RutaSync = new RutaSyncManager();
+window.rutaSync = window.RutaSync;

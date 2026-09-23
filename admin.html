@@ -647,6 +647,11 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="sync.js"></script>
 
+    <!-- Firebase SDKs & Realtime Sync -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="sync.js?v=55"></script>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const ADMIN_PIN_SECRET = '4824';
@@ -1113,14 +1118,17 @@
                     }
                 } catch(e) {}
 
-                // Emitir evento mediante sync.js
-                if (window.rutaSync) {
-                    window.rutaSync.emitEvent('ESTADO_CONDUCTOR_ACTUALIZADO', {
-                        driverId: activeReviewDriver.id,
+                // Emitir y sincronizar evento en tiempo real mediante sync.js y Cloud Firestore
+                if (window.RutaSync) {
+                    const driverPayload = {
+                        id: activeReviewDriver.id || ('drv_' + (activeReviewDriver.dni || '').replace(/\D/g, '')),
                         nombre: activeReviewDriver.nombre,
+                        dni: activeReviewDriver.dni,
                         estadoVerificacion: newStatus,
                         observaciones: revAdminNotes.value.trim()
-                    });
+                    };
+                    window.RutaSync.guardarDocumentosConductor(driverPayload);
+                    window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driverPayload);
                 }
 
                 docReviewModalOverlay.classList.remove('active');
