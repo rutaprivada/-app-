@@ -386,15 +386,20 @@
             </div>
 
             <div class="profile-card" style="margin-top: 10px; margin-bottom: 14px;">
-                <div class="profile-card-top">
-                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" alt="Conductor" class="profile-avatar-large" id="profileAvatarLarge">
-                    <div>
-                        <h3 id="profileFullName">Daniel Pabon</h3>
-                        <p class="profile-role">Chofer Ejecutivo Certificado</p>
-                        <div class="driver-rating" style="margin-top: 4px;">
-                            <i class="fa-solid fa-star text-gold"></i> <strong id="profileRatingNum">4.98</strong> (142 reseñas de 5 estrellas)
+                <div class="profile-card-top" style="flex-wrap: wrap; gap: 12px; align-items: center;">
+                    <div style="display: flex; gap: 14px; align-items: center; width: 100%;">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" alt="Conductor" class="profile-avatar-large" id="profileAvatarLarge">
+                        <div style="flex: 1;">
+                            <h3 id="profileFullName">Daniel Pabon</h3>
+                            <p class="profile-role">Chofer Ejecutivo Certificado</p>
+                            <div class="driver-rating" style="margin-top: 4px;">
+                                <i class="fa-solid fa-star text-gold"></i> <strong id="profileRatingNum">4.98</strong> (142 reseñas de 5 estrellas)
+                            </div>
                         </div>
                     </div>
+                    <button type="button" class="btn-upload-docs-top" id="btnOpenDocsUpload" style="width: 100%; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #fff; border: none; border-radius: 10px; padding: 11px 14px; font-size: 0.88rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4); margin-top: 4px;">
+                        <i class="fa-solid fa-id-card"></i> Cargar / Editar Datos y Documentación
+                    </button>
                 </div>
 
                 <div class="profile-info-grid">
@@ -404,7 +409,7 @@
                     </div>
                     <div class="profile-info-item">
                         <span class="info-lbl">Categoría</span>
-                        <strong class="info-val">Sedán Ejecutivo / Premium</strong>
+                        <strong class="info-val" id="profileCategoryVal">Sedán Ejecutivo / Premium</strong>
                     </div>
                     <div class="profile-info-item">
                         <span class="info-lbl">Teléfono de Contacto</span>
@@ -416,7 +421,7 @@
                     </div>
                     <div class="profile-info-item" style="grid-column: 1 / -1;">
                         <span class="info-lbl">Estado de Cuenta</span>
-                        <strong class="info-val text-emerald"><i class="fa-solid fa-circle-check"></i> Activo & Verificado para Traslados</strong>
+                        <strong class="info-val text-emerald" id="profileStatusVal"><i class="fa-solid fa-circle-check"></i> Activo & Verificado para Traslados</strong>
                     </div>
                 </div>
             </div>
@@ -432,22 +437,166 @@
                     </div>
                     <i class="fa-solid fa-chevron-right"></i>
                 </a>
-
-                <button type="button" class="profile-link-item" id="btnTestSound">
-                    <div class="link-left">
-                        <i class="fa-solid fa-volume-high text-emerald"></i>
-                        <div>
-                            <strong>Probar Alerta Sonora</strong>
-                            <p>Verificar que el audio de viaje entrante suene fuerte</p>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-play"></i>
-                </button>
             </div>
 
             <button type="button" class="btn-cancel-trip full-width" id="btnCerrarPerfilSheet" style="width: 100%; border-radius: 12px; justify-content: center; padding: 12px; font-size: 0.95rem;">
                 Cerrar Perfil
             </button>
+        </div>
+    </div>
+
+    <!-- MODAL: CARGA Y VERIFICACIÓN DE DOCUMENTOS / VEHÍCULO -->
+    <div class="driver-modal-overlay" id="modalDocsUpload" style="z-index: 10005;">
+        <div class="driver-modal-sheet" style="max-height: 92vh; overflow-y: auto; max-width: 540px; margin: 0 auto; padding: 20px;">
+            <div class="modal-sheet-header" style="display:flex; justify-space-between; align-items:center; margin-bottom:16px;">
+                <h3 style="font-size: 1.1rem; color: #fff; font-weight: 700;">
+                    <i class="fa-solid fa-file-shield text-gold"></i> Documentación & Vehículo Partner
+                </h3>
+                <button type="button" class="btn-close-modal" id="btnCloseDocsUpload" style="background:none; border:none; color:#94a3b8; font-size:1.4rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <!-- Banner Estado de Verificación -->
+            <div class="docs-status-banner" id="docsStatusBanner" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; display: flex; align-items: center; gap: 12px;">
+                <i class="fa-solid fa-circle-check text-emerald" id="docsStatusIcon" style="font-size: 1.4rem;"></i>
+                <div>
+                    <strong style="color: #fff; font-size: 0.9rem;" id="docsStatusTitle">Documentación Aprobada & Verificada</strong>
+                    <p style="color: #94a3b8; font-size: 0.78rem; margin: 0;" id="docsStatusDesc">Cuenta activa para recibir traslados inmediatos y reservas en la plataforma.</p>
+                </div>
+            </div>
+
+            <form id="formDocsUpload" style="display:flex; flex-direction:column; gap:16px;">
+                <!-- SECCIÓN 1: DATOS DEL CONDUCTOR -->
+                <div class="docs-section-card" style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px;">
+                    <h4 style="color: #fbbf24; font-size: 0.88rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-user"></i> Datos Personales del Chofer
+                    </h4>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div>
+                            <label style="font-size: 0.75rem; color: #94a3b8;">Nombre y Apellido Completo</label>
+                            <input type="text" id="docInputDriverName" class="driver-form-input" placeholder="Ej. Daniel Pabon" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="font-size: 0.75rem; color: #94a3b8;">N° de DNI / Documento</label>
+                                <input type="text" id="docInputDniNum" class="driver-form-input" placeholder="38.452.910" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.75rem; color: #94a3b8;">Teléfono de Contacto</label>
+                                <input type="tel" id="docInputPhone" class="driver-form-input" placeholder="+54 9 11 2255-8226" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 2: DATOS DEL VEHÍCULO -->
+                <div class="docs-section-card" style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px;">
+                    <h4 style="color: #fbbf24; font-size: 0.88rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-car"></i> Datos del Vehículo Asignado
+                    </h4>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="font-size: 0.75rem; color: #94a3b8;">Marca y Modelo</label>
+                                <input type="text" id="docInputVehicleModel" class="driver-form-input" placeholder="Ej. Fiat Cronos" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.75rem; color: #94a3b8;">Patente / Dominio</label>
+                                <input type="text" id="docInputPlate" class="driver-form-input" placeholder="Ej. AE927CN" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="font-size: 0.75rem; color: #94a3b8;">Color del Vehículo</label>
+                                <input type="text" id="docInputColor" class="driver-form-input" placeholder="Ej. Negro" style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.75rem; color: #94a3b8;">Categoría</label>
+                                <select id="docSelectCategory" class="driver-form-input" style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                                    <option value="Sedán Ejecutivo / Premium">Sedán Ejecutivo / Premium</option>
+                                    <option value="Sedán Standard">Sedán Standard</option>
+                                    <option value="SUV Ejecutivo">SUV Ejecutivo</option>
+                                    <option value="Minivan Flota">Minivan Flota</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 3: SUBIDA DE DOCUMENTOS REQUERIDOS -->
+                <div class="docs-section-card" style="background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px;">
+                    <h4 style="color: #fbbf24; font-size: 0.88rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-folder-open"></i> Documentación Obligatoria Requerida
+                    </h4>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <!-- 1. DNI -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">1. Documento Nacional de Identidad (DNI)</span>
+                                <span class="doc-badge" id="badgeDni" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(16,185,129,0.2); color:#34d399;">Cargado ✓</span>
+                            </div>
+                            <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileDni" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                        </div>
+
+                        <!-- 2. Licencia de conducir -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">2. Licencia de Conducir (Vigente)</span>
+                                <span class="doc-badge" id="badgeLicencia" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(16,185,129,0.2); color:#34d399;">Cargado ✓</span>
+                            </div>
+                            <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileLicencia" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                        </div>
+
+                        <!-- 3. Seguro del auto -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">3. Seguro del Auto (Póliza al día)</span>
+                                <span class="doc-badge" id="badgeSeguro" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(16,185,129,0.2); color:#34d399;">Cargado ✓</span>
+                            </div>
+                            <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileSeguro" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                        </div>
+
+                        <!-- 4. Cédula verde o azul -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">4. Cédula Verde o Azul del Vehículo</span>
+                                <span class="doc-badge" id="badgeCedula" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(16,185,129,0.2); color:#34d399;">Cargado ✓</span>
+                            </div>
+                            <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileCedula" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                        </div>
+
+                        <!-- 5. Antecedentes penales -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">5. Certificado de Antecedentes Penales</span>
+                                <span class="doc-badge" id="badgeAntecedentes" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(16,185,129,0.2); color:#34d399;">Cargado ✓</span>
+                            </div>
+                            <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileAntecedentes" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                        </div>
+
+                        <!-- 6. Foto de Perfil -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">6. Foto de Perfil Clara y Reciente</span>
+                                <span class="doc-badge" id="badgeFotoPerfil" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(16,185,129,0.2); color:#34d399;">Cargado ✓</span>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px;">
+                                <img id="previewFotoPerfil" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1px solid #fbbf24;">
+                                <input type="file" accept="image/*" class="doc-file-input" id="fileFotoPerfil" style="flex:1; font-size:0.75rem; color:#94a3b8;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 4px;">
+                    <button type="submit" class="btn-primary" style="width:100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color:#fff; border:none; padding:12px; border-radius:10px; font-weight:700; cursor:pointer; display:flex; justify-content:center; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Guardar y Enviar Documentación
+                    </button>
+                    <button type="button" id="btnSimulateApproval" style="width:100%; background: rgba(59, 130, 246, 0.15); border: 1px dashed rgba(59, 130, 246, 0.5); color:#60a5fa; padding:10px; border-radius:10px; font-size:0.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                        <i class="fa-solid fa-user-check"></i> Simular Validación & Aprobar Perfil (Demo)
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

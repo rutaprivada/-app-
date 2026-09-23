@@ -166,9 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const tripsListTitle = document.getElementById('tripsListTitle');
     const tripsHistoryContainer = document.getElementById('tripsHistoryContainer');
 
-    // Elementos de Perfil / Utilidades
-    const btnTestSound = document.getElementById('btnTestSound');
-
     // Elementos de Chat In-App con Pasajero
     const btnDriverChatPassenger = document.getElementById('btnDriverChatPassenger');
     const driverChatUnreadDot = document.getElementById('driverChatUnreadDot');
@@ -294,13 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 driverState.audioContext.suspend().catch(() => {});
             }
         } catch (e) {}
-    }
-
-    if (btnTestSound) {
-        btnTestSound.addEventListener('click', () => {
-            playAlertSound('success');
-            alert('¡Alerta de audio verificada correctamente!');
-        });
     }
 
     // ==========================================
@@ -870,6 +860,40 @@ document.addEventListener('DOMContentLoaded', () => {
         return { permitido: true };
     }
 
+    function tieneReservaProxima30Min() {
+        try {
+            const allBookings = getStoredBookings();
+            const validBookings = allBookings.filter(isReservaValidaHojaDeRuta);
+            const tomadas = validBookings.filter(b => {
+                const status = String(b.status || b.estado || '').toLowerCase();
+                return (status === 'aceptada' || b.driverAssigned === driverState.info.nombre) && status !== 'completado' && status !== 'cancelado';
+            });
+
+            const now = new Date();
+            for (const item of tomadas) {
+                const dateStr = item.date || item.pickupDate;
+                const timeStr = item.time || item.pickupTime || '00:00';
+                const scheduled = getReservationScheduledDate(dateStr, timeStr);
+                if (scheduled) {
+                    const diffMs = scheduled.getTime() - now.getTime();
+                    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+                    // Si faltan 30 minutos o menos para que inicie la reserva (o hasta 120 min de tolerancia)
+                    if (diffMinutes <= 30 && diffMinutes >= -120) {
+                        return {
+                            tieneProxima: true,
+                            item,
+                            horaStr: timeStr,
+                            dateStr: dateStr || 'Hoy',
+                            minutosRestantes: Math.max(0, diffMinutes),
+                            cliente: item.clientName || item.customerName || item.nombrePasajero || 'Cliente'
+                        };
+                    }
+                }
+            }
+        } catch(e) {}
+        return { tieneProxima: false };
+    }
+
     function renderReservas() {
         const allBookings = getStoredBookings();
         const filter = driverState.reservaFilter;
@@ -992,9 +1016,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             <button type="button" class="btn-tomar-reserva btn-iniciar-reserva" data-id="${b.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;">
                                 <i class="fa-solid fa-play"></i> Iniciar Traslado en Vivo
                             </button>
-                            <button type="button" class="btn-cancelar-reserva btn-cancelar-reserva-action" data-id="${b.id}" title="Liberar reserva y devolver a disponibles">
-                                <i class="fa-solid fa-xmark"></i> Cancelar Reserva
-                            </button>
+                            ${(status === 'en_curso' || (driverState.activeTrip && driverState.activeTrip.reservaId === b.id)) ? `
+                                <span style="font-size: 0.8rem; color: #10b981; font-weight: 700; background: rgba(16,185,129,0.15); padding: 8px 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-lock text-gold"></i> Viaje Iniciado (No cancelable)
+                                </span>
+                            ` : `
+                                <button type="button" class="btn-cancelar-reserva btn-cancelar-reserva-action" data-id="${b.id}" title="Liberar reserva y devolver a disponibles">
+                                    <i class="fa-solid fa-xmark"></i> Cancelar Reserva
+                                </button>
+                            `}
                         ` : `
                             <button type="button" class="btn-tomar-reserva btn-aceptar-reserva-action" data-id="${b.id}">
                                 <i class="fa-solid fa-check"></i> Aceptar & Agendar Reserva
@@ -1016,7 +1046,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Listeners para Iniciar Traslado (con validación de 30 min)
+        // Listeners para Iniciar Traslado (con validación de 30 min y viaje en curso)
         document.querySelectorAll('.btn-iniciar-reserva').forEach(btn => {
             btn.addEventListener('click', () => {
                 const resId = btn.getAttribute('data-id');
@@ -1050,6 +1080,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function aceptarReservaProgramada(resId) {
+        // Regla: No aceptar ninguna reserva si se tiene un viaje en curso
+        if (driverState.activeTrip) {
+            alert('⚠️ TIENES UN VIAJE EN CURSO\n\nDebes completar el viaje actual antes de aceptar o agendar una reserva.');
+            return;
+        }
+
         const bookings = getStoredBookings();
         const item = bookings.find(b => b.id === resId);
         if (!item) return;
@@ -1087,6 +1123,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const item = bookings.find(b => b.id === resId);
         if (!item) return;
 
+        // Regla: No se puede cancelar una reserva iniciada
+        const status = String(item.status || item.estado || '').toLowerCase();
+        if (status === 'en_curso' || (driverState.activeTrip && driverState.activeTrip.reservaId === resId)) {
+            alert('❌ NO SE PUEDE CANCELAR\n\nEsta reserva ya fue iniciada y está en curso. Los traslados iniciados deben completarse.');
+            return;
+        }
+
         const passName = item.clientName || item.customerName || item.nombrePasajero || 'el pasajero';
         const horaStr = item.time || item.pickupTime || '00:00';
         const fechaStr = item.date || item.pickupDate || 'Hoy';
@@ -1121,6 +1164,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function iniciarViajeDesdeReserva(resId) {
+        // Regla 1: No permitir iniciar una reserva si se tiene un viaje en curso
+        if (driverState.activeTrip) {
+            alert('⚠️ TIENES UN VIAJE EN CURSO\n\nDebes completar el viaje actual antes de iniciar una reserva o tomar otro traslado.');
+            return;
+        }
+
         const bookings = getStoredBookings();
         const item = bookings.find(b => b.id === resId);
         if (!item) return;
@@ -1516,6 +1565,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function acceptSelectedTrip(trip) {
+        // Regla 1: No se puede aceptar ningún viaje si se tiene un viaje en curso
+        if (driverState.activeTrip) {
+            alert('⚠️ TIENES UN VIAJE EN CURSO\n\nDebes completar el viaje actual antes de aceptar un nuevo traslado.');
+            return;
+        }
+
+        // Regla 2: No se puede aceptar ningún viaje si se tiene una reserva y faltan 30 minutos o menos para que inicie
+        const checkReserva = tieneReservaProxima30Min();
+        if (checkReserva.tieneProxima) {
+            alert(
+                `⏰ RESERVA PRÓXIMA PROGRAMADA (A LAS ${checkReserva.horaStr} HS)\n\n` +
+                `Tienes una reserva agendada para ${checkReserva.cliente} en ${checkReserva.minutosRestantes} minutos (${checkReserva.horaStr} hs).\n\n` +
+                `Por política de puntualidad de RutaPrivada, no puedes aceptar traslados inmediatos dentro de los 30 minutos previos al inicio de una reserva.`
+            );
+            return;
+        }
+
         stopAlertLoop();
         driverState.availableTrips = [];
         closeIncomingModal();
@@ -1580,6 +1646,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const tripPrice = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)))
             ? Number(rawPrice)
             : 0;
+
+        // Notificación flotante de sistema por encima de otras aplicaciones si está en background o pantalla de inicio
+        if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+                const notif = new Notification(`🚨 NUEVA SOLICITUD DE VIAJE - $${tripPrice.toLocaleString('es-AR')}`, {
+                    body: `📍 ${tripData.origen || tripData.pickupAddress || 'Origen'} ➔ 🏁 ${tripData.destino || tripData.dropoffAddress || 'Destino'}`,
+                    icon: 'icon-192.png',
+                    tag: 'incoming-trip-system-alert',
+                    renotify: true,
+                    requireInteraction: true
+                });
+                notif.onclick = () => {
+                    window.focus();
+                    notif.close();
+                };
+            } catch(e) {}
+        }
+
+        if (navigator.vibrate) {
+            try { navigator.vibrate([400, 200, 400]); } catch(e) {}
+        }
 
         incomingPrice.textContent = '$' + tripPrice.toLocaleString('es-AR');
         incomingCategory.textContent = tripData.categoria || tripData.category || 'Sedán Ejecutivo';
@@ -2666,6 +2753,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     btnCancelActiveTrip.addEventListener('click', () => {
+        // Regla: No se puede cancelar una reserva iniciada
+        if (driverState.activeTrip && driverState.activeTrip.reservaId) {
+            alert('❌ NO SE PUEDE CANCELAR\n\nEsta reserva ya fue iniciada y el traslado está en curso. Por política de servicio de RutaPrivada, las reservas iniciadas no se pueden cancelar.');
+            return;
+        }
+
         const warningMsg = '⚠️ ADVERTENCIA DE CANCELACIÓN:\n\nAl cancelar este viaje, el servicio volverá a quedar disponible para que otro conductor de la flota lo acepte de inmediato.\n\n¿Estás seguro de que deseas cancelar el viaje?';
         if (confirm(warningMsg)) {
             stopDriverGpsTracking();
@@ -3025,21 +3118,239 @@ document.addEventListener('DOMContentLoaded', () => {
     // 13. INICIALIZACIÓN Y RESTAURACIÓN DE ESTADO
     // ==========================================
     function renderDriverProfileInfo() {
+        let docs = null;
+        try {
+            const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
+            if (raw) docs = JSON.parse(raw);
+        } catch(e) {}
+
         const info = driverState.info;
+        const driverName = docs ? docs.nombre : info.nombre;
+        const vehicleStr = docs ? `${docs.autoMarcaModelo} ${docs.color ? '(' + docs.color + ')' : ''}` : info.auto;
+        const plateStr = docs ? docs.patente : info.patente;
+        const phoneStr = docs ? docs.telefono : info.telefono;
+        const photoStr = (docs && docs.fotoPerfil) ? docs.fotoPerfil : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+        const categoryStr = docs ? docs.categoria : 'Sedán Ejecutivo / Premium';
+        const statusState = docs ? docs.estadoVerificacion : 'aprobado';
+
         const nameEl = document.getElementById('driverName');
         const badgeEl = document.getElementById('driverCarBadge');
         const fullNameEl = document.getElementById('profileFullName');
         const vehicleValEl = document.getElementById('profileVehicleVal');
         const phoneValEl = document.getElementById('profilePhoneVal');
         const ratingNumEl = document.getElementById('profileRatingNum');
+        const avatarLargeEl = document.getElementById('profileAvatarLarge');
+        const categoryValEl = document.getElementById('profileCategoryVal');
+        const statusValEl = document.getElementById('profileStatusVal');
 
-        if (nameEl) nameEl.textContent = info.nombre;
-        if (badgeEl) badgeEl.textContent = `${info.auto} · ${info.patente}`;
-        if (fullNameEl) fullNameEl.textContent = info.nombre;
-        if (vehicleValEl) vehicleValEl.textContent = `${info.auto} (Patente: ${info.patente})`;
-        if (phoneValEl) phoneValEl.textContent = info.telefono;
+        if (nameEl) nameEl.textContent = driverName;
+        if (badgeEl) badgeEl.textContent = `${vehicleStr} · ${plateStr}`;
+        if (fullNameEl) fullNameEl.textContent = driverName;
+        if (vehicleValEl) vehicleValEl.textContent = `${vehicleStr} (Patente: ${plateStr})`;
+        if (phoneValEl) phoneValEl.textContent = phoneStr;
         if (ratingNumEl) ratingNumEl.textContent = info.calificacion || '4.98';
+        if (categoryValEl) categoryValEl.textContent = categoryStr;
+
+        if (avatarLargeEl) avatarLargeEl.src = photoStr;
+
+        document.querySelectorAll('.header-profile-avatar img, .profile-avatar-small').forEach(img => {
+            img.src = photoStr;
+        });
+
+        if (statusValEl) {
+            if (statusState === 'aprobado') {
+                statusValEl.className = 'info-val text-emerald';
+                statusValEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Activo & Verificado para Traslados';
+            } else {
+                statusValEl.className = 'info-val text-gold';
+                statusValEl.innerHTML = '<i class="fa-solid fa-clock"></i> Pendiente de Verificación de Documentación';
+            }
+        }
     }
+
+    function initDocsUploadModule() {
+        const btnOpenDocsUpload = document.getElementById('btnOpenDocsUpload');
+        const modalDocsUpload = document.getElementById('modalDocsUpload');
+        const btnCloseDocsUpload = document.getElementById('btnCloseDocsUpload');
+        const formDocsUpload = document.getElementById('formDocsUpload');
+        const btnSimulateApproval = document.getElementById('btnSimulateApproval');
+
+        const docInputDriverName = document.getElementById('docInputDriverName');
+        const docInputDniNum = document.getElementById('docInputDniNum');
+        const docInputPhone = document.getElementById('docInputPhone');
+        const docInputVehicleModel = document.getElementById('docInputVehicleModel');
+        const docInputPlate = document.getElementById('docInputPlate');
+        const docInputColor = document.getElementById('docInputColor');
+        const docSelectCategory = document.getElementById('docSelectCategory');
+
+        const fileFotoPerfil = document.getElementById('fileFotoPerfil');
+        const previewFotoPerfil = document.getElementById('previewFotoPerfil');
+
+        function loadDocsData() {
+            try {
+                const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
+                if (raw) {
+                    return JSON.parse(raw);
+                }
+            } catch(e) {}
+            return {
+                nombre: driverState.info.nombre || 'Daniel Pabon',
+                dni: '38.452.910',
+                telefono: driverState.info.telefono || '+54 9 11 2255-8226',
+                autoMarcaModelo: driverState.info.auto ? driverState.info.auto.replace(/\s*·.*$/, '') : 'Fiat Cronos',
+                patente: driverState.info.patente || 'AE927CN',
+                color: 'Negro',
+                categoria: 'Sedán Ejecutivo / Premium',
+                fotoPerfil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                estadoVerificacion: 'aprobado'
+            };
+        }
+
+        function populateDocsForm() {
+            const data = loadDocsData();
+            if (docInputDriverName) docInputDriverName.value = data.nombre || '';
+            if (docInputDniNum) docInputDniNum.value = data.dni || '';
+            if (docInputPhone) docInputPhone.value = data.telefono || '';
+            if (docInputVehicleModel) docInputVehicleModel.value = data.autoMarcaModelo || '';
+            if (docInputPlate) docInputPlate.value = data.patente || '';
+            if (docInputColor) docInputColor.value = data.color || 'Negro';
+            if (docSelectCategory) docSelectCategory.value = data.categoria || 'Sedán Ejecutivo / Premium';
+            if (previewFotoPerfil && data.fotoPerfil) previewFotoPerfil.src = data.fotoPerfil;
+
+            updateDocsStatusBanner(data.estadoVerificacion || 'aprobado');
+        }
+
+        function updateDocsStatusBanner(status) {
+            const docsStatusBanner = document.getElementById('docsStatusBanner');
+            const docsStatusIcon = document.getElementById('docsStatusIcon');
+            const docsStatusTitle = document.getElementById('docsStatusTitle');
+            const docsStatusDesc = document.getElementById('docsStatusDesc');
+
+            if (!docsStatusBanner) return;
+
+            if (status === 'aprobado') {
+                docsStatusBanner.style.background = 'rgba(16, 185, 129, 0.12)';
+                docsStatusBanner.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-circle-check text-emerald';
+                if (docsStatusTitle) docsStatusTitle.textContent = 'Documentación Aprobada & Verificada';
+                if (docsStatusDesc) docsStatusDesc.textContent = 'Tu cuenta y vehículo están activos y aprobados para operar en RutaPrivada.';
+            } else if (status === 'pendiente') {
+                docsStatusBanner.style.background = 'rgba(245, 158, 11, 0.12)';
+                docsStatusBanner.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+                if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-clock text-gold';
+                if (docsStatusTitle) docsStatusTitle.textContent = 'Pendiente de Validación por Administración';
+                if (docsStatusDesc) docsStatusDesc.textContent = 'Los documentos subidos se encuentran en proceso de revisión por el equipo técnico.';
+            }
+        }
+
+        if (btnOpenDocsUpload) {
+            btnOpenDocsUpload.addEventListener('click', () => {
+                populateDocsForm();
+                if (modalDocsUpload) modalDocsUpload.classList.add('active');
+            });
+        }
+
+        if (btnCloseDocsUpload) {
+            btnCloseDocsUpload.addEventListener('click', () => {
+                if (modalDocsUpload) modalDocsUpload.classList.remove('active');
+            });
+        }
+
+        if (fileFotoPerfil && previewFotoPerfil) {
+            fileFotoPerfil.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        previewFotoPerfil.src = evt.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        ['fileDni', 'fileLicencia', 'fileSeguro', 'fileCedula', 'fileAntecedentes'].forEach((id, idx) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('change', () => {
+                    const badgeId = ['badgeDni', 'badgeLicencia', 'badgeSeguro', 'badgeCedula', 'badgeAntecedentes'][idx];
+                    const badge = document.getElementById(badgeId);
+                    if (badge && el.files && el.files.length > 0) {
+                        badge.textContent = 'Seleccionado ✓';
+                        badge.style.background = 'rgba(56, 189, 248, 0.2)';
+                        badge.style.color = '#38bdf8';
+                    }
+                });
+            }
+        });
+
+        function saveDocsData(status = 'pendiente') {
+            const current = loadDocsData();
+            const photoSrc = previewFotoPerfil ? previewFotoPerfil.src : current.fotoPerfil;
+
+            const updatedDocs = {
+                nombre: docInputDriverName ? docInputDriverName.value.trim() : current.nombre,
+                dni: docInputDniNum ? docInputDniNum.value.trim() : current.dni,
+                telefono: docInputPhone ? docInputPhone.value.trim() : current.telefono,
+                autoMarcaModelo: docInputVehicleModel ? docInputVehicleModel.value.trim() : current.autoMarcaModelo,
+                patente: docInputPlate ? docInputPlate.value.trim() : current.patente,
+                color: docInputColor ? docInputColor.value.trim() : current.color,
+                categoria: docSelectCategory ? docSelectCategory.value : current.categoria,
+                fotoPerfil: photoSrc,
+                estadoVerificacion: status,
+                updatedAt: Date.now()
+            };
+
+            try {
+                localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(updatedDocs));
+            } catch(e) {}
+
+            try {
+                const driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+                if (driversList.length > 0) {
+                    driversList[0].name = updatedDocs.nombre;
+                    driversList[0].vehicle = `${updatedDocs.autoMarcaModelo} ${updatedDocs.color}`;
+                    driversList[0].plate = updatedDocs.patente;
+                    driversList[0].phone = updatedDocs.telefono.replace(/\D/g, '');
+                    localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
+                }
+            } catch(e) {}
+
+            driverState.info.nombre = updatedDocs.nombre;
+            driverState.info.auto = `${updatedDocs.autoMarcaModelo} ${updatedDocs.color}`;
+            driverState.info.patente = updatedDocs.patente;
+            driverState.info.telefono = updatedDocs.telefono;
+
+            renderDriverProfileInfo();
+            return updatedDocs;
+        }
+
+        if (formDocsUpload) {
+            formDocsUpload.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const saved = saveDocsData('pendiente');
+                updateDocsStatusBanner('pendiente');
+                showDriverToast('📄 Documentación enviada a revisión.');
+                alert('✓ Documentación guardada correctamente.\n\nLos archivos y datos del vehículo han sido enviados para su verificación.');
+            });
+        }
+
+        if (btnSimulateApproval) {
+            btnSimulateApproval.addEventListener('click', () => {
+                const saved = saveDocsData('aprobado');
+                updateDocsStatusBanner('aprobado');
+                if (modalDocsUpload) modalDocsUpload.classList.remove('active');
+                showDriverToast('✅ Perfil y vehículos aprobados');
+                alert(
+                    `✅ ¡DOCUMENTACIÓN Y VEHÍCULO APROBADOS!\n\n` +
+                    `Se han verificado los 6 documentos requeridos (DNI, Licencia, Seguro, Cédula, Antecedentes, Foto).\n\n` +
+                    `Tu perfil se ha actualizado automáticamente con los datos de ${saved.nombre} y el vehículo ${saved.autoMarcaModelo} (${saved.patente}).`
+                );
+            });
+        }
+    }
+
+    initDocsUploadModule();
 
     // Modal de Perfil Partner del Chofer (accesible desde la cabecera)
     const btnOpenDriverProfile = document.getElementById('btnOpenDriverProfile');
