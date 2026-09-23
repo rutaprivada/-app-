@@ -959,22 +959,27 @@
 
                 revAdminNotes.value = driver.observaciones || '';
 
-                // Generar los 7 documentos requeridos para revisión
+                // Extraer imágenes reales cargadas por el conductor
+                const userImgs = driver.docsImages || {};
+
+                // Generar los 6 documentos de revisión (se quita foto de CBU)
                 const docItems = [
-                    { title: '1. Documento Nacional de Identidad (DNI)', key: 'dni', img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80' },
-                    { title: '2. Licencia de Conducir (Vigente)', key: 'licencia', img: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80' },
-                    { title: '3. Póliza de Seguro del Vehículo', key: 'seguro', img: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=400&q=80' },
-                    { title: '4. Cédula Verde / Azul del Auto', key: 'cedula', img: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80' },
-                    { title: '5. Certificado de Antecedentes Penales', key: 'antecedentes', img: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=400&q=80' },
-                    { title: '6. Foto de Perfil Clara y Reciente', key: 'foto', img: driver.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80' },
-                    { title: '7. Comprobante de CBU / Cuenta Bancaria', key: 'comprobanteBanco', img: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=400&q=80' }
+                    { title: '1. Documento Nacional de Identidad (DNI)', key: 'dni', img: userImgs.dni || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80', isReal: !!userImgs.dni },
+                    { title: '2. Licencia de Conducir (Vigente)', key: 'licencia', img: userImgs.licencia || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80', isReal: !!userImgs.licencia },
+                    { title: '3. Póliza de Seguro del Vehículo', key: 'seguro', img: userImgs.seguro || 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=400&q=80', isReal: !!userImgs.seguro },
+                    { title: '4. Cédula Verde / Azul del Auto', key: 'cedula', img: userImgs.cedula || 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80', isReal: !!userImgs.cedula },
+                    { title: '5. Certificado de Antecedentes Penales', key: 'antecedentes', img: userImgs.antecedentes || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=400&q=80', isReal: !!userImgs.antecedentes },
+                    { title: '6. Foto de Perfil Clara y Reciente', key: 'foto', img: userImgs.foto || driver.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80', isReal: !!(userImgs.foto || driver.fotoPerfil) }
                 ];
 
                 docsReviewGrid.innerHTML = docItems.map(item => `
                     <div class="doc-review-card">
                         <div>
-                            <strong style="font-size: 0.8rem; color: #e2e8f0; display: block;">${item.title}</strong>
-                            <img src="${item.img}" class="doc-preview-img zoomable-doc-img" title="Clic para ampliar">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong style="font-size: 0.8rem; color: #e2e8f0;">${item.title}</strong>
+                                ${item.isReal ? '<span style="font-size: 0.65rem; background: rgba(16,185,129,0.2); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✓ Archivo Subido</span>' : '<span style="font-size: 0.65rem; background: rgba(245,158,11,0.2); color: #fbbf24; padding: 2px 6px; border-radius: 4px;">Demostración</span>'}
+                            </div>
+                            <img src="${item.img}" class="doc-preview-img zoomable-doc-img" title="Clic para ampliar documento">
                         </div>
                         <div style="display: flex; gap: 8px; margin-top: 6px;">
                             <button class="admin-btn btn-doc-approve" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">

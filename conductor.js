@@ -3338,6 +3338,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        const loadedDocsImages = (loadDocsData() && loadDocsData().docsImages) || {};
+
         if (fileFotoPerfil && previewFotoPerfil) {
             fileFotoPerfil.addEventListener('change', (e) => {
                 const file = e.target.files[0];
@@ -3345,22 +3347,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     const reader = new FileReader();
                     reader.onload = function(evt) {
                         previewFotoPerfil.src = evt.target.result;
+                        loadedDocsImages.foto = evt.target.result;
                     };
                     reader.readAsDataURL(file);
                 }
             });
         }
 
-        ['fileDni', 'fileLicencia', 'fileSeguro', 'fileCedula', 'fileAntecedentes', 'fileComprobanteBanco'].forEach((id, idx) => {
-            const el = document.getElementById(id);
+        const docInputsConfig = [
+            { id: 'fileDni', key: 'dni', badgeId: 'badgeDni' },
+            { id: 'fileLicencia', key: 'licencia', badgeId: 'badgeLicencia' },
+            { id: 'fileSeguro', key: 'seguro', badgeId: 'badgeSeguro' },
+            { id: 'fileCedula', key: 'cedula', badgeId: 'badgeCedula' },
+            { id: 'fileAntecedentes', key: 'antecedentes', badgeId: 'badgeAntecedentes' }
+        ];
+
+        docInputsConfig.forEach(item => {
+            const el = document.getElementById(item.id);
             if (el) {
-                el.addEventListener('change', () => {
-                    const badgeId = ['badgeDni', 'badgeLicencia', 'badgeSeguro', 'badgeCedula', 'badgeAntecedentes', 'badgeComprobanteBanco'][idx];
-                    const badge = document.getElementById(badgeId);
-                    if (badge && el.files && el.files.length > 0) {
-                        badge.textContent = 'Seleccionado ✓';
-                        badge.style.background = 'rgba(56, 189, 248, 0.2)';
-                        badge.style.color = '#38bdf8';
+                el.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function(evt) {
+                            loadedDocsImages[item.key] = evt.target.result;
+                            const badge = document.getElementById(item.badgeId);
+                            if (badge) {
+                                badge.textContent = 'Cargado ✓';
+                                badge.style.background = 'rgba(16, 185, 129, 0.2)';
+                                badge.style.color = '#34d399';
+                            }
+                        };
+                        reader.readAsDataURL(file);
                     }
                 });
             }
@@ -3382,6 +3400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 banco: docInputBankName ? docInputBankName.value.trim() : current.banco,
                 cbu: docInputCbu ? docInputCbu.value.trim() : current.cbu,
                 titularCuenta: docInputBankHolder ? docInputBankHolder.value.trim() : current.titularCuenta,
+                docsImages: loadedDocsImages,
                 estadoVerificacion: status,
                 updatedAt: Date.now()
             };
@@ -3401,6 +3420,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     driversList[0].banco = updatedDocs.banco;
                     driversList[0].cbu = updatedDocs.cbu;
                     driversList[0].titularCuenta = updatedDocs.titularCuenta;
+                    driversList[0].docsImages = loadedDocsImages;
                     driversList[0].estadoVerificacion = status;
                     localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
                 }
