@@ -708,98 +708,117 @@
                 loadDriversData();
             });
 
-            // 2. CARGA DE DATOS DE CONDUCTORES (CON FALLBACKS REALISTAS)
+            // 2. CARGA DE DATOS REALES DE CONDUCTORES EN TIEMPO REAL
             function loadDriversData() {
-                let drivers = [];
-                try {
-                    const raw = localStorage.getItem('rutaprivada_drivers_v1');
-                    if (raw) drivers = JSON.parse(raw);
-                } catch(e) {}
-
-                // Cargar también documentación enviada desde conductor.js
                 let activeDocs = null;
                 try {
                     const rawDocs = localStorage.getItem('rutaprivada_driver_docs_v1');
                     if (rawDocs) activeDocs = JSON.parse(rawDocs);
                 } catch(e) {}
 
-                // Si no existen conductores en localStorage, sembrar lista inicial demo
-                if (!drivers || drivers.length === 0) {
+                let isOnlineLocal = false;
+                try {
+                    isOnlineLocal = localStorage.getItem('rutaprivada_driver_is_online') === 'true';
+                } catch(e) {}
+
+                let storedDrivers = [];
+                try {
+                    const raw = localStorage.getItem('rutaprivada_drivers_v1');
+                    if (raw) storedDrivers = JSON.parse(raw);
+                } catch(e) {}
+
+                let drivers = [];
+
+                // 1. Incorporar el Conductor Real Activo si ya ha registrado datos o cargado documentos
+                if (activeDocs) {
+                    drivers.push({
+                        id: 'drv_active_user',
+                        nombre: activeDocs.nombre || 'Conductor Registrado',
+                        dni: activeDocs.dni || 'S/D',
+                        telefono: activeDocs.telefono || 'Sin teléfono',
+                        autoMarcaModelo: activeDocs.autoMarcaModelo || 'Vehículo',
+                        patente: activeDocs.patente || 'S/P',
+                        color: activeDocs.color || 'Negro',
+                        categoria: activeDocs.categoria || 'Sedán Ejecutivo / Premium',
+                        fotoPerfil: activeDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                        estadoVerificacion: activeDocs.estadoVerificacion || 'pendiente',
+                        isOnline: isOnlineLocal,
+                        banco: activeDocs.banco || 'Mercado Pago / Banco Galicia',
+                        cbu: activeDocs.cbu || 'Sin registrar',
+                        titularCuenta: activeDocs.titularCuenta || activeDocs.nombre || 'Sin registrar',
+                        docsImages: activeDocs.docsImages || {},
+                        observaciones: activeDocs.observaciones || '',
+                        updatedAt: activeDocs.updatedAt || Date.now()
+                    });
+                }
+
+                // 2. Agregar otros conductores almacenados
+                if (Array.isArray(storedDrivers) && storedDrivers.length > 0) {
+                    storedDrivers.forEach(d => {
+                        const driverName = d.nombre || d.name;
+                        if (!drivers.some(ex => ex.nombre === driverName || ex.id === d.id)) {
+                            drivers.push({
+                                id: d.id || ('drv_' + Math.random().toString(36).substr(2, 6)),
+                                nombre: driverName || 'Conductor Flota',
+                                dni: d.dni || 'S/D',
+                                telefono: d.telefono || d.phone || 'S/T',
+                                autoMarcaModelo: d.autoMarcaModelo || d.vehicle || 'Vehículo',
+                                patente: d.patente || d.plate || 'S/P',
+                                color: d.color || 'Plata',
+                                categoria: d.categoria || 'Sedán Ejecutivo',
+                                fotoPerfil: d.fotoPerfil || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+                                estadoVerificacion: d.estadoVerificacion || 'aprobado',
+                                isOnline: !!d.isOnline,
+                                banco: d.banco || 'BBVA Argentina',
+                                cbu: d.cbu || '0170020620000001928374',
+                                titularCuenta: d.titularCuenta || driverName || 'Titular',
+                                docsImages: d.docsImages || {},
+                                updatedAt: d.updatedAt || Date.now()
+                            });
+                        }
+                    });
+                }
+
+                // 3. Fallback inicial si no hay ningún registro en memoria
+                if (drivers.length === 0) {
                     drivers = [
                         {
                             id: 'drv_101',
-                            nombre: activeDocs ? activeDocs.nombre : 'Daniel Pabón',
-                            dni: activeDocs ? activeDocs.dni : '38.492.102',
-                            telefono: activeDocs ? activeDocs.telefono : '+54 9 11 2255-8226',
-                            autoMarcaModelo: activeDocs ? activeDocs.autoMarcaModelo : 'Fiat Cronos Drive',
-                            patente: activeDocs ? activeDocs.patente : 'AE927CN',
-                            color: activeDocs ? activeDocs.color : 'Negro Azabache',
-                            categoria: activeDocs ? activeDocs.categoria : 'Sedán Ejecutivo / Premium',
-                            fotoPerfil: (activeDocs && activeDocs.fotoPerfil) ? activeDocs.fotoPerfil : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                            estadoVerificacion: activeDocs ? activeDocs.estadoVerificacion : 'pendiente',
-                            isOnline: true,
-                            banco: activeDocs ? activeDocs.banco : 'Mercado Pago / Banco Galicia',
-                            cbu: activeDocs ? activeDocs.cbu : '0000003100084592039481',
-                            titularCuenta: activeDocs ? activeDocs.nombre : 'Daniel Pabón',
-                            updatedAt: Date.now()
-                        },
-                        {
-                            id: 'drv_102',
-                            nombre: 'Carlos Eduardo Ramírez',
-                            dni: '35.120.948',
-                            telefono: '+54 9 11 4920-1122',
-                            autoMarcaModelo: 'Toyota Corolla SEG',
-                            patente: 'AF182MK',
-                            color: 'Gris Plata',
+                            nombre: 'Daniel Pabón',
+                            dni: '38.492.102',
+                            telefono: '+54 9 11 2255-8226',
+                            autoMarcaModelo: 'Fiat Cronos Drive',
+                            patente: 'AE927CN',
+                            color: 'Negro Azabache',
                             categoria: 'Sedán Ejecutivo / Premium',
-                            fotoPerfil: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-                            estadoVerificacion: 'aprobado',
-                            isOnline: true,
-                            banco: 'BBVA Argentina',
-                            cbu: '0170020620000001928374',
-                            titularCuenta: 'Carlos Eduardo Ramírez',
-                            updatedAt: Date.now() - 86400000
-                        },
-                        {
-                            id: 'drv_103',
-                            nombre: 'Roberto Fernández',
-                            dni: '32.901.442',
-                            telefono: '+54 9 11 6712-3344',
-                            autoMarcaModelo: 'Volkswagen Ventus',
-                            patente: 'AA391PO',
-                            color: 'Azul Noche',
-                            categoria: 'Sedán Ejecutivo',
-                            fotoPerfil: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
-                            estadoVerificacion: 'rechazado',
-                            isOnline: false,
-                            banco: 'Banco Nación',
-                            cbu: '0110020130000029182736',
-                            titularCuenta: 'Roberto Fernández',
-                            observaciones: 'Licencia de conducir vencida y foto borrosa de seguro.',
-                            updatedAt: Date.now() - 172800000
+                            fotoPerfil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                            estadoVerificacion: 'pendiente',
+                            isOnline: isOnlineLocal,
+                            banco: 'Mercado Pago / Banco Galicia',
+                            cbu: '0000003100084592039481',
+                            titularCuenta: 'Daniel Pabón',
+                            updatedAt: Date.now()
                         }
                     ];
-                    localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(drivers));
-                } else if (activeDocs) {
-                    // Actualizar el primer conductor con los últimos datos subidos si existen
-                    drivers[0].nombre = activeDocs.nombre || drivers[0].nombre;
-                    drivers[0].dni = activeDocs.dni || drivers[0].dni;
-                    drivers[0].telefono = activeDocs.telefono || drivers[0].telefono;
-                    drivers[0].autoMarcaModelo = activeDocs.autoMarcaModelo || drivers[0].autoMarcaModelo;
-                    drivers[0].patente = activeDocs.patente || drivers[0].patente;
-                    drivers[0].color = activeDocs.color || drivers[0].color;
-                    drivers[0].categoria = activeDocs.categoria || drivers[0].categoria;
-                    drivers[0].fotoPerfil = activeDocs.fotoPerfil || drivers[0].fotoPerfil;
-                    drivers[0].estadoVerificacion = activeDocs.estadoVerificacion || drivers[0].estadoVerificacion;
-                    drivers[0].banco = activeDocs.banco || drivers[0].banco;
-                    drivers[0].cbu = activeDocs.cbu || drivers[0].cbu;
-                    drivers[0].titularCuenta = activeDocs.titularCuenta || drivers[0].titularCuenta;
                 }
 
                 currentDrivers = drivers;
                 renderMetrics();
                 renderDriversTable();
             }
+
+            // Auto-refresco en tiempo real (cada 2 segundos) para detectar cuando un chofer se conecta o actualiza datos
+            setInterval(() => {
+                if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
+                    loadDriversData();
+                }
+            }, 2000);
+
+            window.addEventListener('storage', () => {
+                if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
+                    loadDriversData();
+                }
+            });
 
             // 3. RENDERIZAR MÉTRICAS
             function renderMetrics() {

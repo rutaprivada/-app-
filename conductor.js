@@ -1400,7 +1400,15 @@ document.addEventListener('DOMContentLoaded', () => {
         driverState.isOnline = online;
         try {
             localStorage.setItem('rutaprivada_driver_is_online', online ? 'true' : 'false');
+            window.dispatchEvent(new Event('storage'));
         } catch(e) {}
+
+        if (window.RutaSync) {
+            window.RutaSync.emit('DRIVER_ONLINE_STATUS_CHANGED', {
+                isOnline: online,
+                driverInfo: driverState.info
+            });
+        }
 
         if (online) {
             btnToggleStatus.className = 'driver-status-toggle online';
