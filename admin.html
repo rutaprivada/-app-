@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RutaPrivada | Panel de Administración de Conductores & Documentación</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <!-- Google Fonts & FontAwesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Estilos base y compartidos -->
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="conductor.css">
+
+    <style>
+        :root {
+            --admin-bg: #0b0f19;
+            --admin-card: rgba(18, 26, 43, 0.85);
+            --admin-border: rgba(255, 255, 255, 0.1);
+            --admin-accent: #fbbf24;
+            --admin-success: #10b981;
+            --admin-danger: #ef4444;
+            --admin-warning: #f59e0b;
+        }
+
+        body {
+            background-color: var(--admin-bg);
+            color: #f1f5f9;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        .admin-header {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--admin-border);
+            padding: 16px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .admin-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .admin-brand img {
+            height: 38px;
+        }
+
+        .admin-brand-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+
+        .admin-brand-badge {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.3) 100%);
+            border: 1px solid rgba(251, 191, 36, 0.4);
+            color: #fbbf24;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+
+        .admin-nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .admin-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--admin-border);
+            color: #e2e8f0;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .admin-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .admin-btn-primary {
+            background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+            color: #000;
+            border: none;
+            font-weight: 700;
+        }
+
+        .admin-btn-primary:hover {
+            background: linear-gradient(135deg, #fcd34d 0%, #b45309 100%);
+            color: #000;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
+        }
+
+        .admin-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 24px 20px 60px;
+        }
+
+        /* METRIC CARDS */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .metric-card {
+            background: var(--admin-card);
+            border: 1px solid var(--admin-border);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .metric-val {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 800;
+            line-height: 1.1;
+            color: #fff;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        /* CONTROLES Y FILTROS */
+        .controls-row {
+            background: var(--admin-card);
+            border: 1px solid var(--admin-border);
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 260px;
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #64748b;
+        }
+
+        .search-input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--admin-border);
+            color: #fff;
+            padding: 10px 14px 10px 42px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--admin-accent);
+            box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.15);
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid var(--admin-border);
+        }
+
+        .filter-tab-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-tab-btn.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        /* TABLA Y CARDS DE CONDUCTORES */
+        .drivers-table-wrapper {
+            background: var(--admin-card);
+            border: 1px solid var(--admin-border);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .drivers-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .drivers-table th {
+            background: rgba(15, 23, 42, 0.9);
+            color: #94a3b8;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--admin-border);
+        }
+
+        .drivers-table td {
+            padding: 16px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            vertical-align: middle;
+            font-size: 0.88rem;
+        }
+
+        .drivers-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .driver-user-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .driver-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--admin-accent);
+        }
+
+        .driver-name-box {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .driver-name-bold {
+            font-weight: 700;
+            color: #fff;
+            font-size: 0.92rem;
+        }
+
+        .driver-phone-sub {
+            font-size: 0.78rem;
+            color: #94a3b8;
+        }
+
+        .badge-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .badge-status.pendiente {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .badge-status.aprobado {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .badge-status.rechazado {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        /* MODAL DE AUTENTICACIÓN Y REVISIÓN DOCUMENTAL */
+        .admin-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 8, 15, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        .admin-modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .admin-modal-card {
+            background: #0f172a;
+            border: 1px solid var(--admin-border);
+            border-radius: 20px;
+            max-width: 900px;
+            width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            position: relative;
+        }
+
+        .doc-review-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .doc-review-card {
+            background: rgba(18, 26, 43, 0.9);
+            border: 1px solid var(--admin-border);
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .doc-preview-img {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin: 10px 0;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s;
+        }
+
+        .doc-preview-img:hover {
+            transform: scale(1.02);
+            border-color: var(--admin-accent);
+        }
+
+        .bank-info-box {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 20px;
+        }
+
+        /* PIN AUTH MODAL */
+        #authModalCard {
+            max-width: 420px;
+            text-align: center;
+        }
+
+        .pin-input {
+            width: 100%;
+            font-size: 1.8rem;
+            letter-spacing: 12px;
+            text-align: center;
+            padding: 14px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--admin-border);
+            color: var(--admin-accent);
+            border-radius: 12px;
+            margin: 20px 0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- CABECERA PRINCIPAL -->
+    <header class="admin-header">
+        <a href="index.html" class="admin-brand">
+            <img src="logo_rutaprivada.svg" alt="RutaPrivada Logo">
+            <div>
+                <span class="admin-brand-title">RutaPrivada</span>
+                <span class="admin-brand-badge">ADMIN CONTROL</span>
+            </div>
+        </a>
+
+        <div class="admin-nav-actions">
+            <button id="btnRefreshAdmin" class="admin-btn">
+                <i class="fa-solid fa-rotate"></i> Actualizar
+            </button>
+            <a href="conductor.html" target="_blank" class="admin-btn">
+                <i class="fa-solid fa-car-side"></i> Modo Chofer
+            </a>
+            <button id="btnLogoutAdmin" class="admin-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+                <i class="fa-solid fa-power-off"></i> Salir
+            </button>
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="admin-container">
+
+        <!-- PANEL DE MÉTRICAS -->
+        <section class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-icon" style="background: rgba(251, 191, 36, 0.15); color: #fbbf24;">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+                <div>
+                    <div class="metric-val" id="metricTotalDrivers">0</div>
+                    <div class="metric-label">Conductores Registrados</div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <div>
+                    <div class="metric-val" id="metricPendingDrivers" style="color: #fbbf24;">0</div>
+                    <div class="metric-label">Pendientes de Aprobación</div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                    <i class="fa-solid fa-user-check"></i>
+                </div>
+                <div>
+                    <div class="metric-val" id="metricApprovedDrivers" style="color: #34d399;">0</div>
+                    <div class="metric-label">Conductores Aprobados</div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+                    <i class="fa-solid fa-signal"></i>
+                </div>
+                <div>
+                    <div class="metric-val" id="metricOnlineDrivers" style="color: #60a5fa;">0</div>
+                    <div class="metric-label">Conductores En Línea</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FILTROS Y BÚSQUEDA -->
+        <section class="controls-row">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="adminSearchInput" class="search-input" placeholder="Buscar por nombre, patente, DNI o teléfono...">
+            </div>
+
+            <div class="filter-tabs">
+                <button class="filter-tab-btn active" data-status="todos">Todos</button>
+                <button class="filter-tab-btn" data-status="pendiente">⚠️ Pendientes</button>
+                <button class="filter-tab-btn" data-status="aprobado">✓ Aprobados</button>
+                <button class="filter-tab-btn" data-status="rechazado">✕ Rechazados</button>
+            </div>
+        </section>
+
+        <!-- TABLA DE CONDUCTORES -->
+        <section class="drivers-table-wrapper">
+            <table class="drivers-table">
+                <thead>
+                    <tr>
+                        <th>Conductor</th>
+                        <th>Vehículo & Categoría</th>
+                        <th>DNI / Registro</th>
+                        <th>Cuenta Bancaria Titular</th>
+                        <th>Estado Solicitud</th>
+                        <th style="text-align: right;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="driversTableBody">
+                    <!-- Filas dinámicas generadas por JS -->
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+
+    <!-- MODAL DE AUTENTICACIÓN ADMIN (PIN) -->
+    <div class="admin-modal-overlay active" id="authModalOverlay">
+        <div class="admin-modal-card" id="authModalCard">
+            <div style="margin-bottom: 20px;">
+                <i class="fa-solid fa-shield-halved" style="font-size: 3rem; color: #fbbf24; margin-bottom: 12px;"></i>
+                <h2 style="font-family: 'Outfit', sans-serif; margin: 0; color: #fff;">Acceso de Administrador</h2>
+                <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 6px;">Ingresa tu PIN de seguridad exclusivo para gestionar la flota y aprobar documentación.</p>
+            </div>
+
+            <form id="adminPinForm">
+                <input type="password" id="adminPinInput" class="pin-input" maxlength="6" placeholder="••••" autofocus required>
+                <button type="submit" class="admin-btn admin-btn-primary" style="width: 100%; padding: 14px; font-size: 1rem; justify-content: center;">
+                    <i class="fa-solid fa-unlock"></i> Desbloquear Panel
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE REVISIÓN Y APROBACIÓN DE DOCUMENTOS -->
+    <div class="admin-modal-overlay" id="docReviewModalOverlay">
+        <div class="admin-modal-card">
+            <!-- Header Modal -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--admin-border); padding-bottom: 16px; margin-bottom: 20px;">
+                <div style="display: flex; gap: 14px; align-items: center;">
+                    <img id="revDriverAvatar" src="" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid #fbbf24;">
+                    <div>
+                        <h2 id="revDriverName" style="font-family: 'Outfit', sans-serif; margin: 0; color: #fff; font-size: 1.4rem;">Nombre Conductor</h2>
+                        <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px; font-size: 0.82rem; color: #94a3b8;">
+                            <span id="revDriverPhone"><i class="fa-solid fa-phone"></i> +54 9 11 ...</span>
+                            <span id="revDriverVehicle"><i class="fa-solid fa-car"></i> Fiat Cronos</span>
+                            <span id="revDriverPlate" style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; font-family: monospace; color: #fff;">AE927CN</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="btnCloseDocReview" style="background: transparent; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- SECCIÓN BANCARIA DESTACADA -->
+            <div class="bank-info-box">
+                <h4 style="color: #fbbf24; margin: 0 0 12px 0; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between;">
+                    <span><i class="fa-solid fa-building-columns"></i> Cuenta Bancaria de Cobro Semanal</span>
+                    <span id="bankMatchStatusBadge" class="badge-status aprobado" style="font-size: 0.72rem;">✓ Titular Verificado</span>
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 0.85rem;">
+                    <div>
+                        <span style="color: #94a3b8; display: block; font-size: 0.75rem;">Banco / Entidad</span>
+                        <strong id="revBankName" style="color: #fff;">Mercado Pago</strong>
+                    </div>
+                    <div>
+                        <span style="color: #94a3b8; display: block; font-size: 0.75rem;">CBU / CVU / Alias</span>
+                        <strong id="revBankCbu" style="color: #38bdf8; font-family: monospace; font-size: 0.9rem;">00000031000845920394</strong>
+                    </div>
+                    <div>
+                        <span style="color: #94a3b8; display: block; font-size: 0.75rem;">Titular Registrado de la Cuenta</span>
+                        <strong id="revBankHolder" style="color: #fff;">Nombre Completo Titular</strong>
+                    </div>
+                </div>
+                <p style="margin: 10px 0 0 0; font-size: 0.75rem; color: #cbd5e1; background: rgba(0,0,0,0.2); padding: 6px 10px; border-radius: 6px;">
+                    <i class="fa-solid fa-shield-cat text-gold"></i> <strong>REGLA DE SEGURIDAD:</strong> Las ganancias semanales solo se depositarán si el titular de la cuenta bancaria coincide exactamente con la cuenta del conductor.
+                </p>
+            </div>
+
+            <!-- GRID DE 7 DOCUMENTOS REQUERIDOS -->
+            <h4 style="color: #e2e8f0; margin-bottom: 12px; font-size: 0.95rem;"><i class="fa-solid fa-folder-open"></i> Documentación Adjunta de la Solicitud</h4>
+            
+            <div class="doc-review-grid" id="docsReviewGrid">
+                <!-- Generado por JS: DNI, Licencia, Seguro, Cédula, Antecedentes, Foto y Comprobante Bancario -->
+            </div>
+
+            <!-- OBSERVACIONES Y ACCIONES DE APROBACIÓN -->
+            <div style="background: rgba(15, 23, 42, 0.9); border: 1px solid var(--admin-border); border-radius: 14px; padding: 16px; margin-top: 20px;">
+                <label style="font-size: 0.8rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 6px;">Observaciones o Motivo de Rechazo (Opcional):</label>
+                <textarea id="revAdminNotes" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 10px; font-size: 0.85rem; resize: vertical; min-height: 60px;" placeholder="Ej: Licencia vencida o falta comprobante de CBU..."></textarea>
+                
+                <div style="display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap;">
+                    <button id="btnApproveDriverMaster" class="admin-btn admin-btn-primary" style="flex: 2; padding: 12px; justify-content: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;">
+                        <i class="fa-solid fa-user-check"></i> APROBAR CONDUCTOR & HABILITAR PARA OPERAR
+                    </button>
+                    <button id="btnRejectDriverMaster" class="admin-btn" style="flex: 1; padding: 12px; justify-content: center; background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4);">
+                        <i class="fa-solid fa-user-xmark"></i> RECHAZAR SOLICITUD
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE VISTA PREVIA AMPLIDA DE DOCUMENTO -->
+    <div class="admin-modal-overlay" id="imgZoomModalOverlay">
+        <div style="position: relative; max-width: 90vw; max-height: 90vh;">
+            <button id="btnCloseZoom" style="position: absolute; top: -40px; right: 0; background: transparent; border: none; color: #fff; font-size: 1.8rem; cursor: pointer;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <img id="imgZoomElement" src="" style="max-width: 90vw; max-height: 85vh; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); border: 2px solid var(--admin-accent);">
+        </div>
+    </div>
+
+    <!-- FIREBASE & SYNC SCRIPTS -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="sync.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const ADMIN_PIN_SECRET = '4824';
+            let currentDrivers = [];
+            let activeReviewDriver = null;
+
+            // Elementos DOM
+            const authModalOverlay = document.getElementById('authModalOverlay');
+            const adminPinForm = document.getElementById('adminPinForm');
+            const adminPinInput = document.getElementById('adminPinInput');
+            const btnLogoutAdmin = document.getElementById('btnLogoutAdmin');
+            const btnRefreshAdmin = document.getElementById('btnRefreshAdmin');
+
+            const driversTableBody = document.getElementById('driversTableBody');
+            const adminSearchInput = document.getElementById('adminSearchInput');
+            const filterTabBtns = document.querySelectorAll('.filter-tab-btn');
+
+            const metricTotalDrivers = document.getElementById('metricTotalDrivers');
+            const metricPendingDrivers = document.getElementById('metricPendingDrivers');
+            const metricApprovedDrivers = document.getElementById('metricApprovedDrivers');
+            const metricOnlineDrivers = document.getElementById('metricOnlineDrivers');
+
+            const docReviewModalOverlay = document.getElementById('docReviewModalOverlay');
+            const btnCloseDocReview = document.getElementById('btnCloseDocReview');
+
+            // 1. AUTENTICACIÓN CON PIN
+            function checkAuth() {
+                if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
+                    authModalOverlay.classList.remove('active');
+                    loadDriversData();
+                } else {
+                    authModalOverlay.classList.add('active');
+                    setTimeout(() => adminPinInput.focus(), 100);
+                }
+            }
+
+            adminPinForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const pin = adminPinInput.value.trim();
+                const storedConfigPin = localStorage.getItem('rutaprivada_admin_pin') || ADMIN_PIN_SECRET;
+                
+                if (pin === storedConfigPin || pin === ADMIN_PIN_SECRET) {
+                    sessionStorage.setItem('rutaprivada_admin_authed', 'true');
+                    authModalOverlay.classList.remove('active');
+                    loadDriversData();
+                } else {
+                    alert('❌ Clave de administrador incorrecta. Intenta nuevamente.');
+                    adminPinInput.value = '';
+                    adminPinInput.focus();
+                }
+            });
+
+            btnLogoutAdmin.addEventListener('click', () => {
+                sessionStorage.removeItem('rutaprivada_admin_authed');
+                checkAuth();
+            });
+
+            btnRefreshAdmin.addEventListener('click', () => {
+                loadDriversData();
+            });
+
+            // 2. CARGA DE DATOS DE CONDUCTORES (CON FALLBACKS REALISTAS)
+            function loadDriversData() {
+                let drivers = [];
+                try {
+                    const raw = localStorage.getItem('rutaprivada_drivers_v1');
+                    if (raw) drivers = JSON.parse(raw);
+                } catch(e) {}
+
+                // Cargar también documentación enviada desde conductor.js
+                let activeDocs = null;
+                try {
+                    const rawDocs = localStorage.getItem('rutaprivada_driver_docs_v1');
+                    if (rawDocs) activeDocs = JSON.parse(rawDocs);
+                } catch(e) {}
+
+                // Si no existen conductores en localStorage, sembrar lista inicial demo
+                if (!drivers || drivers.length === 0) {
+                    drivers = [
+                        {
+                            id: 'drv_101',
+                            nombre: activeDocs ? activeDocs.nombre : 'Daniel Pabón',
+                            dni: activeDocs ? activeDocs.dni : '38.492.102',
+                            telefono: activeDocs ? activeDocs.telefono : '+54 9 11 2255-8226',
+                            autoMarcaModelo: activeDocs ? activeDocs.autoMarcaModelo : 'Fiat Cronos Drive',
+                            patente: activeDocs ? activeDocs.patente : 'AE927CN',
+                            color: activeDocs ? activeDocs.color : 'Negro Azabache',
+                            categoria: activeDocs ? activeDocs.categoria : 'Sedán Ejecutivo / Premium',
+                            fotoPerfil: (activeDocs && activeDocs.fotoPerfil) ? activeDocs.fotoPerfil : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                            estadoVerificacion: activeDocs ? activeDocs.estadoVerificacion : 'pendiente',
+                            isOnline: true,
+                            banco: activeDocs ? activeDocs.banco : 'Mercado Pago / Banco Galicia',
+                            cbu: activeDocs ? activeDocs.cbu : '0000003100084592039481',
+                            titularCuenta: activeDocs ? activeDocs.nombre : 'Daniel Pabón',
+                            updatedAt: Date.now()
+                        },
+                        {
+                            id: 'drv_102',
+                            nombre: 'Carlos Eduardo Ramírez',
+                            dni: '35.120.948',
+                            telefono: '+54 9 11 4920-1122',
+                            autoMarcaModelo: 'Toyota Corolla SEG',
+                            patente: 'AF182MK',
+                            color: 'Gris Plata',
+                            categoria: 'Sedán Ejecutivo / Premium',
+                            fotoPerfil: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+                            estadoVerificacion: 'aprobado',
+                            isOnline: true,
+                            banco: 'BBVA Argentina',
+                            cbu: '0170020620000001928374',
+                            titularCuenta: 'Carlos Eduardo Ramírez',
+                            updatedAt: Date.now() - 86400000
+                        },
+                        {
+                            id: 'drv_103',
+                            nombre: 'Roberto Fernández',
+                            dni: '32.901.442',
+                            telefono: '+54 9 11 6712-3344',
+                            autoMarcaModelo: 'Volkswagen Ventus',
+                            patente: 'AA391PO',
+                            color: 'Azul Noche',
+                            categoria: 'Sedán Ejecutivo',
+                            fotoPerfil: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
+                            estadoVerificacion: 'rechazado',
+                            isOnline: false,
+                            banco: 'Banco Nación',
+                            cbu: '0110020130000029182736',
+                            titularCuenta: 'Roberto Fernández',
+                            observaciones: 'Licencia de conducir vencida y foto borrosa de seguro.',
+                            updatedAt: Date.now() - 172800000
+                        }
+                    ];
+                    localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(drivers));
+                } else if (activeDocs) {
+                    // Actualizar el primer conductor con los últimos datos subidos si existen
+                    drivers[0].nombre = activeDocs.nombre || drivers[0].nombre;
+                    drivers[0].dni = activeDocs.dni || drivers[0].dni;
+                    drivers[0].telefono = activeDocs.telefono || drivers[0].telefono;
+                    drivers[0].autoMarcaModelo = activeDocs.autoMarcaModelo || drivers[0].autoMarcaModelo;
+                    drivers[0].patente = activeDocs.patente || drivers[0].patente;
+                    drivers[0].color = activeDocs.color || drivers[0].color;
+                    drivers[0].categoria = activeDocs.categoria || drivers[0].categoria;
+                    drivers[0].fotoPerfil = activeDocs.fotoPerfil || drivers[0].fotoPerfil;
+                    drivers[0].estadoVerificacion = activeDocs.estadoVerificacion || drivers[0].estadoVerificacion;
+                    drivers[0].banco = activeDocs.banco || drivers[0].banco;
+                    drivers[0].cbu = activeDocs.cbu || drivers[0].cbu;
+                    drivers[0].titularCuenta = activeDocs.titularCuenta || drivers[0].titularCuenta;
+                }
+
+                currentDrivers = drivers;
+                renderMetrics();
+                renderDriversTable();
+            }
+
+            // 3. RENDERIZAR MÉTRICAS
+            function renderMetrics() {
+                const total = currentDrivers.length;
+                const pending = currentDrivers.filter(d => (d.estadoVerificacion || 'pendiente') === 'pendiente').length;
+                const approved = currentDrivers.filter(d => d.estadoVerificacion === 'aprobado').length;
+                const online = currentDrivers.filter(d => d.isOnline).length;
+
+                metricTotalDrivers.textContent = total;
+                metricPendingDrivers.textContent = pending;
+                metricApprovedDrivers.textContent = approved;
+                metricOnlineDrivers.textContent = online;
+            }
+
+            // 4. RENDERIZAR TABLA CON FILTROS
+            let activeFilter = 'todos';
+
+            function renderDriversTable() {
+                const searchTerm = adminSearchInput.value.toLowerCase().trim();
+
+                const filtered = currentDrivers.filter(d => {
+                    const status = (d.estadoVerificacion || 'pendiente').toLowerCase();
+                    const matchesFilter = (activeFilter === 'todos') || (status === activeFilter);
+                    
+                    const name = (d.nombre || '').toLowerCase();
+                    const plate = (d.patente || '').toLowerCase();
+                    const phone = (d.telefono || '').toLowerCase();
+                    const dni = (d.dni || '').toLowerCase();
+
+                    const matchesSearch = !searchTerm || name.includes(searchTerm) || plate.includes(searchTerm) || phone.includes(searchTerm) || dni.includes(searchTerm);
+
+                    return matchesFilter && matchesSearch;
+                });
+
+                if (filtered.length === 0) {
+                    driversTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px 20px; color: #94a3b8;">
+                                <i class="fa-solid fa-user-slash" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                                No se encontraron conductores con los criterios de búsqueda seleccionados.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                driversTableBody.innerHTML = filtered.map(d => {
+                    const status = (d.estadoVerificacion || 'pendiente').toLowerCase();
+                    const statusLabel = status === 'aprobado' ? '✓ Aprobado' : (status === 'rechazado' ? '✕ Rechazado' : '⏱️ Pendiente');
+                    const bankName = d.banco || 'Mercado Pago';
+                    const cbuShort = d.cbu ? (d.cbu.substring(0, 10) + '...') : 'Sin CBU';
+                    const holderMatch = (d.titularCuenta || '').toLowerCase() === (d.nombre || '').toLowerCase();
+
+                    return `
+                        <tr>
+                            <td>
+                                <div class="driver-user-cell">
+                                    <img src="${d.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}" class="driver-avatar">
+                                    <div class="driver-name-box">
+                                        <span class="driver-name-bold">${d.nombre || 'Conductor'}</span>
+                                        <span class="driver-phone-sub"><i class="fa-solid fa-phone"></i> ${d.telefono || 'Sin tel.'}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <strong style="color: #fff;">${d.autoMarcaModelo || 'Vehículo'} (${d.color || ''})</strong>
+                                <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
+                                    <span style="font-family: monospace; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: #fff;">${d.patente || 'S/P'}</span>
+                                    <span>${d.categoria || 'Ejecutivo'}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <strong style="color: #cbd5e1;">DNI: ${d.dni || 'S/D'}</strong>
+                            </td>
+                            <td>
+                                <div style="font-size: 0.82rem;">
+                                    <span style="color: #fbbf24; font-weight: 600;">${bankName}</span>
+                                    <div style="font-size: 0.75rem; color: #94a3b8; font-family: monospace;">${cbuShort}</div>
+                                    <span style="font-size: 0.7rem; color: ${holderMatch ? '#34d399' : '#f59e0b'};">
+                                        ${holderMatch ? '✓ Coincide Titular' : '⚠️ Validar Titular'}
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge-status ${status}">
+                                    ${statusLabel}
+                                </span>
+                            </td>
+                            <td style="text-align: right;">
+                                <button class="admin-btn btn-review-driver" data-id="${d.id}" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4);">
+                                    <i class="fa-solid fa-clipboard-check"></i> Revisar Documentación
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // Asignar listeners
+                document.querySelectorAll('.btn-review-driver').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.getAttribute('data-id');
+                        openDocReviewModal(id);
+                    });
+                });
+            }
+
+            // Listeners de búsqueda y pestañas
+            adminSearchInput.addEventListener('input', renderDriversTable);
+
+            filterTabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterTabBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    activeFilter = btn.getAttribute('data-status') || 'todos';
+                    renderDriversTable();
+                });
+            });
+
+            // 5. MODAL DE REVISIÓN DOCUMENTAL DETALLADA
+            const revDriverAvatar = document.getElementById('revDriverAvatar');
+            const revDriverName = document.getElementById('revDriverName');
+            const revDriverPhone = document.getElementById('revDriverPhone');
+            const revDriverVehicle = document.getElementById('revDriverVehicle');
+            const revDriverPlate = document.getElementById('revDriverPlate');
+            const revBankName = document.getElementById('revBankName');
+            const revBankCbu = document.getElementById('revBankCbu');
+            const revBankHolder = document.getElementById('revBankHolder');
+            const bankMatchStatusBadge = document.getElementById('bankMatchStatusBadge');
+            const docsReviewGrid = document.getElementById('docsReviewGrid');
+            const revAdminNotes = document.getElementById('revAdminNotes');
+
+            const btnApproveDriverMaster = document.getElementById('btnApproveDriverMaster');
+            const btnRejectDriverMaster = document.getElementById('btnRejectDriverMaster');
+
+            function openDocReviewModal(driverId) {
+                const driver = currentDrivers.find(d => d.id === driverId) || currentDrivers[0];
+                activeReviewDriver = driver;
+
+                revDriverAvatar.src = driver.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+                revDriverName.textContent = driver.nombre || 'Conductor';
+                revDriverPhone.innerHTML = `<i class="fa-solid fa-phone"></i> ${driver.telefono || 'Sin teléfono'}`;
+                revDriverVehicle.innerHTML = `<i class="fa-solid fa-car"></i> ${driver.autoMarcaModelo || 'Vehículo'} (${driver.color || ''})`;
+                revDriverPlate.textContent = driver.patente || 'AE927CN';
+
+                revBankName.textContent = driver.banco || 'Mercado Pago / Banco Galicia';
+                revBankCbu.textContent = driver.cbu || '0000003100084592039481';
+                revBankHolder.textContent = driver.titularCuenta || driver.nombre || 'Sin registrar';
+
+                const isMatch = (driver.titularCuenta || '').toLowerCase().trim() === (driver.nombre || '').toLowerCase().trim();
+                if (isMatch) {
+                    bankMatchStatusBadge.className = 'badge-status aprobado';
+                    bankMatchStatusBadge.textContent = '✓ Titular Coincide Exactamente';
+                } else {
+                    bankMatchStatusBadge.className = 'badge-status pendiente';
+                    bankMatchStatusBadge.textContent = '⚠️ Verificar Nombre del Titular';
+                }
+
+                revAdminNotes.value = driver.observaciones || '';
+
+                // Generar los 7 documentos requeridos para revisión
+                const docItems = [
+                    { title: '1. Documento Nacional de Identidad (DNI)', key: 'dni', img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80' },
+                    { title: '2. Licencia de Conducir (Vigente)', key: 'licencia', img: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80' },
+                    { title: '3. Póliza de Seguro del Vehículo', key: 'seguro', img: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=400&q=80' },
+                    { title: '4. Cédula Verde / Azul del Auto', key: 'cedula', img: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80' },
+                    { title: '5. Certificado de Antecedentes Penales', key: 'antecedentes', img: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=400&q=80' },
+                    { title: '6. Foto de Perfil Clara y Reciente', key: 'foto', img: driver.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80' },
+                    { title: '7. Comprobante de CBU / Cuenta Bancaria', key: 'comprobanteBanco', img: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=400&q=80' }
+                ];
+
+                docsReviewGrid.innerHTML = docItems.map(item => `
+                    <div class="doc-review-card">
+                        <div>
+                            <strong style="font-size: 0.8rem; color: #e2e8f0; display: block;">${item.title}</strong>
+                            <img src="${item.img}" class="doc-preview-img zoomable-doc-img" title="Clic para ampliar">
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 6px;">
+                            <button class="admin-btn btn-doc-approve" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">
+                                <i class="fa-solid fa-check"></i> Válido
+                            </button>
+                            <button class="admin-btn btn-doc-reject" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(239,68,68,0.2); color:#f87171; border-color:rgba(239,68,68,0.4);">
+                                <i class="fa-solid fa-xmark"></i> Observar
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Listener para zoom de imágenes
+                document.querySelectorAll('.zoomable-doc-img').forEach(img => {
+                    img.addEventListener('click', () => {
+                        openImgZoomModal(img.src);
+                    });
+                });
+
+                docReviewModalOverlay.classList.add('active');
+            }
+
+            btnCloseDocReview.addEventListener('click', () => {
+                docReviewModalOverlay.classList.remove('active');
+            });
+
+            // Zoom modal
+            const imgZoomModalOverlay = document.getElementById('imgZoomModalOverlay');
+            const imgZoomElement = document.getElementById('imgZoomElement');
+            const btnCloseZoom = document.getElementById('btnCloseZoom');
+
+            function openImgZoomModal(src) {
+                imgZoomElement.src = src;
+                imgZoomModalOverlay.classList.add('active');
+            }
+
+            btnCloseZoom.addEventListener('click', () => {
+                imgZoomModalOverlay.classList.remove('active');
+            });
+
+            imgZoomModalOverlay.addEventListener('click', (e) => {
+                if (e.target === imgZoomModalOverlay) imgZoomModalOverlay.classList.remove('active');
+            });
+
+            // 6. ACCIONES MAESTRAS DE APROBACIÓN O RECHAZO
+            function updateDriverStatus(newStatus) {
+                if (!activeReviewDriver) return;
+
+                activeReviewDriver.estadoVerificacion = newStatus;
+                activeReviewDriver.observaciones = revAdminNotes.value.trim();
+                activeReviewDriver.updatedAt = Date.now();
+
+                // Guardar lista general de conductores
+                try {
+                    localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(currentDrivers));
+                } catch(e) {}
+
+                // Si es el conductor local activo (driver docs), actualizar la persistencia de conductor.js
+                try {
+                    const rawLocal = localStorage.getItem('rutaprivada_driver_docs_v1');
+                    if (rawLocal) {
+                        const docsObj = JSON.parse(rawLocal);
+                        docsObj.estadoVerificacion = newStatus;
+                        docsObj.observaciones = revAdminNotes.value.trim();
+                        localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(docsObj));
+                    }
+                } catch(e) {}
+
+                // Emitir evento mediante sync.js
+                if (window.rutaSync) {
+                    window.rutaSync.emitEvent('ESTADO_CONDUCTOR_ACTUALIZADO', {
+                        driverId: activeReviewDriver.id,
+                        nombre: activeReviewDriver.nombre,
+                        estadoVerificacion: newStatus,
+                        observaciones: revAdminNotes.value.trim()
+                    });
+                }
+
+                docReviewModalOverlay.classList.remove('active');
+                renderMetrics();
+                renderDriversTable();
+
+                const msg = newStatus === 'aprobado' ? 
+                    '✅ ¡CONDUCTOR APROBADO EXITOSAMENTE!\nEl chofer ya tiene habilitado el perfil para conectarse y recibir traslados.' :
+                    '❌ Solicitud rechazada o marcada con observaciones.';
+                alert(msg);
+            }
+
+            btnApproveDriverMaster.addEventListener('click', () => {
+                updateDriverStatus('aprobado');
+            });
+
+            btnRejectDriverMaster.addEventListener('click', () => {
+                updateDriverStatus('rechazado');
+            });
+
+            // Iniciar comprobación
+            checkAuth();
+        });
+    </script>
+</body>
+</html>

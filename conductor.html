@@ -66,6 +66,16 @@
                     </div>
                     <span class="toggle-subtext" id="statusSubtext">Toca para conectarte y recibir viajes</span>
                 </button>
+
+                <!-- BOTONES DE ACCESO RÁPIDO: MODO FLOTANTE PIP & PANEL ADMIN -->
+                <div style="display: flex; gap: 8px; margin-top: 10px;">
+                    <button id="btnTogglePipMode" type="button" style="flex: 1; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 8px 12px; border-radius: 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="fa-solid fa-window-restore"></i> Ventana Flotante fuera de la App (PiP)
+                    </button>
+                    <a href="admin.html" target="_blank" style="background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.4); color: #fbbf24; padding: 8px 14px; border-radius: 10px; font-size: 0.78rem; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-user-shield"></i> Panel Admin
+                    </a>
+                </div>
             </div>
 
             <!-- ESTADO 1: DESCONECTADO -->
@@ -583,6 +593,41 @@
                             <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px;">
                                 <img id="previewFotoPerfil" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1px solid #fbbf24;">
                                 <input type="file" accept="image/*" class="doc-file-input" id="fileFotoPerfil" style="flex:1; font-size:0.75rem; color:#94a3b8;">
+                            </div>
+                        </div>
+
+                        <!-- 7. DATOS BANCARIOS DEL TITULAR (OBLIGATORIO) -->
+                        <div class="doc-upload-item" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 10px; padding: 12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <span style="font-size: 0.82rem; font-weight: 700; color: #fbbf24; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-building-columns"></i> 7. Datos Bancarios del Titular Conductor
+                                </span>
+                                <span class="doc-badge" id="badgeComprobanteBanco" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(245,158,11,0.2); color:#fbbf24;">Pendiente CBU</span>
+                            </div>
+
+                            <p style="font-size: 0.74rem; color: #cbd5e1; margin-bottom: 10px; background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 6px; border-left: 3px solid #fbbf24;">
+                                ⚠️ <strong>IMPORTANTE:</strong> La cuenta debe pertenecer <strong>OBLIGATORIAMENTE</strong> al titular de la cuenta del conductor. No se realizarán pagos a cuentas de terceros.
+                            </p>
+
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <div>
+                                    <label style="font-size: 0.72rem; color: #94a3b8;">Banco o Billetera Virtual</label>
+                                    <input type="text" id="docInputBankName" class="driver-form-input" placeholder="Ej. Mercado Pago / Banco Galicia / Brubank" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:6px; font-size:0.82rem;">
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                    <div>
+                                        <label style="font-size: 0.72rem; color: #94a3b8;">CBU / CVU / Alias</label>
+                                        <input type="text" id="docInputCbu" class="driver-form-input" placeholder="Ej. 00000031000845..." required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:6px; font-size:0.82rem; font-family: monospace;">
+                                    </div>
+                                    <div>
+                                        <label style="font-size: 0.72rem; color: #94a3b8;">Nombre Titular Cuenta</label>
+                                        <input type="text" id="docInputBankHolder" class="driver-form-input" placeholder="Igual a tu DNI" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:6px; font-size:0.82rem;">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.72rem; color: #94a3b8;">Constancia CBU / Foto Tarjeta / Comprobante MP</label>
+                                    <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileComprobanteBanco" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                                </div>
                             </div>
                         </div>
                     </div>

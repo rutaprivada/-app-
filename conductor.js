@@ -3248,6 +3248,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const fileFotoPerfil = document.getElementById('fileFotoPerfil');
         const previewFotoPerfil = document.getElementById('previewFotoPerfil');
+        const docInputBankName = document.getElementById('docInputBankName');
+        const docInputCbu = document.getElementById('docInputCbu');
+        const docInputBankHolder = document.getElementById('docInputBankHolder');
+        const fileComprobanteBanco = document.getElementById('fileComprobanteBanco');
+        const badgeComprobanteBanco = document.getElementById('badgeComprobanteBanco');
+        const btnTogglePipMode = document.getElementById('btnTogglePipMode');
 
         function loadDocsData() {
             try {
@@ -3265,6 +3271,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 color: 'Negro',
                 categoria: 'Sedán Ejecutivo / Premium',
                 fotoPerfil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                banco: 'Mercado Pago / Banco Galicia',
+                cbu: '0000003100084592039481',
+                titularCuenta: driverState.info.nombre || 'Daniel Pabon',
                 estadoVerificacion: 'aprobado'
             };
         }
@@ -3279,6 +3288,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (docInputColor) docInputColor.value = data.color || 'Negro';
             if (docSelectCategory) docSelectCategory.value = data.categoria || 'Sedán Ejecutivo / Premium';
             if (previewFotoPerfil && data.fotoPerfil) previewFotoPerfil.src = data.fotoPerfil;
+
+            if (docInputBankName) docInputBankName.value = data.banco || '';
+            if (docInputCbu) docInputCbu.value = data.cbu || '';
+            if (docInputBankHolder) docInputBankHolder.value = data.titularCuenta || data.nombre || '';
 
             updateDocsStatusBanner(data.estadoVerificacion || 'aprobado');
         }
@@ -3295,14 +3308,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 docsStatusBanner.style.background = 'rgba(16, 185, 129, 0.12)';
                 docsStatusBanner.style.borderColor = 'rgba(16, 185, 129, 0.3)';
                 if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-circle-check text-emerald';
-                if (docsStatusTitle) docsStatusTitle.textContent = 'Documentación Aprobada & Verificada';
-                if (docsStatusDesc) docsStatusDesc.textContent = 'Tu cuenta y vehículo están activos y aprobados para operar en RutaPrivada.';
+                if (docsStatusTitle) docsStatusTitle.textContent = 'Documentación y Cuenta Bancaria Aprobadas';
+                if (docsStatusDesc) docsStatusDesc.textContent = 'Tu cuenta, vehículo y cuenta bancaria titular están activos para operar en RutaPrivada.';
             } else if (status === 'pendiente') {
                 docsStatusBanner.style.background = 'rgba(245, 158, 11, 0.12)';
                 docsStatusBanner.style.borderColor = 'rgba(245, 158, 11, 0.3)';
                 if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-clock text-gold';
                 if (docsStatusTitle) docsStatusTitle.textContent = 'Pendiente de Validación por Administración';
-                if (docsStatusDesc) docsStatusDesc.textContent = 'Los documentos subidos se encuentran en proceso de revisión por el equipo técnico.';
+                if (docsStatusDesc) docsStatusDesc.textContent = 'Los documentos y datos bancarios subidos se encuentran en proceso de revisión.';
+            } else if (status === 'rechazado') {
+                docsStatusBanner.style.background = 'rgba(239, 68, 68, 0.12)';
+                docsStatusBanner.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-circle-xmark text-danger';
+                if (docsStatusTitle) docsStatusTitle.textContent = 'Solicitud Rechazada u Observada';
+                if (docsStatusDesc) docsStatusDesc.textContent = 'Por favor revisa tus documentos o datos bancarios y vuelve a enviarlos para revisión.';
             }
         }
 
@@ -3332,11 +3351,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        ['fileDni', 'fileLicencia', 'fileSeguro', 'fileCedula', 'fileAntecedentes'].forEach((id, idx) => {
+        ['fileDni', 'fileLicencia', 'fileSeguro', 'fileCedula', 'fileAntecedentes', 'fileComprobanteBanco'].forEach((id, idx) => {
             const el = document.getElementById(id);
             if (el) {
                 el.addEventListener('change', () => {
-                    const badgeId = ['badgeDni', 'badgeLicencia', 'badgeSeguro', 'badgeCedula', 'badgeAntecedentes'][idx];
+                    const badgeId = ['badgeDni', 'badgeLicencia', 'badgeSeguro', 'badgeCedula', 'badgeAntecedentes', 'badgeComprobanteBanco'][idx];
                     const badge = document.getElementById(badgeId);
                     if (badge && el.files && el.files.length > 0) {
                         badge.textContent = 'Seleccionado ✓';
@@ -3360,6 +3379,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 color: docInputColor ? docInputColor.value.trim() : current.color,
                 categoria: docSelectCategory ? docSelectCategory.value : current.categoria,
                 fotoPerfil: photoSrc,
+                banco: docInputBankName ? docInputBankName.value.trim() : current.banco,
+                cbu: docInputCbu ? docInputCbu.value.trim() : current.cbu,
+                titularCuenta: docInputBankHolder ? docInputBankHolder.value.trim() : current.titularCuenta,
                 estadoVerificacion: status,
                 updatedAt: Date.now()
             };
@@ -3371,10 +3393,15 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
                 if (driversList.length > 0) {
-                    driversList[0].name = updatedDocs.nombre;
-                    driversList[0].vehicle = `${updatedDocs.autoMarcaModelo} ${updatedDocs.color}`;
-                    driversList[0].plate = updatedDocs.patente;
-                    driversList[0].phone = updatedDocs.telefono.replace(/\D/g, '');
+                    driversList[0].nombre = updatedDocs.nombre;
+                    driversList[0].autoMarcaModelo = updatedDocs.autoMarcaModelo;
+                    driversList[0].color = updatedDocs.color;
+                    driversList[0].patente = updatedDocs.patente;
+                    driversList[0].telefono = updatedDocs.telefono;
+                    driversList[0].banco = updatedDocs.banco;
+                    driversList[0].cbu = updatedDocs.cbu;
+                    driversList[0].titularCuenta = updatedDocs.titularCuenta;
+                    driversList[0].estadoVerificacion = status;
                     localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
                 }
             } catch(e) {}
@@ -3393,8 +3420,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
                 const saved = saveDocsData('pendiente');
                 updateDocsStatusBanner('pendiente');
-                showDriverToast('📄 Documentación enviada a revisión.');
-                alert('✓ Documentación guardada correctamente.\n\nLos archivos y datos del vehículo han sido enviados para su verificación.');
+                showDriverToast('📄 Documentación y datos bancarios enviados a revisión.');
+                alert('✓ Documentación y Datos Bancarios guardados correctamente.\n\nLos archivos y tu constancia de CBU han sido enviados para su verificación.');
             });
         }
 
@@ -3403,14 +3430,128 @@ document.addEventListener('DOMContentLoaded', () => {
                 const saved = saveDocsData('aprobado');
                 updateDocsStatusBanner('aprobado');
                 if (modalDocsUpload) modalDocsUpload.classList.remove('active');
-                showDriverToast('✅ Perfil y vehículos aprobados');
+                showDriverToast('✅ Perfil, vehículo y CBU aprobados');
                 alert(
                     `✅ ¡DOCUMENTACIÓN Y VEHÍCULO APROBADOS!\n\n` +
-                    `Se han verificado los 6 documentos requeridos (DNI, Licencia, Seguro, Cédula, Antecedentes, Foto).\n\n` +
+                    `Se han verificado los 7 requerimientos (DNI, Licencia, Seguro, Cédula, Antecedentes, Foto y Cuenta Bancaria del Titular).\n\n` +
                     `Tu perfil se ha actualizado automáticamente con los datos de ${saved.nombre} y el vehículo ${saved.autoMarcaModelo} (${saved.patente}).`
                 );
             });
         }
+
+        // ==========================================
+        // SISTEMA PIP (VENTANA FLOTANTE FUERA DE LA APP)
+        // ==========================================
+        let pipWindowInstance = null;
+
+        async function togglePipMode() {
+            if ('documentPictureInPicture' in window) {
+                try {
+                    if (pipWindowInstance) {
+                        pipWindowInstance.close();
+                        pipWindowInstance = null;
+                        showDriverToast('Ventana flotante cerrada.');
+                        return;
+                    }
+
+                    pipWindowInstance = await window.documentPictureInPicture.requestWindow({
+                        width: 360,
+                        height: 240,
+                    });
+
+                    // Copiar hojas de estilo
+                    [...document.styleSheets].forEach((styleSheet) => {
+                        try {
+                            const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
+                            const style = document.createElement('style');
+                            style.textContent = cssRules;
+                            pipWindowInstance.document.head.appendChild(style);
+                        } catch (e) {
+                            const link = document.createElement('link');
+                            link.rel = 'stylesheet';
+                            link.href = styleSheet.href;
+                            pipWindowInstance.document.head.appendChild(link);
+                        }
+                    });
+
+                    renderPipWindowContent();
+
+                    pipWindowInstance.addEventListener('pagehide', () => {
+                        pipWindowInstance = null;
+                    });
+
+                    showDriverToast('📺 Ventana flotante activa sobre otras apps.');
+                } catch(e) {
+                    console.warn('PiP error or rejected:', e);
+                    alert('📺 Para usar el Acceso Flotante fuera de la App en Android / Chrome, permite la apertura de ventanas o mantén activada la notificación emergente.');
+                }
+            } else {
+                alert('📺 Modo Flotante Activo: Las notificaciones con sonido y botones de respuesta rápida están activadas en segundo plano.');
+            }
+        }
+
+        function renderPipWindowContent() {
+            if (!pipWindowInstance) return;
+            const isOnline = driverState.isOnline;
+            const hasIncoming = !!driverState.incomingTrip;
+
+            pipWindowInstance.document.body.style.cssText = 'background:#0f172a; color:#fff; font-family:sans-serif; margin:0; padding:12px; display:flex; flex-direction:column; justify-content:space-between; height:100vh; box-sizing:border-box; border:2px solid #fbbf24; border-radius:12px;';
+
+            if (hasIncoming) {
+                const trip = driverState.incomingTrip;
+                pipWindowInstance.document.body.innerHTML = `
+                    <div style="background:rgba(251,191,36,0.2); border:1px solid #fbbf24; border-radius:8px; padding:8px; text-align:center;">
+                        <div style="color:#fbbf24; font-weight:800; font-size:0.82rem;">⚡ NUEVO VIAJE ENTRANTE</div>
+                        <div style="font-size:1.3rem; font-weight:800; color:#34d399; margin:4px 0;">$${(trip.price || trip.monto || 18500).toLocaleString('es-AR')}</div>
+                        <div style="font-size:0.75rem; color:#cbd5e1; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">📍 ${trip.origen || trip.pickupAddress || 'Origen'}</div>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button id="pipBtnAccept" style="flex:1; background:#10b981; color:#fff; border:none; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">✓ Aceptar</button>
+                        <button id="pipBtnOpen" style="flex:1; background:#3b82f6; color:#fff; border:none; padding:10px; border-radius:8px; font-weight:700; cursor:pointer;">🚗 Abrir App</button>
+                    </div>
+                `;
+
+                const btnAcc = pipWindowInstance.document.getElementById('pipBtnAccept');
+                const btnOp = pipWindowInstance.document.getElementById('pipBtnOpen');
+
+                if (btnAcc) btnAcc.onclick = () => { window.focus(); };
+                if (btnOp) btnOp.onclick = () => { window.focus(); };
+            } else {
+                pipWindowInstance.document.body.innerHTML = `
+                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="width:10px; height:10px; border-radius:50%; background:${isOnline ? '#34d399' : '#ef4444'}; display:inline-block;"></span>
+                            <strong style="font-size:0.85rem; color:#fff;">RutaPrivada Chofer</strong>
+                        </div>
+                        <span style="font-size:0.7rem; color:#fbbf24; font-weight:700; background:rgba(251,191,36,0.15); padding:2px 6px; border-radius:4px;">${isOnline ? 'EN LÍNEA' : 'OFFLINE'}</span>
+                    </div>
+                    <div style="text-align:center; padding:10px 0;">
+                        <div style="font-size:0.75rem; color:#94a3b8;">Ganancias de Hoy</div>
+                        <div style="font-size:1.4rem; font-weight:800; color:#fbbf24;">$${driverState.stats.gananciasHoy.toLocaleString('es-AR')}</div>
+                    </div>
+                    <button id="pipBtnOpenApp" style="width:100%; background:linear-gradient(135deg,#fbbf24 0%,#d97706 100%); color:#000; border:none; padding:8px; border-radius:8px; font-weight:800; cursor:pointer;">
+                        🚗 Abrir App
+                    </button>
+                `;
+                const btnOpApp = pipWindowInstance.document.getElementById('pipBtnOpenApp');
+                if (btnOpApp) btnOpApp.onclick = () => { window.focus(); };
+            }
+        }
+
+        if (btnTogglePipMode) {
+            btnTogglePipMode.addEventListener('click', togglePipMode);
+        }
+
+        // Escuchar cambios de estado desde el panel de administración
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'rutaprivada_driver_docs_v1' || e.key === 'rutaprivada_drivers_v1') {
+                const fresh = loadDocsData();
+                updateDocsStatusBanner(fresh.estadoVerificacion || 'aprobado');
+                if (fresh.estadoVerificacion === 'aprobado') {
+                    showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el administrador!');
+                }
+            }
+        });
     }
 
     initDocsUploadModule();
