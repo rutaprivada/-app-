@@ -2877,8 +2877,12 @@ function renderQuote() {
     document.getElementById('row-toll-fare').textContent = '$0 (Sin peaje)';
   }
 
-  // Animación del total
-  animateValue('quote-total-amount', state.totalPrice);
+  // Garantizar precio mínimo de cotización inicial ($3.500 ARS)
+  const finalPrice = Math.max(3500, Number(state.totalPrice) || 3500);
+  animateValue('quote-total-amount', finalPrice);
+  const rowTotalFare = document.getElementById('row-total-fare');
+  if (rowTotalFare) rowTotalFare.textContent = '$' + finalPrice.toLocaleString('es-AR');
+
   document.getElementById('quote-currency-symbol').textContent = CURRENCY_SYMBOLS[state.config.currency] || '$';
   document.getElementById('quote-currency-code').textContent = state.config.currency;
 
@@ -4997,11 +5001,69 @@ function openInAppTripModal(trip) {
   if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Buscando Chofer Ejecutivo...';
 
   startPassengerSearchTimeout(trip);
+  startPassengerRealtimePoll(trip.id);
   inappTripModal.classList.remove('hidden');
+}
+
+let passengerFastPollTimer = null;
+
+function startPassengerRealtimePoll(tripId) {
+  if (passengerFastPollTimer) clearInterval(passengerFastPollTimer);
+
+  passengerFastPollTimer = setInterval(async () => {
+    let activeTrip = null;
+    if (window.RutaSync) {
+      activeTrip = window.RutaSync.obtenerViajeActivo();
+    }
+    
+    // Check Firestore directly for instant real-time sync
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      try {
+        const doc = await firebase.firestore().collection('live_trips').doc('current_active_trip').get();
+        if (doc.exists) {
+          const fsData = doc.data();
+          if (fsData && fsData.estado && fsData.estado !== 'buscando_conductor' && fsData.estado !== 'solicitado') {
+            activeTrip = fsData;
+          }
+        }
+      } catch(e){}
+    }
+
+    if (activeTrip && activeTrip.estado && activeTrip.estado !== 'buscando_conductor' && activeTrip.estado !== 'solicitado') {
+      // TRASLADO ACEPTADO POR CHOFER
+      clearInterval(passengerFastPollTimer);
+      passengerFastPollTimer = null;
+      clearPassengerSearchTimeout();
+
+      if (pStateSearching) pStateSearching.classList.add('hidden');
+      if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
+
+      const driverName = (activeTrip.conductor && activeTrip.conductor.nombre) ? activeTrip.conductor.nombre : 'Daniel Pabon';
+      const driverCar = (activeTrip.conductor && activeTrip.conductor.auto) ? activeTrip.conductor.auto : 'Fiat Cronos Negro';
+      const driverPlate = (activeTrip.conductor && activeTrip.conductor.patente) ? activeTrip.conductor.patente : 'AE927CN';
+      const driverRating = (activeTrip.conductor && activeTrip.conductor.calificacion) ? activeTrip.conductor.calificacion : '4.98';
+
+      const pDriverName = document.getElementById('pDriverName');
+      const pDriverCar = document.getElementById('pDriverCar');
+      const pDriverRating = document.getElementById('pDriverRating');
+
+      if (pDriverName) pDriverName.textContent = driverName;
+      if (pDriverCar) pDriverCar.textContent = `${driverCar} · Patente: ${driverPlate}`;
+      if (pDriverRating) pDriverRating.textContent = driverRating;
+
+      updatePassengerTripStage(activeTrip.estado || 'aceptado');
+      try { playPassengerTone('arrived'); } catch(e){}
+      showToast('🎉 ¡Chofer asignado! ' + driverName + ' ha tomado tu viaje.');
+    }
+  }, 1000); // Polling ultra-rápido de 1 segundo
 }
 
 function closeInAppTripModal() {
   clearPassengerSearchTimeout();
+  if (passengerFastPollTimer) {
+    clearInterval(passengerFastPollTimer);
+    passengerFastPollTimer = null;
+  }
   if (inappTripModal) {
     inappTripModal.classList.add('hidden');
   }

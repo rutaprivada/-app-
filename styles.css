@@ -4369,6 +4369,27 @@ html, body {
   }
 }
 
+/* Explicit Golden Time Selector Dropdowns */
+.time-select {
+  background: #0f172a !important;
+  color: #f59e0b !important;
+  font-weight: 800 !important;
+  font-size: 1.25rem !important;
+  border: 1.5px solid #f59e0b !important;
+  border-radius: 10px !important;
+  padding: 8px 12px !important;
+  text-align: center !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25) !important;
+  outline: none !important;
+}
+
+.time-select option {
+  background: #0f172a !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  padding: 8px !important;
+}
+
 /* ==================================================== */
 /* MULTI-STEP WIZARD (PASO A PASO) STYLING */
 /* ==================================================== */
