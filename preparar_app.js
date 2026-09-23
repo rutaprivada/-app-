@@ -4,31 +4,52 @@ const path = require('path');
 const mode = process.argv[2] || 'pasajero'; // 'pasajero' or 'conductor'
 const targetDir = path.join(__dirname, 'android', 'app', 'src', 'main', 'assets', 'public');
 const androidBuildDir = path.join(__dirname, 'android', 'app', 'build');
+const buildGradlePath = path.join(__dirname, 'android', 'app', 'build.gradle');
+const stringsXmlPath = path.join(__dirname, 'android', 'app', 'src', 'main', 'res', 'values', 'strings.xml');
 
 console.log(`==========================================`);
-console.log(` Preparando archivos para App (${mode.toUpperCase()})`);
+console.log(` Configurando App Android: [ ${mode.toUpperCase()} ]`);
 console.log(`==========================================`);
 
-// Clean assets directory to remove previous app files
+// 1. Configure applicationId and app_name
+let appId = mode === 'conductor' ? 'com.rutaprivada.chofer' : 'com.rutaprivada.pasajero';
+let appName = mode === 'conductor' ? 'RutaPrivada Chofer' : 'Ruta Privada';
+
+// Update build.gradle applicationId
+if (fs.existsSync(buildGradlePath)) {
+    let gradleContent = fs.readFileSync(buildGradlePath, 'utf8');
+    gradleContent = gradleContent.replace(/applicationId\s+"[^"]+"/, `applicationId "${appId}"`);
+    fs.writeFileSync(buildGradlePath, gradleContent, 'utf8');
+    console.log(` Package ID configurado: ${appId}`);
+}
+
+// Update strings.xml app_name
+if (fs.existsSync(stringsXmlPath)) {
+    let stringsContent = fs.readFileSync(stringsXmlPath, 'utf8');
+    stringsContent = stringsContent.replace(/<string name="app_name">[^<]+<\/string>/, `<string name="app_name">${appName}</string>`);
+    stringsContent = stringsContent.replace(/<string name="title_activity_main">[^<]+<\/string>/, `<string name="title_activity_main">${appName}</string>`);
+    fs.writeFileSync(stringsXmlPath, stringsContent, 'utf8');
+    console.log(` Nombre de App configurado: ${appName}`);
+}
+
+// 2. Clean assets directory
 if (fs.existsSync(targetDir)) {
     fs.rmSync(targetDir, { recursive: true, force: true });
 }
 fs.mkdirSync(targetDir, { recursive: true });
 
-// Clean Android build folder to force fresh compilation
+// 3. Clean Android build folder to force fresh compilation
 if (fs.existsSync(androidBuildDir)) {
     try {
         fs.rmSync(androidBuildDir, { recursive: true, force: true });
-        console.log(` Limpiada la cache de compilacion anterior (android/app/build).`);
+        console.log(` Limpiada la memoria cache de compilacion anterior.`);
     } catch (e) {
-        console.log(` Nota: No se pudo borrar android/app/build directamente (si Android Studio lo esta usando).`);
+        console.log(` (Cache parcial preservada por Android Studio).`);
     }
 }
 
-// List of extensions to copy
+// 4. Copy web files
 const allowedExtensions = ['.html', '.js', '.css', '.svg', '.png', '.jpg', '.jpeg', '.json', '.webp', '.ico'];
-
-// Files to copy
 const files = fs.readdirSync(__dirname);
 
 files.forEach(file => {
@@ -41,19 +62,19 @@ files.forEach(file => {
     }
 });
 
-// Configure entry point (index.html)
+// 5. Configure entry point (index.html)
 if (mode === 'conductor') {
     const conductorPath = path.join(__dirname, 'conductor.html');
     const destIndexPath = path.join(targetDir, 'index.html');
     fs.copyFileSync(conductorPath, destIndexPath);
-    console.log(` Entrypoint configurado: APP CONDUCTOR (conductor.html -> index.html)`);
+    console.log(` Interfaz de Inicio: conductor.html -> index.html (DRIVER)`);
 } else {
     const passengerPath = path.join(__dirname, 'index.html');
     const destIndexPath = path.join(targetDir, 'index.html');
     fs.copyFileSync(passengerPath, destIndexPath);
-    console.log(` Entrypoint configurado: APP PASAJERO (index.html -> index.html)`);
+    console.log(` Interfaz de Inicio: index.html -> index.html (PASAJERO)`);
 }
 
-console.log(`\n Archivos preparados exitosamente en:`);
-console.log(` ${targetDir}`);
+console.log(`\n==========================================`);
+console.log(` App de [ ${mode.toUpperCase()} ] lista para compilar en Android Studio.`);
 console.log(`==========================================\n`);
