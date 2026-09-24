@@ -59,6 +59,9 @@ body {
 
 .hidden {
   display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
 }
 
 .text-emerald {
@@ -2124,6 +2127,9 @@ body {
 
 .modal-backdrop.hidden {
   display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
 }
 
 .modal-dialog {

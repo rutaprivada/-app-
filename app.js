@@ -5855,7 +5855,6 @@ if (window.RutaSync) {
       showPassengerCompletionModal(viaje);
     }
   });
-}
 
   window.RutaSync.on('CHAT_MENSAJE_ENVIADO', (msg) => {
     if (msg) {
