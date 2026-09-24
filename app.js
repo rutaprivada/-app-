@@ -117,9 +117,9 @@ function goToWizardStep(step) {
     try { container.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e){}
   }
 
-  // 4. Procesar mapa y cálculo en segundo plano para no congelar la app
+  // 4. Procesar mapa y cálculo
   setTimeout(async () => {
-    if (step >= 3 && originVal && destVal) {
+    if (originVal && destVal) {
       // Geocodificar Origen si es necesario
       if (!state.origin || !state.origin.lat || (state.origin.address && state.origin.address !== originVal)) {
         if (typeof searchLocations === 'function') {
@@ -161,14 +161,27 @@ function goToWizardStep(step) {
       }
     }
 
-    // Inicializar Leaflet en Paso 4
+    // Inicializar Leaflet y centrar ruta en Paso 4
     if (step === 4) {
       if (!map && typeof initMap === 'function') {
         try { initMap(); } catch(e){}
       }
-      if (map) {
-        try { map.invalidateSize(); } catch(e){}
-      }
+      setTimeout(() => {
+        if (map) {
+          try {
+            map.invalidateSize();
+            if (state.origin && state.origin.lat && (!originMarker || !map.hasLayer(originMarker))) {
+              setOrigin(state.origin.lat, state.origin.lng, state.origin.address || originVal);
+            }
+            if (state.destination && state.destination.lat && (!destinationMarker || !map.hasLayer(destinationMarker))) {
+              setDestination(state.destination.lat, state.destination.lng, state.destination.address || destVal);
+            }
+            if (routePolyline && map.hasLayer(routePolyline)) {
+              map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+            }
+          } catch(e){}
+        }
+      }, 100);
     }
 
     // Recalcular y Renderizar Cotización en Paso 5
