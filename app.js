@@ -53,7 +53,7 @@ const DEFAULT_CONFIG = {
 // ==========================================
 let currentWizardStep = 1;
 
-async function goToWizardStep(step) {
+function goToWizardStep(step) {
   if (step < 1 || step > 5) return;
 
   const originInput = document.getElementById('origin-input');
@@ -64,58 +64,23 @@ async function goToWizardStep(step) {
   const destVal = destInput ? destInput.value.trim() : '';
   const stopVal = stopInput ? stopInput.value.trim() : '';
 
-  // Validar y geocodificar direcciones en el paso 3 antes de avanzar al paso 4 o 5
-  if (step > 3) {
+  // Validar direcciones al intentar ir a Mapa (4) o Cotización (5)
+  if (step >= 4) {
     if (!originVal || !destVal) {
-      alert('⚠️ Por favor ingresa el Origen y el Destino de tu viaje antes de continuar.');
-      return;
-    }
-
-    // Geocodificar Origen si no está fijado o si el texto cambió
-    if (!state.origin || !state.origin.lat || (state.origin.address && state.origin.address !== originVal)) {
-      if (typeof searchLocations === 'function') {
-        try {
-          const results = await searchLocations(originVal);
-          if (results && results.length > 0) {
-            state.origin = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || originVal };
-          }
-        } catch(e){}
+      showToast('⚠️ Por favor escribe el Origen y el Destino para ver la ruta y cotización.');
+      if (!originVal && originInput) {
+        originInput.focus();
+        step = 3;
+      } else if (!destVal && destInput) {
+        destInput.focus();
+        step = 3;
       }
-    }
-
-    // Geocodificar Destino si no está fijado o si el texto cambió
-    if (!state.destination || !state.destination.lat || (state.destination.address && state.destination.address !== destVal)) {
-      if (typeof searchLocations === 'function') {
-        try {
-          const results = await searchLocations(destVal);
-          if (results && results.length > 0) {
-            state.destination = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || destVal };
-          }
-        } catch(e){}
-      }
-    }
-
-    // Geocodificar Parada Intermedia si aplica
-    if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
-      if (typeof searchLocations === 'function') {
-        try {
-          const results = await searchLocations(stopVal);
-          if (results && results.length > 0) {
-            state.intermediateStop = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || stopVal };
-          }
-        } catch(e){}
-      }
-    }
-
-    // Calcular trazado completo de la ruta por autopistas / calles
-    if (typeof checkAndRoute === 'function') {
-      try { await checkAndRoute(); } catch(e){}
     }
   }
 
   currentWizardStep = step;
 
-  // Actualizar paneles visibles
+  // 1. Actualizar paneles visibles INMEDIATAMENTE (0ms lag)
   for (let i = 1; i <= 5; i++) {
     const panel = document.getElementById(`wizard-step-panel-${i}`);
     const indicator = document.getElementById(`wizard-step-indicator-${i}`);
@@ -141,44 +106,81 @@ async function goToWizardStep(step) {
     }
   }
 
-  // Actualizar insignias de resumen de Fecha y Hora en todos los pasos
+  // 2. Actualizar insignias de fecha y hora
   if (typeof updateStepDateTimeBadges === 'function') {
-    updateStepDateTimeBadges();
+    try { updateStepDateTimeBadges(); } catch(e){}
   }
 
-  // Al entrar al Paso 4 (Mapa), forzar inicialización y refresco de Leaflet
-  if (step === 4) {
-    setTimeout(() => {
+  // 3. Scroll suave al inicio del paso
+  const container = document.getElementById('passenger-wizard-container');
+  if (container) {
+    try { container.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e){}
+  }
+
+  // 4. Procesar mapa y cálculo en segundo plano para no congelar la app
+  setTimeout(async () => {
+    if (step >= 3 && originVal && destVal) {
+      // Geocodificar Origen si es necesario
+      if (!state.origin || !state.origin.lat || (state.origin.address && state.origin.address !== originVal)) {
+        if (typeof searchLocations === 'function') {
+          try {
+            const results = await searchLocations(originVal);
+            if (results && results.length > 0) {
+              state.origin = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || originVal };
+            }
+          } catch(e){}
+        }
+      }
+
+      // Geocodificar Destino si es necesario
+      if (!state.destination || !state.destination.lat || (state.destination.address && state.destination.address !== destVal)) {
+        if (typeof searchLocations === 'function') {
+          try {
+            const results = await searchLocations(destVal);
+            if (results && results.length > 0) {
+              state.destination = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || destVal };
+            }
+          } catch(e){}
+        }
+      }
+
+      // Geocodificar Parada Intermedia si aplica
+      if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
+        if (typeof searchLocations === 'function') {
+          try {
+            const results = await searchLocations(stopVal);
+            if (results && results.length > 0) {
+              state.intermediateStop = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || stopVal };
+            }
+          } catch(e){}
+        }
+      }
+
+      if (typeof checkAndRoute === 'function') {
+        try { await checkAndRoute(); } catch(e){}
+      }
+    }
+
+    // Inicializar Leaflet en Paso 4
+    if (step === 4) {
       if (!map && typeof initMap === 'function') {
         try { initMap(); } catch(e){}
       }
       if (map) {
         try { map.invalidateSize(); } catch(e){}
       }
-      if (typeof checkAndRoute === 'function') {
-        try { checkAndRoute(); } catch(e){}
+    }
+
+    // Recalcular y Renderizar Cotización en Paso 5
+    if (step === 5) {
+      if (typeof updateCalculation === 'function') {
+        try { updateCalculation(); } catch(e){}
       }
-    }, 100);
-  }
-
-  // Si se entra al Paso 5 (Cotización), recalcular tarifa y renderizar desglose
-  if (step === 5) {
-    if (typeof checkAndRoute === 'function' && state.origin && state.destination) {
-      try { await checkAndRoute(); } catch(e){}
+      if (typeof renderQuote === 'function') {
+        try { renderQuote(); } catch(e){}
+      }
     }
-    if (typeof updateCalculation === 'function') {
-      try { updateCalculation(); } catch(e){}
-    }
-    if (typeof renderQuote === 'function') {
-      try { renderQuote(); } catch(e){}
-    }
-  }
-
-  // Scroll suave al inicio del contenedor
-  const container = document.getElementById('passenger-wizard-container');
-  if (container) {
-    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  }, 10);
 }
 
 function updateStepDateTimeBadges() {
@@ -6451,22 +6453,21 @@ if (btnRecenterPassengerMap) {
     if (!window.RutaSync) return;
     const trip = window.RutaSync.obtenerViajeActivo();
     if (trip && trip.id && trip.estado && trip.estado !== 'cancelado' && trip.estado !== 'cancelado_por_pasajero' && trip.estado !== 'completado') {
+      const createdAt = trip.creadoEn || trip.timestamp || Date.now();
+      const ageMs = Date.now() - createdAt;
+      
+      // Si el viaje en búsqueda tiene más de 5 minutos, limpiarlo para no bloquear la app
+      if ((trip.estado === 'buscando_conductor' || trip.estado === 'solicitado') && ageMs > 5 * 60 * 1000) {
+        window.RutaSync.limpiarViajeActivo();
+        return;
+      }
+
       openInAppTripModal(trip);
       if (trip.estado === 'buscando_conductor' || trip.estado === 'solicitado') {
         if (pStateSearching) pStateSearching.classList.remove('hidden');
         if (pStateDriverAssigned) pStateDriverAssigned.classList.add('hidden');
       } else if (trip.conductor) {
-        if (pStateSearching) pStateSearching.classList.add('hidden');
-        if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
-        if (pDriverName) pDriverName.textContent = trip.conductor.nombre || 'Daniel Pabon';
-        if (pDriverCar) pDriverCar.textContent = `${trip.conductor.auto || 'Fiat Cronos Negro'}${trip.conductor.patente ? ' · Patente: ' + trip.conductor.patente : ''}`;
-        if (pDriverRating) pDriverRating.textContent = trip.conductor.calificacion || '4.98';
-        const driverPhoto = trip.conductor.fotoPerfil || trip.conductor.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
-        if (pDriverAvatar) pDriverAvatar.src = driverPhoto;
-        const pChatDriverAvatar = document.getElementById('pChatDriverAvatar');
-        if (pChatDriverAvatar) pChatDriverAvatar.src = driverPhoto;
-        initPassengerLiveMap(trip);
-        updatePassengerTripStage(trip.estado || trip.etapa || 'en_camino');
+        handlePassengerDriverAssigned(trip, false);
       }
     }
   }
