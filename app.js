@@ -2089,14 +2089,18 @@ async function checkAndRoute() {
     state.tollDetails = state.routeHasTolls ? [{ name: 'Peaje Troncal Nacional', fee: 2200 }] : [];
     state.tollRoadNames = state.routeHasTolls ? ['Autopista / Vía rápida'] : [];
 
-    if (routePolyline) map.removeLayer(routePolyline);
-    const linePoints = s ? [[o.lat, o.lng], [s.lat, s.lng], [d.lat, d.lng]] : [[o.lat, o.lng], [d.lat, d.lng]];
-    routePolyline = L.polyline(linePoints, {
-      color: '#38bdf8',
-      dashArray: '8, 8',
-      weight: 4
-    }).addTo(map);
-    map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+    if (map) {
+      try {
+        if (routePolyline) map.removeLayer(routePolyline);
+        const linePoints = s ? [[o.lat, o.lng], [s.lat, s.lng], [d.lat, d.lng]] : [[o.lat, o.lng], [d.lat, d.lng]];
+        routePolyline = L.polyline(linePoints, {
+          color: '#38bdf8',
+          dashArray: '8, 8',
+          weight: 4
+        }).addTo(map);
+        map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+      } catch(e) {}
+    }
 
     if (trafficPill) {
       trafficPill.className = 'traffic-indicator-pill traffic-osrm';
@@ -2689,18 +2693,18 @@ function isLowDemandHour(timeStr) {
 }
 
 function updateCalculation() {
-  // Sin ruta consultada todavía: no mostramos ninguna tarifa de ejemplo
-  const hasRoute = state.origin && state.destination && state.distanceKm > 0;
-  if (!hasRoute) {
-    state.totalPrice = 0;
-    state.durationMin = 0;
-    state.breakdown = {};
-    renderEmptyQuote();
-    return;
+  const o = state.origin;
+  const d = state.destination;
+
+  // Si hay origen y destino, asegurarse de que distanceKm no sea 0
+  if (o && d && (state.distanceKm <= 0 || isNaN(state.distanceKm))) {
+    const rawKm = haversineDistance(o.lat, o.lng, d.lat, d.lng);
+    const roadFactor = 1.35;
+    state.distanceKm = Math.round(rawKm * roadFactor * 10) / 10;
+    state.baseDurationMin = Math.max(5, Math.round((state.distanceKm / 28) * 60));
   }
 
-  const cfg = state.config;
-  const km = Math.max(0, state.distanceKm);
+  const km = Math.max(0, state.distanceKm || 0);
 
   // Duración según el tráfico predictivo para la fecha y horario de reserva seleccionados
   const traffic = trafficFactorForTime(state.time, state.date);
@@ -2708,8 +2712,8 @@ function updateCalculation() {
   state.trafficLabel = traffic.label;
   state.durationMin = state.baseDurationMin > 0
     ? Math.max(1, Math.round(state.baseDurationMin * traffic.factor))
-    : 0;
-  const min = Math.max(0, state.durationMin);
+    : (km > 0 ? Math.max(1, Math.round((km / 28) * 60 * traffic.factor)) : 0);
+  const min = Math.max(0, state.durationMin || 0);
 
   // Resolver matriz de tarifas exacta por día, franja, distancia y duración
   const resolved = resolveTariffRates(state.date, state.time, km, min);
@@ -2727,7 +2731,7 @@ function updateCalculation() {
     baseFare = 0;
     baseFareLabel = 'Bonificada $0 (Viaje a Ezeiza >30 km)';
   } else if (state.hasIntermediateStop && km <= 15) {
-    const stopBase = cfg.baseFareStopUnder15 !== undefined ? cfg.baseFareStopUnder15 : 2500;
+    const stopBase = state.config.baseFareStopUnder15 !== undefined ? state.config.baseFareStopUnder15 : 2500;
     baseFare = stopBase;
     baseFareLabel = 'Tarifa base con parada intermedia (≤15 km)';
   }
@@ -2752,9 +2756,9 @@ function updateCalculation() {
   // 5. Extras
   let extrasCost = 0;
   if (state.hasIntermediateStop) extrasCost += (state.stopFee || 1000);
-  if (state.extras.pet) extrasCost += (cfg.petFee || 4000);
+  if (state.extras.pet) extrasCost += (state.config.petFee || 4000);
 
-  // 6. Subtotal de ida con factor de clima aplicado si corresponde
+  // 6. Subtotal de ida con factor de clima/horario aplicado
   let oneWaySubtotal = (baseFare + distanceCost + durationCost) * VEHICLE.factor;
   oneWaySubtotal = Math.round(oneWaySubtotal * state.timeMultiplier);
   let oneWayFull = oneWaySubtotal + tollCost + extrasCost;
@@ -2783,6 +2787,11 @@ function updateCalculation() {
     }
     roundtripDiscount = Math.round(returnLegFullPrice * (roundtripDiscountPercent / 100));
     finalTotal = oneWayFull + returnLegFullPrice - roundtripDiscount;
+  }
+
+  // Si no hay origen o destino, precio base mínimo $3.500
+  if (!state.origin || !state.destination) {
+    finalTotal = Math.max(3500, baseFare);
   }
 
   state.totalPrice = finalTotal;
