@@ -910,10 +910,7 @@ let stopMarker = null;
 let routePolyline = null;
 
 // ==========================================
-// 3. INICIALIZACIÓN
-// ==========================================
-
-document.addEventListener('DOMContentLoaded', () => {
+function initializePassengerApp() {
   try { initDateTimeControls(); } catch (e) { console.error('Error initDateTimeControls:', e); }
   try { initMap(); } catch (e) { console.error('Error initMap:', e); }
   try { initEventListeners(); } catch (e) { console.error('Error initEventListeners:', e); }
@@ -923,7 +920,14 @@ document.addEventListener('DOMContentLoaded', () => {
   try { fetchRealtimeWeather(); } catch (e) { console.error('Error fetchRealtimeWeather:', e); }
   try { updateCalculation(); } catch (e) { console.error('Error updateCalculation:', e); }
   try { initPwa(); } catch (e) { console.error('Error initPwa:', e); }
-});
+  try { goToWizardStep(1); } catch (e) { console.error('Error goToWizardStep(1):', e); }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializePassengerApp);
+} else {
+  initializePassengerApp();
+}
 
 function loadConfig() {
   try {
