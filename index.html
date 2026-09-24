@@ -293,40 +293,67 @@
           </div>
 
           <div class="schedule-stylish-wrapper">
-            <div class="schedule-block">
+            <div class="schedule-block digital-alarm-block">
               <div class="block-header">
-                <span class="block-label">Opciones Rápidas de Horario</span>
+                <span class="block-label">⏰ Selector de Horario Tipo Alarma</span>
                 <div class="quick-preset-pills">
                   <button type="button" class="preset-pill" id="btn-time-now">⚡ Ahora</button>
-                  <button type="button" class="preset-pill" id="btn-time-plus30">+30 min</button>
-                  <button type="button" class="preset-pill" id="btn-time-plus60">+1 hora</button>
+                  <button type="button" class="preset-pill" id="btn-time-plus15">+15m</button>
+                  <button type="button" class="preset-pill" id="btn-time-plus30">+30m</button>
+                  <button type="button" class="preset-pill" id="btn-time-plus60">+1h</button>
                 </div>
               </div>
 
-              <div class="stepper-time-wrapper">
-                <button type="button" class="stepper-btn" id="btn-time-minus" title="Restar 5 minutos">−5m</button>
-                
-                <div class="dual-time-selectors">
-                  <div class="time-select-unit">
-                    <label for="select-hour">Hora</label>
-                    <select id="select-hour" class="time-select" aria-label="Hora"></select>
-                  </div>
-                  <span class="time-colon">:</span>
-                  <div class="time-select-unit">
-                    <label for="select-minute">Minutos</label>
-                    <select id="select-minute" class="time-select" aria-label="Minutos"></select>
-                  </div>
+              <!-- Digital Alarm Clock Face -->
+              <div class="alarm-clock-container">
+                <div class="alarm-digit-group">
+                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-hour-up" aria-label="Aumentar hora">▲</button>
+                  <div class="alarm-digit-display" id="alarm-hour-display">12</div>
+                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-hour-down" aria-label="Disminuir hora">▼</button>
+                  <span class="alarm-digit-label">HORA</span>
                 </div>
 
-                <button type="button" class="stepper-btn" id="btn-time-plus" title="Sumar 5 minutos">+5m</button>
+                <div class="alarm-colon-separator">:</div>
+
+                <div class="alarm-digit-group">
+                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-min-up" aria-label="Aumentar minutos">▲</button>
+                  <div class="alarm-digit-display" id="alarm-min-display">00</div>
+                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-min-down" aria-label="Disminuir minutos">▼</button>
+                  <span class="alarm-digit-label">MINUTOS</span>
+                </div>
+
+                <div class="alarm-period-group">
+                  <button type="button" class="alarm-ampm-btn active" id="btn-alarm-am">AM</button>
+                  <button type="button" class="alarm-ampm-btn" id="btn-alarm-pm">PM</button>
+                  <span class="alarm-digit-label">PERÍODO</span>
+                </div>
               </div>
 
-              <div class="selected-time-box">
-                <span>Horario Confirmado:</span>
-                <strong id="selected-time-highlight" class="selected-time-highlight">--:-- hs</strong>
+              <!-- Quick Time Preset Matrix -->
+              <div class="alarm-quick-matrix">
+                <span class="matrix-title">Horarios frecuentes:</span>
+                <div class="matrix-pills">
+                  <button type="button" class="matrix-pill" data-time="07:00">07:00 AM</button>
+                  <button type="button" class="matrix-pill" data-time="08:30">08:30 AM</button>
+                  <button type="button" class="matrix-pill" data-time="12:00">12:00 PM</button>
+                  <button type="button" class="matrix-pill" data-time="18:00">06:00 PM</button>
+                  <button type="button" class="matrix-pill" data-time="20:30">08:30 PM</button>
+                  <button type="button" class="matrix-pill" data-time="22:00">10:00 PM</button>
+                </div>
               </div>
 
+              <div class="selected-time-box alarm-confirmed-box">
+                <span class="confirmed-clock-icon">🕒</span>
+                <div class="confirmed-text-wrap">
+                  <span class="confirmed-sub">Horario Seleccionado:</span>
+                  <strong id="selected-time-highlight" class="selected-time-highlight">12:00 hs</strong>
+                </div>
+              </div>
+
+              <!-- Hidden native sync input for legacy bindings -->
               <input type="time" id="trip-time" step="300" class="hidden" />
+              <select id="select-hour" class="hidden" aria-hidden="true"></select>
+              <select id="select-minute" class="hidden" aria-hidden="true"></select>
             </div>
           </div>
         </div>
@@ -1166,9 +1193,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=53"></script>
+  <script src="sync.js?v=54"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=53"></script>
+  <script src="app.js?v=54"></script>
 </body>
 </html>

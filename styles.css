@@ -4798,12 +4798,30 @@ html, body {
 }
 
 .breakdown-details {
-  display: flex !important;
+  display: none !important;
   flex-direction: column !important;
   gap: 10px !important;
   margin-top: 12px !important;
-  padding-top: 10px !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 12px 14px !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+  border-radius: var(--radius-md) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  animation: breakdownFadeIn 0.25s ease-out !important;
+}
+
+.breakdown-details.open {
+  display: flex !important;
+}
+
+@keyframes breakdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .breakdown-row {
@@ -4853,6 +4871,221 @@ html, body {
 
 .discount-row strong {
   color: #34d399 !important;
+}
+
+/* =========================================================
+   ESTILOS DE ALTO CONTRASTE: RELOJ ALARMA DIGITAL
+   ========================================================= */
+.digital-alarm-block {
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(9, 14, 26, 0.98)) !important;
+  border: 1.5px solid rgba(52, 211, 153, 0.35) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  border-radius: 16px !important;
+  padding: 16px !important;
+}
+
+.alarm-clock-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: #090e1a;
+  border: 2px solid rgba(16, 185, 129, 0.5);
+  border-radius: 18px;
+  padding: 16px 12px;
+  margin: 10px 0 14px 0;
+  box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.8), 0 0 18px rgba(16, 185, 129, 0.15);
+}
+
+.alarm-digit-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.alarm-btn-adjust {
+  width: 52px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
+  border: 1.5px solid rgba(52, 211, 153, 0.4);
+  color: #34d399;
+  font-size: 1.1rem;
+  font-weight: 900;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.alarm-btn-adjust:hover {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  border-color: #34d399;
+  transform: scale(1.06);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
+}
+
+.alarm-btn-adjust:active {
+  transform: scale(0.94);
+}
+
+.alarm-digit-display {
+  width: 80px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #020617;
+  border: 2px solid #34d399;
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 2.5rem;
+  font-weight: 900;
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+  letter-spacing: 1px;
+  box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.35), 0 0 12px rgba(16, 185, 129, 0.2);
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+  user-select: none;
+}
+
+.alarm-digit-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.alarm-colon-separator {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #34d399;
+  margin-bottom: 22px;
+  animation: colonBlink 1.2s infinite ease-in-out;
+  text-shadow: 0 0 10px rgba(52, 211, 153, 0.7);
+  user-select: none;
+}
+
+@keyframes colonBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.95); }
+}
+
+.alarm-period-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.alarm-ampm-btn {
+  width: 48px;
+  height: 38px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  font-size: 0.92rem;
+  font-weight: 800;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.alarm-ampm-btn.active {
+  background: linear-gradient(135deg, #10b981, #047857);
+  border-color: #34d399;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.55);
+}
+
+.alarm-quick-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.matrix-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.matrix-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.matrix-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.matrix-pill:hover,
+.matrix-pill.active {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: #34d399;
+  color: #34d399;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+.alarm-confirmed-box {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 78, 59, 0.25)) !important;
+  border: 1.5px solid rgba(52, 211, 153, 0.4) !important;
+  border-radius: 12px !important;
+  padding: 12px 16px !important;
+  text-align: center !important;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.15) !important;
+}
+
+.confirmed-clock-icon {
+  font-size: 1.4rem;
+}
+
+.confirmed-text-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.confirmed-sub {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.alarm-confirmed-box .selected-time-highlight {
+  font-size: 1.25rem !important;
+  font-weight: 900 !important;
+  color: #34d399 !important;
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.4) !important;
 }
 
 /* Mobile App Viewport Enhancements */

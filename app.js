@@ -56,47 +56,52 @@ let currentWizardStep = 1;
 async function goToWizardStep(step) {
   if (step < 1 || step > 5) return;
 
+  const originInput = document.getElementById('origin-input');
+  const destInput = document.getElementById('destination-input');
+  const stopInput = document.getElementById('stop-input');
+
+  const originVal = originInput ? originInput.value.trim() : '';
+  const destVal = destInput ? destInput.value.trim() : '';
+  const stopVal = stopInput ? stopInput.value.trim() : '';
+
   // Validar y geocodificar direcciones en el paso 3 antes de avanzar al paso 4 o 5
-  if (step > 3 && currentWizardStep <= 3) {
-    const originVal = document.getElementById('origin-input')?.value.trim();
-    const destVal = document.getElementById('destination-input')?.value.trim();
+  if (step > 3) {
     if (!originVal || !destVal) {
-      alert('⚠️ Por favor ingresa el Origen y el Destino de tu viaje antes de continuar al mapa o cotización.');
+      alert('⚠️ Por favor ingresa el Origen y el Destino de tu viaje antes de continuar.');
       return;
     }
 
-    // Geocodificar Origen si aún no se han fijado las coordenadas
-    if (!state.origin || !state.origin.lat) {
+    // Geocodificar Origen si no está fijado o si el texto cambió
+    if (!state.origin || !state.origin.lat || (state.origin.address && state.origin.address !== originVal)) {
       if (typeof searchLocations === 'function') {
         try {
           const results = await searchLocations(originVal);
           if (results && results.length > 0) {
-            setOrigin(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
+            state.origin = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || originVal };
           }
         } catch(e){}
       }
     }
 
-    // Geocodificar Destino si aún no se han fijado las coordenadas
-    if (!state.destination || !state.destination.lat) {
+    // Geocodificar Destino si no está fijado o si el texto cambió
+    if (!state.destination || !state.destination.lat || (state.destination.address && state.destination.address !== destVal)) {
       if (typeof searchLocations === 'function') {
         try {
           const results = await searchLocations(destVal);
           if (results && results.length > 0) {
-            setDestination(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
+            state.destination = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || destVal };
           }
         } catch(e){}
       }
     }
 
     // Geocodificar Parada Intermedia si aplica
-    const stopVal = document.getElementById('stop-input')?.value.trim();
     if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
       if (typeof searchLocations === 'function') {
         try {
           const results = await searchLocations(stopVal);
           if (results && results.length > 0) {
-            setIntermediateStop(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
+            state.intermediateStop = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || stopVal };
           }
         } catch(e){}
       }
@@ -160,7 +165,8 @@ async function goToWizardStep(step) {
   if (step === 5) {
     if (typeof checkAndRoute === 'function' && state.origin && state.destination) {
       try { await checkAndRoute(); } catch(e){}
-    } else if (typeof updateCalculation === 'function') {
+    }
+    if (typeof updateCalculation === 'function') {
       try { updateCalculation(); } catch(e){}
     }
     if (typeof renderQuote === 'function') {
@@ -995,7 +1001,20 @@ function initDateTimeControls() {
   const selectHour = document.getElementById('select-hour');
   const selectMinute = document.getElementById('select-minute');
 
-  // 1. Población de opciones de hora (00 a 23)
+  const alarmHourDisplay = document.getElementById('alarm-hour-display');
+  const alarmMinDisplay = document.getElementById('alarm-min-display');
+  const btnAlarmHourUp = document.getElementById('btn-alarm-hour-up');
+  const btnAlarmHourDown = document.getElementById('btn-alarm-hour-down');
+  const btnAlarmMinUp = document.getElementById('btn-alarm-min-up');
+  const btnAlarmMinDown = document.getElementById('btn-alarm-min-down');
+  const btnAlarmAm = document.getElementById('btn-alarm-am');
+  const btnAlarmPm = document.getElementById('btn-alarm-pm');
+
+  // Estado interno del reloj de alarma
+  let currentHour = 12;
+  let currentMin = 0;
+
+  // 1. Población de opciones de hora (00 a 23) para compatibilidad
   if (selectHour) {
     selectHour.innerHTML = '';
     for (let h = 0; h < 24; h++) {
@@ -1038,28 +1057,186 @@ function initDateTimeControls() {
   now.setMinutes(roundedMin);
   now.setSeconds(0);
 
-  const initialH = String(now.getHours()).padStart(2, '0');
-  const initialM = String(now.getMinutes()).padStart(2, '0');
+  currentHour = now.getHours();
+  currentMin = now.getMinutes();
+  if (currentMin >= 60) {
+    currentHour = (currentHour + 1) % 24;
+    currentMin = 0;
+  }
 
-  if (selectHour) selectHour.value = initialH;
-  if (selectMinute) selectMinute.value = initialM;
-  if (timeInput) timeInput.value = `${initialH}:${initialM}`;
-  state.time = `${initialH}:${initialM}`;
+  function renderAlarmClock() {
+    const isPm = currentHour >= 12;
+    let displayH12 = currentHour % 12;
+    if (displayH12 === 0) displayH12 = 12;
 
-  // Sincronización al cambiar selects
-  function syncFromSelects() {
-    const h = selectHour ? selectHour.value : '12';
-    const m = selectMinute ? selectMinute.value : '00';
-    const timeStr = `${h}:${m}`;
-    if (timeInput) timeInput.value = timeStr;
-    state.time = timeStr;
+    const displayHStr = String(displayH12).padStart(2, '0');
+    const displayMStr = String(currentMin).padStart(2, '0');
+    const fullTime24Str = `${String(currentHour).padStart(2, '0')}:${displayMStr}`;
+
+    if (alarmHourDisplay) alarmHourDisplay.textContent = displayHStr;
+    if (alarmMinDisplay) alarmMinDisplay.textContent = displayMStr;
+
+    if (btnAlarmAm && btnAlarmPm) {
+      if (isPm) {
+        btnAlarmPm.classList.add('active');
+        btnAlarmAm.classList.remove('active');
+      } else {
+        btnAlarmAm.classList.add('active');
+        btnAlarmPm.classList.remove('active');
+      }
+    }
+
+    if (selectHour) selectHour.value = String(currentHour).padStart(2, '0');
+    if (selectMinute) selectMinute.value = displayMStr;
+    if (timeInput) timeInput.value = fullTime24Str;
+    state.time = fullTime24Str;
+
+    const slotTag = currentHour < 12 ? 'Mañana' : (currentHour < 20 ? 'Tarde' : 'Noche');
+    const highlightEl = document.getElementById('selected-time-highlight');
+    if (highlightEl) {
+      highlightEl.textContent = `${fullTime24Str} hs (${displayHStr}:${displayMStr} ${isPm ? 'PM' : 'AM'} • ${slotTag})`;
+    }
+
+    // Actualizar matriz de atajos activos
+    document.querySelectorAll('.matrix-pill').forEach(pill => {
+      const pTime = pill.getAttribute('data-time');
+      if (pTime === fullTime24Str) {
+        pill.classList.add('active');
+      } else {
+        pill.classList.remove('active');
+      }
+    });
+
     evaluateTimeRate(state.time, state.date);
     updateStepDateTimeBadges();
     updateCalculation();
   }
 
-  if (selectHour) selectHour.addEventListener('change', syncFromSelects);
-  if (selectMinute) selectMinute.addEventListener('change', syncFromSelects);
+  // Ajustes de Hora
+  if (btnAlarmHourUp) {
+    btnAlarmHourUp.addEventListener('click', () => {
+      currentHour = (currentHour + 1) % 24;
+      renderAlarmClock();
+    });
+  }
+
+  if (btnAlarmHourDown) {
+    btnAlarmHourDown.addEventListener('click', () => {
+      currentHour = (currentHour - 1 + 24) % 24;
+      renderAlarmClock();
+    });
+  }
+
+  // Ajustes de Minutos (+5m / -5m)
+  if (btnAlarmMinUp) {
+    btnAlarmMinUp.addEventListener('click', () => {
+      currentMin += 5;
+      if (currentMin >= 60) {
+        currentMin = 0;
+        currentHour = (currentHour + 1) % 24;
+      }
+      renderAlarmClock();
+    });
+  }
+
+  if (btnAlarmMinDown) {
+    btnAlarmMinDown.addEventListener('click', () => {
+      currentMin -= 5;
+      if (currentMin < 0) {
+        currentMin = 55;
+        currentHour = (currentHour - 1 + 24) % 24;
+      }
+      renderAlarmClock();
+    });
+  }
+
+  // Interruptores AM / PM
+  if (btnAlarmAm) {
+    btnAlarmAm.addEventListener('click', () => {
+      if (currentHour >= 12) {
+        currentHour -= 12;
+      }
+      renderAlarmClock();
+      showToast('Horario fijado en AM (Mañana)');
+    });
+  }
+
+  if (btnAlarmPm) {
+    btnAlarmPm.addEventListener('click', () => {
+      if (currentHour < 12) {
+        currentHour += 12;
+      }
+      renderAlarmClock();
+      showToast('Horario fijado en PM (Tarde / Noche)');
+    });
+  }
+
+  // Matrix Pills
+  document.querySelectorAll('.matrix-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const t = pill.getAttribute('data-time');
+      if (t) {
+        const [h, m] = t.split(':').map(Number);
+        currentHour = h;
+        currentMin = m;
+        renderAlarmClock();
+        showToast(`Horario fijado en ${t} hs.`);
+      }
+    });
+  });
+
+  // Atajos rápidos
+  const btnTimeNow = document.getElementById('btn-time-now');
+  if (btnTimeNow) {
+    btnTimeNow.addEventListener('click', () => {
+      const fresh = new Date();
+      const rMin = Math.ceil(fresh.getMinutes() / 5) * 5;
+      fresh.setMinutes(rMin);
+      currentHour = fresh.getHours();
+      currentMin = fresh.getMinutes();
+      if (currentMin >= 60) {
+        currentHour = (currentHour + 1) % 24;
+        currentMin = 0;
+      }
+      renderAlarmClock();
+      showToast('Horario fijado en este momento.');
+    });
+  }
+
+  const btnTimePlus15 = document.getElementById('btn-time-plus15');
+  if (btnTimePlus15) {
+    btnTimePlus15.addEventListener('click', () => {
+      currentMin += 15;
+      while (currentMin >= 60) {
+        currentMin -= 60;
+        currentHour = (currentHour + 1) % 24;
+      }
+      renderAlarmClock();
+      showToast('Hora ajustada: +15 minutos.');
+    });
+  }
+
+  const btnTimePlus30 = document.getElementById('btn-time-plus30');
+  if (btnTimePlus30) {
+    btnTimePlus30.addEventListener('click', () => {
+      currentMin += 30;
+      while (currentMin >= 60) {
+        currentMin -= 60;
+        currentHour = (currentHour + 1) % 24;
+      }
+      renderAlarmClock();
+      showToast('Hora ajustada: +30 minutos.');
+    });
+  }
+
+  const btnTimePlus60 = document.getElementById('btn-time-plus60');
+  if (btnTimePlus60) {
+    btnTimePlus60.addEventListener('click', () => {
+      currentHour = (currentHour + 1) % 24;
+      renderAlarmClock();
+      showToast('Hora ajustada: +1 hora.');
+    });
+  }
 
   if (dateInput) {
     dateInput.addEventListener('change', (e) => {
@@ -1106,78 +1283,10 @@ function initDateTimeControls() {
     });
   }
 
-  // Inicializar tira interactiva de días y calendario dinámico
+  // Render inicial del reloj
+  renderAlarmClock();
   renderUpcomingDaysStrip();
   initCustomCalendar();
-
-  // Stepper botones (-5 min / +5 min)
-  const btnTimeMinus = document.getElementById('btn-time-minus');
-  if (btnTimeMinus) {
-    btnTimeMinus.addEventListener('click', () => {
-      adjustTimeByMinutes(-5);
-    });
-  }
-
-  const btnTimePlus = document.getElementById('btn-time-plus');
-  if (btnTimePlus) {
-    btnTimePlus.addEventListener('click', () => {
-      adjustTimeByMinutes(5);
-    });
-  }
-
-  // Atajos de hora: Ahora / +30 min / +1 hora
-  const btnTimeNow = document.getElementById('btn-time-now');
-  if (btnTimeNow) {
-    btnTimeNow.addEventListener('click', () => {
-      const fresh = new Date();
-      const rMin = Math.ceil(fresh.getMinutes() / 5) * 5;
-      fresh.setMinutes(rMin);
-      setTimeFromDate(fresh);
-      showToast('Hora actualizada a este momento.');
-    });
-  }
-
-  const btnTimePlus30 = document.getElementById('btn-time-plus30');
-  if (btnTimePlus30) {
-    btnTimePlus30.addEventListener('click', () => {
-      adjustTimeByMinutes(30);
-      showToast('Hora ajustada: +30 minutos.');
-    });
-  }
-
-  const btnTimePlus60 = document.getElementById('btn-time-plus60');
-  if (btnTimePlus60) {
-    btnTimePlus60.addEventListener('click', () => {
-      adjustTimeByMinutes(60);
-      showToast('Hora ajustada: +1 hora.');
-    });
-  }
-
-  function adjustTimeByMinutes(deltaMin) {
-    if (!selectHour || !selectMinute) return;
-    const curH = parseInt(selectHour.value, 10) || 0;
-    const curM = parseInt(selectMinute.value, 10) || 0;
-    let totalMins = curH * 60 + curM + deltaMin;
-
-    if (totalMins < 0) totalMins += 24 * 60;
-    totalMins = totalMins % (24 * 60);
-
-    const newH = String(Math.floor(totalMins / 60)).padStart(2, '0');
-    const newM = String(totalMins % 60).padStart(2, '0');
-
-    selectHour.value = newH;
-    selectMinute.value = newM;
-    syncFromSelects();
-  }
-
-  function setTimeFromDate(d) {
-    if (!selectHour || !selectMinute) return;
-    const h = String(d.getHours()).padStart(2, '0');
-    const m = String(d.getMinutes()).padStart(2, '0');
-    selectHour.value = h;
-    selectMinute.value = m;
-    syncFromSelects();
-  }
 }
 
 // ==========================================
@@ -5093,6 +5202,70 @@ function openInAppTripModal(trip) {
 
 let passengerFastPollTimer = null;
 
+function handlePassengerDriverAssigned(viaje, showNotification = true) {
+  if (!viaje) return;
+  clearPassengerSearchTimeout();
+  if (passengerFastPollTimer) {
+    clearInterval(passengerFastPollTimer);
+    passengerFastPollTimer = null;
+  }
+
+  if (pStateSearching) pStateSearching.classList.add('hidden');
+  if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
+  if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Chofer Asignado';
+
+  const cond = viaje.conductor || {};
+  const driverName = cond.nombre || 'Daniel Pabon';
+  const driverCar = cond.auto || 'Fiat Cronos Negro';
+  const driverPlate = cond.patente ? ` · Patente: ${cond.patente}` : (!driverCar.includes('Patente') ? ' · Patente: AE927CN' : '');
+  const driverRating = cond.calificacion || '4.98';
+  const driverPhoto = cond.fotoPerfil || cond.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+
+  if (pDriverName) pDriverName.textContent = driverName;
+  if (pDriverCar) pDriverCar.textContent = `${driverCar}${driverPlate}`;
+  if (pDriverRating) pDriverRating.textContent = driverRating;
+  if (pChatDriverName) pChatDriverName.textContent = `${driverName} (Chofer)`;
+  if (pDriverAvatar) pDriverAvatar.src = driverPhoto;
+  const pChatDriverAvatar = document.getElementById('pChatDriverAvatar');
+  if (pChatDriverAvatar) pChatDriverAvatar.src = driverPhoto;
+
+  if (btnPassengerCallDriver) {
+    btnPassengerCallDriver.href = `tel:${cond.telefono || '+5491122558226'}`;
+  }
+
+  // Actualizar precio de la solicitud
+  const rawPrice = viaje.precioEstimado || viaje.precio || viaje.totalFare || viaje.monto;
+  if (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0) {
+    if (pTripTotal) pTripTotal.textContent = '$' + Number(rawPrice).toLocaleString('es-AR');
+  }
+  if (viaje.origen && pTripOrigin) pTripOrigin.textContent = viaje.origen;
+  if (viaje.destino && pTripDestination) pTripDestination.textContent = viaje.destino;
+
+  const stopAddr = viaje.parada || viaje.stopAddress || viaje.intermediateStop || (viaje.hasStop && viaje.stop ? viaje.stop : null);
+  const pTripStopRow = document.getElementById('pTripStopRow');
+  const pTripStop = document.getElementById('pTripStop');
+  if (stopAddr) {
+    if (pTripStopRow) pTripStopRow.style.display = 'flex';
+    if (pTripStop) pTripStop.textContent = stopAddr;
+  } else {
+    if (pTripStopRow) pTripStopRow.style.display = 'none';
+  }
+
+  pActiveTripData = { ...(pActiveTripData || {}), ...viaje };
+
+  try {
+    initPassengerLiveMap(viaje);
+  } catch(e){}
+
+  const activeStage = (viaje.estado && viaje.estado !== 'buscando_conductor' && viaje.estado !== 'solicitado') ? viaje.estado : 'en_camino';
+  updatePassengerTripStage(activeStage);
+
+  if (showNotification) {
+    try { playPassengerTone('arrived'); } catch(e){}
+    showToast(`🎉 ¡Chofer asignado! ${driverName} aceptó tu viaje y está en camino.`);
+  }
+}
+
 function startPassengerRealtimePoll(tripId) {
   if (passengerFastPollTimer) clearInterval(passengerFastPollTimer);
 
@@ -5116,30 +5289,7 @@ function startPassengerRealtimePoll(tripId) {
     }
 
     if (activeTrip && activeTrip.estado && activeTrip.estado !== 'buscando_conductor' && activeTrip.estado !== 'solicitado') {
-      // TRASLADO ACEPTADO POR CHOFER
-      clearInterval(passengerFastPollTimer);
-      passengerFastPollTimer = null;
-      clearPassengerSearchTimeout();
-
-      if (pStateSearching) pStateSearching.classList.add('hidden');
-      if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
-
-      const driverName = (activeTrip.conductor && activeTrip.conductor.nombre) ? activeTrip.conductor.nombre : 'Daniel Pabon';
-      const driverCar = (activeTrip.conductor && activeTrip.conductor.auto) ? activeTrip.conductor.auto : 'Fiat Cronos Negro';
-      const driverPlate = (activeTrip.conductor && activeTrip.conductor.patente) ? activeTrip.conductor.patente : 'AE927CN';
-      const driverRating = (activeTrip.conductor && activeTrip.conductor.calificacion) ? activeTrip.conductor.calificacion : '4.98';
-
-      const pDriverName = document.getElementById('pDriverName');
-      const pDriverCar = document.getElementById('pDriverCar');
-      const pDriverRating = document.getElementById('pDriverRating');
-
-      if (pDriverName) pDriverName.textContent = driverName;
-      if (pDriverCar) pDriverCar.textContent = `${driverCar} · Patente: ${driverPlate}`;
-      if (pDriverRating) pDriverRating.textContent = driverRating;
-
-      updatePassengerTripStage(activeTrip.estado || 'aceptado');
-      try { playPassengerTone('arrived'); } catch(e){}
-      showToast('🎉 ¡Chofer asignado! ' + driverName + ' ha tomado tu viaje.');
+      handlePassengerDriverAssigned(activeTrip, true);
     }
   }, 1000); // Polling ultra-rápido de 1 segundo
 }
@@ -5596,33 +5746,7 @@ document.querySelectorAll('.chat-quick-replies .quick-chip-btn').forEach(btn => 
 // Sincronización en tiempo real de eventos
 if (window.RutaSync) {
   window.RutaSync.on('VIAJE_ACEPTADO', (viaje) => {
-    clearPassengerSearchTimeout();
-    if (viaje && viaje.conductor) {
-      if (pStateSearching) pStateSearching.classList.add('hidden');
-      if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
-
-      const driverName = viaje.conductor.nombre || 'Daniel Pabon';
-      const driverCar = viaje.conductor.auto || 'Fiat Cronos Negro';
-      const driverPlate = viaje.conductor.patente ? ` · Patente: ${viaje.conductor.patente}` : (!driverCar.includes('Patente') ? ' · Patente: AE927CN' : '');
-      const driverRating = viaje.conductor.calificacion || '4.98';
-      const driverPhoto = viaje.conductor.fotoPerfil || viaje.conductor.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
-
-      if (pDriverName) pDriverName.textContent = driverName;
-      if (pDriverCar) pDriverCar.textContent = `${driverCar}${driverPlate}`;
-      if (pDriverRating) pDriverRating.textContent = driverRating;
-      if (pChatDriverName) pChatDriverName.textContent = `${driverName} (Chofer)`;
-      if (pDriverAvatar) pDriverAvatar.src = driverPhoto;
-      const pChatDriverAvatar = document.getElementById('pChatDriverAvatar');
-      if (pChatDriverAvatar) pChatDriverAvatar.src = driverPhoto;
-
-      if (btnPassengerCallDriver) {
-        btnPassengerCallDriver.href = `tel:${viaje.conductor.telefono || '+5491122558226'}`;
-      }
-
-      initPassengerLiveMap(viaje);
-      updatePassengerTripStage('en_camino');
-      showToast(`🚗 ¡Conductor Asignado! ${driverName} aceptó tu viaje y está en camino.`);
-    }
+    handlePassengerDriverAssigned(viaje, true);
   });
 
   window.RutaSync.on('CONDUCTOR_DATOS_ACTUALIZADOS', (data) => {
@@ -5654,6 +5778,13 @@ if (window.RutaSync) {
           alert('⚠️ AVISO:\n\nTu conductor asignado tuvo un inconveniente y canceló el servicio.\n\nEl sistema está buscando automáticamente otro conductor disponible en la zona para atender tu viaje de inmediato.');
         }
         return;
+      }
+    }
+
+    // Si el viaje está asignado o en camino pero el panel de búsqueda seguía visible, actualizar
+    if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(viaje.estado)) {
+      if (pStateSearching && !pStateSearching.classList.contains('hidden')) {
+        handlePassengerDriverAssigned(viaje, false);
       }
     }
 
@@ -5718,6 +5849,7 @@ if (window.RutaSync) {
       showPassengerCompletionModal(viaje);
     }
   });
+}
 
   window.RutaSync.on('CHAT_MENSAJE_ENVIADO', (msg) => {
     if (msg) {

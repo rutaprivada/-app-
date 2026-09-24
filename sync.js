@@ -66,10 +66,17 @@ class RutaSyncManager {
                                             senderId: data.senderId,
                                             timestamp: data.timestamp || Date.now()
                                         });
-                                    } else if (data.estado === 'aceptado') {
+                                    } else if (data.estado === 'aceptado' || data.estado === 'en_camino') {
                                         this.handleIncoming({
-                                            id: 'fs_acc_' + (data.id || Date.now()),
+                                            id: 'fs_acc_' + (data.id || Date.now()) + '_' + (data.ultimoEstadoEn || Date.now()),
                                             type: 'VIAJE_ACEPTADO',
+                                            payload: data,
+                                            senderId: data.senderId,
+                                            timestamp: data.timestamp || Date.now()
+                                        });
+                                        this.handleIncoming({
+                                            id: 'fs_st_' + (data.id || Date.now()) + '_' + data.estado + '_' + (data.ultimoEstadoEn || Date.now()),
+                                            type: 'ESTADO_VIAJE_CAMBIADO',
                                             payload: data,
                                             senderId: data.senderId,
                                             timestamp: data.timestamp || Date.now()
