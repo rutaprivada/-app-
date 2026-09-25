@@ -977,15 +977,15 @@ body {
   top: calc(100% + 6px);
   left: 0;
   width: 100%;
-  max-width: 310px;
+  max-width: 100%;
   background: rgba(12, 17, 30, 0.98);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
-  border: 1.5px solid rgba(52, 211, 153, 0.4);
+  border: 1.5px solid rgba(52, 211, 153, 0.5);
   border-radius: 14px;
   padding: 10px 12px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85), 0 0 25px rgba(16, 185, 129, 0.18);
-  z-index: 1050;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.9), 0 0 25px rgba(16, 185, 129, 0.25);
+  z-index: 9999;
   animation: calPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -4148,13 +4148,18 @@ body.is-app-mode .main-header {
 .passenger-live-map-container {
   position: relative;
   width: 100%;
-  height: 240px;
+  height: 195px;
   border-radius: 16px;
   overflow: hidden;
   margin-bottom: 14px;
   border: 1px solid rgba(251, 191, 36, 0.25);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), inset 0 0 1px rgba(255, 255, 255, 0.1);
   background: #090d16;
+  transition: height 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.passenger-live-map-container.expanded {
+  height: 340px;
 }
 
 .passenger-active-map {

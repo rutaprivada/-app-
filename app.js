@@ -256,22 +256,39 @@ function updateStepDateTimeBadges() {
   }
 }
 
+function updateStep5ActionButton() {
+  const btnTitle = document.getElementById('btn-request-inapp-title');
+  const btnSubtitle = document.getElementById('btn-request-inapp-subtitle');
+  const btnIcon = document.getElementById('btn-request-inapp-icon');
+
+  if (state.tripType === 'schedule') {
+    if (btnTitle) btnTitle.textContent = 'SOLICITAR RESERVA';
+    if (btnSubtitle) {
+      const dateFmt = (typeof formatDateWithWeekday === 'function' && state.date) ? formatDateWithWeekday(state.date) : 'la fecha elegida';
+      btnSubtitle.textContent = `Agendar viaje para ${dateFmt} a las ${state.time || '12:00'} hs`;
+    }
+    if (btnIcon) btnIcon.textContent = '📅';
+  } else {
+    if (btnTitle) btnTitle.textContent = 'SOLICITAR VIAJE';
+    if (btnSubtitle) btnSubtitle.textContent = 'Búsqueda inmediata y seguimiento en tiempo real';
+    if (btnIcon) btnIcon.textContent = '🚀';
+  }
+}
+window.updateStep5ActionButton = updateStep5ActionButton;
+
 function selectTripMode(mode) {
   state.tripType = mode;
   const btnLive = document.getElementById('btn-mode-live');
   const btnSchedule = document.getElementById('btn-mode-schedule');
-  const btnTimeNow = document.getElementById('btn-time-now');
-  const btnDateToday = document.getElementById('btn-date-today');
 
   if (mode === 'live') {
     if (btnLive) btnLive.classList.add('active');
     if (btnSchedule) btnSchedule.classList.remove('active');
-    if (btnTimeNow) btnTimeNow.click();
-    if (btnDateToday) btnDateToday.click();
   } else {
     if (btnSchedule) btnSchedule.classList.add('active');
     if (btnLive) btnLive.classList.remove('active');
   }
+  updateStep5ActionButton();
 }
 
 function handleStep1Next() {
@@ -1077,6 +1094,17 @@ function getFormattedWhatsAppNumber() {
 // 4. CONTROL DE FECHA Y HORA (INTERVALOS 5 MIN)
 // ==========================================
 
+function getMinAllowedTimeForDate(dateStr) {
+  const todayStr = formatDateToString(new Date());
+  if (dateStr === todayStr) {
+    const fresh = new Date();
+    const rawMin = fresh.getHours() * 60 + fresh.getMinutes() + 45; // 45 min mínimo
+    const roundedMin = Math.ceil(rawMin / 5) * 5;
+    return roundedMin;
+  }
+  return 0; // Para mañana u otros días, cualquier hora 00:00 - 23:55
+}
+
 function initDateTimeControls() {
   const dateInput = document.getElementById('trip-date');
   const timeInput = document.getElementById('trip-time');
@@ -1092,7 +1120,7 @@ function initDateTimeControls() {
   const btnAlarmAm = document.getElementById('btn-alarm-am');
   const btnAlarmPm = document.getElementById('btn-alarm-pm');
 
-  // Estado interno del reloj de alarma
+  // Estado interno del reloj de alarma en formato 24hs
   let currentHour = 12;
   let currentMin = 0;
 
@@ -1133,31 +1161,38 @@ function initDateTimeControls() {
   state.date = todayStr;
   updateDateDisplay();
 
-  // 4. Redondear hora actual al múltiplo de 5 minutos más cercano hacia arriba
-  const currentMinutes = now.getMinutes();
-  const roundedMin = Math.ceil(currentMinutes / 5) * 5;
-  now.setMinutes(roundedMin);
-  now.setSeconds(0);
-
-  currentHour = now.getHours();
-  currentMin = now.getMinutes();
+  // 4. Calcular hora inicial con regla de 45 minutos si es hoy
+  const minAllowedTotalMin = getMinAllowedTimeForDate(todayStr);
+  currentHour = Math.floor(minAllowedTotalMin / 60) % 24;
+  currentMin = minAllowedTotalMin % 60;
   if (currentMin >= 60) {
     currentHour = (currentHour + 1) % 24;
     currentMin = 0;
   }
 
   function renderAlarmClock() {
-    const isPm = currentHour >= 12;
-    let displayH12 = currentHour % 12;
-    if (displayH12 === 0) displayH12 = 12;
+    const curTodayStr = formatDateToString(new Date());
+    const minAllowedMin = getMinAllowedTimeForDate(state.date);
 
-    const displayHStr = String(displayH12).padStart(2, '0');
+    // Validación estricta para reservas de hoy: mínimo ahora + 45 min
+    if (state.date === curTodayStr && (currentHour * 60 + currentMin) < minAllowedMin) {
+      currentHour = Math.floor(minAllowedMin / 60) % 24;
+      currentMin = minAllowedMin % 60;
+      if (currentMin >= 60) {
+        currentHour = (currentHour + 1) % 24;
+        currentMin = 0;
+      }
+    }
+
+    const displayHStr = String(currentHour).padStart(2, '0');
     const displayMStr = String(currentMin).padStart(2, '0');
-    const fullTime24Str = `${String(currentHour).padStart(2, '0')}:${displayMStr}`;
+    const fullTime24Str = `${displayHStr}:${displayMStr}`;
 
+    // Display digital en formato 24hs completo (00 a 23)
     if (alarmHourDisplay) alarmHourDisplay.textContent = displayHStr;
     if (alarmMinDisplay) alarmMinDisplay.textContent = displayMStr;
 
+    const isPm = currentHour >= 12;
     if (btnAlarmAm && btnAlarmPm) {
       if (isPm) {
         btnAlarmPm.classList.add('active');
@@ -1168,7 +1203,7 @@ function initDateTimeControls() {
       }
     }
 
-    if (selectHour) selectHour.value = String(currentHour).padStart(2, '0');
+    if (selectHour) selectHour.value = displayHStr;
     if (selectMinute) selectMinute.value = displayMStr;
     if (timeInput) timeInput.value = fullTime24Str;
     state.time = fullTime24Str;
@@ -1176,7 +1211,8 @@ function initDateTimeControls() {
     const slotTag = currentHour < 12 ? 'Mañana' : (currentHour < 20 ? 'Tarde' : 'Noche');
     const highlightEl = document.getElementById('selected-time-highlight');
     if (highlightEl) {
-      highlightEl.textContent = `${fullTime24Str} hs (${displayHStr}:${displayMStr} ${isPm ? 'PM' : 'AM'} • ${slotTag})`;
+      const note45 = (state.date === curTodayStr) ? ' • Mín. 45 min de anticipación' : '';
+      highlightEl.textContent = `${fullTime24Str} hs (${slotTag}${note45})`;
     }
 
     // Actualizar matriz de atajos activos
@@ -1191,10 +1227,11 @@ function initDateTimeControls() {
 
     evaluateTimeRate(state.time, state.date);
     updateStepDateTimeBadges();
+    updateStep5ActionButton();
     updateCalculation();
   }
 
-  // Ajustes de Hora
+  // Ajustes de Hora (00 a 23 hs continuo)
   if (btnAlarmHourUp) {
     btnAlarmHourUp.addEventListener('click', () => {
       currentHour = (currentHour + 1) % 24;
@@ -1204,7 +1241,17 @@ function initDateTimeControls() {
 
   if (btnAlarmHourDown) {
     btnAlarmHourDown.addEventListener('click', () => {
-      currentHour = (currentHour - 1 + 24) % 24;
+      const curTodayStr = formatDateToString(new Date());
+      const minAllowed = getMinAllowedTimeForDate(state.date);
+      const nextTotal = ((currentHour - 1 + 24) % 24) * 60 + currentMin;
+
+      if (state.date === curTodayStr && nextTotal < minAllowed) {
+        currentHour = Math.floor(minAllowed / 60) % 24;
+        currentMin = minAllowed % 60;
+        showToast('⚠️ Las reservas para el mismo día requieren al menos 45 minutos de anticipación.');
+      } else {
+        currentHour = (currentHour - 1 + 24) % 24;
+      }
       renderAlarmClock();
     });
   }
@@ -1223,10 +1270,23 @@ function initDateTimeControls() {
 
   if (btnAlarmMinDown) {
     btnAlarmMinDown.addEventListener('click', () => {
-      currentMin -= 5;
-      if (currentMin < 0) {
-        currentMin = 55;
-        currentHour = (currentHour - 1 + 24) % 24;
+      const curTodayStr = formatDateToString(new Date());
+      const minAllowed = getMinAllowedTimeForDate(state.date);
+      let targetH = currentHour;
+      let targetM = currentMin - 5;
+      if (targetM < 0) {
+        targetM = 55;
+        targetH = (targetH - 1 + 24) % 24;
+      }
+      const nextTotal = targetH * 60 + targetM;
+
+      if (state.date === curTodayStr && nextTotal < minAllowed) {
+        currentHour = Math.floor(minAllowed / 60) % 24;
+        currentMin = minAllowed % 60;
+        showToast('⚠️ Las reservas para el mismo día requieren al menos 45 minutos de anticipación.');
+      } else {
+        currentHour = targetH;
+        currentMin = targetM;
       }
       renderAlarmClock();
     });
@@ -1259,6 +1319,15 @@ function initDateTimeControls() {
       const t = pill.getAttribute('data-time');
       if (t) {
         const [h, m] = t.split(':').map(Number);
+        const curTodayStr = formatDateToString(new Date());
+        const minAllowed = getMinAllowedTimeForDate(state.date);
+        const pillTotal = h * 60 + m;
+
+        if (state.date === curTodayStr && pillTotal < minAllowed) {
+          showToast('⚠️ Este horario es anterior a los 45 min requeridos para hoy.');
+          return;
+        }
+
         currentHour = h;
         currentMin = m;
         renderAlarmClock();
@@ -1272,16 +1341,24 @@ function initDateTimeControls() {
   if (btnTimeNow) {
     btnTimeNow.addEventListener('click', () => {
       const fresh = new Date();
-      const rMin = Math.ceil(fresh.getMinutes() / 5) * 5;
-      fresh.setMinutes(rMin);
-      currentHour = fresh.getHours();
-      currentMin = fresh.getMinutes();
-      if (currentMin >= 60) {
-        currentHour = (currentHour + 1) % 24;
-        currentMin = 0;
+      const curTodayStr = formatDateToString(fresh);
+      if (state.date === curTodayStr && state.tripType === 'schedule') {
+        const minAllowed = getMinAllowedTimeForDate(curTodayStr);
+        currentHour = Math.floor(minAllowed / 60) % 24;
+        currentMin = minAllowed % 60;
+        showToast('Horario fijado en el horario más próximo (+45 min).');
+      } else {
+        const rMin = Math.ceil(fresh.getMinutes() / 5) * 5;
+        fresh.setMinutes(rMin);
+        currentHour = fresh.getHours();
+        currentMin = fresh.getMinutes();
+        if (currentMin >= 60) {
+          currentHour = (currentHour + 1) % 24;
+          currentMin = 0;
+        }
+        showToast('Horario fijado en este momento.');
       }
       renderAlarmClock();
-      showToast('Horario fijado en este momento.');
     });
   }
 
@@ -1322,10 +1399,7 @@ function initDateTimeControls() {
 
   if (dateInput) {
     dateInput.addEventListener('change', (e) => {
-      state.date = e.target.value;
-      updateDateDisplay();
-      evaluateTimeRate(state.time, state.date);
-      updateCalculation();
+      selectDateFromCalendar(e.target.value);
     });
   }
 
@@ -1337,7 +1411,7 @@ function initDateTimeControls() {
   if (btnToday) {
     btnToday.addEventListener('click', () => {
       selectDateFromCalendar(todayStr);
-      showToast('Fecha fijada en Hoy.');
+      showToast('Fecha fijada en Hoy (Reserva con 45m mín.).');
     });
   }
 
@@ -1610,6 +1684,11 @@ function selectDateFromCalendar(dateStr) {
   const dateInput = document.getElementById('trip-date');
   if (dateInput) dateInput.value = dateStr;
 
+  // Si se selecciona un día específico, pasar automáticamente a Reserva Programada
+  if (typeof selectTripMode === 'function') {
+    selectTripMode('schedule');
+  }
+
   const todayStr = formatDateToString(new Date());
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1633,10 +1712,31 @@ function selectDateFromCalendar(dateStr) {
     }
   }
 
+  // Ajustar hora mínima si es para hoy
+  if (dateStr === todayStr && typeof getMinAllowedTimeForDate === 'function') {
+    const minAllowedMin = getMinAllowedTimeForDate(todayStr);
+    if (state.time) {
+      const [h, m] = state.time.split(':').map(Number);
+      if ((h * 60 + m) < minAllowedMin) {
+        const nH = Math.floor(minAllowedMin / 60) % 24;
+        const nM = minAllowedMin % 60;
+        state.time = `${String(nH).padStart(2, '0')}:${String(nM).padStart(2, '0')}`;
+        const timeInput = document.getElementById('trip-time');
+        if (timeInput) timeInput.value = state.time;
+        const alarmHourDisplay = document.getElementById('alarm-hour-display');
+        const alarmMinDisplay = document.getElementById('alarm-min-display');
+        if (alarmHourDisplay) alarmHourDisplay.textContent = String(nH).padStart(2, '0');
+        if (alarmMinDisplay) alarmMinDisplay.textContent = String(nM).padStart(2, '0');
+      }
+    }
+  }
+
   updateDateDisplay();
   renderUpcomingDaysStrip();
   renderCustomCalendar();
   evaluateTimeRate(state.time, state.date);
+  updateStepDateTimeBadges();
+  updateStep5ActionButton();
   updateCalculation();
 }
 
@@ -3462,15 +3562,7 @@ function initEventListeners() {
     });
   });
 
-  // Desplegable de desglose
-  const toggleBreakdownBtn = document.getElementById('toggle-breakdown');
-  const breakdownContent = document.getElementById('breakdown-content');
-  if (toggleBreakdownBtn && breakdownContent) {
-    toggleBreakdownBtn.addEventListener('click', () => {
-      toggleBreakdownBtn.classList.toggle('open');
-      breakdownContent.classList.toggle('open');
-    });
-  }
+
 
   // Acciones principales
   const btnReserveWa = document.getElementById('btn-reserve-whatsapp');
@@ -5455,7 +5547,27 @@ function updatePassengerTripStage(stage) {
     }
   }
 
-  // 3. Actualizar textos, banner superior y pasos activos
+  // 3. Ajuste dinámico de tamaño de mapa: compacto mientras espera chofer, expandido al iniciar viaje
+  const liveMapContainer = document.getElementById('passengerLiveMapContainer');
+  if (stage === 'en_viaje' || stage === 'hacia_parada' || stage === 'en_parada') {
+    if (liveMapContainer) liveMapContainer.classList.add('expanded');
+    setTimeout(() => {
+      if (passengerLiveMap) {
+        passengerLiveMap.invalidateSize();
+        fitPassengerMapBounds();
+      }
+    }, 360);
+  } else {
+    if (liveMapContainer) liveMapContainer.classList.remove('expanded');
+    setTimeout(() => {
+      if (passengerLiveMap) {
+        passengerLiveMap.invalidateSize();
+        fitPassengerMapBounds();
+      }
+    }, 360);
+  }
+
+  // 4. Actualizar textos, banner superior y pasos activos
   if (stage === 'aceptado') {
     if (pStepAssigned) pStepAssigned.classList.add('active');
     if (pStageBannerText) pStageBannerText.textContent = '¡Chofer confirmado! Preparando salida hacia tu ubicación.';
@@ -5559,16 +5671,6 @@ if (btnRequestInapp) {
       return;
     }
 
-    // Validación de viaje inmediato (5 a 10 min) vs Reserva programada
-    const todayStr = new Date().toISOString().split('T')[0];
-    const selectedDate = document.getElementById('pickup-date-input')?.value || state.date || todayStr;
-    if (selectedDate && selectedDate > todayStr) {
-      showToast('ℹ️ El pedido de chofer en vivo es para salidas inmediatas (5 a 10 min). Para traslados programados, por favor toca "Reservar Traslado".');
-      const btnReserve = document.getElementById('btn-action-reserva');
-      if (btnReserve) btnReserve.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-
     // Obtener la cotización exacta activa
     let calculatedFare = 0;
     if (state.totalPrice && Number(state.totalPrice) > 0) {
@@ -5582,7 +5684,7 @@ if (btnRequestInapp) {
         calculatedFare = domPrice;
       } else {
         updateCalculation();
-        calculatedFare = Number(state.totalPrice) || 0;
+        calculatedFare = Number(state.totalPrice) || 3500;
       }
     }
 
@@ -5595,6 +5697,110 @@ if (btnRequestInapp) {
     const hasIntermediateStop = !!(state.hasIntermediateStop && (stopAddress || stopVal));
     const tollCostNum = Number(b.tollCost || b.tollFare || 0);
 
+    const isReservation = (state.tripType === 'schedule');
+    const curTodayStr = formatDateToString(new Date());
+
+    // Si es reserva para hoy, verificar regla de 45 minutos
+    if (isReservation && state.date === curTodayStr && typeof getMinAllowedTimeForDate === 'function') {
+      const minAllowed = getMinAllowedTimeForDate(curTodayStr);
+      const [h, m] = (state.time || '00:00').split(':').map(Number);
+      if ((h * 60 + m) < minAllowed) {
+        showToast('⚠️ Las reservas para el mismo día requieren al menos 45 minutos de anticipación.');
+        goToWizardStep(2);
+        return;
+      }
+    }
+
+    if (isReservation) {
+      // ==========================================
+      // FLUJO DE RESERVA PROGRAMADA (NO ABRE RADAR EN VIVO)
+      // ==========================================
+      const reservaData = {
+        id: 'res_' + Date.now(),
+        tipo: 'reserva',
+        type: 'reserva',
+        isSchedule: true,
+        estado: 'disponible',
+        status: 'disponible',
+        creadoEn: Date.now(),
+        timestamp: Date.now(),
+        fecha: state.date || curTodayStr,
+        date: state.date || curTodayStr,
+        hora: state.time || '12:00',
+        time: state.time || '12:00',
+        pickupTime: state.time || '12:00',
+        origen: originAddress,
+        pickupAddress: originAddress,
+        destino: destAddress,
+        dropoffAddress: destAddress,
+        parada: hasIntermediateStop ? stopAddress : null,
+        stopAddress: hasIntermediateStop ? stopAddress : null,
+        hasStop: hasIntermediateStop,
+        hasIntermediateStop: hasIntermediateStop,
+        stopFee: Number(state.stopFee || b.stopFee || 0),
+        distancia: `${(state.distanceKm || 0).toFixed(1)} km`,
+        distanceKm: Number(state.distanceKm) || 0,
+        duracion: `${state.durationMin || state.baseDurationMin || 0} min`,
+        durationMin: Number(state.durationMin || state.baseDurationMin) || 0,
+        fuelCostEst: Math.round((Number(state.distanceKm) || 0) * 210),
+        precioEstimado: calculatedFare,
+        precio: calculatedFare,
+        totalFare: calculatedFare,
+        monto: calculatedFare,
+        peajes: tollCostNum,
+        tollFare: tollCostNum,
+        tollActual: tollCostNum,
+        nombrePasajero: passName,
+        clientName: passName,
+        customerName: passName,
+        telefono: passPhone,
+        clientPhone: passPhone,
+        customerPhone: passPhone,
+        notas: passNotes,
+        categoria: 'Sedán Ejecutivo',
+        originCoords: state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null,
+        destinationCoords: state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null,
+        stopCoords: (hasIntermediateStop && state.stop && state.stop.lat) ? { lat: state.stop.lat, lng: state.stop.lng } : null
+      };
+
+      if (window.RutaSync) {
+        window.RutaSync.guardarReservaEnAgenda(reservaData);
+        window.RutaSync.emit('RESERVA_CREADA', reservaData);
+      }
+
+      // Guardar en el historial local del perfil de pasajero
+      try {
+        let historyList = JSON.parse(localStorage.getItem('rutaprivada_passenger_history') || '[]');
+        historyList.unshift({
+          id: reservaData.id,
+          date: reservaData.fecha,
+          time: reservaData.hora,
+          origin: reservaData.origen,
+          destination: reservaData.destino,
+          hasStop: reservaData.hasStop,
+          stopAddress: reservaData.parada,
+          fare: reservaData.precioEstimado,
+          distance: reservaData.distancia,
+          duration: reservaData.duracion,
+          status: 'Agendada (Reserva)',
+          rating: 5,
+          paymentMethod: 'Efectivo / Transferencia',
+          driver: { name: 'Por asignar', car: 'Sedán Ejecutivo', plate: '--' }
+        });
+        localStorage.setItem('rutaprivada_passenger_history', JSON.stringify(historyList));
+        if (typeof loadPassengerTripHistory === 'function') loadPassengerTripHistory();
+      } catch(e){}
+
+      try { playPassengerTone('confirmed'); } catch(e){}
+      showToast('📅 ¡Reserva agendada con éxito!');
+      alert(`📅 ¡SOLICITUD DE RESERVA CONFIRMADA!\n\nTu traslado para el ${formatDateWithWeekday(reservaData.fecha)} a las ${reservaData.hora} hs ha sido agendado exitosamente.\n\nLa reserva fue cargada en el sistema para que los conductores disponibles la tomen.\n\n¡Muchas gracias por elegir RutaPrivada!`);
+      goToWizardStep(1);
+      return;
+    }
+
+    // ==========================================
+    // FLUJO DE VIAJE EN VIVO / INMEDIATO
+    // ==========================================
     const tripData = {
       id: 'trip_' + Date.now(),
       origen: originAddress,
@@ -5626,7 +5832,7 @@ if (btnRequestInapp) {
       customerPhone: passPhone,
       notas: passNotes,
       categoria: 'Sedán Ejecutivo',
-      fecha: state.date || new Date().toISOString().split('T')[0],
+      fecha: curTodayStr,
       hora: state.time || '12:00',
       originCoords: state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null,
       destinationCoords: state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null,

@@ -220,7 +220,7 @@
             </div>
 
             <!-- Botón principal para abrir el calendario completo de fecha exacta o lejana -->
-            <div class="styled-date-input-wrap">
+            <div class="styled-date-input-wrap" style="position: relative;">
               <button type="button" class="custom-calendar-trigger-btn" id="btn-toggle-custom-calendar" aria-expanded="false" aria-label="Abrir selector de fecha exacta o lejana">
                 <div class="trigger-cal-left">
                   <div class="trigger-cal-icon-wrap">
@@ -241,32 +241,32 @@
                 </div>
               </button>
               <input type="hidden" id="trip-date" />
-            </div>
 
-            <!-- Custom Dark-Mode Glassmorphism Interactive Calendar -->
-            <div id="custom-calendar-dropdown" class="custom-calendar-dropdown hidden" role="dialog" aria-modal="true" aria-label="Selector interactivo de fecha">
-              <div class="cal-dropdown-header">
-                <button type="button" id="cal-prev-month" class="cal-nav-btn" title="Mes anterior">‹</button>
-                <div class="cal-header-selectors">
-                  <select id="cal-select-month" class="cal-header-select" aria-label="Seleccionar mes"></select>
-                  <select id="cal-select-year" class="cal-header-select" aria-label="Seleccionar año"></select>
+              <!-- Custom Dark-Mode Glassmorphism Interactive Calendar -->
+              <div id="custom-calendar-dropdown" class="custom-calendar-dropdown hidden" role="dialog" aria-modal="true" aria-label="Selector interactivo de fecha">
+                <div class="cal-dropdown-header">
+                  <button type="button" id="cal-prev-month" class="cal-nav-btn" title="Mes anterior">‹</button>
+                  <div class="cal-header-selectors">
+                    <select id="cal-select-month" class="cal-header-select" aria-label="Seleccionar mes"></select>
+                    <select id="cal-select-year" class="cal-header-select" aria-label="Seleccionar año"></select>
+                  </div>
+                  <button type="button" id="cal-next-month" class="cal-nav-btn" title="Mes siguiente">›</button>
                 </div>
-                <button type="button" id="cal-next-month" class="cal-nav-btn" title="Mes siguiente">›</button>
-              </div>
 
-              <div class="cal-weekdays-grid">
-                <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span class="we-label">Sá</span><span class="we-label">Do</span>
-              </div>
-
-              <div id="cal-days-grid" class="cal-days-grid"></div>
-
-              <div class="cal-dropdown-footer">
-                <div class="cal-footer-shortcuts">
-                  <button type="button" class="cal-shortcut-pill" id="cal-shortcut-today">Hoy</button>
-                  <button type="button" class="cal-shortcut-pill" id="cal-shortcut-tomorrow">Mañana</button>
-                  <button type="button" class="cal-shortcut-pill" id="cal-shortcut-weekend">Fin de Semana</button>
+                <div class="cal-weekdays-grid">
+                  <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span class="we-label">Sá</span><span class="we-label">Do</span>
                 </div>
-                <button type="button" class="cal-close-btn" id="cal-close-dropdown">Seleccionar Fecha ✓</button>
+
+                <div id="cal-days-grid" class="cal-days-grid"></div>
+
+                <div class="cal-dropdown-footer">
+                  <div class="cal-footer-shortcuts">
+                    <button type="button" class="cal-shortcut-pill" id="cal-shortcut-today">Hoy</button>
+                    <button type="button" class="cal-shortcut-pill" id="cal-shortcut-tomorrow">Mañana</button>
+                    <button type="button" class="cal-shortcut-pill" id="cal-shortcut-weekend">Fin de Semana</button>
+                  </div>
+                  <button type="button" class="cal-close-btn" id="cal-close-dropdown">Seleccionar Fecha ✓</button>
+                </div>
               </div>
             </div>
           </div>
@@ -635,10 +635,10 @@
           <!-- Booking & Action Buttons -->
           <div class="quote-actions" style="margin-top: 15px;">
             <button id="btn-request-inapp" class="btn btn-primary full-width btn-inapp-trip-action">
-              <span class="btn-icon">🚀</span>
+              <span class="btn-icon" id="btn-request-inapp-icon">🚀</span>
               <span class="btn-text">
-                <strong>SOLICITAR VIAJE / RESERVA</strong>
-                <small>Búsqueda inmediata y seguimiento en tiempo real</small>
+                <strong id="btn-request-inapp-title">SOLICITAR VIAJE</strong>
+                <small id="btn-request-inapp-subtitle">Búsqueda inmediata y seguimiento en tiempo real</small>
               </span>
             </button>
 

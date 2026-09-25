@@ -938,8 +938,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const disponibles = validFutureBookings.filter(b => {
             const status = String(b.status || b.estado || '').toLowerCase();
-            return (!b.driverAssigned || b.driverAssigned === '' || status === 'pendiente' || status === 'solicitada') &&
-                   status !== 'aceptada';
+            return (!b.driverAssigned || b.driverAssigned === '' || status === 'pendiente' || status === 'solicitada' || status === 'disponible') &&
+                   status !== 'aceptada' && status !== 'en_curso' && status !== 'completado' && status !== 'completada' && status !== 'cancelado';
         }).sort((a, b) => {
             const dateA = a.date || a.pickupDate || '';
             const dateB = b.date || b.pickupDate || '';
