@@ -3088,11 +3088,13 @@ function renderQuote() {
     document.getElementById('row-toll-fare').textContent = '$0 (Sin peaje)';
   }
 
-  // Garantizar precio mínimo de cotización inicial ($3.500 ARS)
+  // Garantizar precio mínimo de cotización inicial ($3.500 ARS) y actualizar en vivo inmediatamente
   const finalPrice = Math.max(3500, Number(state.totalPrice) || 3500);
+  const quoteAmtEl = document.getElementById('quote-total-amount');
+  if (quoteAmtEl) quoteAmtEl.textContent = formatNumber(finalPrice);
   animateValue('quote-total-amount', finalPrice);
   const rowTotalFare = document.getElementById('row-total-fare');
-  if (rowTotalFare) rowTotalFare.textContent = '$' + finalPrice.toLocaleString('es-AR');
+  if (rowTotalFare) rowTotalFare.textContent = '$' + formatNumber(finalPrice);
 
   document.getElementById('quote-currency-symbol').textContent = CURRENCY_SYMBOLS[state.config.currency] || '$';
   document.getElementById('quote-currency-code').textContent = state.config.currency;
@@ -5929,6 +5931,22 @@ if (window.RutaSync) {
         }
         playPassengerTone('chime');
         showToast(`💬 Mensaje de tu chofer: "${msg.texto}"`);
+
+        // Notificación push en la barra superior del celular
+        try {
+          if ('Notification' in window) {
+            if (Notification.permission === 'granted') {
+              new Notification('💬 Mensaje de tu Chofer', {
+                body: msg.texto,
+                icon: 'favicon.svg',
+                badge: 'favicon.svg',
+                vibrate: [150, 100, 150]
+              });
+            } else if (Notification.permission === 'default') {
+              Notification.requestPermission();
+            }
+          }
+        } catch(e) {}
       }
     }
   });
@@ -6497,45 +6515,303 @@ if (btnRecenterPassengerMap) {
 
     // 9. Limpiar viaje activo en sincronización
     if (window.RutaSync) {
-      window.RutaSync.limpiarViajeActivo();
+      try {
+        window.RutaSync.clearActiveTrip();
+      } catch(e) {}
     }
-
-    // 10. Actualizar UI
-    if (typeof updateCalculation === 'function') {
-      updateCalculation();
-    }
+    try {
+      localStorage.removeItem('rutaprivada_active_trip');
+    } catch(e) {}
   }
 
   // ====================================================
-  // RECUPERACIÓN DE VIAJE ACTIVO AL RECARGAR PÁGINA
+  // 16. SISTEMA DE PERFIL DEL PASAJERO, MEDIOS DE PAGO E HISTORIAL CABIFY
   // ====================================================
-  function restorePassengerActiveTripIfExists() {
-    if (!window.RutaSync) return;
-    const trip = window.RutaSync.obtenerViajeActivo();
-    if (trip && trip.id && trip.estado && trip.estado !== 'cancelado' && trip.estado !== 'cancelado_por_pasajero' && trip.estado !== 'completado') {
-      const createdAt = trip.creadoEn || trip.timestamp || Date.now();
-      const ageMs = Date.now() - createdAt;
-      
-      // Si el viaje en búsqueda tiene más de 5 minutos, limpiarlo para no bloquear la app
-      if ((trip.estado === 'buscando_conductor' || trip.estado === 'solicitado') && ageMs > 5 * 60 * 1000) {
-        window.RutaSync.limpiarViajeActivo();
-        return;
-      }
+  const DEFAULT_PASSENGER_PROFILE = {
+    nombre: 'Daniel Felipe',
+    telefono: '11 7373 8790',
+    email: 'pasajero@rutaprivada.com',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+    metodoPagoPredeterminado: 'efectivo'
+  };
 
-      openInAppTripModal(trip);
-      if (trip.estado === 'buscando_conductor' || trip.estado === 'solicitado') {
-        if (pStateSearching) pStateSearching.classList.remove('hidden');
-        if (pStateDriverAssigned) pStateDriverAssigned.classList.add('hidden');
-      } else if (trip.conductor) {
-        handlePassengerDriverAssigned(trip, false);
+  function loadPassengerProfile() {
+    try {
+      const saved = localStorage.getItem('rutaprivada_passenger_profile');
+      if (saved) {
+        return { ...DEFAULT_PASSENGER_PROFILE, ...JSON.parse(saved) };
       }
+    } catch(e) {}
+    return { ...DEFAULT_PASSENGER_PROFILE };
+  }
+
+  function savePassengerProfile(data) {
+    try {
+      localStorage.setItem('rutaprivada_passenger_profile', JSON.stringify(data));
+      updatePassengerHeaderAndInputs(data);
+      showToast('✅ Perfil guardado correctamente.');
+    } catch(e) {}
+  }
+
+  function updatePassengerHeaderAndInputs(profile) {
+    const headerAvatar = document.getElementById('headerPassengerAvatar');
+    const headerName = document.getElementById('headerPassengerName');
+    const modalAvatar = document.getElementById('profileModalAvatarImg');
+    const modalTitle = document.getElementById('profileModalNameTitle');
+
+    if (headerAvatar && profile.avatar) headerAvatar.src = profile.avatar;
+    if (headerName && profile.nombre) headerName.textContent = profile.nombre;
+    if (modalAvatar && profile.avatar) modalAvatar.src = profile.avatar;
+    if (modalTitle && profile.nombre) modalTitle.textContent = profile.nombre;
+
+    // Autocompletar inputs en el Paso 5
+    const nameInp = document.getElementById('passenger-name-input');
+    const phoneInp = document.getElementById('passenger-phone-input');
+    const statusMsg = document.getElementById('passengerProfileStatusMsg');
+
+    if (nameInp && profile.nombre && !nameInp.value) {
+      nameInp.value = profile.nombre;
+    }
+    if (phoneInp && profile.telefono && !phoneInp.value) {
+      phoneInp.value = profile.telefono;
+    }
+    if (statusMsg && profile.nombre) {
+      statusMsg.innerHTML = `Viajando como <strong style="color: #38bdf8;">${escapeHtml(profile.nombre)}</strong> (WhatsApp: ${escapeHtml(profile.telefono)})`;
+    }
+
+    // Modal form fields
+    const pName = document.getElementById('profPassengerName');
+    const pPhone = document.getElementById('profPassengerPhone');
+    const pEmail = document.getElementById('profPassengerEmail');
+    if (pName) pName.value = profile.nombre || '';
+    if (pPhone) pPhone.value = profile.telefono || '';
+    if (pEmail) pEmail.value = profile.email || '';
+  }
+
+  function getPassengerTripHistory() {
+    try {
+      const saved = localStorage.getItem('rutaprivada_passenger_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch(e) {}
+
+    // Ejemplo realista idéntico a Cabify (capturas adjuntas) si aún no tiene viajes realizados
+    const sampleTrips = [
+      {
+        id: 'hist_sample_1',
+        fechaAmigable: 'Domingo 18 ene 2026',
+        horaOrigen: '02:39',
+        horaDestino: '02:41',
+        origen: 'Avenida de los Trabajadores, 4320, Mar del Plata',
+        destino: 'Avenida de los Trabajadores, 2985, General Pueyrredón',
+        distanciaKm: 1.61,
+        categoria: 'RutaPrivada Ejecutivo',
+        modelo: 'Fiat Cronos',
+        patente: 'AE927CN',
+        conductor: 'Daniel Felipe',
+        precioTotal: 7700,
+        precioBase: 4815,
+        suplementoEfectivo: 39.33,
+        procesamientoServicio: 534.47,
+        altaDemanda: 2311.20,
+        metodoPago: 'Efectivo',
+        valoracionTexto: '⭐⭐⭐⭐⭐ ¡Excelente traslado!'
+      }
+    ];
+    try {
+      localStorage.setItem('rutaprivada_passenger_history', JSON.stringify(sampleTrips));
+    } catch(e) {}
+    return sampleTrips;
+  }
+
+  function renderPassengerHistoryUI() {
+    const list = document.getElementById('passengerHistoryList');
+    if (!list) return;
+
+    const trips = getPassengerTripHistory();
+    if (trips.length === 0) {
+      list.innerHTML = `<div style="text-align:center; padding:30px; color:#94a3b8;">Aún no tienes viajes registrados en tu historial.</div>`;
+      return;
+    }
+
+    list.innerHTML = trips.map(t => {
+      const distStr = t.distanciaKm ? `${t.distanciaKm} km` : (t.distancia || '1.61 km');
+      const totalStr = '$' + Number(t.precioTotal || t.totalFare || 7700).toLocaleString('es-AR');
+      const baseStr = '$' + Number(t.precioBase || 4815).toLocaleString('es-AR');
+      const extraStr = '$' + Number(t.altaDemanda || t.peajes || 2311).toLocaleString('es-AR');
+      const servStr = '$' + Number(t.procesamientoServicio || 534).toLocaleString('es-AR');
+
+      return `
+        <div class="cabify-history-card">
+          <div class="cabify-card-header">
+            <span class="cabify-trip-date">${escapeHtml(t.fechaAmigable || 'Viaje Realizado')}</span>
+            <span class="cabify-trip-price">${totalStr}</span>
+          </div>
+
+          <!-- Miniatura visual de ruta -->
+          <div class="cabify-map-thumb" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); display:flex; align-items:center; justify-content:center; border: 1px solid rgba(0,0,0,0.1);">
+            <span style="font-size: 0.82rem; font-weight: 700; color: #38bdf8;">🗺️ Ruta de ${distStr} completada con éxito</span>
+          </div>
+
+          <!-- Timeline Recogida y Destino -->
+          <div class="cabify-timeline">
+            <div class="cabify-point origin">
+              <div class="cabify-point-addr">${escapeHtml(t.origen || 'Origen')}</div>
+              <div class="cabify-point-time">Origen, ${escapeHtml(t.horaOrigen || '02:39')}</div>
+            </div>
+            <div class="cabify-point dest">
+              <div class="cabify-point-addr">${escapeHtml(t.destino || 'Destino')}</div>
+              <div class="cabify-point-time">Destino, ${escapeHtml(t.horaDestino || '02:41')}</div>
+            </div>
+          </div>
+
+          <!-- Detalles del servicio -->
+          <div class="cabify-section-title">Detalles del servicio</div>
+          <div class="cabify-meta-row"><span>Categoría</span><strong>${escapeHtml(t.categoria || 'RutaPrivada')}</strong></div>
+          <div class="cabify-meta-row"><span>Modelo</span><strong>${escapeHtml(t.modelo || 'Fiat Cronos')}</strong></div>
+          <div class="cabify-meta-row"><span>Matrícula</span><strong>${escapeHtml(t.patente || 'AE927CN')}</strong></div>
+          <div class="cabify-meta-row"><span>Conductor</span><strong>${escapeHtml(t.conductor || 'Daniel Felipe')}</strong></div>
+
+          <!-- Desglose de tarifa -->
+          <div class="cabify-section-title">Desglose de tarifa</div>
+          <div class="cabify-meta-row"><span>Precio base</span><strong>${baseStr}</strong></div>
+          <div class="cabify-meta-row"><span>Procesamiento de servicio y seguridad</span><strong>${servStr}</strong></div>
+          <div class="cabify-meta-row"><span>Alta demanda / Peajes</span><strong>${extraStr}</strong></div>
+          <div class="cabify-meta-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f5f9; font-weight:800;">
+            <span style="color: #0f172a;">Precio total</span><strong style="color: #0f172a; font-size: 0.95rem;">${totalStr}</strong>
+          </div>
+
+          <!-- Método de pago y Valoración -->
+          <div class="cabify-section-title">Método de pago</div>
+          <div class="cabify-meta-row"><span>Método</span><strong>💵 ${escapeHtml(t.metodoPago || 'Efectivo')}</strong></div>
+
+          <div class="cabify-section-title">Valoración</div>
+          <div style="font-size: 0.85rem; color: #10b981; font-weight: 700;">${escapeHtml(t.valoracionTexto || '⭐⭐⭐⭐⭐ 5/5')}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function initPassengerProfileModule() {
+    const prof = loadPassengerProfile();
+    updatePassengerHeaderAndInputs(prof);
+
+    // Abrir modal desde el botón de la barra superior
+    const btnOpenProf = document.getElementById('btnOpenPassengerProfile');
+    const btnQuickOpen = document.getElementById('btnQuickOpenProfile');
+    const modalProf = document.getElementById('modalPassengerProfile');
+    const btnCloseProf = document.getElementById('btnClosePassengerProfile');
+
+    function openModal() {
+      if (modalProf) {
+        modalProf.classList.remove('hidden');
+        renderPassengerHistoryUI();
+      }
+    }
+
+    function closeModal() {
+      if (modalProf) modalProf.classList.add('hidden');
+    }
+
+    if (btnOpenProf) btnOpenProf.addEventListener('click', openModal);
+    if (btnQuickOpen) btnQuickOpen.addEventListener('click', openModal);
+    if (btnCloseProf) btnCloseProf.addEventListener('click', closeModal);
+    if (modalProf) {
+      modalProf.addEventListener('click', (e) => {
+        if (e.target === modalProf) closeModal();
+      });
+    }
+
+    // Selector de avatar
+    document.querySelectorAll('.avatar-choice').forEach(choice => {
+      choice.addEventListener('click', () => {
+        document.querySelectorAll('.avatar-choice').forEach(c => c.classList.remove('active'));
+        choice.classList.add('active');
+        const src = choice.getAttribute('data-src');
+        const modalImg = document.getElementById('profileModalAvatarImg');
+        if (modalImg && src) modalImg.src = src;
+      });
+    });
+
+    // Pestañas del modal
+    document.querySelectorAll('.p-tab-btn').forEach(tabBtn => {
+      tabBtn.addEventListener('click', () => {
+        document.querySelectorAll('.p-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.p-tab-content').forEach(c => {
+          c.classList.add('hidden');
+          c.classList.remove('active');
+        });
+
+        tabBtn.classList.add('active');
+        const targetId = tabBtn.getAttribute('data-tab');
+        const targetContent = document.getElementById(targetId);
+        if (targetContent) {
+          targetContent.classList.remove('hidden');
+          targetContent.classList.add('active');
+        }
+        if (targetId === 'tabProfileHistory') {
+          renderPassengerHistoryUI();
+        }
+      });
+    });
+
+    // Formulario de perfil
+    const formProf = document.getElementById('passengerProfileForm');
+    if (formProf) {
+      formProf.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const activeChoice = document.querySelector('.avatar-choice.active');
+        const avatarSrc = activeChoice ? activeChoice.getAttribute('data-src') : prof.avatar;
+
+        const updated = {
+          nombre: document.getElementById('profPassengerName')?.value.trim() || prof.nombre,
+          telefono: document.getElementById('profPassengerPhone')?.value.trim() || prof.telefono,
+          email: document.getElementById('profPassengerEmail')?.value.trim() || prof.email,
+          avatar: avatarSrc || prof.avatar,
+          metodoPagoPredeterminado: prof.metodoPagoPredeterminado || 'efectivo'
+        };
+
+        savePassengerProfile(updated);
+        closeModal();
+      });
+    }
+
+    // Toggle formulario de tarjeta
+    const btnToggleCard = document.getElementById('btnToggleAddCard');
+    const formCard = document.getElementById('addCardFormWrap');
+    const btnSaveCard = document.getElementById('btnSaveCard');
+    if (btnToggleCard && formCard) {
+      btnToggleCard.addEventListener('click', () => {
+        formCard.classList.toggle('hidden');
+      });
+    }
+
+    if (btnSaveCard && formCard) {
+      btnSaveCard.addEventListener('click', () => {
+        const num = document.getElementById('cardNumber')?.value.trim() || '';
+        const name = document.getElementById('cardHolderName')?.value.trim() || '';
+        if (num.length < 15 || !name) {
+          showToast('⚠️ Por favor ingresa un número de tarjeta válido y nombre.');
+          return;
+        }
+        const last4 = num.slice(-4);
+        const cardLabel = document.getElementById('savedCardLabel');
+        const cardSub = document.getElementById('savedCardSub');
+        if (cardLabel) cardLabel.textContent = `Tarjeta terminada en •••• ${last4}`;
+        if (cardSub) cardSub.textContent = `Titular: ${name} (Tarjeta vinculada)`;
+        formCard.classList.add('hidden');
+        showToast(`💳 Tarjeta terminada en ${last4} vinculada exitosamente.`);
+      });
     }
   }
 
+  // Inicializar al cargar
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', restorePassengerActiveTripIfExists);
+    document.addEventListener('DOMContentLoaded', initPassengerProfileModule);
   } else {
-    restorePassengerActiveTripIfExists();
+    initPassengerProfileModule();
   }
 
 

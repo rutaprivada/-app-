@@ -161,6 +161,17 @@
         <span class="badge badge-trust">🛡️ Choferes Verificados</span>
         <span class="badge badge-fair">⭐ Servicio 24 Horas</span>
       </div>
+      <!-- Passenger Profile Avatar Trigger -->
+      <div class="passenger-header-profile clickable-header-profile" id="btnOpenPassengerProfile" title="Ver mi Perfil, Medios de Pago e Historial de Viajes">
+        <div class="passenger-avatar-wrap">
+          <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Pasajero" class="passenger-avatar" id="headerPassengerAvatar" />
+          <span class="status-indicator online"></span>
+        </div>
+        <div class="passenger-meta web-only">
+          <span class="passenger-name" id="headerPassengerName">Mi Perfil</span>
+          <span class="passenger-status-sub">⭐ Pasajero VIP</span>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -594,10 +605,13 @@
           <div class="passenger-booking-fields-card" style="margin-top: 15px;">
             <div class="passenger-fields-header">
               <span class="passenger-fields-icon">👤</span>
-              <div>
+              <div style="flex: 1;">
                 <h4>Datos del Pasajero para la Reserva</h4>
-                <p>Indica el nombre y WhatsApp para coordinar el viaje</p>
+                <p id="passengerProfileStatusMsg">Indica el nombre y WhatsApp para coordinar el viaje</p>
               </div>
+              <button type="button" id="btnQuickOpenProfile" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 4px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">
+                👤 Mi Perfil
+              </button>
             </div>
             <div class="passenger-fields-grid">
               <div class="field-item">
@@ -1166,6 +1180,125 @@
   </div>
 
 
+
+  <!-- Modal de Perfil del Pasajero & Historial de Viajes (Estilo Cabify) -->
+  <div id="modalPassengerProfile" class="modal-backdrop hidden" style="z-index: 10000;">
+    <div class="modal-dialog passenger-profile-dialog">
+      <div class="modal-header">
+        <div class="profile-header-title-wrap">
+          <div class="passenger-avatar-box-lg">
+            <img id="profileModalAvatarImg" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Avatar Pasajero" />
+          </div>
+          <div>
+            <h3 id="profileModalNameTitle" style="margin: 0; font-size: 1.1rem; color: #fff;">Mi Perfil de Pasajero</h3>
+            <span class="profile-member-badge">⭐ Pasajero Ejecutivo RutaPrivada</span>
+          </div>
+        </div>
+        <button id="btnClosePassengerProfile" class="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+
+      <!-- Navigation Tabs: Perfil | Medios de Pago | Historial de Viajes -->
+      <div class="profile-nav-tabs">
+        <button type="button" class="p-tab-btn active" data-tab="tabProfileData">
+          👤 Mis Datos
+        </button>
+        <button type="button" class="p-tab-btn" data-tab="tabProfilePayments">
+          💳 Pagos
+        </button>
+        <button type="button" class="p-tab-btn" data-tab="tabProfileHistory">
+          📜 Historial de Viajes
+        </button>
+      </div>
+
+      <div class="modal-body passenger-profile-body">
+        
+        <!-- TAB 1: MIS DATOS -->
+        <div class="p-tab-content active" id="tabProfileData">
+          <form id="passengerProfileForm" class="profile-form-grid">
+            <div class="avatar-picker-section">
+              <span class="field-label" style="font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 4px;">Seleccionar Foto / Avatar</span>
+              <div class="avatar-choices-row">
+                <img class="avatar-choice active" data-src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Avatar 1" />
+                <img class="avatar-choice" data-src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" alt="Avatar 2" />
+                <img class="avatar-choice" data-src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80" src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80" alt="Avatar 3" />
+                <img class="avatar-choice" data-src="https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=150&q=80" src="https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=150&q=80" alt="Avatar 4" />
+              </div>
+            </div>
+
+            <div class="field-item">
+              <label for="profPassengerName" style="color:#94a3b8; font-size:0.8rem;">Nombre y Apellido *</label>
+              <input type="text" id="profPassengerName" placeholder="Ej: Dr. Roberto Gómez" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" required />
+            </div>
+
+            <div class="field-item">
+              <label for="profPassengerPhone" style="color:#94a3b8; font-size:0.8rem;">Número de WhatsApp *</label>
+              <input type="tel" id="profPassengerPhone" placeholder="Ej: 11 5544 3322" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" required />
+            </div>
+
+            <div class="field-item">
+              <label for="profPassengerEmail" style="color:#94a3b8; font-size:0.8rem;">Correo Electrónico (para comprobantes de viaje)</label>
+              <input type="email" id="profPassengerEmail" placeholder="Ej: roberto.gomez@gmail.com" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" />
+            </div>
+
+            <button type="submit" class="btn btn-primary full-width" style="margin-top: 10px;">
+              💾 Guardar Mi Perfil
+            </button>
+          </form>
+        </div>
+
+        <!-- TAB 2: MEDIOS DE PAGO -->
+        <div class="p-tab-content hidden" id="tabProfilePayments">
+          <div class="payment-methods-wrapper">
+            <h4 style="color: #f8fafc; font-size: 0.95rem; margin-bottom: 12px;">Métodos de Pago</h4>
+            
+            <div class="payment-option-card active" id="payMethodCash">
+              <div class="pay-option-left">
+                <span class="pay-icon">💵</span>
+                <div>
+                  <strong>Efectivo / Transferencia Directa</strong>
+                  <small>Pago al chofer al finalizar el viaje</small>
+                </div>
+              </div>
+              <span class="pay-check-badge">✓ Activo</span>
+            </div>
+
+            <div class="payment-option-card" id="payMethodCardCard">
+              <div class="pay-option-left">
+                <span class="pay-icon">💳</span>
+                <div>
+                  <strong id="savedCardLabel">Tarjeta de Débito / Crédito</strong>
+                  <small id="savedCardSub">Vincula tu tarjeta para pago rápido</small>
+                </div>
+              </div>
+              <button type="button" class="btn-card-action" id="btnToggleAddCard">Gestionar</button>
+            </div>
+
+            <!-- Formulario para agregar tarjeta -->
+            <div id="addCardFormWrap" class="add-card-form-wrap hidden" style="background: rgba(15,23,42,0.9); padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); margin-top: 10px;">
+              <h5 style="color:#38bdf8; margin-bottom:10px;">Vincular Tarjeta</h5>
+              <div style="display:grid; gap:10px;">
+                <input type="text" id="cardHolderName" placeholder="Nombre en la tarjeta" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
+                <input type="text" id="cardNumber" placeholder="Número de tarjeta (16 dígitos)" maxlength="19" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                  <input type="text" id="cardExpiry" placeholder="MM/AA" maxlength="5" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
+                  <input type="password" id="cardCvc" placeholder="CVC" maxlength="4" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
+                </div>
+                <button type="button" class="btn btn-primary" id="btnSaveCard">Vincular Tarjeta</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: HISTORIAL DE VIAJES (ESTILO CABIFY) -->
+        <div class="p-tab-content hidden" id="tabProfileHistory">
+          <div class="passenger-history-list" id="passengerHistoryList">
+            <!-- Inyectado dinámicamente con tarjetas idénticas a Cabify -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <!-- Toast Notification -->
   <div id="toast" class="toast hidden"></div>

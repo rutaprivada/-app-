@@ -264,6 +264,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 gain.connect(ctx.destination);
                 osc.start();
                 osc.stop(ctx.currentTime + 0.28);
+            } else if (type === 'chat' || type === 'chime') {
+                // Tono suave idéntico al del pasajero para mensajes de chat
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.18);
+                gain.gain.setValueAtTime(0.28, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.28);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.28);
+                if (navigator.vibrate) navigator.vibrate(120);
             } else if (type === 'success') {
                 // Tono de confirmación / reserva aceptada
                 osc.type = 'triangle';
@@ -3165,8 +3177,24 @@ document.addEventListener('DOMContentLoaded', () => {
                         driverChatUnreadDot.textContent = driverUnreadChatCount;
                         driverChatUnreadDot.classList.remove('hidden');
                     }
-                    playAlertSound('incoming');
+                    playAlertSound('chat');
                     showDriverToast(`💬 Mensaje del pasajero: "${msg.texto}"`);
+
+                    // Notificación en la barra superior del celular
+                    try {
+                        if ('Notification' in window) {
+                            if (Notification.permission === 'granted') {
+                                new Notification('💬 Mensaje de tu Pasajero', {
+                                    body: msg.texto,
+                                    icon: 'logo_chofer.svg',
+                                    badge: 'logo_chofer.svg',
+                                    vibrate: [150, 100, 150]
+                                });
+                            } else if (Notification.permission === 'default') {
+                                Notification.requestPermission();
+                            }
+                        }
+                    } catch(e) {}
                 }
             }
         });
@@ -3626,8 +3654,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (btnTogglePipMode) {
-            btnTogglePipMode.addEventListener('click', togglePipMode);
+        const btnRefreshDriverTrips = document.getElementById('btnRefreshDriverTrips');
+        if (btnRefreshDriverTrips) {
+            btnRefreshDriverTrips.addEventListener('click', () => {
+                const icon = document.getElementById('iconRefreshDriverTrips');
+                if (icon) icon.classList.add('fa-spin');
+                if (window.RutaSync) {
+                    try {
+                        const activeTrip = window.RutaSync.obtenerViajeActivo();
+                        if (activeTrip && activeTrip.id && !driverState.activeTrip) {
+                            restoreDriverActiveTripIfExists();
+                        }
+                    } catch(e) {}
+                }
+                renderAvailableTripsList();
+                renderReservas();
+                playAlertSound('chat');
+                showDriverToast('✅ Solicitudes de viajes y radar actualizados.');
+                setTimeout(() => {
+                    if (icon) icon.classList.remove('fa-spin');
+                }, 700);
+            });
         }
 
         // Escuchar cambios de estado desde el panel de administración

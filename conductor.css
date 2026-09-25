@@ -24,11 +24,21 @@
     --shadow-premium: 0 10px 30px -5px rgba(0, 0, 0, 0.6);
 }
 
+/* Eliminar barras de desplazamiento nativas antiestéticas */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+*::-webkit-scrollbar,
+::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
 }
 
 body.driver-body {
