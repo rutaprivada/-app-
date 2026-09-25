@@ -518,9 +518,27 @@
           </div>
           <p class="price-guarantee hidden" id="quote-guarantee-note"></p>
 
+          <!-- Additional Options (Ida y Vuelta / Mascota) -->
+          <div class="extras-selection-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0;">
+            <label class="extra-option-card" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="extra-roundtrip" style="width: 18px; height: 18px; accent-color: #38bdf8;" />
+              <div>
+                <strong style="font-size: 0.85rem; display: block; color: #fff;">🔄 Ida y Vuelta</strong>
+                <small style="color: #34d399; font-size: 0.75rem;" id="extra-roundtrip-badge">-15% Vuelta</small>
+              </div>
+            </label>
+            <label class="extra-option-card" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="extra-pet" style="width: 18px; height: 18px; accent-color: #38bdf8;" />
+              <div>
+                <strong style="font-size: 0.85rem; display: block; color: #fff;">🐾 Mascota</strong>
+                <small style="color: #94a3b8; font-size: 0.75rem;">+$4.000</small>
+              </div>
+            </label>
+          </div>
+
           <!-- Detailed Breakdown -->
           <div class="breakdown-container">
-            <button type="button" class="breakdown-toggle-btn" id="toggle-breakdown">
+            <button type="button" class="breakdown-toggle-btn" id="toggle-breakdown" onclick="toggleFareBreakdown()">
               <span>Ver detalles de la tarifa</span>
               <span class="arrow">▼</span>
             </button>

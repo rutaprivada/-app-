@@ -53,7 +53,23 @@ const DEFAULT_CONFIG = {
 // ==========================================
 let currentWizardStep = 1;
 
-function goToWizardStep(step) {
+function toggleFareBreakdown() {
+  const toggleBreakdownBtn = document.getElementById('toggle-breakdown');
+  const breakdownContent = document.getElementById('breakdown-content');
+  if (!breakdownContent) return;
+
+  const isOpen = breakdownContent.classList.contains('open');
+  if (isOpen) {
+    breakdownContent.classList.remove('open');
+    if (toggleBreakdownBtn) toggleBreakdownBtn.classList.remove('open');
+  } else {
+    breakdownContent.classList.add('open');
+    if (toggleBreakdownBtn) toggleBreakdownBtn.classList.add('open');
+  }
+}
+window.toggleFareBreakdown = toggleFareBreakdown;
+
+async function goToWizardStep(step) {
   if (step < 1 || step > 5) return;
 
   const originInput = document.getElementById('origin-input');
@@ -118,82 +134,110 @@ function goToWizardStep(step) {
   }
 
   // 4. Procesar mapa y cálculo
-  setTimeout(async () => {
-    if (originVal && destVal) {
-      // Geocodificar Origen si es necesario
-      if (!state.origin || !state.origin.lat || (state.origin.address && state.origin.address !== originVal)) {
-        if (typeof searchLocations === 'function') {
-          try {
-            const results = await searchLocations(originVal);
-            if (results && results.length > 0) {
-              state.origin = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || originVal };
-            }
-          } catch(e){}
-        }
-      }
-
-      // Geocodificar Destino si es necesario
-      if (!state.destination || !state.destination.lat || (state.destination.address && state.destination.address !== destVal)) {
-        if (typeof searchLocations === 'function') {
-          try {
-            const results = await searchLocations(destVal);
-            if (results && results.length > 0) {
-              state.destination = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || destVal };
-            }
-          } catch(e){}
-        }
-      }
-
-      // Geocodificar Parada Intermedia si aplica
-      if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
-        if (typeof searchLocations === 'function') {
-          try {
-            const results = await searchLocations(stopVal);
-            if (results && results.length > 0) {
-              state.intermediateStop = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || stopVal };
-            }
-          } catch(e){}
-        }
-      }
-
-      if (typeof checkAndRoute === 'function') {
-        try { await checkAndRoute(); } catch(e){}
+  if (originVal && destVal) {
+    // Si falta lat/lng en origen, geocodificar
+    if (!state.origin || !state.origin.lat) {
+      if (typeof searchLocations === 'function') {
+        try {
+          const results = await searchLocations(originVal);
+          if (results && results.length > 0) {
+            state.origin = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || originVal };
+          }
+        } catch(e){}
       }
     }
 
-    // Inicializar Leaflet y centrar ruta en Paso 4
-    if (step === 4) {
-      if (!map && typeof initMap === 'function') {
-        try { initMap(); } catch(e){}
+    // Si falta lat/lng en destino, geocodificar
+    if (!state.destination || !state.destination.lat) {
+      if (typeof searchLocations === 'function') {
+        try {
+          const results = await searchLocations(destVal);
+          if (results && results.length > 0) {
+            state.destination = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || destVal };
+          }
+        } catch(e){}
       }
-      setTimeout(() => {
-        if (map) {
-          try {
-            map.invalidateSize();
-            if (state.origin && state.origin.lat && (!originMarker || !map.hasLayer(originMarker))) {
-              setOrigin(state.origin.lat, state.origin.lng, state.origin.address || originVal);
-            }
-            if (state.destination && state.destination.lat && (!destinationMarker || !map.hasLayer(destinationMarker))) {
-              setDestination(state.destination.lat, state.destination.lng, state.destination.address || destVal);
-            }
-            if (routePolyline && map.hasLayer(routePolyline)) {
-              map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
-            }
-          } catch(e){}
-        }
-      }, 100);
     }
 
-    // Recalcular y Renderizar Cotización en Paso 5
-    if (step === 5) {
-      if (typeof updateCalculation === 'function') {
-        try { updateCalculation(); } catch(e){}
-      }
-      if (typeof renderQuote === 'function') {
-        try { renderQuote(); } catch(e){}
+    // Si hay parada intermedia y falta lat/lng, geocodificar
+    if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
+      if (typeof searchLocations === 'function') {
+        try {
+          const results = await searchLocations(stopVal);
+          if (results && results.length > 0) {
+            state.intermediateStop = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || stopVal };
+          }
+        } catch(e){}
       }
     }
-  }, 10);
+
+    // Fallback de coordenadas si siguen vacías
+    if (!state.origin || !state.origin.lat) {
+      state.origin = { lat: -34.6037, lng: -58.3816, address: originVal };
+    }
+    if (!state.destination || !state.destination.lat) {
+      state.destination = { lat: -34.8127, lng: -58.5372, address: destVal };
+    }
+
+    if (typeof checkAndRoute === 'function') {
+      try { await checkAndRoute(); } catch(e){}
+    }
+  }
+
+  // Inicializar Leaflet y centrar ruta en Paso 4
+  if (step === 4) {
+    if (!map && typeof initMap === 'function') {
+      try { initMap(); } catch(e){}
+    }
+    setTimeout(() => {
+      if (map) {
+        try {
+          map.invalidateSize();
+          if (state.origin && state.origin.lat) {
+            if (!originMarker || !map.hasLayer(originMarker)) {
+              const originIcon = L.divIcon({
+                className: 'custom-map-pin origin-marker-pin',
+                html: '<div style="background:#10b981; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
+                iconSize: [22, 22],
+                iconAnchor: [11, 11]
+              });
+              originMarker = L.marker([state.origin.lat, state.origin.lng], { icon: originIcon }).addTo(map);
+              originMarker.bindPopup(`<strong>Origen:</strong><br>${state.origin.address || originVal}`);
+            } else {
+              originMarker.setLatLng([state.origin.lat, state.origin.lng]);
+            }
+          }
+          if (state.destination && state.destination.lat) {
+            if (!destinationMarker || !map.hasLayer(destinationMarker)) {
+              const destinationIcon = L.divIcon({
+                className: 'custom-map-pin dest-marker-pin',
+                html: '<div style="background:#ef4444; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
+                iconSize: [22, 22],
+                iconAnchor: [11, 11]
+              });
+              destinationMarker = L.marker([state.destination.lat, state.destination.lng], { icon: destinationIcon }).addTo(map);
+              destinationMarker.bindPopup(`<strong>Destino:</strong><br>${state.destination.address || destVal}`);
+            } else {
+              destinationMarker.setLatLng([state.destination.lat, state.destination.lng]);
+            }
+          }
+          if (routePolyline && map.hasLayer(routePolyline)) {
+            map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+          }
+        } catch(e){}
+      }
+    }, 80);
+  }
+
+  // Recalcular y Renderizar Cotización en Paso 4 y 5
+  if (step === 4 || step === 5) {
+    if (typeof updateCalculation === 'function') {
+      try { updateCalculation(); } catch(e){}
+    }
+    if (typeof renderQuote === 'function') {
+      try { renderQuote(); } catch(e){}
+    }
+  }
 }
 
 function updateStepDateTimeBadges() {

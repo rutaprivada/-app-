@@ -4804,7 +4804,7 @@ html, body {
 }
 
 .breakdown-details {
-  display: none !important;
+  display: none;
   flex-direction: column !important;
   gap: 10px !important;
   margin-top: 12px !important;
