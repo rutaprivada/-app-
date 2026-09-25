@@ -257,6 +257,7 @@ function updateStepDateTimeBadges() {
 }
 
 function selectTripMode(mode) {
+  state.tripType = mode;
   const btnLive = document.getElementById('btn-mode-live');
   const btnSchedule = document.getElementById('btn-mode-schedule');
   const btnTimeNow = document.getElementById('btn-time-now');
@@ -273,8 +274,26 @@ function selectTripMode(mode) {
   }
 }
 
+function handleStep1Next() {
+  if (state.tripType === 'live' || !state.tripType) {
+    goToWizardStep(3);
+  } else {
+    goToWizardStep(2);
+  }
+}
+
+function handleStep3Prev() {
+  if (state.tripType === 'live' || !state.tripType) {
+    goToWizardStep(1);
+  } else {
+    goToWizardStep(2);
+  }
+}
+
 window.goToWizardStep = goToWizardStep;
 window.selectTripMode = selectTripMode;
+window.handleStep1Next = handleStep1Next;
+window.handleStep3Prev = handleStep3Prev;
 
 // ==========================================
 // 1.1 FERIADOS NACIONALES Y DÍAS FESTIVOS (ARGENTINA)
@@ -6402,6 +6421,33 @@ if (btnRecenterPassengerMap) {
         localStorage.setItem('rutaprivada_driver_ratings', JSON.stringify(ratings));
       } catch (e) {}
 
+      // Guardar en el historial de viajes del pasajero (Cabify style)
+      try {
+        const activeTrip = pActiveTripData || (window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null) || {};
+        const now = new Date();
+        const tripHistoryItem = {
+          id: 'trip_' + Date.now(),
+          fechaAmigable: formatDateWithWeekday(state.date || formatDateToString(now)),
+          horaOrigen: activeTrip.horaSolicitud || activeTrip.hora || state.time || '00:00',
+          horaDestino: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          origen: activeTrip.origen || (state.origin ? state.origin.address : 'Punto de partida'),
+          destino: activeTrip.destino || (state.destination ? state.destination.address : 'Punto de destino'),
+          distanciaKm: state.distanceKm || activeTrip.distancia || 0,
+          categoria: activeTrip.categoria || 'RutaPrivada Ejecutivo',
+          modelo: (activeTrip.conductor && activeTrip.conductor.auto) ? activeTrip.conductor.auto : 'Sedán Ejecutivo',
+          patente: (activeTrip.conductor && activeTrip.conductor.patente) ? activeTrip.conductor.patente : 'Oficial',
+          conductor: (activeTrip.conductor && activeTrip.conductor.nombre) ? activeTrip.conductor.nombre : (pFinalDriverName ? pFinalDriverName.textContent : 'Daniel Felipe'),
+          precioTotal: Number(activeTrip.totalCobrado || activeTrip.precioEstimado || activeTrip.totalFare || state.totalPrice || 0),
+          precioBase: state.breakdown ? state.breakdown.baseFare : 0,
+          suplementoEfectivo: 0,
+          procesamientoServicio: Math.round((Number(state.totalPrice) || 0) * 0.08),
+          altaDemanda: state.breakdown ? state.breakdown.tollCost : 0,
+          metodoPago: activeTrip.metodoPago || 'Efectivo',
+          valoracionTexto: '⭐'.repeat(passengerSelectedRating) + ` (${passengerSelectedRating}/5)`
+        };
+        addTripToPassengerHistory(tripHistoryItem);
+      } catch(e) {}
+
       if (window.RutaSync) {
         window.RutaSync.emit('CALIFICACION_GUARDADA', ratingRecord);
         window.RutaSync.limpiarViajeActivo();
@@ -6531,7 +6577,7 @@ if (btnRecenterPassengerMap) {
     nombre: 'Daniel Felipe',
     telefono: '11 7373 8790',
     email: 'pasajero@rutaprivada.com',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+    avatar: '', // Sin foto por defecto (icono silueta)
     metodoPagoPredeterminado: 'efectivo'
   };
 
@@ -6557,12 +6603,37 @@ if (btnRecenterPassengerMap) {
     const headerAvatar = document.getElementById('headerPassengerAvatar');
     const headerName = document.getElementById('headerPassengerName');
     const modalAvatar = document.getElementById('profileModalAvatarImg');
+    const modalPlaceholder = document.getElementById('profileModalAvatarPlaceholder');
     const modalTitle = document.getElementById('profileModalNameTitle');
+    const btnRemovePhoto = document.getElementById('btnRemoveProfilePhoto');
 
-    if (headerAvatar && profile.avatar) headerAvatar.src = profile.avatar;
+    const hasPhoto = !!(profile.avatar && profile.avatar.trim().length > 0);
+
+    if (headerAvatar) {
+      if (hasPhoto) {
+        headerAvatar.src = profile.avatar;
+        headerAvatar.style.display = 'block';
+      } else {
+        headerAvatar.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="%2394a3b8"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+        headerAvatar.style.display = 'block';
+      }
+    }
+
     if (headerName && profile.nombre) headerName.textContent = profile.nombre;
-    if (modalAvatar && profile.avatar) modalAvatar.src = profile.avatar;
     if (modalTitle && profile.nombre) modalTitle.textContent = profile.nombre;
+
+    if (modalAvatar && modalPlaceholder) {
+      if (hasPhoto) {
+        modalAvatar.src = profile.avatar;
+        modalAvatar.style.display = 'block';
+        modalPlaceholder.style.display = 'none';
+        if (btnRemovePhoto) btnRemovePhoto.classList.remove('hidden');
+      } else {
+        modalAvatar.style.display = 'none';
+        modalPlaceholder.style.display = 'block';
+        if (btnRemovePhoto) btnRemovePhoto.classList.add('hidden');
+      }
+    }
 
     // Autocompletar inputs en el Paso 5
     const nameInp = document.getElementById('passenger-name-input');
@@ -6576,7 +6647,7 @@ if (btnRecenterPassengerMap) {
       phoneInp.value = profile.telefono;
     }
     if (statusMsg && profile.nombre) {
-      statusMsg.innerHTML = `Viajando como <strong style="color: #38bdf8;">${escapeHtml(profile.nombre)}</strong> (WhatsApp: ${escapeHtml(profile.telefono)})`;
+      statusMsg.innerHTML = `Viajando como <strong style="color: #38bdf8;">${escapeHtml(profile.nombre)}</strong> (Celular: ${escapeHtml(profile.telefono)})`;
     }
 
     // Modal form fields
@@ -6588,115 +6659,213 @@ if (btnRecenterPassengerMap) {
     if (pEmail) pEmail.value = profile.email || '';
   }
 
+  // Medios de pago / Tarjetas vinculadas
+  function loadSavedCards() {
+    try {
+      const saved = localStorage.getItem('rutaprivada_passenger_cards');
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return [];
+  }
+
+  function saveSavedCards(cards) {
+    try {
+      localStorage.setItem('rutaprivada_passenger_cards', JSON.stringify(cards));
+      renderSavedCardsUI();
+    } catch(e) {}
+  }
+
+  function renderSavedCardsUI() {
+    const container = document.getElementById('savedCardsListContainer');
+    if (!container) return;
+
+    const cards = loadSavedCards();
+    if (cards.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 10px; color: #64748b; font-size: 0.78rem;">
+          No tienes tarjetas vinculadas aún. Agrega una para pago directo.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = cards.map((c, idx) => `
+      <div class="saved-card-item ${idx === 0 ? 'selected' : ''}">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.2rem;">💳</span>
+          <div>
+            <strong style="font-size: 0.85rem; color: #f8fafc; display: block;">•••• ${escapeHtml(c.last4)} (${escapeHtml(c.brand || 'Tarjeta')})</strong>
+            <small style="color: #94a3b8; font-size: 0.74rem;">Titular: ${escapeHtml(c.titular)} · Vto: ${escapeHtml(c.vencimiento)}</small>
+          </div>
+        </div>
+        <button type="button" class="btn-delete-card" onclick="deleteSavedCard('${c.id}')" title="Eliminar tarjeta">🗑️</button>
+      </div>
+    `).join('');
+  }
+
+  window.deleteSavedCard = function(id) {
+    if (!confirm('¿Deseas desvincular esta tarjeta?')) return;
+    const cards = loadSavedCards().filter(c => c.id !== id);
+    saveSavedCards(cards);
+    showToast('💳 Tarjeta eliminada.');
+  };
+
+  // Historial de viajes del pasajero (Vacío inicialmente, guardando viajes reales)
   function getPassengerTripHistory() {
     try {
       const saved = localStorage.getItem('rutaprivada_passenger_history');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch(e) {}
-
-    // Ejemplo realista idéntico a Cabify (capturas adjuntas) si aún no tiene viajes realizados
-    const sampleTrips = [
-      {
-        id: 'hist_sample_1',
-        fechaAmigable: 'Domingo 18 ene 2026',
-        horaOrigen: '02:39',
-        horaDestino: '02:41',
-        origen: 'Avenida de los Trabajadores, 4320, Mar del Plata',
-        destino: 'Avenida de los Trabajadores, 2985, General Pueyrredón',
-        distanciaKm: 1.61,
-        categoria: 'RutaPrivada Ejecutivo',
-        modelo: 'Fiat Cronos',
-        patente: 'AE927CN',
-        conductor: 'Daniel Felipe',
-        precioTotal: 7700,
-        precioBase: 4815,
-        suplementoEfectivo: 39.33,
-        procesamientoServicio: 534.47,
-        altaDemanda: 2311.20,
-        metodoPago: 'Efectivo',
-        valoracionTexto: '⭐⭐⭐⭐⭐ ¡Excelente traslado!'
-      }
-    ];
-    try {
-      localStorage.setItem('rutaprivada_passenger_history', JSON.stringify(sampleTrips));
-    } catch(e) {}
-    return sampleTrips;
+    return [];
   }
 
+  function addTripToPassengerHistory(trip) {
+    try {
+      const history = getPassengerTripHistory();
+      history.unshift(trip);
+      localStorage.setItem('rutaprivada_passenger_history', JSON.stringify(history));
+      renderPassengerHistoryUI();
+    } catch(e) {}
+  }
+  window.addTripToPassengerHistory = addTripToPassengerHistory;
+
   function renderPassengerHistoryUI() {
-    const list = document.getElementById('passengerHistoryList');
-    if (!list) return;
+    const listView = document.getElementById('passengerHistoryListView');
+    const detailView = document.getElementById('passengerHistoryDetailView');
+    if (!listView) return;
+
+    if (detailView) {
+      detailView.classList.add('hidden');
+      detailView.innerHTML = '';
+    }
+    listView.classList.remove('hidden');
 
     const trips = getPassengerTripHistory();
     if (trips.length === 0) {
-      list.innerHTML = `<div style="text-align:center; padding:30px; color:#94a3b8;">Aún no tienes viajes registrados en tu historial.</div>`;
+      listView.innerHTML = `
+        <div style="text-align: center; padding: 40px 20px; color: #94a3b8;">
+          <span style="font-size: 2.5rem; display: block; margin-bottom: 10px;">📜</span>
+          <strong style="color: #f8fafc; font-size: 0.95rem; display: block; margin-bottom: 4px;">Aún no tienes viajes realizados</strong>
+          <p style="font-size: 0.8rem; color: #64748b; margin: 0;">Cuando realices traslados con nuestros choferes ejecutivos, tus recibos y rutas aparecerán aquí.</p>
+        </div>
+      `;
       return;
     }
 
-    list.innerHTML = trips.map(t => {
-      const distStr = t.distanciaKm ? `${t.distanciaKm} km` : (t.distancia || '1.61 km');
-      const totalStr = '$' + Number(t.precioTotal || t.totalFare || 7700).toLocaleString('es-AR');
-      const baseStr = '$' + Number(t.precioBase || 4815).toLocaleString('es-AR');
-      const extraStr = '$' + Number(t.altaDemanda || t.peajes || 2311).toLocaleString('es-AR');
-      const servStr = '$' + Number(t.procesamientoServicio || 534).toLocaleString('es-AR');
+    listView.innerHTML = trips.map(t => {
+      const distStr = t.distanciaKm ? `${t.distanciaKm} km` : (t.distancia || '1.6 km');
+      const totalStr = '$' + Number(t.precioTotal || t.totalFare || 0).toLocaleString('es-AR');
 
       return `
-        <div class="cabify-history-card">
-          <div class="cabify-card-header">
-            <span class="cabify-trip-date">${escapeHtml(t.fechaAmigable || 'Viaje Realizado')}</span>
-            <span class="cabify-trip-price">${totalStr}</span>
+        <div class="history-compact-card" onclick="showPassengerTripDetail('${t.id}')">
+          <div class="history-card-header-row">
+            <span class="history-card-date">📅 ${escapeHtml(t.fechaAmigable || 'Viaje')}</span>
+            <span class="history-card-price">${totalStr} ARS</span>
           </div>
-
-          <!-- Miniatura visual de ruta -->
-          <div class="cabify-map-thumb" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); display:flex; align-items:center; justify-content:center; border: 1px solid rgba(0,0,0,0.1);">
-            <span style="font-size: 0.82rem; font-weight: 700; color: #38bdf8;">🗺️ Ruta de ${distStr} completada con éxito</span>
+          <div class="history-card-route">
+            <div>🟢 <strong>Origen:</strong> ${escapeHtml(t.origen || 'Origen')}</div>
+            <div>🔴 <strong>Destino:</strong> ${escapeHtml(t.destino || 'Destino')}</div>
           </div>
-
-          <!-- Timeline Recogida y Destino -->
-          <div class="cabify-timeline">
-            <div class="cabify-point origin">
-              <div class="cabify-point-addr">${escapeHtml(t.origen || 'Origen')}</div>
-              <div class="cabify-point-time">Origen, ${escapeHtml(t.horaOrigen || '02:39')}</div>
-            </div>
-            <div class="cabify-point dest">
-              <div class="cabify-point-addr">${escapeHtml(t.destino || 'Destino')}</div>
-              <div class="cabify-point-time">Destino, ${escapeHtml(t.horaDestino || '02:41')}</div>
-            </div>
+          <div class="history-card-footer">
+            <span>🚗 ${escapeHtml(t.categoria || 'RutaPrivada Ejecutivo')} · ${distStr}</span>
+            <span class="history-btn-view-detail">Ver detalle ➔</span>
           </div>
-
-          <!-- Detalles del servicio -->
-          <div class="cabify-section-title">Detalles del servicio</div>
-          <div class="cabify-meta-row"><span>Categoría</span><strong>${escapeHtml(t.categoria || 'RutaPrivada')}</strong></div>
-          <div class="cabify-meta-row"><span>Modelo</span><strong>${escapeHtml(t.modelo || 'Fiat Cronos')}</strong></div>
-          <div class="cabify-meta-row"><span>Matrícula</span><strong>${escapeHtml(t.patente || 'AE927CN')}</strong></div>
-          <div class="cabify-meta-row"><span>Conductor</span><strong>${escapeHtml(t.conductor || 'Daniel Felipe')}</strong></div>
-
-          <!-- Desglose de tarifa -->
-          <div class="cabify-section-title">Desglose de tarifa</div>
-          <div class="cabify-meta-row"><span>Precio base</span><strong>${baseStr}</strong></div>
-          <div class="cabify-meta-row"><span>Procesamiento de servicio y seguridad</span><strong>${servStr}</strong></div>
-          <div class="cabify-meta-row"><span>Alta demanda / Peajes</span><strong>${extraStr}</strong></div>
-          <div class="cabify-meta-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f5f9; font-weight:800;">
-            <span style="color: #0f172a;">Precio total</span><strong style="color: #0f172a; font-size: 0.95rem;">${totalStr}</strong>
-          </div>
-
-          <!-- Método de pago y Valoración -->
-          <div class="cabify-section-title">Método de pago</div>
-          <div class="cabify-meta-row"><span>Método</span><strong>💵 ${escapeHtml(t.metodoPago || 'Efectivo')}</strong></div>
-
-          <div class="cabify-section-title">Valoración</div>
-          <div style="font-size: 0.85rem; color: #10b981; font-weight: 700;">${escapeHtml(t.valoracionTexto || '⭐⭐⭐⭐⭐ 5/5')}</div>
         </div>
       `;
     }).join('');
   }
 
+  window.showPassengerTripDetail = function(tripId) {
+    const trips = getPassengerTripHistory();
+    const t = trips.find(item => item.id === tripId);
+    if (!t) return;
+
+    const listView = document.getElementById('passengerHistoryListView');
+    const detailView = document.getElementById('passengerHistoryDetailView');
+    if (!listView || !detailView) return;
+
+    const distStr = t.distanciaKm ? `${t.distanciaKm} km` : (t.distancia || '1.6 km');
+    const totalStr = '$' + Number(t.precioTotal || 0).toLocaleString('es-AR');
+    const baseStr = '$' + Number(t.precioBase || Math.round(t.precioTotal * 0.65) || 0).toLocaleString('es-AR');
+    const extraStr = '$' + Number(t.altaDemanda || t.peajes || 0).toLocaleString('es-AR');
+    const servStr = '$' + Number(t.procesamientoServicio || Math.round(t.precioTotal * 0.08) || 0).toLocaleString('es-AR');
+
+    detailView.innerHTML = `
+      <div style="margin-bottom: 12px;">
+        <button type="button" class="btn btn-secondary" onclick="backToPassengerHistoryList()" style="font-size: 0.78rem; padding: 6px 12px; border-radius: 8px;">
+          ‹ Volver a Mis Viajes
+        </button>
+      </div>
+
+      <div class="cabify-history-card">
+        <div class="cabify-card-header">
+          <span class="cabify-trip-date">${escapeHtml(t.fechaAmigable || 'Detalle del Viaje')}</span>
+          <span class="cabify-trip-price">${totalStr}</span>
+        </div>
+
+        <!-- Miniatura visual de ruta -->
+        <div class="cabify-map-thumb" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); display:flex; align-items:center; justify-content:center; border: 1px solid rgba(0,0,0,0.1);">
+          <span style="font-size: 0.82rem; font-weight: 700; color: #38bdf8;">🗺️ Ruta de ${distStr} completada</span>
+        </div>
+
+        <!-- Timeline Recogida y Destino -->
+        <div class="cabify-timeline">
+          <div class="cabify-point origin">
+            <div class="cabify-point-addr">${escapeHtml(t.origen || 'Origen')}</div>
+            <div class="cabify-point-time">Origen, ${escapeHtml(t.horaOrigen || '--:--')}</div>
+          </div>
+          <div class="cabify-point dest">
+            <div class="cabify-point-addr">${escapeHtml(t.destino || 'Destino')}</div>
+            <div class="cabify-point-time">Destino, ${escapeHtml(t.horaDestino || '--:--')}</div>
+          </div>
+        </div>
+
+        <!-- Detalles del servicio -->
+        <div class="cabify-section-title">Detalles del servicio</div>
+        <div class="cabify-meta-row"><span>Categoría</span><strong>${escapeHtml(t.categoria || 'RutaPrivada Ejecutivo')}</strong></div>
+        <div class="cabify-meta-row"><span>Modelo</span><strong>${escapeHtml(t.modelo || 'Sedán Ejecutivo')}</strong></div>
+        <div class="cabify-meta-row"><span>Matrícula</span><strong>${escapeHtml(t.patente || 'Oficial')}</strong></div>
+        <div class="cabify-meta-row"><span>Conductor</span><strong>${escapeHtml(t.conductor || 'Chofer Asignado')}</strong></div>
+
+        <!-- Desglose de tarifa -->
+        <div class="cabify-section-title">Desglose de tarifa</div>
+        <div class="cabify-meta-row"><span>Precio base & Trayecto</span><strong>${baseStr}</strong></div>
+        <div class="cabify-meta-row"><span>Tasa de servicio y seguridad</span><strong>${servStr}</strong></div>
+        <div class="cabify-meta-row"><span>Peajes oficiales / Recargos</span><strong>${extraStr}</strong></div>
+        <div class="cabify-meta-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f5f9; font-weight:800;">
+          <span style="color: #0f172a;">Precio total</span><strong style="color: #0f172a; font-size: 0.95rem;">${totalStr}</strong>
+        </div>
+
+        <!-- Método de pago y Valoración -->
+        <div class="cabify-section-title">Método de pago</div>
+        <div class="cabify-meta-row"><span>Método</span><strong>💵 ${escapeHtml(t.metodoPago || 'Efectivo')}</strong></div>
+
+        <div class="cabify-section-title">Valoración</div>
+        <div style="font-size: 0.85rem; color: #10b981; font-weight: 700;">${escapeHtml(t.valoracionTexto || '⭐⭐⭐⭐⭐')}</div>
+      </div>
+    `;
+
+    listView.classList.add('hidden');
+    detailView.classList.remove('hidden');
+  };
+
+  window.backToPassengerHistoryList = function() {
+    const listView = document.getElementById('passengerHistoryListView');
+    const detailView = document.getElementById('passengerHistoryDetailView');
+    if (listView) listView.classList.remove('hidden');
+    if (detailView) {
+      detailView.classList.add('hidden');
+      detailView.innerHTML = '';
+    }
+  };
+
   function initPassengerProfileModule() {
     const prof = loadPassengerProfile();
     updatePassengerHeaderAndInputs(prof);
+    renderSavedCardsUI();
 
     // Abrir modal desde el botón de la barra superior
     const btnOpenProf = document.getElementById('btnOpenPassengerProfile');
@@ -6708,6 +6877,7 @@ if (btnRecenterPassengerMap) {
       if (modalProf) {
         modalProf.classList.remove('hidden');
         renderPassengerHistoryUI();
+        renderSavedCardsUI();
       }
     }
 
@@ -6724,16 +6894,45 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // Selector de avatar
-    document.querySelectorAll('.avatar-choice').forEach(choice => {
-      choice.addEventListener('click', () => {
-        document.querySelectorAll('.avatar-choice').forEach(c => c.classList.remove('active'));
-        choice.classList.add('active');
-        const src = choice.getAttribute('data-src');
-        const modalImg = document.getElementById('profileModalAvatarImg');
-        if (modalImg && src) modalImg.src = src;
+    // Subida de foto personalizada desde archivo o celular
+    const fileInput = document.getElementById('passengerPhotoFileInput');
+    const btnTriggerUpload = document.getElementById('btnTriggerPhotoUpload');
+    const btnRemovePhoto = document.getElementById('btnRemoveProfilePhoto');
+
+    if (btnTriggerUpload && fileInput) {
+      btnTriggerUpload.addEventListener('click', () => fileInput.click());
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+          showToast('⚠️ La imagen no debe superar los 5MB.');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target.result;
+          const current = loadPassengerProfile();
+          current.avatar = base64;
+          savePassengerProfile(current);
+          showToast('📸 Foto de perfil actualizada correctamente.');
+        };
+        reader.readAsDataURL(file);
       });
-    });
+    }
+
+    if (btnRemovePhoto) {
+      btnRemovePhoto.addEventListener('click', () => {
+        const current = loadPassengerProfile();
+        current.avatar = '';
+        savePassengerProfile(current);
+        showToast('Foto de perfil eliminada.');
+      });
+    }
 
     // Pestañas del modal
     document.querySelectorAll('.p-tab-btn').forEach(tabBtn => {
@@ -6753,24 +6952,23 @@ if (btnRecenterPassengerMap) {
         }
         if (targetId === 'tabProfileHistory') {
           renderPassengerHistoryUI();
+        } else if (targetId === 'tabProfilePayments') {
+          renderSavedCardsUI();
         }
       });
     });
 
-    // Formulario de perfil
+    // Formulario de datos de perfil
     const formProf = document.getElementById('passengerProfileForm');
     if (formProf) {
       formProf.addEventListener('submit', (e) => {
         e.preventDefault();
-        const activeChoice = document.querySelector('.avatar-choice.active');
-        const avatarSrc = activeChoice ? activeChoice.getAttribute('data-src') : prof.avatar;
-
+        const current = loadPassengerProfile();
         const updated = {
-          nombre: document.getElementById('profPassengerName')?.value.trim() || prof.nombre,
-          telefono: document.getElementById('profPassengerPhone')?.value.trim() || prof.telefono,
-          email: document.getElementById('profPassengerEmail')?.value.trim() || prof.email,
-          avatar: avatarSrc || prof.avatar,
-          metodoPagoPredeterminado: prof.metodoPagoPredeterminado || 'efectivo'
+          ...current,
+          nombre: document.getElementById('profPassengerName')?.value.trim() || current.nombre,
+          telefono: document.getElementById('profPassengerPhone')?.value.trim() || current.telefono,
+          email: document.getElementById('profPassengerEmail')?.value.trim() || current.email
         };
 
         savePassengerProfile(updated);
@@ -6778,33 +6976,122 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // Toggle formulario de tarjeta
+    // Gestión de múltiples tarjetas
     const btnToggleCard = document.getElementById('btnToggleAddCard');
     const formCard = document.getElementById('addCardFormWrap');
+    const btnCancelAddCard = document.getElementById('btnCancelAddCard');
     const btnSaveCard = document.getElementById('btnSaveCard');
+
     if (btnToggleCard && formCard) {
       btnToggleCard.addEventListener('click', () => {
         formCard.classList.toggle('hidden');
       });
     }
 
+    if (btnCancelAddCard && formCard) {
+      btnCancelAddCard.addEventListener('click', () => {
+        formCard.classList.add('hidden');
+      });
+    }
+
     if (btnSaveCard && formCard) {
       btnSaveCard.addEventListener('click', () => {
-        const num = document.getElementById('cardNumber')?.value.trim() || '';
-        const name = document.getElementById('cardHolderName')?.value.trim() || '';
+        const num = (document.getElementById('cardNumber')?.value || '').trim().replace(/\D/g, '');
+        const name = (document.getElementById('cardHolderName')?.value || '').trim();
+        const expiry = (document.getElementById('cardExpiry')?.value || '').trim();
+
         if (num.length < 15 || !name) {
-          showToast('⚠️ Por favor ingresa un número de tarjeta válido y nombre.');
+          showToast('⚠️ Ingresa un número de tarjeta válido y el nombre del titular.');
           return;
         }
+
+        const cards = loadSavedCards();
         const last4 = num.slice(-4);
-        const cardLabel = document.getElementById('savedCardLabel');
-        const cardSub = document.getElementById('savedCardSub');
-        if (cardLabel) cardLabel.textContent = `Tarjeta terminada en •••• ${last4}`;
-        if (cardSub) cardSub.textContent = `Titular: ${name} (Tarjeta vinculada)`;
+        const newCard = {
+          id: 'card_' + Date.now(),
+          last4: last4,
+          titular: name,
+          vencimiento: expiry || '12/28',
+          brand: num.startsWith('4') ? 'Visa' : (num.startsWith('5') ? 'Mastercard' : 'Tarjeta')
+        };
+
+        cards.push(newCard);
+        saveSavedCards(cards);
         formCard.classList.add('hidden');
+        
+        // Limpiar campos
+        if (document.getElementById('cardNumber')) document.getElementById('cardNumber').value = '';
+        if (document.getElementById('cardHolderName')) document.getElementById('cardHolderName').value = '';
+        if (document.getElementById('cardExpiry')) document.getElementById('cardExpiry').value = '';
+        if (document.getElementById('cardCvc')) document.getElementById('cardCvc').value = '';
+
         showToast(`💳 Tarjeta terminada en ${last4} vinculada exitosamente.`);
       });
     }
+
+    // Setup de botones 'X' para borrar direcciones en el Paso 3
+    const origInp = document.getElementById('origin-input');
+    const btnClearOrig = document.getElementById('btn-clear-origin');
+    const destInp = document.getElementById('destination-input');
+    const btnClearDest = document.getElementById('btn-clear-destination');
+    const stopInp = document.getElementById('stop-input');
+    const btnClearStop = document.getElementById('btn-clear-stop');
+
+    function setupClearAddressButton(input, btn, onClear) {
+      if (!input || !btn) return;
+      const toggle = () => {
+        btn.classList.toggle('hidden', !input.value || input.value.trim().length === 0);
+      };
+      input.addEventListener('input', toggle);
+      input.addEventListener('change', toggle);
+      toggle();
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        input.value = '';
+        toggle();
+        input.focus();
+        if (typeof onClear === 'function') onClear();
+      });
+    }
+
+    setupClearAddressButton(origInp, btnClearOrig, () => {
+      state.origin = null;
+      if (typeof originMarker !== 'undefined' && originMarker && typeof map !== 'undefined' && map) {
+        try { map.removeLayer(originMarker); } catch(e){}
+        originMarker = null;
+      }
+      if (typeof routePolyline !== 'undefined' && routePolyline && typeof map !== 'undefined' && map) {
+        try { map.removeLayer(routePolyline); } catch(e){}
+        routePolyline = null;
+      }
+      updateCalculation();
+    });
+
+    setupClearAddressButton(destInp, btnClearDest, () => {
+      state.destination = null;
+      if (typeof destinationMarker !== 'undefined' && destinationMarker && typeof map !== 'undefined' && map) {
+        try { map.removeLayer(destinationMarker); } catch(e){}
+        destinationMarker = null;
+      }
+      if (typeof routePolyline !== 'undefined' && routePolyline && typeof map !== 'undefined' && map) {
+        try { map.removeLayer(routePolyline); } catch(e){}
+        routePolyline = null;
+      }
+      updateCalculation();
+    });
+
+    setupClearAddressButton(stopInp, btnClearStop, () => {
+      state.intermediateStop = null;
+      if (typeof stopMarker !== 'undefined' && stopMarker && typeof map !== 'undefined' && map) {
+        try { map.removeLayer(stopMarker); } catch(e){}
+        stopMarker = null;
+      }
+      if (state.origin && state.destination) {
+        checkAndRoute();
+      } else {
+        updateCalculation();
+      }
+    });
   }
 
   // Inicializar al cargar

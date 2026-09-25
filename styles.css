@@ -5473,4 +5473,131 @@ html, body {
   color: #0f172a;
 }
 
+/* Clear address button 'X' */
+.btn-clear-address {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.btn-clear-address:hover {
+  background: rgba(239, 68, 68, 0.7);
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* Saved Payment Cards List */
+.saved-card-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saved-card-item.selected {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.saved-card-item:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.btn-delete-card {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 0.95rem;
+  padding: 4px 6px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.btn-delete-card:hover {
+  opacity: 1;
+}
+
+/* Compact History Trip Cards */
+.history-compact-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.22s ease;
+}
+
+.history-compact-card:hover {
+  background: rgba(56, 189, 248, 0.06);
+  border-color: rgba(56, 189, 248, 0.35);
+  transform: translateY(-1px);
+}
+
+.history-card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.history-card-date {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.history-card-price {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #34d399;
+}
+
+.history-card-route {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+.history-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.history-btn-view-detail {
+  color: #38bdf8;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 

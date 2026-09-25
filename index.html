@@ -274,20 +274,20 @@
 
         <div class="wizard-nav-footer">
           <div></div>
-          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(2)">
-            Siguiente: Elegir Horario ➔
+          <button type="button" class="btn btn-primary btn-wizard-next" id="btn-next-step1" onclick="handleStep1Next()">
+            Siguiente: Continuar ➔
           </button>
         </div>
       </div>
 
       <!-- ==================================================== -->
-      <!-- PASO 2: HORARIO DE RECOGIDA -->
+      <!-- PASO 2: HORARIO DE RECOGIDA (24 HORAS) -->
       <!-- ==================================================== -->
       <div class="wizard-step-panel hidden" id="wizard-step-panel-2">
         <div class="compact-wizard-header">
           <div class="compact-header-left">
             <span class="compact-step-tag">Paso 2 de 5</span>
-            <h2 class="compact-step-title">🕒 Hora de Recogida</h2>
+            <h2 class="compact-step-title">🕒 Hora de Recogida (Formato 24 hs)</h2>
           </div>
           <div id="step-datetime-summary-step2" class="step-summary-badge">📅 Hoy</div>
         </div>
@@ -306,16 +306,16 @@
           <div class="schedule-stylish-wrapper">
             <div class="schedule-block digital-alarm-block">
               <div class="block-header">
-                <span class="block-label">⏰ Selector de Horario de Recogida</span>
+                <span class="block-label">⏰ Horario de Recogida (00:00 a 23:55 hs)</span>
               </div>
 
-              <!-- Digital Alarm Clock Face -->
-              <div class="alarm-clock-container">
+              <!-- Digital Alarm Clock Face 24hs -->
+              <div class="alarm-clock-container" style="justify-content: center; gap: 18px;">
                 <div class="alarm-digit-group">
                   <button type="button" class="alarm-btn-adjust" id="btn-alarm-hour-up" aria-label="Aumentar hora">▲</button>
                   <div class="alarm-digit-display" id="alarm-hour-display">12</div>
                   <button type="button" class="alarm-btn-adjust" id="btn-alarm-hour-down" aria-label="Disminuir hora">▼</button>
-                  <span class="alarm-digit-label">HORA</span>
+                  <span class="alarm-digit-label">HORA (24H)</span>
                 </div>
 
                 <div class="alarm-colon-separator">:</div>
@@ -325,12 +325,6 @@
                   <div class="alarm-digit-display" id="alarm-min-display">00</div>
                   <button type="button" class="alarm-btn-adjust" id="btn-alarm-min-down" aria-label="Disminuir minutos">▼</button>
                   <span class="alarm-digit-label">MINUTOS</span>
-                </div>
-
-                <div class="alarm-period-group">
-                  <button type="button" class="alarm-ampm-btn active" id="btn-alarm-am">AM</button>
-                  <button type="button" class="alarm-ampm-btn" id="btn-alarm-pm">PM</button>
-                  <span class="alarm-digit-label">PERÍODO</span>
                 </div>
               </div>
 
@@ -381,9 +375,12 @@
             <!-- Origin -->
             <div class="input-field-wrap">
               <div class="input-icon-pin origin-pin" title="Punto de Origen"></div>
-              <div class="field-body">
+              <div class="field-body" style="position: relative;">
                 <label for="origin-input">Punto de Partida (Origen) *</label>
-                <input type="text" id="origin-input" placeholder="Ej: Aeropuerto Ezeiza, Obelisco o calle y número..." autocomplete="off" />
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="text" id="origin-input" placeholder="Ej: Aeropuerto Ezeiza, Obelisco o calle y número..." autocomplete="off" style="padding-right: 36px;" />
+                  <button type="button" class="btn-clear-address hidden" id="btn-clear-origin" title="Borrar dirección">✕</button>
+                </div>
                 <div id="origin-suggestions" class="suggestions-list hidden"></div>
               </div>
               <button id="btn-use-location" class="location-btn" title="Usar mi ubicación actual">📍</button>
@@ -400,12 +397,15 @@
             <!-- Intermediate Stop (Optional) -->
             <div id="stop-field-wrap" class="input-field-wrap stop-field-wrap hidden">
               <div class="input-icon-pin stop-pin" title="Parada Intermedia"></div>
-              <div class="field-body">
+              <div class="field-body" style="position: relative;">
                 <div class="field-label-row">
                   <label for="stop-input">Parada Intermedia</label>
                   <span id="stop-rate-badge" class="stop-rate-badge">+$500 (En camino)</span>
                 </div>
-                <input type="text" id="stop-input" placeholder="Ej: Calle y número o lugar de la parada..." autocomplete="off" />
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="text" id="stop-input" placeholder="Ej: Calle y número o lugar de la parada..." autocomplete="off" style="padding-right: 36px;" />
+                  <button type="button" class="btn-clear-address hidden" id="btn-clear-stop" title="Borrar parada">✕</button>
+                </div>
                 <div id="stop-suggestions" class="suggestions-list hidden"></div>
               </div>
               <button type="button" id="btn-remove-stop" class="remove-stop-btn" title="Quitar parada intermedia">✕</button>
@@ -419,9 +419,12 @@
             <!-- Destination -->
             <div class="input-field-wrap">
               <div class="input-icon-pin destination-pin" title="Punto de Destino"></div>
-              <div class="field-body">
+              <div class="field-body" style="position: relative;">
                 <label for="destination-input">Punto de Destino Final *</label>
-                <input type="text" id="destination-input" placeholder="Ej: Hotel Hilton, Puerto Madero, Nordelta, Aeroparque..." autocomplete="off" />
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="text" id="destination-input" placeholder="Ej: Hotel Hilton, Puerto Madero, Nordelta, Aeroparque..." autocomplete="off" style="padding-right: 36px;" />
+                  <button type="button" class="btn-clear-address hidden" id="btn-clear-destination" title="Borrar dirección">✕</button>
+                </div>
                 <div id="destination-suggestions" class="suggestions-list hidden"></div>
               </div>
             </div>
@@ -429,7 +432,7 @@
         </div>
 
         <div class="wizard-nav-footer">
-          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(2)">
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="handleStep3Prev()">
             ‹ Atrás
           </button>
           <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(4)">
@@ -607,7 +610,7 @@
               <span class="passenger-fields-icon">👤</span>
               <div style="flex: 1;">
                 <h4>Datos del Pasajero para la Reserva</h4>
-                <p id="passengerProfileStatusMsg">Indica el nombre y WhatsApp para coordinar el viaje</p>
+                <p id="passengerProfileStatusMsg">Indica tu nombre y número de celular para que el conductor pueda contactarte</p>
               </div>
               <button type="button" id="btnQuickOpenProfile" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 4px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer;">
                 👤 Mi Perfil
@@ -619,7 +622,7 @@
                 <input type="text" id="passenger-name-input" placeholder="Ej: Dr. Roberto Gómez" autocomplete="name" required />
               </div>
               <div class="field-item">
-                <label for="passenger-phone-input">Número de WhatsApp *</label>
+                <label for="passenger-phone-input">Número de Celular *</label>
                 <input type="tel" id="passenger-phone-input" placeholder="Ej: 11 5544 3322" autocomplete="tel" required />
               </div>
               <div class="field-item full-width">
@@ -1215,13 +1218,26 @@
         <!-- TAB 1: MIS DATOS -->
         <div class="p-tab-content active" id="tabProfileData">
           <form id="passengerProfileForm" class="profile-form-grid">
-            <div class="avatar-picker-section">
-              <span class="field-label" style="font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 4px;">Seleccionar Foto / Avatar</span>
-              <div class="avatar-choices-row">
-                <img class="avatar-choice active" data-src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Avatar 1" />
-                <img class="avatar-choice" data-src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" alt="Avatar 2" />
-                <img class="avatar-choice" data-src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80" src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80" alt="Avatar 3" />
-                <img class="avatar-choice" data-src="https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=150&q=80" src="https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=150&q=80" alt="Avatar 4" />
+            
+            <!-- Foto de perfil personalizada / Subir desde celular -->
+            <div class="custom-photo-upload-section" style="background: rgba(255,255,255,0.03); border: 1.5px dashed rgba(56,189,248,0.3); border-radius: 14px; padding: 14px; text-align: center;">
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                <div id="passengerProfileAvatarContainer" style="width: 76px; height: 76px; border-radius: 50%; overflow: hidden; border: 2.5px solid #38bdf8; background: #1e293b; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 16px rgba(56,189,248,0.3);">
+                  <img id="profileModalAvatarImg" src="" alt="Foto de Perfil" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
+                  <span id="profileModalAvatarPlaceholder" style="font-size: 2.2rem; color: #94a3b8;">👤</span>
+                </div>
+                <div>
+                  <input type="file" id="passengerPhotoFileInput" accept="image/*" class="hidden" />
+                  <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-secondary" id="btnTriggerPhotoUpload" style="font-size: 0.78rem; padding: 6px 12px; border-radius: 8px; background: rgba(56,189,248,0.15); color: #38bdf8; border-color: rgba(56,189,248,0.4);">
+                      📷 Subir Foto desde Celular
+                    </button>
+                    <button type="button" class="btn btn-secondary hidden" id="btnRemoveProfilePhoto" style="font-size: 0.78rem; padding: 6px 10px; border-radius: 8px; background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">
+                      ✕ Quitar Foto
+                    </button>
+                  </div>
+                  <small style="color: #64748b; font-size: 0.72rem; display: block; margin-top: 4px;">Selecciona una foto clara para que el chofer pueda reconocerte.</small>
+                </div>
               </div>
             </div>
 
@@ -1231,7 +1247,7 @@
             </div>
 
             <div class="field-item">
-              <label for="profPassengerPhone" style="color:#94a3b8; font-size:0.8rem;">Número de WhatsApp *</label>
+              <label for="profPassengerPhone" style="color:#94a3b8; font-size:0.8rem;">Número de Celular * (para llamadas y coordinación con el chofer)</label>
               <input type="tel" id="profPassengerPhone" placeholder="Ej: 11 5544 3322" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" required />
             </div>
 
@@ -1246,53 +1262,61 @@
           </form>
         </div>
 
-        <!-- TAB 2: MEDIOS DE PAGO -->
+        <!-- TAB 2: MEDIOS DE PAGO (MÚLTIPLES TARJETAS) -->
         <div class="p-tab-content hidden" id="tabProfilePayments">
           <div class="payment-methods-wrapper">
-            <h4 style="color: #f8fafc; font-size: 0.95rem; margin-bottom: 12px;">Métodos de Pago</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h4 style="color: #f8fafc; font-size: 0.95rem; margin: 0;">Tus Medios de Pago</h4>
+              <button type="button" class="btn btn-secondary" id="btnToggleAddCard" style="font-size: 0.75rem; padding: 5px 10px; border-radius: 8px; color: #38bdf8; border-color: rgba(56,189,248,0.4);">
+                ➕ Vincular Tarjeta
+              </button>
+            </div>
             
             <div class="payment-option-card active" id="payMethodCash">
               <div class="pay-option-left">
                 <span class="pay-icon">💵</span>
                 <div>
                   <strong>Efectivo / Transferencia Directa</strong>
-                  <small>Pago al chofer al finalizar el viaje</small>
+                  <small>Pago directo al chofer al finalizar</small>
                 </div>
               </div>
               <span class="pay-check-badge">✓ Activo</span>
             </div>
 
-            <div class="payment-option-card" id="payMethodCardCard">
-              <div class="pay-option-left">
-                <span class="pay-icon">💳</span>
-                <div>
-                  <strong id="savedCardLabel">Tarjeta de Débito / Crédito</strong>
-                  <small id="savedCardSub">Vincula tu tarjeta para pago rápido</small>
-                </div>
-              </div>
-              <button type="button" class="btn-card-action" id="btnToggleAddCard">Gestionar</button>
+            <!-- Contenedor dinámico de tarjetas vinculadas -->
+            <div id="savedCardsListContainer" style="display: flex; flex-direction: column; gap: 8px; margin: 10px 0;">
+              <!-- Tarjetas agregadas se renderizan aquí -->
             </div>
 
-            <!-- Formulario para agregar tarjeta -->
-            <div id="addCardFormWrap" class="add-card-form-wrap hidden" style="background: rgba(15,23,42,0.9); padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); margin-top: 10px;">
-              <h5 style="color:#38bdf8; margin-bottom:10px;">Vincular Tarjeta</h5>
+            <!-- Formulario para agregar nueva tarjeta -->
+            <div id="addCardFormWrap" class="add-card-form-wrap hidden" style="background: rgba(15,23,42,0.95); padding: 14px; border-radius: 12px; border: 1.5px solid rgba(56,189,248,0.3); margin-top: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h5 style="color:#38bdf8; margin: 0; font-size: 0.9rem;">💳 Vincular Nueva Tarjeta</h5>
+                <button type="button" id="btnCancelAddCard" style="background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer;">✕</button>
+              </div>
               <div style="display:grid; gap:10px;">
-                <input type="text" id="cardHolderName" placeholder="Nombre en la tarjeta" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
+                <input type="text" id="cardHolderName" placeholder="Nombre del Titular (como figura en la tarjeta)" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
                 <input type="text" id="cardNumber" placeholder="Número de tarjeta (16 dígitos)" maxlength="19" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                  <input type="text" id="cardExpiry" placeholder="MM/AA" maxlength="5" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
-                  <input type="password" id="cardCvc" placeholder="CVC" maxlength="4" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
+                  <input type="text" id="cardExpiry" placeholder="Vencimiento (MM/AA)" maxlength="5" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
+                  <input type="password" id="cardCvc" placeholder="CVC / Código" maxlength="4" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
                 </div>
-                <button type="button" class="btn btn-primary" id="btnSaveCard">Vincular Tarjeta</button>
+                <button type="button" class="btn btn-primary" id="btnSaveCard" style="margin-top: 4px;">Guardar Tarjeta</button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- TAB 3: HISTORIAL DE VIAJES (ESTILO CABIFY) -->
+        <!-- TAB 3: HISTORIAL DE VIAJES (LISTA Y DETALLE COMPLETO CABIFY) -->
         <div class="p-tab-content hidden" id="tabProfileHistory">
-          <div class="passenger-history-list" id="passengerHistoryList">
-            <!-- Inyectado dinámicamente con tarjetas idénticas a Cabify -->
+          <!-- Vista 1: Lista de viajes realizados -->
+          <div id="passengerHistoryListView" class="passenger-history-list">
+            <!-- Renderizado dinámicamente -->
+          </div>
+
+          <!-- Vista 2: Detalle completo del viaje seleccionado (Cabify Style) -->
+          <div id="passengerHistoryDetailView" class="passenger-history-detail hidden">
+            <!-- Inyectado dinámicamente al hacer clic en un viaje -->
           </div>
         </div>
 

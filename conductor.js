@@ -1706,6 +1706,8 @@ document.addEventListener('DOMContentLoaded', () => {
         showDriverToast('🚗 ¡Viaje Aceptado! Dirígete al punto de recogida.');
     }
 
+    const driverPendingTripQueue = [];
+
     function enqueueIncomingTrip(tripData) {
         if (!driverState.isOnline || driverState.activeTrip) return;
         if (!tripData || !tripData.id) return;
@@ -1717,10 +1719,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderAvailableTripsList();
 
-        // Si no hay modal activo, mostrar la solicitud entrante
-        if (!driverState.incomingTrip) {
-            showIncomingTrip(tripData);
+        // Si ya hay una solicitud en pantalla, encolar en espera
+        if (driverState.incomingTrip) {
+            if (driverState.incomingTrip.id !== tripData.id && !driverPendingTripQueue.some(t => t.id === tripData.id)) {
+                driverPendingTripQueue.push(tripData);
+            }
+            return;
         }
+
+        // Si no hay modal activo, mostrar la solicitud entrante
+        showIncomingTrip(tripData);
     }
 
     function showIncomingTrip(tripData) {
@@ -1774,7 +1782,7 @@ document.addEventListener('DOMContentLoaded', () => {
         incomingTripModal.classList.add('active');
         startAlertLoop();
 
-        // 1. Notificación Emergente de Alta Prioridad (Heads-Up Alert por encima de otras apps)
+        // 1. Notificación Emergente de Alta Prioridad
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
                 const rawP = tripData.precioEstimado || tripData.precio || tripData.totalFare || tripData.monto || 0;
@@ -1801,20 +1809,15 @@ document.addEventListener('DOMContentLoaded', () => {
             try { navigator.vibrate([600, 200, 600, 200, 1000]); } catch(e){}
         }
 
-        // 3. Actualizar la Ventana Flotante (PiP) si está abierta fuera de la app
-        if (typeof renderPipWindowContent === 'function') {
-            try { renderPipWindowContent(); } catch(e){}
-        }
-
-        // Iniciar cuenta regresiva de 15 segundos
-        driverState.countdownSecs = 15;
-        countdownSecs.textContent = '15s';
+        // Iniciar cuenta regresiva exacta de 30 segundos
+        driverState.countdownSecs = 30;
+        countdownSecs.textContent = '30s';
         countdownBar.style.width = '100%';
 
         if (driverState.countdownTimer) clearInterval(driverState.countdownTimer);
 
         const startTime = Date.now();
-        const duration = 15000;
+        const duration = 30000; // 30 segundos
 
         driverState.countdownTimer = setInterval(() => {
             const elapsed = Date.now() - startTime;
@@ -1841,6 +1844,17 @@ document.addEventListener('DOMContentLoaded', () => {
         driverState.incomingTrip = null;
     }
 
+    function processNextQueuedTrip() {
+        if (!driverState.isOnline || driverState.activeTrip || driverState.incomingTrip) return;
+
+        if (driverPendingTripQueue.length > 0) {
+            const nextTrip = driverPendingTripQueue.shift();
+            if (nextTrip && nextTrip.id) {
+                showIncomingTrip(nextTrip);
+            }
+        }
+    }
+
     function rejectIncomingTrip() {
         const trip = driverState.incomingTrip;
         closeIncomingModal();
@@ -1852,14 +1866,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         renderAvailableTripsList();
 
-        // Programar re-intento tras 30 SEGUNDOS si la solicitud continúa sin ser tomada por nadie
+        // 1. Si hay otra solicitud esperando en cola, presentarla de inmediato (solicitudes una por una)
+        setTimeout(() => {
+            processNextQueuedTrip();
+        }, 300);
+
+        // 2. Programar re-intento tras 30 SEGUNDOS si la solicitud continúa sin ser tomada por nadie
         if (driverRejectRecycleTimers[trip.id]) clearTimeout(driverRejectRecycleTimers[trip.id]);
         driverRejectRecycleTimers[trip.id] = setTimeout(() => {
             if (driverState.isOnline && !driverState.activeTrip) {
                 const tripCreatedAt = trip.creadoEn || trip.timestamp || Date.now();
-                const isWithin5Min = (Date.now() - tripCreatedAt) < (5 * 60 * 1000);
+                const isWithin10Min = (Date.now() - tripCreatedAt) < (10 * 60 * 1000);
 
-                let sigueBuscando = isWithin5Min;
+                let sigueBuscando = isWithin10Min;
                 if (window.RutaSync) {
                     const active = window.RutaSync.obtenerViajeActivo();
                     if (active && active.id === trip.id && !['buscando_conductor', 'solicitado'].includes(active.estado)) {
@@ -1868,9 +1887,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (sigueBuscando) {
-                    if (!driverState.incomingTrip) {
-                        showIncomingTrip(trip);
-                    }
+                    enqueueIncomingTrip(trip);
                 } else {
                     driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== trip.id);
                     renderAvailableTripsList();
@@ -3656,21 +3673,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const btnRefreshDriverTrips = document.getElementById('btnRefreshDriverTrips');
         if (btnRefreshDriverTrips) {
-            btnRefreshDriverTrips.addEventListener('click', () => {
+            btnRefreshDriverTrips.addEventListener('click', async () => {
                 const icon = document.getElementById('iconRefreshDriverTrips');
                 if (icon) icon.classList.add('fa-spin');
+                
                 if (window.RutaSync) {
                     try {
                         const activeTrip = window.RutaSync.obtenerViajeActivo();
-                        if (activeTrip && activeTrip.id && !driverState.activeTrip) {
-                            restoreDriverActiveTripIfExists();
+                        if (activeTrip && activeTrip.id) {
+                            if (!driverState.activeTrip && ['aceptado', 'en_camino', 'en_origen', 'en_viaje'].includes(activeTrip.estado)) {
+                                restoreDriverActiveTripIfExists();
+                            } else if (['buscando_conductor', 'solicitado'].includes(activeTrip.estado)) {
+                                enqueueIncomingTrip(activeTrip);
+                            }
+                        }
+
+                        // Consulta directa a Firestore si está disponible
+                        if (window.RutaSync.firestore) {
+                            try {
+                                const docSnap = await window.RutaSync.firestore.collection('live_trips').doc('current_active_trip').get();
+                                if (docSnap.exists) {
+                                    const fsData = docSnap.data();
+                                    if (fsData && ['buscando_conductor', 'solicitado'].includes(fsData.estado)) {
+                                        enqueueIncomingTrip(fsData);
+                                    }
+                                }
+                            } catch(fsErr) {}
                         }
                     } catch(e) {}
                 }
+
                 renderAvailableTripsList();
                 renderReservas();
                 playAlertSound('chat');
-                showDriverToast('✅ Solicitudes de viajes y radar actualizados.');
+                showDriverToast('🔄 Radar y solicitudes actualizados al instante.');
                 setTimeout(() => {
                     if (icon) icon.classList.remove('fa-spin');
                 }, 700);
