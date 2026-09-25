@@ -69,6 +69,66 @@ function toggleFareBreakdown() {
 }
 window.toggleFareBreakdown = toggleFareBreakdown;
 
+async function resolvePassengerLocation(text) {
+  if (!text || !text.trim()) return null;
+  const q = text.trim();
+  // 1. Landmark instantaneo (0ms)
+  if (typeof STRATEGIC_LANDMARKS !== 'undefined' && Array.isArray(STRATEGIC_LANDMARKS)) {
+    for (const lm of STRATEGIC_LANDMARKS) {
+      if (lm.regex && lm.regex.test(q)) {
+        return {
+          lat: parseFloat(lm.lat),
+          lng: parseFloat(lm.lon),
+          address: `${lm.mainTitle}, ${lm.subTitle}`
+        };
+      }
+    }
+  }
+  // 2. Geocoding
+  if (typeof searchLocations === 'function') {
+    try {
+      const res = await searchLocations(q);
+      if (res && res.length > 0) {
+        return {
+          lat: parseFloat(res[0].lat),
+          lng: parseFloat(res[0].lon),
+          address: res[0].display_name || q
+        };
+      }
+    } catch(e){}
+  }
+  // 3. Fallbacks inteligentes por palabras clave
+  const qLower = q.toLowerCase();
+  if (qLower.includes('ezeiza') || qLower.includes('pistarini')) {
+    return { lat: -34.8222, lng: -58.5358, address: q };
+  }
+  if (qLower.includes('aeroparque') || qLower.includes('newbery')) {
+    return { lat: -34.5588, lng: -58.4168, address: q };
+  }
+  if (qLower.includes('obelisco') || qLower.includes('centro') || qLower.includes('caba')) {
+    return { lat: -34.6037, lng: -58.3816, address: q };
+  }
+  if (qLower.includes('palermo')) {
+    return { lat: -34.5889, lng: -58.4306, address: q };
+  }
+  if (qLower.includes('belgrano')) {
+    return { lat: -34.5627, lng: -58.4564, address: q };
+  }
+  if (qLower.includes('puerto madero')) {
+    return { lat: -34.6111, lng: -58.3639, address: q };
+  }
+  if (qLower.includes('pilar')) {
+    return { lat: -34.4587, lng: -58.9142, address: q };
+  }
+  if (qLower.includes('tigre')) {
+    return { lat: -34.4251, lng: -58.5796, address: q };
+  }
+  if (qLower.includes('san isidro')) {
+    return { lat: -34.4717, lng: -58.5286, address: q };
+  }
+  return { lat: -34.6037, lng: -58.3816, address: q };
+}
+
 async function goToWizardStep(step) {
   if (step < 1 || step > 5) return;
 
@@ -80,16 +140,16 @@ async function goToWizardStep(step) {
   const destVal = destInput ? destInput.value.trim() : '';
   const stopVal = stopInput ? stopInput.value.trim() : '';
 
-  // Validar direcciones al intentar ir a Mapa (4) o Cotización (5)
-  if (step >= 4) {
+  // Validar direcciones al intentar ir a pasos posteriores
+  if (step >= 2) {
     if (!originVal || !destVal) {
-      showToast('⚠️ Por favor escribe el Origen y el Destino para ver la ruta y cotización.');
+      showToast('⚠️ Por favor escribe el Origen y el Destino para continuar.');
       if (!originVal && originInput) {
         originInput.focus();
-        step = 3;
+        step = 1;
       } else if (!destVal && destInput) {
         destInput.focus();
-        step = 3;
+        step = 1;
       }
     }
   }
@@ -122,9 +182,12 @@ async function goToWizardStep(step) {
     }
   }
 
-  // 2. Actualizar insignias de fecha y hora
+  // 2. Actualizar insignias de resumen y botones
   if (typeof updateStepDateTimeBadges === 'function') {
     try { updateStepDateTimeBadges(); } catch(e){}
+  }
+  if (typeof updateStep5ActionButton === 'function') {
+    try { updateStep5ActionButton(); } catch(e){}
   }
 
   // 3. Scroll suave al inicio del paso
@@ -133,59 +196,8 @@ async function goToWizardStep(step) {
     try { container.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e){}
   }
 
-  // 4. Procesar mapa y cálculo
-  if (originVal && destVal) {
-    // Si falta lat/lng en origen, geocodificar
-    if (!state.origin || !state.origin.lat) {
-      if (typeof searchLocations === 'function') {
-        try {
-          const results = await searchLocations(originVal);
-          if (results && results.length > 0) {
-            state.origin = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || originVal };
-          }
-        } catch(e){}
-      }
-    }
-
-    // Si falta lat/lng en destino, geocodificar
-    if (!state.destination || !state.destination.lat) {
-      if (typeof searchLocations === 'function') {
-        try {
-          const results = await searchLocations(destVal);
-          if (results && results.length > 0) {
-            state.destination = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || destVal };
-          }
-        } catch(e){}
-      }
-    }
-
-    // Si hay parada intermedia y falta lat/lng, geocodificar
-    if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
-      if (typeof searchLocations === 'function') {
-        try {
-          const results = await searchLocations(stopVal);
-          if (results && results.length > 0) {
-            state.intermediateStop = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || stopVal };
-          }
-        } catch(e){}
-      }
-    }
-
-    // Fallback de coordenadas si siguen vacías
-    if (!state.origin || !state.origin.lat) {
-      state.origin = { lat: -34.6037, lng: -58.3816, address: originVal };
-    }
-    if (!state.destination || !state.destination.lat) {
-      state.destination = { lat: -34.8127, lng: -58.5372, address: destVal };
-    }
-
-    if (typeof checkAndRoute === 'function') {
-      try { await checkAndRoute(); } catch(e){}
-    }
-  }
-
-  // Inicializar Leaflet y centrar ruta en Paso 4
-  if (step === 4) {
+  // 4. Si el paso es 2 (Mapa), inicializar Leaflet y centrar ruta
+  if (step === 2) {
     if (!map && typeof initMap === 'function') {
       try { initMap(); } catch(e){}
     }
@@ -221,16 +233,30 @@ async function goToWizardStep(step) {
               destinationMarker.setLatLng([state.destination.lat, state.destination.lng]);
             }
           }
+          if (state.hasIntermediateStop && state.intermediateStop && state.intermediateStop.lat) {
+            if (!stopMarker || !map.hasLayer(stopMarker)) {
+              const stopIcon = L.divIcon({
+                className: 'custom-map-pin stop-marker-pin',
+                html: '<div style="background:#f59e0b; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
+                iconSize: [22, 22],
+                iconAnchor: [11, 11]
+              });
+              stopMarker = L.marker([state.intermediateStop.lat, state.intermediateStop.lng], { icon: stopIcon }).addTo(map);
+              stopMarker.bindPopup(`<strong>Parada Intermedia:</strong><br>${state.intermediateStop.address || stopVal}`);
+            } else {
+              stopMarker.setLatLng([state.intermediateStop.lat, state.intermediateStop.lng]);
+            }
+          }
           if (routePolyline && map.hasLayer(routePolyline)) {
             map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
           }
         } catch(e){}
       }
-    }, 80);
+    }, 100);
   }
 
-  // Recalcular y Renderizar Cotización en Paso 4 y 5
-  if (step === 4 || step === 5) {
+  // 5. Recalcular y Renderizar Cotización para pasos 2, 3, 4 y 5
+  if (step >= 2) {
     if (typeof updateCalculation === 'function') {
       try { updateCalculation(); } catch(e){}
     }
@@ -242,17 +268,35 @@ async function goToWizardStep(step) {
 
 function updateStepDateTimeBadges() {
   const dateFormatted = (typeof formatDateWithWeekday === 'function' && state.date) ? formatDateWithWeekday(state.date) : 'Hoy';
-  const timeStr = state.time ? `${state.time} hs` : 'Ahora';
-  const badgeText = `📅 ${dateFormatted} • 🕒 ${timeStr}`;
+  const timeStr = state.tripType === 'live' ? '⚡ Ahora mismo' : (state.time ? `${state.time} hs` : '12:00 hs');
 
-  ['step-datetime-summary-step2', 'step-datetime-summary-step3', 'step-datetime-summary-step4', 'step-datetime-summary-step5'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = badgeText;
-  });
+  const step2Badge = document.getElementById('step-datetime-summary-step2');
+  if (step2Badge) {
+    const origShort = state.origin?.address ? state.origin.address.split(',')[0] : 'Origen';
+    const destShort = state.destination?.address ? state.destination.address.split(',')[0] : 'Destino';
+    step2Badge.textContent = `📍 ${origShort} ➔ ${destShort}`;
+  }
+
+  const step3Badge = document.getElementById('step-datetime-summary-step3');
+  if (step3Badge) {
+    const distStr = state.distanceKm > 0 ? `${state.distanceKm.toFixed(1)} km` : 'Ruta lista';
+    const durStr = state.durationMin > 0 ? `~${state.durationMin} min` : '';
+    step3Badge.textContent = `🚗 ${distStr} ${durStr ? '• ' + durStr : ''}`;
+  }
+
+  const step4Badge = document.getElementById('step-datetime-summary-step4');
+  if (step4Badge) {
+    step4Badge.textContent = `📅 ${dateFormatted}`;
+  }
+
+  const step5Badge = document.getElementById('step-datetime-summary-step5');
+  if (step5Badge) {
+    step5Badge.textContent = `📅 ${state.tripType === 'live' ? '⚡ En Vivo' : dateFormatted} • 🕒 ${timeStr}`;
+  }
 
   const selectedTimeDisplay = document.getElementById('selected-time-highlight');
   if (selectedTimeDisplay) {
-    selectedTimeDisplay.textContent = timeStr;
+    selectedTimeDisplay.textContent = state.time ? `${state.time} hs` : '12:00 hs';
   }
 }
 
@@ -288,29 +332,77 @@ function selectTripMode(mode) {
     if (btnSchedule) btnSchedule.classList.add('active');
     if (btnLive) btnLive.classList.remove('active');
   }
+  updateStepDateTimeBadges();
   updateStep5ActionButton();
 }
 
-function handleStep1Next() {
-  if (state.tripType === 'live' || !state.tripType) {
-    goToWizardStep(3);
+async function handleStep1Next() {
+  const originInput = document.getElementById('origin-input');
+  const destInput = document.getElementById('destination-input');
+  const stopInput = document.getElementById('stop-input');
+
+  const originVal = originInput ? originInput.value.trim() : '';
+  const destVal = destInput ? destInput.value.trim() : '';
+  const stopVal = stopInput ? stopInput.value.trim() : '';
+
+  if (!originVal) {
+    showToast('⚠️ Por favor ingresa el punto de partida (Origen).');
+    if (originInput) originInput.focus();
+    return;
+  }
+  if (!destVal) {
+    showToast('⚠️ Por favor ingresa el punto de destino final.');
+    if (destInput) destInput.focus();
+    return;
+  }
+
+  // Resolver coordenadas inmediatamente
+  if (!state.origin || !state.origin.lat || state.origin.address !== originVal) {
+    const resOrig = await resolvePassengerLocation(originVal);
+    if (resOrig) state.origin = resOrig;
+  }
+  if (!state.destination || !state.destination.lat || state.destination.address !== destVal) {
+    const resDest = await resolvePassengerLocation(destVal);
+    if (resDest) state.destination = resDest;
+  }
+  if (state.hasIntermediateStop && stopVal) {
+    if (!state.intermediateStop || !state.intermediateStop.lat || state.intermediateStop.address !== stopVal) {
+      const resStop = await resolvePassengerLocation(stopVal);
+      if (resStop) state.intermediateStop = resStop;
+    }
+  }
+
+  if (typeof checkAndRoute === 'function') {
+    try { await checkAndRoute(); } catch(e){}
+  }
+  if (typeof updateCalculation === 'function') {
+    try { updateCalculation(); } catch(e){}
+  }
+
+  goToWizardStep(2);
+}
+
+function handleStep3Next() {
+  if (state.tripType === 'live') {
+    goToWizardStep(5);
   } else {
-    goToWizardStep(2);
+    goToWizardStep(4);
   }
 }
 
-function handleStep3Prev() {
-  if (state.tripType === 'live' || !state.tripType) {
-    goToWizardStep(1);
+function handleStep5Prev() {
+  if (state.tripType === 'live') {
+    goToWizardStep(3);
   } else {
-    goToWizardStep(2);
+    goToWizardStep(4);
   }
 }
 
 window.goToWizardStep = goToWizardStep;
 window.selectTripMode = selectTripMode;
 window.handleStep1Next = handleStep1Next;
-window.handleStep3Prev = handleStep3Prev;
+window.handleStep3Next = handleStep3Next;
+window.handleStep5Prev = handleStep5Prev;
 
 // ==========================================
 // 1.1 FERIADOS NACIONALES Y DÍAS FESTIVOS (ARGENTINA)

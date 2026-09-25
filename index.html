@@ -181,12 +181,164 @@
     <div id="passenger-wizard-container" class="passenger-wizard-wrapper">
       
       <!-- ==================================================== -->
-      <!-- PASO 1: TIPO DE VIAJE Y SELECCIÓN DE DÍA -->
+      <!-- PASO 1: DIRECCIONES (ORIGEN, PARADA, DESTINO) -->
       <!-- ==================================================== -->
       <div class="wizard-step-panel active-wizard-step" id="wizard-step-panel-1">
         <div class="compact-wizard-header">
-          <div class="compact-step-tag">Paso 1 de 5</div>
-          <h2 class="compact-step-title">📅 ¿Cuándo deseas realizar tu traslado?</h2>
+          <div class="compact-header-left">
+            <span class="compact-step-tag">Paso 1 de 5</span>
+            <h2 class="compact-step-title">📍 ¿A dónde te trasladamos?</h2>
+          </div>
+        </div>
+
+        <div class="card route-card">
+          <div class="card-header">
+            <h3>📍 Itinerario de Ruta</h3>
+          </div>
+
+          <div class="route-inputs-group">
+            <!-- Origin -->
+            <div class="input-field-wrap">
+              <div class="input-icon-pin origin-pin" title="Punto de Origen"></div>
+              <div class="field-body" style="position: relative;">
+                <label for="origin-input">Punto de Partida (Origen) *</label>
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="text" id="origin-input" placeholder="Ej: Aeropuerto Ezeiza, Obelisco o calle y número..." autocomplete="off" style="padding-right: 36px;" />
+                  <button type="button" class="btn-clear-address hidden" id="btn-clear-origin" title="Borrar dirección">✕</button>
+                </div>
+                <div id="origin-suggestions" class="suggestions-list hidden"></div>
+              </div>
+              <button id="btn-use-location" class="location-btn" title="Usar mi ubicación actual">📍</button>
+            </div>
+
+            <!-- Add Intermediate Stop Toggle Button -->
+            <div class="stop-toggle-wrapper" id="stop-toggle-wrapper">
+              <button type="button" id="btn-toggle-stop" class="btn-toggle-stop">
+                <span class="plus-icon">➕</span>
+                <span>Agregar Parada Intermedia (Opcional)</span>
+              </button>
+            </div>
+
+            <!-- Intermediate Stop (Optional) -->
+            <div id="stop-field-wrap" class="input-field-wrap stop-field-wrap hidden">
+              <div class="input-icon-pin stop-pin" title="Parada Intermedia"></div>
+              <div class="field-body" style="position: relative;">
+                <div class="field-label-row">
+                  <label for="stop-input">Parada Intermedia</label>
+                  <span id="stop-rate-badge" class="stop-rate-badge">+$500 (En camino)</span>
+                </div>
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="text" id="stop-input" placeholder="Ej: Calle y número o lugar de la parada..." autocomplete="off" style="padding-right: 36px;" />
+                  <button type="button" class="btn-clear-address hidden" id="btn-clear-stop" title="Borrar parada">✕</button>
+                </div>
+                <div id="stop-suggestions" class="suggestions-list hidden"></div>
+              </div>
+              <button type="button" id="btn-remove-stop" class="remove-stop-btn" title="Quitar parada intermedia">✕</button>
+            </div>
+
+            <!-- Swap Button -->
+            <div class="swap-wrapper">
+              <button id="btn-swap-route" class="swap-btn" title="Invertir origen y destino">⇅</button>
+            </div>
+
+            <!-- Destination -->
+            <div class="input-field-wrap">
+              <div class="input-icon-pin destination-pin" title="Punto de Destino"></div>
+              <div class="field-body" style="position: relative;">
+                <label for="destination-input">Punto de Destino Final *</label>
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="text" id="destination-input" placeholder="Ej: Hotel Hilton, Puerto Madero, Nordelta, Aeroparque..." autocomplete="off" style="padding-right: 36px;" />
+                  <button type="button" class="btn-clear-address hidden" id="btn-clear-destination" title="Borrar dirección">✕</button>
+                </div>
+                <div id="destination-suggestions" class="suggestions-list hidden"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav-footer">
+          <div></div>
+          <button type="button" class="btn btn-primary btn-wizard-next" id="btn-next-step1" onclick="handleStep1Next()">
+            Siguiente: Ver Mapa de Ruta ➔
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================================================== -->
+      <!-- PASO 2: MAPA DE RUTA Y VERIFICACIÓN -->
+      <!-- ==================================================== -->
+      <div class="wizard-step-panel hidden" id="wizard-step-panel-2">
+        <div class="compact-wizard-header">
+          <div class="compact-header-left">
+            <span class="compact-step-tag">Paso 2 de 5</span>
+            <h2 class="compact-step-title">🗺️ Verificación de Ruta</h2>
+          </div>
+          <div id="step-datetime-summary-step2" class="step-summary-badge">📍 Ruta Seleccionada</div>
+        </div>
+
+        <div class="card map-card">
+          <div class="map-header">
+            <div class="map-header-left">
+              <h3>Trazado de Ruta Oficial</h3>
+              <span id="traffic-indicator-pill" class="traffic-indicator-pill">⏱️ Tráfico estimado</span>
+            </div>
+            <span id="route-calc-status" class="status-indicator">Calculando trazado...</span>
+          </div>
+          
+          <div id="map-container" class="map-container" style="height: 260px;"></div>
+
+          <div id="traffic-live-banner" class="traffic-live-banner">
+            <div class="traffic-banner-icon-wrap">
+              <span class="traffic-pulse-dot" id="traffic-pulse-dot"></span>
+              <span id="traffic-banner-icon" class="traffic-banner-icon">🚦</span>
+            </div>
+            <div class="traffic-banner-text">
+              <div class="traffic-banner-title-row">
+                <strong id="traffic-banner-title">Tráfico Estimado por Horario</strong>
+                <span id="traffic-banner-badge" class="traffic-banner-badge">Programado</span>
+              </div>
+              <span id="traffic-banner-desc" class="traffic-banner-desc">El tiempo del viaje se calcula según el estado del tránsito en tiempo real.</span>
+            </div>
+          </div>
+
+          <div class="route-metrics-bar">
+            <div class="metric-box">
+              <span class="metric-label">Distancia</span>
+              <span class="metric-value" id="metric-distance">0.0 km</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-box">
+              <span class="metric-label">Duración</span>
+              <span class="metric-value" id="metric-duration">0 min</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-box">
+              <span class="metric-label">Llegada Estimada</span>
+              <span class="metric-value" id="metric-arrival">--:--</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav-footer">
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(1)">
+            ‹ Modificar Direcciones
+          </button>
+          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(3)">
+            Siguiente: ¿Cuándo deseas viajar? ➔
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================================================== -->
+      <!-- PASO 3: TIPO DE TRASLADO Y SELECCIÓN DE DÍA -->
+      <!-- ==================================================== -->
+      <div class="wizard-step-panel hidden" id="wizard-step-panel-3">
+        <div class="compact-wizard-header">
+          <div class="compact-header-left">
+            <span class="compact-step-tag">Paso 3 de 5</span>
+            <h2 class="compact-step-title">📅 ¿Cuándo deseas viajar?</h2>
+          </div>
+          <div id="step-datetime-summary-step3" class="step-summary-badge">🚗 Ruta Lista</div>
         </div>
 
         <div class="card schedule-card">
@@ -273,23 +425,25 @@
         </div>
 
         <div class="wizard-nav-footer">
-          <div></div>
-          <button type="button" class="btn btn-primary btn-wizard-next" id="btn-next-step1" onclick="handleStep1Next()">
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(2)">
+            ‹ Volver al Mapa
+          </button>
+          <button type="button" class="btn btn-primary btn-wizard-next" id="btn-next-step3" onclick="handleStep3Next()">
             Siguiente: Continuar ➔
           </button>
         </div>
       </div>
 
       <!-- ==================================================== -->
-      <!-- PASO 2: HORARIO DE RECOGIDA (24 HORAS) -->
+      <!-- PASO 4: HORARIO DE RECOGIDA (24 HORAS) -->
       <!-- ==================================================== -->
-      <div class="wizard-step-panel hidden" id="wizard-step-panel-2">
+      <div class="wizard-step-panel hidden" id="wizard-step-panel-4">
         <div class="compact-wizard-header">
           <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 2 de 5</span>
+            <span class="compact-step-tag">Paso 4 de 5</span>
             <h2 class="compact-step-title">🕒 Hora de Recogida (Formato 24 hs)</h2>
           </div>
-          <div id="step-datetime-summary-step2" class="step-summary-badge">📅 Hoy</div>
+          <div id="step-datetime-summary-step4" class="step-summary-badge">📅 Hoy</div>
         </div>
 
         <div class="card schedule-card">
@@ -345,160 +499,8 @@
         </div>
 
         <div class="wizard-nav-footer">
-          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(1)">
-            ‹ Atrás
-          </button>
-          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(3)">
-            Siguiente: Direcciones ➔
-          </button>
-        </div>
-      </div>
-
-      <!-- ==================================================== -->
-      <!-- PASO 3: DIRECCIONES (ORIGEN, PARADA, DESTINO) -->
-      <!-- ==================================================== -->
-      <div class="wizard-step-panel hidden" id="wizard-step-panel-3">
-        <div class="compact-wizard-header">
-          <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 3 de 5</span>
-            <h2 class="compact-step-title">📍 Direcciones del Traslado</h2>
-          </div>
-          <div id="step-datetime-summary-step3" class="step-summary-badge">📅 Hoy • 🕒 --:--</div>
-        </div>
-
-        <div class="card route-card">
-          <div class="card-header">
-            <h3>📍 Itinerario de Ruta</h3>
-          </div>
-
-          <div class="route-inputs-group">
-            <!-- Origin -->
-            <div class="input-field-wrap">
-              <div class="input-icon-pin origin-pin" title="Punto de Origen"></div>
-              <div class="field-body" style="position: relative;">
-                <label for="origin-input">Punto de Partida (Origen) *</label>
-                <div style="position: relative; display: flex; align-items: center;">
-                  <input type="text" id="origin-input" placeholder="Ej: Aeropuerto Ezeiza, Obelisco o calle y número..." autocomplete="off" style="padding-right: 36px;" />
-                  <button type="button" class="btn-clear-address hidden" id="btn-clear-origin" title="Borrar dirección">✕</button>
-                </div>
-                <div id="origin-suggestions" class="suggestions-list hidden"></div>
-              </div>
-              <button id="btn-use-location" class="location-btn" title="Usar mi ubicación actual">📍</button>
-            </div>
-
-            <!-- Add Intermediate Stop Toggle Button -->
-            <div class="stop-toggle-wrapper" id="stop-toggle-wrapper">
-              <button type="button" id="btn-toggle-stop" class="btn-toggle-stop">
-                <span class="plus-icon">➕</span>
-                <span>Agregar Parada Intermedia (Opcional)</span>
-              </button>
-            </div>
-
-            <!-- Intermediate Stop (Optional) -->
-            <div id="stop-field-wrap" class="input-field-wrap stop-field-wrap hidden">
-              <div class="input-icon-pin stop-pin" title="Parada Intermedia"></div>
-              <div class="field-body" style="position: relative;">
-                <div class="field-label-row">
-                  <label for="stop-input">Parada Intermedia</label>
-                  <span id="stop-rate-badge" class="stop-rate-badge">+$500 (En camino)</span>
-                </div>
-                <div style="position: relative; display: flex; align-items: center;">
-                  <input type="text" id="stop-input" placeholder="Ej: Calle y número o lugar de la parada..." autocomplete="off" style="padding-right: 36px;" />
-                  <button type="button" class="btn-clear-address hidden" id="btn-clear-stop" title="Borrar parada">✕</button>
-                </div>
-                <div id="stop-suggestions" class="suggestions-list hidden"></div>
-              </div>
-              <button type="button" id="btn-remove-stop" class="remove-stop-btn" title="Quitar parada intermedia">✕</button>
-            </div>
-
-            <!-- Swap Button -->
-            <div class="swap-wrapper">
-              <button id="btn-swap-route" class="swap-btn" title="Invertir origen y destino">⇅</button>
-            </div>
-
-            <!-- Destination -->
-            <div class="input-field-wrap">
-              <div class="input-icon-pin destination-pin" title="Punto de Destino"></div>
-              <div class="field-body" style="position: relative;">
-                <label for="destination-input">Punto de Destino Final *</label>
-                <div style="position: relative; display: flex; align-items: center;">
-                  <input type="text" id="destination-input" placeholder="Ej: Hotel Hilton, Puerto Madero, Nordelta, Aeroparque..." autocomplete="off" style="padding-right: 36px;" />
-                  <button type="button" class="btn-clear-address hidden" id="btn-clear-destination" title="Borrar dirección">✕</button>
-                </div>
-                <div id="destination-suggestions" class="suggestions-list hidden"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="wizard-nav-footer">
-          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="handleStep3Prev()">
-            ‹ Atrás
-          </button>
-          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(4)">
-            Siguiente: Ver Mapa ➔
-          </button>
-        </div>
-      </div>
-
-      <!-- ==================================================== -->
-      <!-- PASO 4: MAPA DE RUTA Y VERIFICACIÓN -->
-      <!-- ==================================================== -->
-      <div class="wizard-step-panel hidden" id="wizard-step-panel-4">
-        <div class="compact-wizard-header">
-          <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 4 de 5</span>
-            <h2 class="compact-step-title">🗺️ Verificación en el Mapa</h2>
-          </div>
-          <div id="step-datetime-summary-step4" class="step-summary-badge">📅 Hoy • 🕒 --:--</div>
-        </div>
-
-        <div class="card map-card">
-          <div class="map-header">
-            <div class="map-header-left">
-              <h3>Trazado de Ruta Oficial</h3>
-              <span id="traffic-indicator-pill" class="traffic-indicator-pill">⏱️ Tráfico estimado</span>
-            </div>
-            <span id="route-calc-status" class="status-indicator">Calculando trazado...</span>
-          </div>
-          
-          <div id="map-container" class="map-container" style="height: 260px;"></div>
-
-          <div id="traffic-live-banner" class="traffic-live-banner">
-            <div class="traffic-banner-icon-wrap">
-              <span class="traffic-pulse-dot" id="traffic-pulse-dot"></span>
-              <span id="traffic-banner-icon" class="traffic-banner-icon">🚦</span>
-            </div>
-            <div class="traffic-banner-text">
-              <div class="traffic-banner-title-row">
-                <strong id="traffic-banner-title">Tráfico Estimado por Horario</strong>
-                <span id="traffic-banner-badge" class="traffic-banner-badge">Programado</span>
-              </div>
-              <span id="traffic-banner-desc" class="traffic-banner-desc">El tiempo del viaje se calcula según el estado del tránsito del horario seleccionado.</span>
-            </div>
-          </div>
-
-          <div class="route-metrics-bar">
-            <div class="metric-box">
-              <span class="metric-label">Distancia</span>
-              <span class="metric-value" id="metric-distance">0.0 km</span>
-            </div>
-            <div class="metric-divider"></div>
-            <div class="metric-box">
-              <span class="metric-label">Duración</span>
-              <span class="metric-value" id="metric-duration">0 min</span>
-            </div>
-            <div class="metric-divider"></div>
-            <div class="metric-box">
-              <span class="metric-label">Llegada Estimada</span>
-              <span class="metric-value" id="metric-arrival">--:--</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="wizard-nav-footer">
           <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(3)">
-            ‹ Modificar Direcciones
+            ‹ Modificar Fecha / Modo
           </button>
           <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(5)">
             Siguiente: Ver Cotización ➔
@@ -650,8 +652,8 @@
         </div>
 
         <div class="wizard-nav-footer">
-          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(4)">
-            ‹ Volver al Mapa
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="handleStep5Prev()">
+            ‹ Atrás
           </button>
           <div></div>
         </div>
