@@ -80,23 +80,9 @@ async function goToWizardStep(step) {
   const destVal = destInput ? destInput.value.trim() : '';
   const stopVal = stopInput ? stopInput.value.trim() : '';
 
-  // Validar direcciones al intentar ir a Mapa (4) o Cotización (5)
-  if (step >= 4) {
-    if (!originVal || !destVal) {
-      showToast('⚠️ Por favor escribe el Origen y el Destino para ver la ruta y cotización.');
-      if (!originVal && originInput) {
-        originInput.focus();
-        step = 3;
-      } else if (!destVal && destInput) {
-        destInput.focus();
-        step = 3;
-      }
-    }
-  }
-
   currentWizardStep = step;
 
-  // 1. Actualizar paneles visibles INMEDIATAMENTE (0ms lag)
+  // 1. Actualizar paneles visibles INMEDIATAMENTE
   for (let i = 1; i <= 5; i++) {
     const panel = document.getElementById(`wizard-step-panel-${i}`);
     const indicator = document.getElementById(`wizard-step-indicator-${i}`);
@@ -122,7 +108,7 @@ async function goToWizardStep(step) {
     }
   }
 
-  // 2. Actualizar insignias de fecha y hora
+  // 2. Actualizar insignias de fecha, hora y métricas
   if (typeof updateStepDateTimeBadges === 'function') {
     try { updateStepDateTimeBadges(); } catch(e){}
   }
@@ -133,59 +119,9 @@ async function goToWizardStep(step) {
     try { container.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e){}
   }
 
-  // 4. Procesar mapa y cálculo
-  if (originVal && destVal) {
-    // Si falta lat/lng en origen, geocodificar
-    if (!state.origin || !state.origin.lat) {
-      if (typeof searchLocations === 'function') {
-        try {
-          const results = await searchLocations(originVal);
-          if (results && results.length > 0) {
-            state.origin = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || originVal };
-          }
-        } catch(e){}
-      }
-    }
-
-    // Si falta lat/lng en destino, geocodificar
-    if (!state.destination || !state.destination.lat) {
-      if (typeof searchLocations === 'function') {
-        try {
-          const results = await searchLocations(destVal);
-          if (results && results.length > 0) {
-            state.destination = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || destVal };
-          }
-        } catch(e){}
-      }
-    }
-
-    // Si hay parada intermedia y falta lat/lng, geocodificar
-    if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
-      if (typeof searchLocations === 'function') {
-        try {
-          const results = await searchLocations(stopVal);
-          if (results && results.length > 0) {
-            state.intermediateStop = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || stopVal };
-          }
-        } catch(e){}
-      }
-    }
-
-    // Fallback de coordenadas si siguen vacías
-    if (!state.origin || !state.origin.lat) {
-      state.origin = { lat: -34.6037, lng: -58.3816, address: originVal };
-    }
-    if (!state.destination || !state.destination.lat) {
-      state.destination = { lat: -34.8127, lng: -58.5372, address: destVal };
-    }
-
-    if (typeof checkAndRoute === 'function') {
-      try { await checkAndRoute(); } catch(e){}
-    }
-  }
-
-  // Inicializar Leaflet y centrar ruta en Paso 4
-  if (step === 4) {
+  // 4. Comportamientos específicos por Paso
+  if (step === 2) {
+    // Inicializar Leaflet y centrar ruta en Paso 2 (Mapa)
     if (!map && typeof initMap === 'function') {
       try { initMap(); } catch(e){}
     }
@@ -221,16 +157,27 @@ async function goToWizardStep(step) {
               destinationMarker.setLatLng([state.destination.lat, state.destination.lng]);
             }
           }
+          if (state.hasIntermediateStop && state.intermediateStop && state.intermediateStop.lat) {
+            if (!stopMarker || !map.hasLayer(stopMarker)) {
+              const stopIcon = L.divIcon({
+                className: 'custom-map-pin stop-marker-pin',
+                html: '<div style="background:#f59e0b; width:20px; height:20px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+              });
+              stopMarker = L.marker([state.intermediateStop.lat, state.intermediateStop.lng], { icon: stopIcon }).addTo(map);
+              stopMarker.bindPopup(`<strong>Parada:</strong><br>${state.intermediateStop.address || stopVal}`);
+            } else {
+              stopMarker.setLatLng([state.intermediateStop.lat, state.intermediateStop.lng]);
+            }
+          }
           if (routePolyline && map.hasLayer(routePolyline)) {
             map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
           }
         } catch(e){}
       }
     }, 80);
-  }
 
-  // Recalcular y Renderizar Cotización en Paso 4 y 5
-  if (step === 4 || step === 5) {
     if (typeof updateCalculation === 'function') {
       try { updateCalculation(); } catch(e){}
     }
@@ -238,21 +185,61 @@ async function goToWizardStep(step) {
       try { renderQuote(); } catch(e){}
     }
   }
+
+  if (step === 3) {
+    if (typeof updateCalculation === 'function') {
+      try { updateCalculation(); } catch(e){}
+    }
+    if (typeof renderQuote === 'function') {
+      try { renderQuote(); } catch(e){}
+    }
+  }
+
+  if (step === 4) {
+    if (typeof renderAlarmClock === 'function') {
+      try { renderAlarmClock(); } catch(e){}
+    }
+    if (typeof updateCalculation === 'function') {
+      try { updateCalculation(); } catch(e){}
+    }
+    if (typeof renderQuote === 'function') {
+      try { renderQuote(); } catch(e){}
+    }
+  }
+
+  if (step === 5) {
+    if (typeof updateCalculation === 'function') {
+      try { updateCalculation(); } catch(e){}
+    }
+    if (typeof renderQuote === 'function') {
+      try { renderQuote(); } catch(e){}
+    }
+    if (typeof updateStep5ActionButton === 'function') {
+      try { updateStep5ActionButton(); } catch(e){}
+    }
+  }
 }
 
 function updateStepDateTimeBadges() {
   const dateFormatted = (typeof formatDateWithWeekday === 'function' && state.date) ? formatDateWithWeekday(state.date) : 'Hoy';
-  const timeStr = state.time ? `${state.time} hs` : 'Ahora';
+  const timeStr = state.time ? `${state.time} hs` : (state.tripType === 'schedule' ? '12:00 hs' : 'Ahora');
   const badgeText = `📅 ${dateFormatted} • 🕒 ${timeStr}`;
 
-  ['step-datetime-summary-step2', 'step-datetime-summary-step3', 'step-datetime-summary-step4', 'step-datetime-summary-step5'].forEach(id => {
+  const summaryStep2 = document.getElementById('step-datetime-summary-step2');
+  if (summaryStep2) {
+    const kmText = (state.distanceKm && state.distanceKm > 0) ? `${state.distanceKm.toFixed(1)} km` : 'Ruta';
+    const durText = (state.durationMin && state.durationMin > 0) ? ` • ${state.durationMin} min` : '';
+    summaryStep2.textContent = `📍 ${kmText}${durText}`;
+  }
+
+  ['step-datetime-summary-step3', 'step-datetime-summary-step4', 'step-datetime-summary-step5'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = badgeText;
   });
 
   const selectedTimeDisplay = document.getElementById('selected-time-highlight');
   if (selectedTimeDisplay) {
-    selectedTimeDisplay.textContent = timeStr;
+    selectedTimeDisplay.textContent = `${state.time || '12:00'} hs`;
   }
 }
 
@@ -284,33 +271,111 @@ function selectTripMode(mode) {
   if (mode === 'live') {
     if (btnLive) btnLive.classList.add('active');
     if (btnSchedule) btnSchedule.classList.remove('active');
+    state.time = '';
   } else {
     if (btnSchedule) btnSchedule.classList.add('active');
     if (btnLive) btnLive.classList.remove('active');
+    if (!state.time) state.time = '12:00';
   }
+  updateStepDateTimeBadges();
   updateStep5ActionButton();
+  if (typeof updateCalculation === 'function') updateCalculation();
 }
 
-function handleStep1Next() {
-  if (state.tripType === 'live' || !state.tripType) {
-    goToWizardStep(3);
+async function handleStep1Next() {
+  const originInput = document.getElementById('origin-input');
+  const destInput = document.getElementById('destination-input');
+  const stopInput = document.getElementById('stop-input');
+
+  const originVal = originInput ? originInput.value.trim() : '';
+  const destVal = destInput ? destInput.value.trim() : '';
+  const stopVal = stopInput ? stopInput.value.trim() : '';
+
+  if (!originVal || !destVal) {
+    showToast('⚠️ Por favor escribe el Punto de Partida (Origen) y el Destino Final.');
+    if (!originVal && originInput) {
+      originInput.focus();
+    } else if (!destVal && destInput) {
+      destInput.focus();
+    }
+    return;
+  }
+
+  // Geocodificar origen si falta latitud o cambió el texto
+  if (!state.origin || !state.origin.lat || (state.origin.address && state.origin.address !== originVal && !originVal.includes(state.origin.address.split(',')[0]))) {
+    if (typeof searchLocations === 'function') {
+      try {
+        const results = await searchLocations(originVal);
+        if (results && results.length > 0) {
+          state.origin = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || originVal };
+        }
+      } catch(e){}
+    }
+  }
+
+  // Geocodificar destino si falta latitud o cambió el texto
+  if (!state.destination || !state.destination.lat || (state.destination.address && state.destination.address !== destVal && !destVal.includes(state.destination.address.split(',')[0]))) {
+    if (typeof searchLocations === 'function') {
+      try {
+        const results = await searchLocations(destVal);
+        if (results && results.length > 0) {
+          state.destination = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || destVal };
+        }
+      } catch(e){}
+    }
+  }
+
+  // Geocodificar parada intermedia si aplica
+  if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
+    if (typeof searchLocations === 'function') {
+      try {
+        const results = await searchLocations(stopVal);
+        if (results && results.length > 0) {
+          state.intermediateStop = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || stopVal };
+        }
+      } catch(e){}
+    }
+  }
+
+  // Fallbacks de coordenadas seguros
+  if (!state.origin || !state.origin.lat) {
+    state.origin = { lat: -34.6037, lng: -58.3816, address: originVal };
+  }
+  if (!state.destination || !state.destination.lat) {
+    state.destination = { lat: -34.8127, lng: -58.5372, address: destVal };
+  }
+
+  // Calcular ruta y distancias con tráfico real
+  if (typeof checkAndRoute === 'function') {
+    try { await checkAndRoute(); } catch(e){}
+  }
+
+  goToWizardStep(2);
+}
+
+function handleStep3Next() {
+  if (state.tripType === 'schedule') {
+    goToWizardStep(4);
   } else {
-    goToWizardStep(2);
+    // Viaje en vivo / inmediato: se salta el selector de horario y va directo a cotización y confirmación
+    goToWizardStep(5);
   }
 }
 
-function handleStep3Prev() {
-  if (state.tripType === 'live' || !state.tripType) {
-    goToWizardStep(1);
+function handleStep5Prev() {
+  if (state.tripType === 'schedule') {
+    goToWizardStep(4);
   } else {
-    goToWizardStep(2);
+    // Viaje en vivo: vuelve a selección de traslado / día
+    goToWizardStep(3);
   }
 }
 
 window.goToWizardStep = goToWizardStep;
 window.selectTripMode = selectTripMode;
 window.handleStep1Next = handleStep1Next;
-window.handleStep3Prev = handleStep3Prev;
+window.handleStep3Next = handleStep3Next;
+window.handleStep5Prev = handleStep5Prev;
 
 // ==========================================
 // 1.1 FERIADOS NACIONALES Y DÍAS FESTIVOS (ARGENTINA)
@@ -5706,7 +5771,7 @@ if (btnRequestInapp) {
       const [h, m] = (state.time || '00:00').split(':').map(Number);
       if ((h * 60 + m) < minAllowed) {
         showToast('⚠️ Las reservas para el mismo día requieren al menos 45 minutos de anticipación.');
-        goToWizardStep(2);
+        goToWizardStep(4);
         return;
       }
     }

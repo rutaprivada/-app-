@@ -181,189 +181,14 @@
     <div id="passenger-wizard-container" class="passenger-wizard-wrapper">
       
       <!-- ==================================================== -->
-      <!-- PASO 1: TIPO DE VIAJE Y SELECCIÓN DE DÍA -->
+      <!-- PASO 1: DIRECCIONES (ORIGEN, PARADA, DESTINO) -->
       <!-- ==================================================== -->
       <div class="wizard-step-panel active-wizard-step" id="wizard-step-panel-1">
         <div class="compact-wizard-header">
-          <div class="compact-step-tag">Paso 1 de 5</div>
-          <h2 class="compact-step-title">📅 ¿Cuándo deseas realizar tu traslado?</h2>
-        </div>
-
-        <div class="card schedule-card">
-          <!-- Selection mode toggle -->
-          <div class="wizard-mode-selector">
-            <button type="button" class="wizard-mode-btn active" id="btn-mode-live" onclick="selectTripMode('live')">
-              <span class="mode-icon">⚡</span>
-              <div>
-                <strong>Viaje Inmediato / En Vivo</strong>
-                <small>Chofer disponible para buscarte ahora mismo</small>
-              </div>
-            </button>
-            <button type="button" class="wizard-mode-btn" id="btn-mode-schedule" onclick="selectTripMode('schedule')">
-              <span class="mode-icon">📅</span>
-              <div>
-                <strong>Reserva Programada</strong>
-                <small>Agendar día y hora para viaje futuro</small>
-              </div>
-            </button>
-          </div>
-
-          <!-- Date Section -->
-          <div class="schedule-block" id="schedule-date-block" style="margin-top: 15px;">
-            <div class="block-header">
-              <span class="block-label">📅 Seleccionar Día del Viaje</span>
-              <div class="quick-preset-pills">
-                <button type="button" class="preset-pill active" id="btn-date-today">Hoy</button>
-                <button type="button" class="preset-pill" id="btn-date-tomorrow">Mañana</button>
-                <button type="button" class="preset-pill" id="btn-date-weekend">Finde</button>
-              </div>
-            </div>
-
-            <!-- Botón principal para abrir el calendario completo de fecha exacta o lejana -->
-            <div class="styled-date-input-wrap" style="position: relative;">
-              <button type="button" class="custom-calendar-trigger-btn" id="btn-toggle-custom-calendar" aria-expanded="false" aria-label="Abrir selector de fecha exacta o lejana">
-                <div class="trigger-cal-left">
-                  <div class="trigger-cal-icon-wrap">
-                    <svg class="trigger-cal-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="3" ry="3" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span id="trip-date-display" class="trigger-date-text">Hoy</span>
-                    <span id="trip-date-badge-info" class="trigger-date-subtext">⚡ Viaje para hoy</span>
-                  </div>
-                </div>
-                <div class="trigger-cal-right">
-                  <span class="trigger-change-pill">Elegir fecha ▾</span>
-                </div>
-              </button>
-              <input type="hidden" id="trip-date" />
-
-              <!-- Custom Dark-Mode Glassmorphism Interactive Calendar -->
-              <div id="custom-calendar-dropdown" class="custom-calendar-dropdown hidden" role="dialog" aria-modal="true" aria-label="Selector interactivo de fecha">
-                <div class="cal-dropdown-header">
-                  <button type="button" id="cal-prev-month" class="cal-nav-btn" title="Mes anterior">‹</button>
-                  <div class="cal-header-selectors">
-                    <select id="cal-select-month" class="cal-header-select" aria-label="Seleccionar mes"></select>
-                    <select id="cal-select-year" class="cal-header-select" aria-label="Seleccionar año"></select>
-                  </div>
-                  <button type="button" id="cal-next-month" class="cal-nav-btn" title="Mes siguiente">›</button>
-                </div>
-
-                <div class="cal-weekdays-grid">
-                  <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span class="we-label">Sá</span><span class="we-label">Do</span>
-                </div>
-
-                <div id="cal-days-grid" class="cal-days-grid"></div>
-
-                <div class="cal-dropdown-footer">
-                  <div class="cal-footer-shortcuts">
-                    <button type="button" class="cal-shortcut-pill" id="cal-shortcut-today">Hoy</button>
-                    <button type="button" class="cal-shortcut-pill" id="cal-shortcut-tomorrow">Mañana</button>
-                    <button type="button" class="cal-shortcut-pill" id="cal-shortcut-weekend">Fin de Semana</button>
-                  </div>
-                  <button type="button" class="cal-close-btn" id="cal-close-dropdown">Seleccionar Fecha ✓</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="wizard-nav-footer">
-          <div></div>
-          <button type="button" class="btn btn-primary btn-wizard-next" id="btn-next-step1" onclick="handleStep1Next()">
-            Siguiente: Continuar ➔
-          </button>
-        </div>
-      </div>
-
-      <!-- ==================================================== -->
-      <!-- PASO 2: HORARIO DE RECOGIDA (24 HORAS) -->
-      <!-- ==================================================== -->
-      <div class="wizard-step-panel hidden" id="wizard-step-panel-2">
-        <div class="compact-wizard-header">
           <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 2 de 5</span>
-            <h2 class="compact-step-title">🕒 Hora de Recogida (Formato 24 hs)</h2>
+            <span class="compact-step-tag">Paso 1 de 5</span>
+            <h2 class="compact-step-title">📍 ¿A dónde deseas viajar?</h2>
           </div>
-          <div id="step-datetime-summary-step2" class="step-summary-badge">📅 Hoy</div>
-        </div>
-
-        <div class="card schedule-card">
-          <div class="card-header flex-between-header">
-            <div class="header-left-title">
-              <h3>🕒 Ajustar Horario Exacto</h3>
-            </div>
-            <div id="weather-status-pill" class="weather-status-pill" title="Evaluación meteorológica automática en tiempo real">
-              <span id="weather-icon">☀️</span>
-              <span id="weather-text">Clima Óptimo</span>
-            </div>
-          </div>
-
-          <div class="schedule-stylish-wrapper">
-            <div class="schedule-block digital-alarm-block">
-              <div class="block-header">
-                <span class="block-label">⏰ Horario de Recogida (00:00 a 23:55 hs)</span>
-              </div>
-
-              <!-- Digital Alarm Clock Face 24hs -->
-              <div class="alarm-clock-container" style="justify-content: center; gap: 18px;">
-                <div class="alarm-digit-group">
-                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-hour-up" aria-label="Aumentar hora">▲</button>
-                  <div class="alarm-digit-display" id="alarm-hour-display">12</div>
-                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-hour-down" aria-label="Disminuir hora">▼</button>
-                  <span class="alarm-digit-label">HORA (24H)</span>
-                </div>
-
-                <div class="alarm-colon-separator">:</div>
-
-                <div class="alarm-digit-group">
-                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-min-up" aria-label="Aumentar minutos">▲</button>
-                  <div class="alarm-digit-display" id="alarm-min-display">00</div>
-                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-min-down" aria-label="Disminuir minutos">▼</button>
-                  <span class="alarm-digit-label">MINUTOS</span>
-                </div>
-              </div>
-
-              <div class="selected-time-box alarm-confirmed-box">
-                <span class="confirmed-clock-icon">🕒</span>
-                <div class="confirmed-text-wrap">
-                  <span class="confirmed-sub">Horario Seleccionado:</span>
-                  <strong id="selected-time-highlight" class="selected-time-highlight">12:00 hs</strong>
-                </div>
-              </div>
-
-              <!-- Hidden native sync input for legacy bindings -->
-              <input type="time" id="trip-time" step="300" class="hidden" />
-              <select id="select-hour" class="hidden" aria-hidden="true"></select>
-              <select id="select-minute" class="hidden" aria-hidden="true"></select>
-            </div>
-          </div>
-        </div>
-
-        <div class="wizard-nav-footer">
-          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(1)">
-            ‹ Atrás
-          </button>
-          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(3)">
-            Siguiente: Direcciones ➔
-          </button>
-        </div>
-      </div>
-
-      <!-- ==================================================== -->
-      <!-- PASO 3: DIRECCIONES (ORIGEN, PARADA, DESTINO) -->
-      <!-- ==================================================== -->
-      <div class="wizard-step-panel hidden" id="wizard-step-panel-3">
-        <div class="compact-wizard-header">
-          <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 3 de 5</span>
-            <h2 class="compact-step-title">📍 Direcciones del Traslado</h2>
-          </div>
-          <div id="step-datetime-summary-step3" class="step-summary-badge">📅 Hoy • 🕒 --:--</div>
         </div>
 
         <div class="card route-card">
@@ -432,25 +257,23 @@
         </div>
 
         <div class="wizard-nav-footer">
-          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="handleStep3Prev()">
-            ‹ Atrás
-          </button>
-          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(4)">
+          <div></div>
+          <button type="button" class="btn btn-primary btn-wizard-next" id="btn-next-step1" onclick="handleStep1Next()">
             Siguiente: Ver Mapa ➔
           </button>
         </div>
       </div>
 
       <!-- ==================================================== -->
-      <!-- PASO 4: MAPA DE RUTA Y VERIFICACIÓN -->
+      <!-- PASO 2: MAPA DE RUTA Y VERIFICACIÓN -->
       <!-- ==================================================== -->
-      <div class="wizard-step-panel hidden" id="wizard-step-panel-4">
+      <div class="wizard-step-panel hidden" id="wizard-step-panel-2">
         <div class="compact-wizard-header">
           <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 4 de 5</span>
-            <h2 class="compact-step-title">🗺️ Verificación en el Mapa</h2>
+            <span class="compact-step-tag">Paso 2 de 5</span>
+            <h2 class="compact-step-title">🗺️ Verificación de Ruta & Tráfico</h2>
           </div>
-          <div id="step-datetime-summary-step4" class="step-summary-badge">📅 Hoy • 🕒 --:--</div>
+          <div id="step-datetime-summary-step2" class="step-summary-badge">📍 Ruta</div>
         </div>
 
         <div class="card map-card">
@@ -497,8 +320,187 @@
         </div>
 
         <div class="wizard-nav-footer">
-          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(3)">
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(1)">
             ‹ Modificar Direcciones
+          </button>
+          <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(3)">
+            Siguiente: Tipo de Traslado ➔
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================================================== -->
+      <!-- PASO 3: TIPO DE TRASLADO Y SELECCIÓN DE DÍA -->
+      <!-- ==================================================== -->
+      <div class="wizard-step-panel hidden" id="wizard-step-panel-3">
+        <div class="compact-wizard-header">
+          <div class="compact-header-left">
+            <span class="compact-step-tag">Paso 3 de 5</span>
+            <h2 class="compact-step-title">📅 ¿Cuándo deseas realizar tu traslado?</h2>
+          </div>
+          <div id="step-datetime-summary-step3" class="step-summary-badge">📅 Hoy</div>
+        </div>
+
+        <div class="card schedule-card">
+          <!-- Selection mode toggle -->
+          <div class="wizard-mode-selector">
+            <button type="button" class="wizard-mode-btn active" id="btn-mode-live" onclick="selectTripMode('live')">
+              <span class="mode-icon">⚡</span>
+              <div>
+                <strong>Viaje Inmediato / En Vivo</strong>
+                <small>Chofer disponible para buscarte ahora mismo</small>
+              </div>
+            </button>
+            <button type="button" class="wizard-mode-btn" id="btn-mode-schedule" onclick="selectTripMode('schedule')">
+              <span class="mode-icon">📅</span>
+              <div>
+                <strong>Reserva Programada</strong>
+                <small>Agendar día y hora para viaje futuro</small>
+              </div>
+            </button>
+          </div>
+
+          <!-- Date Section -->
+          <div class="schedule-block" id="schedule-date-block" style="margin-top: 15px;">
+            <div class="block-header">
+              <span class="block-label">📅 Seleccionar Día del Viaje</span>
+              <div class="quick-preset-pills">
+                <button type="button" class="preset-pill active" id="btn-date-today">Hoy</button>
+                <button type="button" class="preset-pill" id="btn-date-tomorrow">Mañana</button>
+                <button type="button" class="preset-pill" id="btn-date-weekend">Finde</button>
+              </div>
+            </div>
+
+            <!-- Botón principal para abrir el calendario completo de fecha exacta o lejana -->
+            <div class="styled-date-input-wrap" style="position: relative;">
+              <button type="button" class="custom-calendar-trigger-btn" id="btn-toggle-custom-calendar" aria-expanded="false" aria-label="Abrir selector de fecha exacta o lejana">
+                <div class="trigger-cal-left">
+                  <div class="trigger-cal-icon-wrap">
+                    <svg class="trigger-cal-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="3" ry="3" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span id="trip-date-display" class="trigger-date-text">Hoy</span>
+                    <span id="trip-date-badge-info" class="trigger-date-subtext">⚡ Salida inmediata / Hoy</span>
+                  </div>
+                </div>
+                <div class="trigger-cal-right">
+                  <span class="trigger-change-pill">Elegir fecha ▾</span>
+                </div>
+              </button>
+              <input type="hidden" id="trip-date" />
+
+              <!-- Custom Dark-Mode Glassmorphism Interactive Calendar -->
+              <div id="custom-calendar-dropdown" class="custom-calendar-dropdown hidden" role="dialog" aria-modal="true" aria-label="Selector interactivo de fecha">
+                <div class="cal-dropdown-header">
+                  <button type="button" id="cal-prev-month" class="cal-nav-btn" title="Mes anterior">‹</button>
+                  <div class="cal-header-selectors">
+                    <select id="cal-select-month" class="cal-header-select" aria-label="Seleccionar mes"></select>
+                    <select id="cal-select-year" class="cal-header-select" aria-label="Seleccionar año"></select>
+                  </div>
+                  <button type="button" id="cal-next-month" class="cal-nav-btn" title="Mes siguiente">›</button>
+                </div>
+
+                <div class="cal-weekdays-grid">
+                  <span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span class="we-label">Sá</span><span class="we-label">Do</span>
+                </div>
+
+                <div id="cal-days-grid" class="cal-days-grid"></div>
+
+                <div class="cal-dropdown-footer">
+                  <div class="cal-footer-shortcuts">
+                    <button type="button" class="cal-shortcut-pill" id="cal-shortcut-today">Hoy</button>
+                    <button type="button" class="cal-shortcut-pill" id="cal-shortcut-tomorrow">Mañana</button>
+                    <button type="button" class="cal-shortcut-pill" id="cal-shortcut-weekend">Fin de Semana</button>
+                  </div>
+                  <button type="button" class="cal-close-btn" id="cal-close-dropdown">Seleccionar Fecha ✓</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav-footer">
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(2)">
+            ‹ Volver al Mapa
+          </button>
+          <button type="button" class="btn btn-primary btn-wizard-next" id="btn-next-step3" onclick="handleStep3Next()">
+            Siguiente: Continuar ➔
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================================================== -->
+      <!-- PASO 4: HORARIO DE RECOGIDA (24 HORAS - SOLO PARA RESERVA) -->
+      <!-- ==================================================== -->
+      <div class="wizard-step-panel hidden" id="wizard-step-panel-4">
+        <div class="compact-wizard-header">
+          <div class="compact-header-left">
+            <span class="compact-step-tag">Paso 4 de 5</span>
+            <h2 class="compact-step-title">🕒 Hora de Recogida (Formato 24 hs)</h2>
+          </div>
+          <div id="step-datetime-summary-step4" class="step-summary-badge">📅 Hoy</div>
+        </div>
+
+        <div class="card schedule-card">
+          <div class="card-header flex-between-header">
+            <div class="header-left-title">
+              <h3>🕒 Ajustar Horario Exacto</h3>
+            </div>
+            <div id="weather-status-pill" class="weather-status-pill" title="Evaluación meteorológica automática en tiempo real">
+              <span id="weather-icon">☀️</span>
+              <span id="weather-text">Clima Óptimo</span>
+            </div>
+          </div>
+
+          <div class="schedule-stylish-wrapper">
+            <div class="schedule-block digital-alarm-block">
+              <div class="block-header">
+                <span class="block-label">⏰ Horario de Recogida (00:00 a 23:55 hs)</span>
+              </div>
+
+              <!-- Digital Alarm Clock Face 24hs -->
+              <div class="alarm-clock-container" style="justify-content: center; gap: 18px;">
+                <div class="alarm-digit-group">
+                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-hour-up" aria-label="Aumentar hora">▲</button>
+                  <div class="alarm-digit-display" id="alarm-hour-display">12</div>
+                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-hour-down" aria-label="Disminuir hora">▼</button>
+                  <span class="alarm-digit-label">HORA (24H)</span>
+                </div>
+
+                <div class="alarm-colon-separator">:</div>
+
+                <div class="alarm-digit-group">
+                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-min-up" aria-label="Aumentar minutos">▲</button>
+                  <div class="alarm-digit-display" id="alarm-min-display">00</div>
+                  <button type="button" class="alarm-btn-adjust" id="btn-alarm-min-down" aria-label="Disminuir minutos">▼</button>
+                  <span class="alarm-digit-label">MINUTOS</span>
+                </div>
+              </div>
+
+              <div class="selected-time-box alarm-confirmed-box">
+                <span class="confirmed-clock-icon">🕒</span>
+                <div class="confirmed-text-wrap">
+                  <span class="confirmed-sub">Horario Seleccionado:</span>
+                  <strong id="selected-time-highlight" class="selected-time-highlight">12:00 hs</strong>
+                </div>
+              </div>
+
+              <!-- Hidden native sync input for legacy bindings -->
+              <input type="time" id="trip-time" step="300" class="hidden" />
+              <select id="select-hour" class="hidden" aria-hidden="true"></select>
+              <select id="select-minute" class="hidden" aria-hidden="true"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav-footer">
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(3)">
+            ‹ Volver al Día
           </button>
           <button type="button" class="btn btn-primary btn-wizard-next" onclick="goToWizardStep(5)">
             Siguiente: Ver Cotización ➔
@@ -552,7 +554,7 @@
 
           <!-- Detailed Breakdown -->
           <div class="breakdown-container">
-            <button type="button" class="breakdown-toggle-btn" id="toggle-breakdown" onclick="toggleFareBreakdown()">
+            <button type="button" class="breakdown-toggle-btn" id="toggle-breakdown" onclick="toggleFareBreakdown(event)">
               <span>Ver detalles de la tarifa</span>
               <span class="arrow">▼</span>
             </button>
@@ -650,8 +652,8 @@
         </div>
 
         <div class="wizard-nav-footer">
-          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="goToWizardStep(4)">
-            ‹ Volver al Mapa
+          <button type="button" class="btn btn-secondary btn-wizard-prev" onclick="handleStep5Prev()">
+            ‹ Volver
           </button>
           <div></div>
         </div>
