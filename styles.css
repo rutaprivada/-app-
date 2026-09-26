@@ -5605,4 +5605,209 @@ html, body {
   gap: 4px;
 }
 
+/* ==========================================
+   BOTÓN MIS RESERVAS EN HEADER Y BANNER ACTIVO
+   ========================================== */
+.btn-header-reservations {
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fbbf24;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-header-reservations:hover {
+  background: rgba(251, 191, 36, 0.22);
+  border-color: #fbbf24;
+  transform: translateY(-1px);
+}
+
+.badge-res-count {
+  background: #f59e0b;
+  color: #0c111a;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+/* Banner de Viaje en Curso para el Pasajero (Visible en Inicio) */
+.passenger-active-trip-banner {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(6, 78, 59, 0.28) 100%);
+  border: 1.5px solid #10b981;
+  border-radius: 14px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
+  animation: pulse-soft 2s infinite;
+  transition: all 0.25s ease;
+}
+
+.passenger-active-trip-banner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.35);
+  border-color: #34d399;
+}
+
+.passenger-active-trip-banner .banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.active-pulse-dot {
+  width: 14px;
+  height: 14px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #10b981;
+  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.banner-info strong {
+  display: block;
+  font-size: 0.95rem;
+  color: #ffffff;
+}
+
+.banner-info small {
+  font-size: 0.78rem;
+  color: #a7f3d0;
+}
+
+.btn-banner-action {
+  background: #10b981;
+  color: #042f2e;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 6px 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Modal Mis Reservas del Pasajero */
+.passenger-res-dialog {
+  max-width: 520px;
+  width: 95%;
+  background: #0f172a;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+  overflow: hidden;
+}
+
+.passenger-res-card {
+  background: rgba(22, 31, 52, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.passenger-res-card:hover {
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+.passenger-res-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.passenger-res-date {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #fbbf24;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.passenger-res-status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.passenger-res-status.pendiente {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.passenger-res-status.aceptada {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.passenger-res-status.completada {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.passenger-res-fare-breakdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-top: 10px;
+  font-size: 0.82rem;
+}
+
+.passenger-res-fare-breakdown .fare-sub {
+  color: #94a3b8;
+}
+
+.passenger-res-fare-breakdown .fare-total {
+  color: #34d399;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+/* Separador de Días en Hoja de Ruta / Reservas */
+.reserva-day-separator {
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.15) 0%, rgba(15, 23, 42, 0) 100%);
+  border-left: 4px solid #fbbf24;
+  padding: 8px 12px;
+  margin: 18px 0 10px 0;
+  border-radius: 0 8px 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #fef08a;
+  letter-spacing: 0.3px;
+}
+
+.reserva-day-separator .day-badge-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+
 

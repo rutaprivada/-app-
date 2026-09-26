@@ -158,8 +158,10 @@
         </div>
       </div>
       <div class="header-badges">
-        <span class="badge badge-trust">🛡️ Choferes Verificados</span>
-        <span class="badge badge-fair">⭐ Servicio 24 Horas</span>
+        <button type="button" class="btn-header-reservations" id="btnOpenPassengerReservations" onclick="openPassengerReservationsModal()" title="Ver Mis Reservas Programadas">
+          📅 Mis Reservas <span class="badge-res-count hidden" id="headerReservationsBadge">0</span>
+        </button>
+        <span class="badge badge-trust web-only">🛡️ Choferes Verificados</span>
       </div>
       <!-- Passenger Profile Avatar Trigger -->
       <div class="passenger-header-profile clickable-header-profile" id="btnOpenPassengerProfile" title="Ver mi Perfil, Medios de Pago e Historial de Viajes">
@@ -178,6 +180,20 @@
   <!-- Main Hero / Multi-Step Wizard Calculator Section -->
   <main class="container main-layout">
     
+    <!-- Floating Active Trip Quick Access Banner (Visible when there is an active trip/search) -->
+    <div id="passengerActiveTripBanner" class="passenger-active-trip-banner hidden" onclick="reopenPassengerActiveTripModal()">
+      <div class="banner-left">
+        <span class="active-pulse-dot"></span>
+        <div class="banner-info">
+          <strong id="activeTripBannerTitle">🚗 Solicitud de Viaje en Curso</strong>
+          <small id="activeTripBannerSubtitle">Toca aquí para ver el seguimiento en vivo</small>
+        </div>
+      </div>
+      <div class="banner-right">
+        <span class="btn-banner-action">Ver Seguimiento ➔</span>
+      </div>
+    </div>
+
     <div id="passenger-wizard-container" class="passenger-wizard-wrapper">
       
       <!-- ==================================================== -->
@@ -1322,6 +1338,37 @@
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Mis Reservas Programadas del Pasajero -->
+  <div id="modalPassengerReservations" class="modal-backdrop hidden" style="z-index: 9998;">
+    <div class="modal-dialog passenger-res-dialog">
+      <div class="modal-header inapp-header">
+        <div class="inapp-status-badge-wrap">
+          <span style="font-size: 1.3rem;">📅</span>
+          <div>
+            <h3 style="margin: 0; color: #fff; font-size: 1.1rem;">Mis Reservas Programadas</h3>
+            <p class="inapp-status-sub" style="margin: 2px 0 0 0; font-size: 0.75rem; color: #94a3b8;">Historial y reservas agendadas en tu cuenta</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close" onclick="closePassengerReservationsModal()" aria-label="Cerrar">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px; max-height: 65vh; overflow-y: auto;">
+        <div id="passengerReservationsList">
+          <!-- Injected dynamically via JS -->
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 16px; background: rgba(15,23,42,0.95); border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-secondary" onclick="closePassengerReservationsModal()" style="font-size: 0.85rem; padding: 8px 16px;">
+          Cerrar
+        </button>
+        <button type="button" class="btn btn-primary" onclick="closePassengerReservationsModal(); goToWizardStep(1);" style="font-size: 0.85rem; padding: 8px 16px;">
+          ➕ Nueva Reserva
+        </button>
       </div>
     </div>
   </div>
