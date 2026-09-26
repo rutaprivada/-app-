@@ -11,6 +11,17 @@
       gtag('config', 'AW-18455388833');
       gtag('config', 'G-7DR3WLELMK');
     </script>
+    <!-- Event snippet for Reservar cita conversion page -->
+    <script>
+      function trackGoogleAdsConversion() {
+        if (typeof gtag === 'function') {
+          gtag('event', 'conversion', {
+            'send_to': 'AW-18455388833/T_yFCJa2-PkcEKHFm-BE'
+          });
+        }
+      }
+      window.trackGoogleAdsConversion = trackGoogleAdsConversion;
+    </script>
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">

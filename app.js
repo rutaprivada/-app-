@@ -6021,6 +6021,14 @@ if (btnRequestInapp) {
         window.RutaSync.emit('RESERVA_CREADA', reservaData);
       }
 
+      // Guardar en reservas de pasajero
+      try {
+        let pResList = JSON.parse(localStorage.getItem('rutaprivada_passenger_reservations') || '[]');
+        pResList.unshift(reservaData);
+        localStorage.setItem('rutaprivada_passenger_reservations', JSON.stringify(pResList));
+        if (typeof updatePassengerReservationsBadge === 'function') updatePassengerReservationsBadge();
+      } catch(e){}
+
       // Guardar en el historial local del perfil de pasajero
       try {
         let historyList = JSON.parse(localStorage.getItem('rutaprivada_passenger_history') || '[]');
@@ -6043,6 +6051,11 @@ if (btnRequestInapp) {
         localStorage.setItem('rutaprivada_passenger_history', JSON.stringify(historyList));
         if (typeof loadPassengerTripHistory === 'function') loadPassengerTripHistory();
       } catch(e){}
+
+      // Disparar conversión Google Ads
+      if (typeof window.trackGoogleAdsConversion === 'function') {
+        try { window.trackGoogleAdsConversion(); } catch(e){}
+      }
 
       try { playPassengerTone('confirmed'); } catch(e){}
       showToast('📅 ¡Reserva agendada con éxito!');
@@ -6091,6 +6104,11 @@ if (btnRequestInapp) {
       destinationCoords: state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null,
       stopCoords: (hasIntermediateStop && state.stop && state.stop.lat) ? { lat: state.stop.lat, lng: state.stop.lng } : null
     };
+
+    // Disparar conversión Google Ads
+    if (typeof window.trackGoogleAdsConversion === 'function') {
+      try { window.trackGoogleAdsConversion(); } catch(e){}
+    }
 
     if (window.RutaSync) {
       const activeTrip = window.RutaSync.solicitarViaje(tripData);
@@ -7790,7 +7808,6 @@ if (btnRecenterPassengerMap) {
     initPassengerProfileModule();
     checkAndRestoreActiveTripOnStartup();
   }
-});
 
 
 
