@@ -53,7 +53,10 @@ const DEFAULT_CONFIG = {
 // ==========================================
 let currentWizardStep = 1;
 
-function toggleFareBreakdown() {
+function toggleFareBreakdown(e) {
+  if (e && typeof e.preventDefault === 'function') {
+    e.preventDefault();
+  }
   const toggleBreakdownBtn = document.getElementById('toggle-breakdown');
   const breakdownContent = document.getElementById('breakdown-content');
   if (!breakdownContent) return;
@@ -3048,15 +3051,108 @@ function isLowDemandHour(timeStr) {
   return totalMin >= 600 && totalMin < 960;
 }
 
+// ==========================================
+// 5.9 RESOLUCIÓN GEOESPACIAL DE PUNTOS Y HITOS (AMBA / BUENOS AIRES)
+// ==========================================
+const BUE_LANDMARKS = {
+  'ezeiza': { lat: -34.8150, lng: -58.5348 },
+  'aeropuerto internacional de ezeiza': { lat: -34.8150, lng: -58.5348 },
+  'aeropuerto de ezeiza': { lat: -34.8150, lng: -58.5348 },
+  'aeropuerto ezeiza': { lat: -34.8150, lng: -58.5348 },
+  'eze': { lat: -34.8150, lng: -58.5348 },
+  'pistarini': { lat: -34.8150, lng: -58.5348 },
+  'aeroparque': { lat: -34.5580, lng: -58.4173 },
+  'aeroparque jorge newbery': { lat: -34.5580, lng: -58.4173 },
+  'aep': { lat: -34.5580, lng: -58.4173 },
+  'newbery': { lat: -34.5580, lng: -58.4173 },
+  'obelisco': { lat: -34.6037, lng: -58.3816 },
+  'centro': { lat: -34.6037, lng: -58.3816 },
+  '9 de julio': { lat: -34.6037, lng: -58.3816 },
+  'av. 9 de julio': { lat: -34.6037, lng: -58.3816 },
+  'corrientes': { lat: -34.6037, lng: -58.3816 },
+  'puerto madero': { lat: -34.6118, lng: -58.3644 },
+  'hilton': { lat: -34.6050, lng: -58.3644 },
+  'faena': { lat: -34.6163, lng: -58.3619 },
+  'palermo': { lat: -34.5889, lng: -58.4306 },
+  'palermo soho': { lat: -34.5889, lng: -58.4306 },
+  'palermo hollywood': { lat: -34.5815, lng: -58.4350 },
+  'campos': { lat: -34.5682, lng: -58.4371 },
+  'luis m. av': { lat: -34.5682, lng: -58.4371 },
+  'luis maria campos': { lat: -34.5682, lng: -58.4371 },
+  'las cañitas': { lat: -34.5694, lng: -58.4336 },
+  'cañitas': { lat: -34.5694, lng: -58.4336 },
+  'recoleta': { lat: -34.5875, lng: -58.3974 },
+  'belgrano': { lat: -34.5614, lng: -58.4563 },
+  'nuñez': { lat: -34.5448, lng: -58.4632 },
+  'san telmo': { lat: -34.6212, lng: -58.3731 },
+  'caballito': { lat: -34.6186, lng: -58.4428 },
+  'almagro': { lat: -34.6105, lng: -58.4237 },
+  'villa crespo': { lat: -34.5975, lng: -58.4419 },
+  'villa urquiza': { lat: -34.5721, lng: -58.4908 },
+  'devoto': { lat: -34.5996, lng: -58.5135 },
+  'san isidro': { lat: -34.4719, lng: -58.5283 },
+  'vicente lopez': { lat: -34.5273, lng: -58.4764 },
+  'olivos': { lat: -34.5108, lng: -58.4878 },
+  'martinez': { lat: -34.4938, lng: -58.5085 },
+  'tigre': { lat: -34.4251, lng: -58.5796 },
+  'nordelta': { lat: -34.4072, lng: -58.6472 },
+  'pilar': { lat: -34.4589, lng: -58.9142 },
+  'escobar': { lat: -34.3486, lng: -58.7942 },
+  'ramos mejia': { lat: -34.6534, lng: -58.5636 },
+  'moron': { lat: -34.6521, lng: -58.6198 },
+  'castelar': { lat: -34.6530, lng: -58.6400 },
+  'quilmes': { lat: -34.7242, lng: -58.2527 },
+  'lanus': { lat: -34.7071, lng: -58.3934 },
+  'banfield': { lat: -34.7431, lng: -58.3970 },
+  'lomas de zamora': { lat: -34.7600, lng: -58.4000 },
+  'avellaneda': { lat: -34.6625, lng: -58.3653 },
+  'la plata': { lat: -34.9214, lng: -57.9545 }
+};
+
+function resolveAddressCoords(addressStr, defaultFallback) {
+  if (!addressStr || typeof addressStr !== 'string') return defaultFallback;
+  const norm = addressStr.toLowerCase().trim();
+  for (const [key, coords] of Object.entries(BUE_LANDMARKS)) {
+    if (norm.includes(key)) {
+      return { lat: coords.lat, lng: coords.lng, address: addressStr };
+    }
+  }
+  return defaultFallback;
+}
+
 function updateCalculation() {
+  const originInp = document.getElementById('origin-input');
+  const destInp = document.getElementById('destination-input');
+  const stopInp = document.getElementById('stop-input');
+  const origVal = originInp ? originInp.value.trim() : '';
+  const destVal = destInp ? destInp.value.trim() : '';
+  const stopVal = stopInp ? stopInp.value.trim() : '';
+
+  // 1. Si hay texto pero falta state.origin, resolver coordenadas inmediatamente
+  if (origVal && (!state.origin || !state.origin.lat)) {
+    state.origin = resolveAddressCoords(origVal, { lat: -34.6037, lng: -58.3816, address: origVal });
+  }
+  // 2. Si hay texto pero falta state.destination, resolver coordenadas inmediatamente
+  if (destVal && (!state.destination || !state.destination.lat)) {
+    state.destination = resolveAddressCoords(destVal, { lat: -34.8127, lng: -58.5372, address: destVal });
+  }
+  // 3. Parada intermedia
+  if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
+    state.intermediateStop = resolveAddressCoords(stopVal, { lat: -34.5889, lng: -58.4306, address: stopVal });
+  }
+
   const o = state.origin;
   const d = state.destination;
 
   // Si hay origen y destino, asegurarse de que distanceKm no sea 0
   if (o && d && (state.distanceKm <= 0 || isNaN(state.distanceKm))) {
-    const rawKm = haversineDistance(o.lat, o.lng, d.lat, d.lng);
+    let rawKm = haversineDistance(o.lat, o.lng, d.lat, d.lng);
+    if (state.hasIntermediateStop && state.intermediateStop) {
+      const s = state.intermediateStop;
+      rawKm = haversineDistance(o.lat, o.lng, s.lat, s.lng) + haversineDistance(s.lat, s.lng, d.lat, d.lng);
+    }
     const roadFactor = 1.35;
-    state.distanceKm = Math.round(rawKm * roadFactor * 10) / 10;
+    state.distanceKm = Math.max(1, Math.round(rawKm * roadFactor * 10) / 10);
     state.baseDurationMin = Math.max(5, Math.round((state.distanceKm / 28) * 60));
   }
 
@@ -3145,8 +3241,8 @@ function updateCalculation() {
     finalTotal = oneWayFull + returnLegFullPrice - roundtripDiscount;
   }
 
-  // Si no hay origen o destino, precio base mínimo $3.500
-  if (!state.origin || !state.destination) {
+  // Si no hay origen o destino escritos en ningún lado, mostrar tarifa base inicial $3.500
+  if (!origVal && !destVal && !state.origin && !state.destination) {
     finalTotal = Math.max(3500, baseFare);
   }
 

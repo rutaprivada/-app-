@@ -2954,9 +2954,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         modalDriverChat.classList.add('active');
         renderDriverChatMessages();
-        setTimeout(() => {
-            if (driverChatInputText) driverChatInputText.focus();
-        }, 100);
     }
 
     function closeDriverChat() {
