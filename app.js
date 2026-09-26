@@ -5553,8 +5553,52 @@ function clearPassengerSearchTimeout() {
   }
 }
 
+function updatePassengerActiveTripBanner(trip) {
+  const banner = document.getElementById('passengerActiveTripBanner');
+  const titleEl = document.getElementById('pActiveBannerTitle');
+  const subEl = document.getElementById('pActiveBannerSub');
+  const openBtn = document.getElementById('btnOpenActiveTripModal');
+  if (!banner) return;
+
+  if (!trip || !trip.estado || ['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_sistema', 'cancelado_por_conductor'].includes(trip.estado)) {
+    banner.classList.add('hidden');
+    return;
+  }
+
+  banner.classList.remove('hidden');
+
+  if (openBtn && !openBtn._bound) {
+    openBtn._bound = true;
+    openBtn.addEventListener('click', () => {
+      const curTrip = (window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null) || pActiveTripData || trip;
+      if (inappTripModal) {
+        inappTripModal.classList.remove('hidden');
+        if (curTrip && curTrip.estado && !['buscando_conductor', 'solicitado'].includes(curTrip.estado)) {
+          handlePassengerDriverAssigned(curTrip, false);
+        }
+      }
+    });
+  }
+
+  if (['buscando_conductor', 'solicitado'].includes(trip.estado)) {
+    if (titleEl) titleEl.textContent = 'Buscando Chofer Ejecutivo...';
+    if (subEl) subEl.textContent = `📍 Recogida: ${trip.origen || 'Origen'} · Conectando en vivo`;
+  } else {
+    const driverName = (trip.conductor && trip.conductor.nombre) ? trip.conductor.nombre : 'Daniel Pabon';
+    const driverCar = (trip.conductor && trip.conductor.auto) ? trip.conductor.auto : 'Fiat Cronos';
+    if (titleEl) titleEl.textContent = `🚗 Chofer Asignado: ${driverName}`;
+    if (subEl) subEl.textContent = `📍 ${driverCar} · Toca para ver el mapa y llegada en tiempo real`;
+  }
+}
+
 function openInAppTripModal(trip) {
-  if (!inappTripModal) return;
+  if (!inappTripModal || !trip) return;
+
+  pActiveTripData = trip;
+  try {
+    localStorage.setItem('rutaprivada_passenger_active_trip', JSON.stringify(trip));
+    if (window.RutaSync) window.RutaSync.guardarViajeActivo(trip);
+  } catch(e){}
 
   const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto;
   const tripFare = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
@@ -5575,12 +5619,17 @@ function openInAppTripModal(trip) {
     if (pTripStopRow) pTripStopRow.style.display = 'none';
   }
 
-  // Estado inicial: Buscando
-  if (pStateSearching) pStateSearching.classList.remove('hidden');
-  if (pStateDriverAssigned) pStateDriverAssigned.classList.add('hidden');
-  if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Buscando Chofer Ejecutivo...';
+  // Si ya tiene chofer asignado, abrir directamente en estado asignado
+  if (trip.estado && !['buscando_conductor', 'solicitado'].includes(trip.estado)) {
+    handlePassengerDriverAssigned(trip, false);
+  } else {
+    if (pStateSearching) pStateSearching.classList.remove('hidden');
+    if (pStateDriverAssigned) pStateDriverAssigned.classList.add('hidden');
+    if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Buscando Chofer Ejecutivo...';
+    startPassengerSearchTimeout(trip);
+  }
 
-  startPassengerSearchTimeout(trip);
+  updatePassengerActiveTripBanner(trip);
   startPassengerRealtimePoll(trip.id);
   inappTripModal.classList.remove('hidden');
 }
@@ -5590,10 +5639,13 @@ let passengerFastPollTimer = null;
 function handlePassengerDriverAssigned(viaje, showNotification = true) {
   if (!viaje) return;
   clearPassengerSearchTimeout();
-  if (passengerFastPollTimer) {
-    clearInterval(passengerFastPollTimer);
-    passengerFastPollTimer = null;
-  }
+
+  pActiveTripData = { ...(pActiveTripData || {}), ...viaje };
+
+  try {
+    localStorage.setItem('rutaprivada_passenger_active_trip', JSON.stringify(pActiveTripData));
+    if (window.RutaSync) window.RutaSync.guardarViajeActivo(pActiveTripData);
+  } catch(e) {}
 
   if (pStateSearching) pStateSearching.classList.add('hidden');
   if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
@@ -5636,10 +5688,10 @@ function handlePassengerDriverAssigned(viaje, showNotification = true) {
     if (pTripStopRow) pTripStopRow.style.display = 'none';
   }
 
-  pActiveTripData = { ...(pActiveTripData || {}), ...viaje };
+  updatePassengerActiveTripBanner(pActiveTripData);
 
   try {
-    initPassengerLiveMap(viaje);
+    initPassengerLiveMap(pActiveTripData);
   } catch(e){}
 
   const activeStage = (viaje.estado && viaje.estado !== 'buscando_conductor' && viaje.estado !== 'solicitado') ? viaje.estado : 'en_camino';
@@ -5659,8 +5711,14 @@ function startPassengerRealtimePoll(tripId) {
     if (window.RutaSync) {
       activeTrip = window.RutaSync.obtenerViajeActivo();
     }
+    if (!activeTrip) {
+      try {
+        const raw = localStorage.getItem('rutaprivada_passenger_active_trip') || localStorage.getItem('rutaprivada_viaje_activo');
+        if (raw) activeTrip = JSON.parse(raw);
+      } catch(e){}
+    }
     
-    // Check Firestore directly for instant real-time sync
+    // Check Firestore directly for instant real-time sync across devices
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
       try {
         const doc = await firebase.firestore().collection('live_trips').doc('current_active_trip').get();
@@ -5673,20 +5731,31 @@ function startPassengerRealtimePoll(tripId) {
       } catch(e){}
     }
 
-    if (activeTrip && activeTrip.estado && activeTrip.estado !== 'buscando_conductor' && activeTrip.estado !== 'solicitado') {
-      handlePassengerDriverAssigned(activeTrip, true);
+    if (activeTrip && activeTrip.estado) {
+      if (['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_conductor', 'cancelado_por_sistema'].includes(activeTrip.estado)) {
+        if (passengerFastPollTimer) {
+          clearInterval(passengerFastPollTimer);
+          passengerFastPollTimer = null;
+        }
+        updatePassengerActiveTripBanner(null);
+      } else if (!['buscando_conductor', 'solicitado'].includes(activeTrip.estado)) {
+        if (pStateSearching && !pStateSearching.classList.contains('hidden')) {
+          handlePassengerDriverAssigned(activeTrip, true);
+        }
+      }
     }
-  }, 1000); // Polling ultra-rápido de 1 segundo
+  }, 600); // Polling ultra-rápido de 600ms
 }
 
 function closeInAppTripModal() {
-  clearPassengerSearchTimeout();
-  if (passengerFastPollTimer) {
-    clearInterval(passengerFastPollTimer);
-    passengerFastPollTimer = null;
-  }
   if (inappTripModal) {
     inappTripModal.classList.add('hidden');
+  }
+  const curTrip = (window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null) || pActiveTripData;
+  if (curTrip && curTrip.estado && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_sistema'].includes(curTrip.estado)) {
+    updatePassengerActiveTripBanner(curTrip);
+  } else {
+    updatePassengerActiveTripBanner(null);
   }
 }
 
@@ -7509,11 +7578,247 @@ if (btnRecenterPassengerMap) {
     });
   }
 
+  // ==========================================
+  // MODAL DE MIS RESERVAS PROGRAMADAS (PASAJERO)
+  // ==========================================
+  function renderPassengerReservationsList() {
+    const listContainer = document.getElementById('passengerReservationsListContainer');
+    const badgeEl = document.getElementById('headerReservationsBadge');
+    if (!listContainer) return;
+
+    let bookings = [];
+    try {
+      const raw = localStorage.getItem('rutaprivada_bookings_v1');
+      if (raw) bookings = JSON.parse(raw);
+    } catch(e){}
+
+    let passengerHistory = [];
+    try {
+      const rawH = localStorage.getItem('rutaprivada_passenger_history');
+      if (rawH) passengerHistory = JSON.parse(rawH);
+    } catch(e){}
+
+    // Combinar y deduplicar reservas del pasajero
+    const combined = [...bookings, ...passengerHistory];
+    const uniqueMap = new Map();
+    combined.forEach(item => {
+      if (item && item.id && (item.isSchedule || item.tipo === 'reserva' || item.type === 'reserva' || (item.fecha && item.hora))) {
+        if (!uniqueMap.has(item.id)) {
+          uniqueMap.set(item.id, item);
+        }
+      }
+    });
+
+    const reservations = Array.from(uniqueMap.values()).sort((a, b) => {
+      const dateA = a.date || a.fecha || a.pickupDate || '';
+      const dateB = b.date || b.fecha || b.pickupDate || '';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return (a.time || a.hora || a.pickupTime || '').localeCompare(b.time || b.hora || b.pickupTime || '');
+    });
+
+    const activeReservations = reservations.filter(r => {
+      const st = String(r.status || r.estado || '').toLowerCase();
+      return st !== 'cancelado' && st !== 'cancelada';
+    });
+
+    if (badgeEl) {
+      if (activeReservations.length > 0) {
+        badgeEl.textContent = activeReservations.length;
+        badgeEl.classList.remove('hidden');
+      } else {
+        badgeEl.classList.add('hidden');
+      }
+    }
+
+    if (reservations.length === 0) {
+      listContainer.innerHTML = `
+        <div style="text-align: center; padding: 32px 16px; color: #94a3b8; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+          <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">📅</span>
+          <h4 style="color: #fff; margin: 0 0 4px; font-size: 1rem;">No tienes reservas programadas</h4>
+          <p style="font-size: 0.78rem; margin: 0; color: #64748b;">Cuando programes un viaje con fecha y hora, aparecerá aquí con su estado y chofer asignado.</p>
+        </div>
+      `;
+      return;
+    }
+
+    listContainer.innerHTML = reservations.map(r => {
+      const dateStr = r.date || r.fecha || r.pickupDate || 'Hoy';
+      const timeStr = r.time || r.hora || r.pickupTime || '--:--';
+      const originStr = r.origin || r.origen || r.pickupAddress || 'Origen';
+      const destStr = r.destination || r.destino || r.dropoffAddress || 'Destino';
+      const stopStr = r.stop || r.parada || r.stopAddress || null;
+      const rawFare = r.totalFare || r.precio || r.precioEstimado || r.monto || 0;
+      const fareNum = Number(rawFare) || 0;
+      const tollFare = Number(r.tollFare || r.peajes || 0);
+      const tripFareOnly = Math.max(0, fareNum - tollFare);
+
+      const status = String(r.status || r.estado || 'Pendiente').toLowerCase();
+      const isAssigned = (status === 'aceptada' || status === 'en_curso' || !!r.driverAssigned);
+      const driverName = r.driverAssigned || (r.conductor && r.conductor.nombre) || 'Por asignar por la flota';
+      const driverCar = r.driverCar || (r.conductor && r.conductor.auto) || 'Sedán Ejecutivo';
+      const driverPlate = r.driverPlate || (r.conductor && r.conductor.patente) || '';
+
+      return `
+        <div class="passenger-reserva-card" data-id="${r.id}">
+          <div class="p-res-header">
+            <div class="p-res-datetime">
+              <span class="p-res-date-pill">📅 ${dateStr}</span>
+              <span class="p-res-time-bold">⏰ ${timeStr} hs</span>
+            </div>
+            <span class="p-res-status-tag ${isAssigned ? 'asignada' : 'programada'}">
+              ${isAssigned ? '✓ Chofer Asignado' : '⏳ Solicitada'}
+            </span>
+          </div>
+
+          <div class="p-res-route">
+            <div class="p-res-point">
+              <span style="color: #10b981;">🟢</span>
+              <div>
+                <small style="font-size: 0.72rem; color: #94a3b8; display: block;">ORIGEN</small>
+                <strong>${escapeHtml(originStr)}</strong>
+              </div>
+            </div>
+            ${stopStr ? `
+              <div class="p-res-point">
+                <span style="color: #f59e0b;">🛑</span>
+                <div>
+                  <small style="font-size: 0.72rem; color: #f59e0b; display: block;">PARADA INTERMEDIA</small>
+                  <strong style="color: #fef08a;">${escapeHtml(stopStr)}</strong>
+                </div>
+              </div>
+            ` : ''}
+            <div class="p-res-point">
+              <span style="color: #38bdf8;">🏁</span>
+              <div>
+                <small style="font-size: 0.72rem; color: #94a3b8; display: block;">DESTINO</small>
+                <strong>${escapeHtml(destStr)}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-res-fare-row">
+            <div>
+              <span style="color: #94a3b8;">Tarifa Total: </span>
+              <strong style="color: #fbbf24; font-size: 0.95rem;">$${fareNum.toLocaleString('es-AR')}</strong>
+            </div>
+            <div style="font-size: 0.75rem; color: #94a3b8;">
+              ${tollFare > 0 ? `🚗 $${tripFareOnly.toLocaleString('es-AR')} + 🛣️ $${tollFare.toLocaleString('es-AR')} peajes` : `(Sin peajes)`}
+            </div>
+          </div>
+
+          <div class="p-res-driver-info">
+            <span style="font-size: 1.1rem;">🚘</span>
+            <div>
+              <span style="font-weight: 700; color: #fff;">${escapeHtml(driverName)}</span>
+              <span style="display: block; font-size: 0.72rem; color: #94a3b8;">${escapeHtml(driverCar)} ${driverPlate ? '· ' + driverPlate : ''}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function initPassengerReservationsModule() {
+    const btnOpen = document.getElementById('btnHeaderOpenReservations');
+    const modal = document.getElementById('passengerReservationsModal');
+    const btnClose = document.getElementById('btnClosePassengerReservations');
+
+    function openResModal() {
+      if (modal) {
+        modal.classList.remove('hidden');
+        renderPassengerReservationsList();
+      }
+    }
+
+    function closeResModal() {
+      if (modal) modal.classList.add('hidden');
+    }
+
+    if (btnOpen) btnOpen.addEventListener('click', openResModal);
+    if (btnClose) btnClose.addEventListener('click', closeResModal);
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeResModal();
+      });
+    }
+
+    renderPassengerReservationsList();
+  }
+
+  function restorePassengerActiveTripOnLoad() {
+    let trip = null;
+    if (window.RutaSync) {
+      trip = window.RutaSync.obtenerViajeActivo();
+    }
+    if (!trip) {
+      try {
+        const raw = localStorage.getItem('rutaprivada_passenger_active_trip') || localStorage.getItem('rutaprivada_viaje_activo');
+        if (raw) trip = JSON.parse(raw);
+      } catch(e){}
+    }
+
+    if (trip && trip.estado && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_sistema', 'cancelado_por_conductor'].includes(trip.estado)) {
+      pActiveTripData = trip;
+      updatePassengerActiveTripBanner(trip);
+
+      if (['buscando_conductor', 'solicitado'].includes(trip.estado)) {
+        startPassengerSearchTimeout(trip);
+        startPassengerRealtimePoll(trip.id);
+      } else {
+        handlePassengerDriverAssigned(trip, false);
+      }
+    }
+
+    // Escuchar eventos globales de sync en window
+    window.addEventListener('rutaprivada:trip_updated', (e) => {
+      if (e.detail) {
+        updatePassengerActiveTripBanner(e.detail);
+        if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(e.detail.estado)) {
+          handlePassengerDriverAssigned(e.detail, true);
+        }
+      }
+      renderPassengerReservationsList();
+    });
+
+    window.addEventListener('rutaprivada:driver_assigned', (e) => {
+      if (e.detail) {
+        handlePassengerDriverAssigned(e.detail, true);
+      }
+    });
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'rutaprivada_viaje_activo' || e.key === 'rutaprivada_passenger_active_trip') {
+        if (e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            if (parsed && parsed.estado) {
+              updatePassengerActiveTripBanner(parsed);
+              if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(parsed.estado)) {
+                handlePassengerDriverAssigned(parsed, true);
+              }
+            }
+          } catch(err){}
+        } else {
+          updatePassengerActiveTripBanner(null);
+        }
+      }
+      if (e.key === 'rutaprivada_bookings_v1' || e.key === 'rutaprivada_passenger_history') {
+        renderPassengerReservationsList();
+      }
+    });
+  }
+
   // Inicializar al cargar
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initPassengerProfileModule);
-  } else {
+  const bootPassengerApp = () => {
     initPassengerProfileModule();
+    initPassengerReservationsModule();
+    restorePassengerActiveTripOnLoad();
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootPassengerApp);
+  } else {
+    bootPassengerApp();
   }
 
 

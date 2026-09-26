@@ -981,97 +981,158 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        reservasContainer.innerHTML = filtered.map(b => {
-            const status = String(b.status || b.estado || '').toLowerCase();
-            const isTomada = status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre;
-            const clientName = b.clientName || b.customerName || b.nombrePasajero || 'Cliente Ejecutivo';
-            const pickupAddr = b.pickupAddress || b.origin || b.origen || 'Punto de recogida';
-            const dropoffAddr = b.dropoffAddress || b.destination || b.destino || 'Destino';
-            const rawPhone = (b.clientPhone || b.customerPhone || b.telefono || '5491100000000').replace(/[^0-9]/g, '');
-            const rawPrice = b.price || b.totalFare || b.monto || b.precioEstimado;
-            const priceVal = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
-                ? Number(rawPrice)
-                : 35000;
-            const dateStr = b.date || b.pickupDate || 'Hoy';
-            const timeStr = b.time || b.pickupTime || '00:00';
-            const paymentStr = b.paymentMethod || b.metodoPago || 'Efectivo / Transferencia';
+        // Helper para agrupar reservas por fecha de manera ordenada
+        const groupsByDate = {};
+        filtered.forEach(b => {
+            const rawDate = b.date || b.pickupDate || 'Hoy';
+            if (!groupsByDate[rawDate]) groupsByDate[rawDate] = [];
+            groupsByDate[rawDate].push(b);
+        });
 
-            return `
-                <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''}">
-                    <div class="reserva-header-row">
-                        <div class="reserva-datetime">
-                            <span class="reserva-date-pill">📅 ${dateStr}</span>
-                            <span class="reserva-time-bold">⏰ ${timeStr} hs</span>
-                        </div>
-                        <span class="reserva-status-tag ${isTomada ? 'tomada' : 'disponible'}">
-                            ${isTomada ? '✓ Agendada en tu Hoja' : '⚡ Disponible'}
-                        </span>
-                    </div>
+        const sortedDates = Object.keys(groupsByDate).sort((a, b) => {
+            if (a === 'Hoy') return -1;
+            if (b === 'Hoy') return 1;
+            return a.localeCompare(b);
+        });
 
-                    <div class="reserva-route-box">
-                        <div class="reserva-point">
-                            <i class="fa-solid fa-circle-dot text-emerald"></i>
-                            <div>
-                                <strong style="font-size: 0.76rem; color: #94a3b8; display: block;">ORIGEN</strong>
-                                <span>${pickupAddr}</span>
-                            </div>
-                        </div>
-                        <div class="reserva-point">
-                            <i class="fa-solid fa-location-dot text-gold"></i>
-                            <div>
-                                <strong style="font-size: 0.76rem; color: #94a3b8; display: block;">DESTINO</strong>
-                                <span>${dropoffAddr}</span>
-                            </div>
-                        </div>
-                    </div>
+        function formatDayHeading(dateString) {
+            if (dateString === 'Hoy') return 'Hoy';
+            try {
+                const parts = dateString.split('-');
+                if (parts.length === 3) {
+                    const year = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10) - 1;
+                    const day = parseInt(parts[2], 10);
+                    const d = new Date(year, month, day);
+                    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                    return `${days[d.getDay()]} ${day} de ${months[month]}`;
+                }
+            } catch(e) {}
+            return dateString;
+        }
 
-                    <div class="reserva-meta-grid">
-                        <div class="reserva-meta-item">
-                            <span class="m-title">Pasajero</span>
-                            <span class="m-val">${clientName}</span>
-                        </div>
-                        <div class="reserva-meta-item">
-                            <span class="m-title">Tarifa Estimada</span>
-                            <span class="m-val text-gold">$${priceVal.toLocaleString('es-AR')}</span>
-                        </div>
-                        <div class="reserva-meta-item">
-                            <span class="m-title">Pago</span>
-                            <span class="m-val">${paymentStr}</span>
-                        </div>
-                    </div>
+        let htmlBuffer = '';
+        sortedDates.forEach(dateKey => {
+            const listForDay = groupsByDate[dateKey];
+            const dayTitle = formatDayHeading(dateKey);
+            const countStr = listForDay.length === 1 ? '1 reserva' : `${listForDay.length} reservas`;
 
-                    ${b.notes ? `
-                        <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(255,255,255,0.03); padding: 8px 10px; border-radius: 8px; margin-bottom: 12px;">
-                            <i class="fa-solid fa-circle-info text-gold"></i> <em>${b.notes}</em>
-                        </div>
-                    ` : ''}
-
-                    <div class="reserva-actions-row">
-                        ${isTomada ? `
-                            <button type="button" class="btn-tomar-reserva btn-iniciar-reserva" data-id="${b.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;">
-                                <i class="fa-solid fa-play"></i> Iniciar Traslado en Vivo
-                            </button>
-                            ${(status === 'en_curso' || (driverState.activeTrip && driverState.activeTrip.reservaId === b.id)) ? `
-                                <span style="font-size: 0.8rem; color: #10b981; font-weight: 700; background: rgba(16,185,129,0.15); padding: 8px 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
-                                    <i class="fa-solid fa-lock text-gold"></i> Viaje Iniciado (No cancelable)
-                                </span>
-                            ` : `
-                                <button type="button" class="btn-cancelar-reserva btn-cancelar-reserva-action" data-id="${b.id}" title="Liberar reserva y devolver a disponibles">
-                                    <i class="fa-solid fa-xmark"></i> Cancelar Reserva
-                                </button>
-                            `}
-                        ` : `
-                            <button type="button" class="btn-tomar-reserva btn-aceptar-reserva-action" data-id="${b.id}">
-                                <i class="fa-solid fa-check"></i> Aceptar & Agendar Reserva
-                            </button>
-                        `}
-                        <a href="https://wa.me/${rawPhone}?text=Hola%20${encodeURIComponent(clientName)},%20soy%20tu%20chofer%20ejecutivo%20de%20RutaPrivada.%20Tengo%20tu%20reserva%20agendada%20para%20el%20${encodeURIComponent(dateStr)}%20a%20las%20${encodeURIComponent(timeStr)}hs." target="_blank" class="btn-ver-reserva-whatsapp" title="Chatear por WhatsApp">
-                            <i class="fa-brands fa-whatsapp"></i>
-                        </a>
+            htmlBuffer += `
+                <div class="reservation-day-separator">
+                    <div class="day-sep-pill">
+                        <i class="fa-solid fa-calendar-day"></i>
+                        <span>${dayTitle}</span>
+                        <span class="day-count-tag">(${countStr})</span>
                     </div>
                 </div>
             `;
-        }).join('');
+
+            listForDay.forEach(b => {
+                const status = String(b.status || b.estado || '').toLowerCase();
+                const isTomada = status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre;
+                const clientName = b.clientName || b.customerName || b.nombrePasajero || 'Cliente Ejecutivo';
+                const pickupAddr = b.pickupAddress || b.origin || b.origen || 'Punto de recogida';
+                const dropoffAddr = b.dropoffAddress || b.destination || b.destino || 'Destino';
+                const rawPhone = (b.clientPhone || b.customerPhone || b.telefono || '5491100000000').replace(/[^0-9]/g, '');
+                const rawPrice = b.price || b.totalFare || b.monto || b.precioEstimado;
+                const priceVal = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
+                    ? Number(rawPrice)
+                    : 35000;
+                
+                const tollVal = Number(b.tollFare || b.peajes || b.tolls || 0);
+                const tripOnlyVal = Math.max(0, priceVal - tollVal);
+
+                const dateStr = b.date || b.pickupDate || 'Hoy';
+                const timeStr = b.time || b.pickupTime || '00:00';
+                const paymentStr = b.paymentMethod || b.metodoPago || 'Efectivo / Transferencia';
+
+                htmlBuffer += `
+                    <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''}">
+                        <div class="reserva-header-row">
+                            <div class="reserva-datetime">
+                                <span class="reserva-date-pill">📅 ${dateStr}</span>
+                                <span class="reserva-time-bold">⏰ ${timeStr} hs</span>
+                            </div>
+                            <span class="reserva-status-tag ${isTomada ? 'tomada' : 'disponible'}">
+                                ${isTomada ? '✓ Agendada en tu Hoja' : '⚡ Disponible'}
+                            </span>
+                        </div>
+
+                        <div class="reserva-route-box">
+                            <div class="reserva-point">
+                                <i class="fa-solid fa-circle-dot text-emerald"></i>
+                                <div>
+                                    <strong style="font-size: 0.76rem; color: #94a3b8; display: block;">ORIGEN</strong>
+                                    <span>${pickupAddr}</span>
+                                </div>
+                            </div>
+                            <div class="reserva-point">
+                                <i class="fa-solid fa-location-dot text-gold"></i>
+                                <div>
+                                    <strong style="font-size: 0.76rem; color: #94a3b8; display: block;">DESTINO</strong>
+                                    <span>${dropoffAddr}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="reserva-meta-grid">
+                            <div class="reserva-meta-item">
+                                <span class="m-title">Pasajero</span>
+                                <span class="m-val">${clientName}</span>
+                            </div>
+                            <div class="reserva-meta-item">
+                                <span class="m-title">Tarifa Total</span>
+                                <span class="m-val text-gold">$${priceVal.toLocaleString('es-AR')}</span>
+                            </div>
+                            <div class="reserva-meta-item">
+                                <span class="m-title">Pago</span>
+                                <span class="m-val">${paymentStr}</span>
+                            </div>
+                        </div>
+
+                        ${tollVal > 0 ? `
+                            <div class="fare-split-chips" style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px;">
+                                <span class="fs-chip trip">🚗 Viaje: $${tripOnlyVal.toLocaleString('es-AR')}</span>
+                                <span class="fs-chip tolls">🛣️ Peajes: $${tollVal.toLocaleString('es-AR')}</span>
+                            </div>
+                        ` : ''}
+
+                        ${b.notes ? `
+                            <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(255,255,255,0.03); padding: 8px 10px; border-radius: 8px; margin-bottom: 12px;">
+                                <i class="fa-solid fa-circle-info text-gold"></i> <em>${b.notes}</em>
+                            </div>
+                        ` : ''}
+
+                        <div class="reserva-actions-row">
+                            ${isTomada ? `
+                                <button type="button" class="btn-tomar-reserva btn-iniciar-reserva" data-id="${b.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;">
+                                    <i class="fa-solid fa-play"></i> Iniciar Traslado en Vivo
+                                </button>
+                                ${(status === 'en_curso' || (driverState.activeTrip && driverState.activeTrip.reservaId === b.id)) ? `
+                                    <span style="font-size: 0.8rem; color: #10b981; font-weight: 700; background: rgba(16,185,129,0.15); padding: 8px 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-lock text-gold"></i> Viaje Iniciado (No cancelable)
+                                    </span>
+                                ` : `
+                                    <button type="button" class="btn-cancelar-reserva btn-cancelar-reserva-action" data-id="${b.id}" title="Liberar reserva y devolver a disponibles">
+                                        <i class="fa-solid fa-xmark"></i> Cancelar Reserva
+                                    </button>
+                                `}
+                            ` : `
+                                <button type="button" class="btn-tomar-reserva btn-aceptar-reserva-action" data-id="${b.id}">
+                                    <i class="fa-solid fa-check"></i> Aceptar & Agendar Reserva
+                                </button>
+                            `}
+                            <a href="https://wa.me/${rawPhone}?text=Hola%20${encodeURIComponent(clientName)},%20soy%20tu%20chofer%20ejecutivo%20de%20RutaPrivada.%20Tengo%20tu%20reserva%20agendada%20para%20el%20${encodeURIComponent(dateStr)}%20a%20las%20${encodeURIComponent(timeStr)}hs." target="_blank" class="btn-ver-reserva-whatsapp" title="Chatear por WhatsApp">
+                                <i class="fa-brands fa-whatsapp"></i>
+                            </a>
+                        </div>
+                    </div>
+                `;
+            });
+        });
+
+        reservasContainer.innerHTML = htmlBuffer;
 
         // Listeners para botones Aceptar Reserva
         document.querySelectorAll('.btn-aceptar-reserva-action').forEach(btn => {
@@ -1497,6 +1558,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 driverState.onlineTimer = null;
             }
         }
+        updateDriverFloatingBubble();
     }
 
     const driverOnlineQuickWidget = document.getElementById('driverOnlineQuickWidget');
@@ -1767,6 +1829,30 @@ document.addEventListener('DOMContentLoaded', () => {
         incomingDestination.textContent = tripData.destino || tripData.dropoffAddress || tripData.destination || 'Punto de destino';
         incomingDistance.textContent = tripData.distancia || '15 km';
         incomingDuration.textContent = tripData.duracion || '25 min';
+
+        // Cálculo de tarifa desglosada y valor por km (Estilo Cabify)
+        const tollCost = Number(tripData.tollFare || tripData.peajes || tripData.tolls || 0);
+        const tripFareOnly = Math.max(0, tripPrice - tollCost);
+        const rawDistStr = String(tripData.distancia || tripData.distanceKm || '10');
+        const distKm = parseFloat(rawDistStr.replace(/[^0-9.]/g, '')) || 10;
+        const ratePerKm = Math.round(tripFareOnly / (distKm > 0 ? distKm : 1));
+
+        const incomingRatePerKm = document.getElementById('incomingRatePerKm');
+        const incomingTripFareOnly = document.getElementById('incomingTripFareOnly');
+        const incomingTollsFare = document.getElementById('incomingTollsFare');
+        if (incomingRatePerKm) incomingRatePerKm.textContent = `↑ $${ratePerKm.toLocaleString('es-AR')}/km`;
+        if (incomingTripFareOnly) incomingTripFareOnly.textContent = `🚗 Viaje: $${tripFareOnly.toLocaleString('es-AR')}`;
+        if (incomingTollsFare) incomingTollsFare.textContent = `🛣️ Peajes: $${tollCost.toLocaleString('es-AR')}`;
+
+        // Datos del pasajero
+        const incomingPassengerName = document.getElementById('incomingPassengerName');
+        const incomingPassengerRating = document.getElementById('incomingPassengerRating');
+        if (incomingPassengerName) {
+            incomingPassengerName.textContent = tripData.nombrePasajero || tripData.clientName || tripData.customerName || 'Pasajero';
+        }
+        if (incomingPassengerRating) {
+            incomingPassengerRating.textContent = tripData.rating || '4.98';
+        }
 
         // Parada intermedia si existe
         const incomingStopRow = document.getElementById('incomingStopRow');
@@ -4179,12 +4265,138 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
 
+    // ==========================================
+    // 12. BURBUJA FLOTANTE SUPERPUESTA ("APARECER ENCIMA" / CABIFY STYLE OVERLAY)
+    // ==========================================
+    function updateDriverFloatingBubble() {
+        const bubble = document.getElementById('driverFloatingBubbleOverlay');
+        if (!bubble) return;
+
+        const isOnline = !!driverState.isOnline;
+        const hasActiveTrip = !!driverState.activeTrip;
+        const hasIncoming = !!driverState.incomingTrip;
+
+        // El widget flotante de acceso rápido está activo si el chofer está en línea o con viaje
+        if (isOnline || hasActiveTrip) {
+            bubble.classList.add('visible');
+        } else {
+            bubble.classList.remove('visible');
+        }
+
+        const badge = document.getElementById('bubbleActiveTripBadge');
+        if (badge) {
+            if (hasActiveTrip) {
+                badge.textContent = '● En viaje';
+                badge.style.display = 'block';
+                badge.style.background = '#10b981';
+            } else if (hasIncoming) {
+                badge.textContent = '¡Viaje!';
+                badge.style.display = 'block';
+                badge.style.background = '#ef4444';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        const dot = document.getElementById('bubbleOnlineIndicator');
+        if (dot) {
+            dot.style.background = isOnline ? '#10b981' : '#64748b';
+        }
+    }
+
+    function initDriverFloatingBubble() {
+        const bubble = document.getElementById('driverFloatingBubbleOverlay');
+        if (!bubble) return;
+
+        let isDragging = false;
+        let startX = 0, startY = 0;
+        let initialLeft = 0, initialTop = 0;
+        let hasMoved = false;
+
+        function onPointerDown(e) {
+            isDragging = true;
+            hasMoved = false;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            startX = clientX;
+            startY = clientY;
+
+            const rect = bubble.getBoundingClientRect();
+            initialLeft = rect.left;
+            initialTop = rect.top;
+
+            bubble.style.transition = 'none';
+        }
+
+        function onPointerMove(e) {
+            if (!isDragging) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const deltaX = clientX - startX;
+            const deltaY = clientY - startY;
+
+            if (Math.abs(deltaX) > 6 || Math.abs(deltaY) > 6) {
+                hasMoved = true;
+            }
+
+            let newLeft = initialLeft + deltaX;
+            let newTop = initialTop + deltaY;
+
+            const maxLeft = window.innerWidth - bubble.offsetWidth - 10;
+            const maxTop = window.innerHeight - bubble.offsetHeight - 10;
+
+            newLeft = Math.max(10, Math.min(newLeft, maxLeft));
+            newTop = Math.max(10, Math.min(newTop, maxTop));
+
+            bubble.style.left = `${newLeft}px`;
+            bubble.style.top = `${newTop}px`;
+            bubble.style.right = 'auto';
+            bubble.style.bottom = 'auto';
+        }
+
+        function onPointerUp() {
+            if (!isDragging) return;
+            isDragging = false;
+            bubble.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+
+            if (hasMoved) {
+                const rect = bubble.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                if (centerX < window.innerWidth / 2) {
+                    bubble.style.left = '16px';
+                } else {
+                    bubble.style.left = `${window.innerWidth - bubble.offsetWidth - 16}px`;
+                }
+            } else {
+                switchTab('viewLive');
+                try { window.focus(); } catch(e){}
+                showDriverToast('🚗 Acceso Rápido Chofer RutaPrivada');
+                if (driverState.activeTrip) {
+                    stateActiveTrip.classList.add('active');
+                    stateSearching.classList.remove('active');
+                    stateOffline.classList.remove('active');
+                }
+            }
+        }
+
+        bubble.addEventListener('touchstart', onPointerDown, { passive: true });
+        window.addEventListener('touchmove', onPointerMove, { passive: true });
+        window.addEventListener('touchend', onPointerUp);
+
+        bubble.addEventListener('mousedown', onPointerDown);
+        window.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('mouseup', onPointerUp);
+
+        updateDriverFloatingBubble();
+    }
+
     // Limpieza de datos de prueba y arranque
     purgeTestBookings();
     renderDriverProfileInfo();
     loadSavedStats();
     initFirebaseConductor();
     renderReservas();
+    initDriverFloatingBubble();
 
     // 1. Iniciar estado online base
     try {

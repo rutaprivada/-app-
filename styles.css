@@ -5605,208 +5605,264 @@ html, body {
   gap: 4px;
 }
 
-/* ==========================================
-   BOTÓN MIS RESERVAS EN HEADER Y BANNER ACTIVO
-   ========================================== */
-.btn-header-reservations {
-  background: rgba(251, 191, 36, 0.12);
-  border: 1px solid rgba(251, 191, 36, 0.35);
-  color: #fbbf24;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s ease;
-}
-
-.btn-header-reservations:hover {
-  background: rgba(251, 191, 36, 0.22);
-  border-color: #fbbf24;
-  transform: translateY(-1px);
-}
-
-.badge-res-count {
-  background: #f59e0b;
-  color: #0c111a;
-  font-size: 0.72rem;
-  font-weight: 800;
-  padding: 1px 6px;
-  border-radius: 10px;
-}
-
-/* Banner de Viaje en Curso para el Pasajero (Visible en Inicio) */
+/* Persistent Passenger Active Trip Floating Banner */
 .passenger-active-trip-banner {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(6, 78, 59, 0.28) 100%);
-  border: 1.5px solid #10b981;
-  border-radius: 14px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
+  position: sticky;
+  top: 60px;
+  z-index: 990;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 41, 59, 0.96) 100%);
+  border-bottom: 1.5px solid rgba(245, 158, 11, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(245, 158, 11, 0.2);
+  padding: 10px 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: slideDownBanner 0.3s ease-out;
+}
+
+@keyframes slideDownBanner {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.active-trip-banner-container {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  cursor: pointer;
-  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
-  animation: pulse-soft 2s infinite;
-  transition: all 0.25s ease;
-}
-
-.passenger-active-trip-banner:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.35);
-  border-color: #34d399;
-}
-
-.passenger-active-trip-banner .banner-left {
-  display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.active-pulse-dot {
-  width: 14px;
-  height: 14px;
-  background: #10b981;
-  border-radius: 50%;
-  box-shadow: 0 0 10px #10b981;
-  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-.banner-info strong {
-  display: block;
-  font-size: 0.95rem;
-  color: #ffffff;
-}
-
-.banner-info small {
-  font-size: 0.78rem;
-  color: #a7f3d0;
-}
-
-.btn-banner-action {
-  background: #10b981;
-  color: #042f2e;
-  font-size: 0.8rem;
-  font-weight: 800;
-  padding: 6px 12px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Modal Mis Reservas del Pasajero */
-.passenger-res-dialog {
-  max-width: 520px;
-  width: 95%;
-  background: #0f172a;
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  border-radius: 20px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.8);
-  overflow: hidden;
-}
-
-.passenger-res-card {
-  background: rgba(22, 31, 52, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 12px;
-  transition: all 0.2s ease;
-}
-
-.passenger-res-card:hover {
-  border-color: rgba(251, 191, 36, 0.4);
-}
-
-.passenger-res-header {
+.banner-left {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
-.passenger-res-date {
-  font-size: 0.88rem;
-  font-weight: 800;
+.banner-pulse-icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.banner-car-icon {
+  font-size: 1.3rem;
+}
+
+.pulse-dot-live {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulseDot 1.5s infinite;
+}
+
+.banner-text-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.banner-text-info strong {
+  font-size: 0.92rem;
   color: #fbbf24;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.banner-text-info span {
+  font-size: 0.76rem;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-banner-open-trip {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  font-size: 0.82rem !important;
+  padding: 8px 16px !important;
+  border-radius: 10px !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35) !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+}
+
+.btn-banner-open-trip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.5) !important;
+}
+
+/* Header Button for Mis Reservas */
+.btn-header-reservas {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+  padding: 7px 12px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
+  transition: all 0.2s;
+  position: relative;
 }
 
-.passenger-res-status {
-  font-size: 0.72rem;
-  font-weight: 700;
+.btn-header-reservas:hover {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #fbbf24;
+  transform: translateY(-1px);
+}
+
+.res-counter-badge {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5);
+}
+
+/* Passenger Reservations Modal & Cards */
+.passenger-reservations-dialog {
+  max-width: 580px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.passenger-reservations-body {
+  overflow-y: auto;
+  padding: 14px 16px;
+}
+
+.passenger-reservations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.passenger-reserva-card {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.p-res-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.p-res-datetime {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.p-res-date-pill {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
   padding: 3px 8px;
   border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
-.passenger-res-status.pendiente {
-  background: rgba(245, 158, 11, 0.18);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.35);
+.p-res-time-bold {
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.95rem;
 }
 
-.passenger-res-status.aceptada {
-  background: rgba(16, 185, 129, 0.18);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.35);
+.p-res-status-tag {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
 }
 
-.passenger-res-status.completada {
-  background: rgba(56, 189, 248, 0.18);
+.p-res-status-tag.programada {
+  background: rgba(56, 189, 248, 0.15);
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.35);
 }
 
-.passenger-res-fare-breakdown {
+.p-res-status-tag.asignada {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.p-res-route {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.84rem;
+}
+
+.p-res-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #cbd5e1;
+}
+
+.p-res-point strong {
+  color: #ffffff;
+}
+
+.p-res-fare-row {
+  display: flex;
   justify-content: space-between;
-  background: rgba(0, 0, 0, 0.25);
-  padding: 8px 12px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
-  margin-top: 10px;
+  padding: 8px 12px;
   font-size: 0.82rem;
 }
 
-.passenger-res-fare-breakdown .fare-sub {
-  color: #94a3b8;
-}
-
-.passenger-res-fare-breakdown .fare-total {
-  color: #34d399;
-  font-size: 1.05rem;
-  font-weight: 800;
-}
-
-/* Separador de Días en Hoja de Ruta / Reservas */
-.reserva-day-separator {
-  background: linear-gradient(90deg, rgba(251, 191, 36, 0.15) 0%, rgba(15, 23, 42, 0) 100%);
-  border-left: 4px solid #fbbf24;
+.p-res-driver-info {
+  background: rgba(56, 189, 248, 0.06);
+  border: 1px dashed rgba(56, 189, 248, 0.3);
+  border-radius: 8px;
   padding: 8px 12px;
-  margin: 18px 0 10px 0;
-  border-radius: 0 8px 8px 0;
+  font-size: 0.78rem;
+  color: #cbd5e1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: #fef08a;
-  letter-spacing: 0.3px;
-}
-
-.reserva-day-separator .day-badge-count {
-  font-size: 0.72rem;
-  font-weight: 700;
-  background: rgba(251, 191, 36, 0.2);
-  color: #fbbf24;
-  padding: 2px 8px;
-  border-radius: 10px;
+  gap: 8px;
 }
 
 

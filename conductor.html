@@ -652,11 +652,39 @@
                 <div class="countdown-circle" id="countdownSecs">15s</div>
             </div>
 
-            <!-- Tarifa destacada -->
-            <div class="incoming-price-box">
-                <span class="price-title">Ganancia Estimada</span>
-                <div class="price-number" id="incomingPrice">$0</div>
-                <span class="category-pill" id="incomingCategory">Sedán Ejecutivo</span>
+            <!-- Tarifa destacada con desglose oficial (Estilo Cabify) -->
+            <div class="incoming-price-box" style="padding: 12px 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <div>
+                        <div style="display: flex; align-items: baseline; gap: 6px;">
+                            <span class="price-number" id="incomingPrice" style="font-size: 2rem; color: #ffffff;">$0</span>
+                            <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">en app</span>
+                        </div>
+                    </div>
+                    <span class="category-pill" id="incomingCategory">Sedán Ejecutivo</span>
+                </div>
+
+                <!-- Desglose de tarifa y peajes -->
+                <div class="fare-split-chips" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px;">
+                    <span class="fs-chip rate-km" id="incomingRatePerKm">↑ $0/km</span>
+                    <span class="fs-chip trip" id="incomingTripFareOnly">🚗 Viaje: $0</span>
+                    <span class="fs-chip tolls" id="incomingTollsFare">🛣️ Peajes: $0</span>
+                </div>
+            </div>
+
+            <!-- Fila de métricas del pasajero (Cabify Style) -->
+            <div class="passenger-verification-badge" id="incomingPassengerMetaRow">
+                <div class="p-badge-item">
+                    <i class="fa-solid fa-user"></i> <span id="incomingPassengerName">Pasajero</span>
+                </div>
+                <span>·</span>
+                <div class="p-badge-item">
+                    <span>⭐</span> <span id="incomingPassengerRating">4.98</span>
+                </div>
+                <span>·</span>
+                <div class="p-badge-item p-verified">
+                    <i class="fa-solid fa-circle-check"></i> <span>Verificado</span>
+                </div>
             </div>
 
             <!-- Ruta del viaje entrante -->
@@ -1037,6 +1065,15 @@
         </div>
     </div>
 
+    <!-- BOTÓN CIRCULAR FLOTANTE DE SUPERPOSICIÓN / APARECER ENCIMA (CABIFY STYLE) -->
+    <div id="driverFloatingBubbleOverlay" class="driver-floating-bubble-overlay" style="display: none;" title="RutaPrivada Chofer - Toca para volver a la app">
+        <span class="bubble-status-dot"></span>
+        <div class="bubble-icon-wrap">
+            <img src="icon_chofer.png" alt="RutaPrivada" class="bubble-icon-img" onerror="this.src='favicon.svg';" />
+        </div>
+        <span class="bubble-brand-text">rutaprivada</span>
+    </div>
+
     <!-- Firebase App & Cloud Firestore SDKs (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -1045,7 +1082,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- SCRIPTS -->
-    <script src="sync.js?v=54"></script>
-    <script src="conductor.js?v=54"></script>
+    <script src="sync.js?v=57"></script>
+    <script src="conductor.js?v=57"></script>
 </body>
 </html>

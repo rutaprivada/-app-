@@ -2459,6 +2459,205 @@ body.is-app-mode .web-only {
     color: #ffffff;
 }
 
+/* ==========================================
+   RESERVAS: SEPARADOR POR DÍA
+   ========================================== */
+.reservation-day-separator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0 10px 0;
+    width: 100%;
+}
+
+.day-sep-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.4), transparent);
+}
+
+.day-sep-pill {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #fbbf24;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.day-sep-count {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fef08a;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* ==========================================
+   DESGLOSE TARIFA VS PEAJES (CABIFY STYLE)
+   ========================================== */
+.fare-split-box {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin: 8px 0;
+}
+
+.fare-split-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.fare-split-hero {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #34d399;
+}
+
+.fare-split-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.fs-chip {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #cbd5e1;
+}
+
+.fs-chip.trip {
+    background: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.fs-chip.tolls {
+    background: rgba(245, 158, 11, 0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.fs-chip.rate-km {
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    font-weight: 700;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Passenger Verification Badge (Cabify Style) */
+.passenger-verification-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    color: #cbd5e1;
+    margin: 6px 0;
+}
+
+.passenger-verification-badge .p-badge-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.passenger-verification-badge .p-verified {
+    color: #38bdf8;
+    font-weight: 700;
+}
+
+/* ==========================================
+   WIDGET CIRCULAR FLOTANTE DE SUPERPOSICIÓN (CABIFY STYLE)
+   ========================================== */
+.driver-floating-bubble-overlay {
+    position: fixed;
+    right: 20px;
+    top: 160px;
+    width: 66px;
+    height: 66px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%);
+    border: 2.5px solid #ffffff;
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.6), 0 0 16px rgba(251, 191, 36, 0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    z-index: 99999;
+    user-select: none;
+    touch-action: none;
+    transition: transform 0.15s ease-out;
+    animation: bubbleBounce 0.4s ease-out;
+}
+
+.driver-floating-bubble-overlay:active {
+    cursor: grabbing;
+    transform: scale(1.08);
+}
+
+.driver-floating-bubble-overlay .bubble-icon-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.driver-floating-bubble-overlay .bubble-icon-img {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+}
+
+.driver-floating-bubble-overlay .bubble-brand-text {
+    font-size: 0.58rem;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: 0.4px;
+    margin-top: 2px;
+    text-transform: lowercase;
+}
+
+.driver-floating-bubble-overlay .bubble-status-dot {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #10b981;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 6px #10b981;
+    animation: pulseDot 1.5s infinite;
+}
+
+@keyframes bubbleBounce {
+    0% { transform: scale(0.5); opacity: 0; }
+    70% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+
 
 
 
