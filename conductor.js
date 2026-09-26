@@ -1809,15 +1809,15 @@ document.addEventListener('DOMContentLoaded', () => {
             try { navigator.vibrate([600, 200, 600, 200, 1000]); } catch(e){}
         }
 
-        // Iniciar cuenta regresiva exacta de 30 segundos
-        driverState.countdownSecs = 30;
-        countdownSecs.textContent = '30s';
+        // Iniciar cuenta regresiva exacta de 15 segundos
+        driverState.countdownSecs = 15;
+        countdownSecs.textContent = '15s';
         countdownBar.style.width = '100%';
 
         if (driverState.countdownTimer) clearInterval(driverState.countdownTimer);
 
         const startTime = Date.now();
-        const duration = 30000; // 30 segundos
+        const duration = 15000; // 15 segundos
 
         driverState.countdownTimer = setInterval(() => {
             const elapsed = Date.now() - startTime;

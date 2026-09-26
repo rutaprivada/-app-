@@ -1569,6 +1569,129 @@ function renderUpcomingDaysStrip() {
   }
 }
 
+function selectQuickPresetDate(preset, e) {
+  if (e) {
+    try { e.preventDefault(); e.stopPropagation(); } catch(err){}
+  }
+  const now = new Date();
+  let targetDate = new Date();
+  let labelToast = 'Hoy';
+
+  if (preset === 'today') {
+    targetDate = now;
+    labelToast = 'Hoy';
+  } else if (preset === 'tomorrow') {
+    targetDate.setDate(now.getDate() + 1);
+    labelToast = 'Mañana';
+  } else if (preset === 'weekend') {
+    const day = now.getDay();
+    let addDays = 0;
+    if (day === 6) addDays = 1; // Si hoy es sábado, pasar a domingo
+    else if (day === 0) addDays = 6; // Si hoy es domingo, pasar al siguiente sábado
+    else addDays = 6 - day; // De lun a vie, calcular días hasta el sábado
+    targetDate.setDate(now.getDate() + addDays);
+    labelToast = 'Fin de Semana (Tarifa Plana)';
+  }
+
+  const dStr = formatDateToString(targetDate);
+  selectDateFromCalendar(dStr);
+  closeCustomCalendarDropdown();
+  if (typeof showToast === 'function') {
+    showToast(`Fecha fijada en ${formatDateWithWeekday(dStr)} (${labelToast})`);
+  }
+}
+
+function toggleCustomCalendarDropdown(e) {
+  if (e) {
+    try { e.preventDefault(); e.stopPropagation(); } catch(err){}
+  }
+  const dropdown = document.getElementById('custom-calendar-dropdown');
+  const toggleBtn = document.getElementById('btn-toggle-custom-calendar');
+  if (!dropdown) return;
+
+  const isHidden = dropdown.classList.contains('hidden');
+  if (isHidden) {
+    if (state.date) {
+      const p = state.date.split('-');
+      if (p.length === 3) {
+        calCurrentYear = parseInt(p[0], 10);
+        calCurrentMonth = parseInt(p[1], 10) - 1;
+      }
+    }
+    renderCustomCalendar();
+    dropdown.classList.remove('hidden');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+  } else {
+    dropdown.classList.add('hidden');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function closeCustomCalendarDropdown(e) {
+  if (e) {
+    try { e.preventDefault(); e.stopPropagation(); } catch(err){}
+  }
+  const dropdown = document.getElementById('custom-calendar-dropdown');
+  const toggleBtn = document.getElementById('btn-toggle-custom-calendar');
+  if (dropdown) dropdown.classList.add('hidden');
+  if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+}
+
+function changeCustomCalMonth(delta, e) {
+  if (e) {
+    try { e.preventDefault(); e.stopPropagation(); } catch(err){}
+  }
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth();
+
+  if (delta < 0) {
+    if (calCurrentYear > curYear || (calCurrentYear === curYear && calCurrentMonth > curMonth)) {
+      calCurrentMonth--;
+      if (calCurrentMonth < 0) {
+        calCurrentMonth = 11;
+        calCurrentYear--;
+      }
+    }
+  } else {
+    calCurrentMonth++;
+    if (calCurrentMonth > 11) {
+      calCurrentMonth = 0;
+      calCurrentYear++;
+    }
+  }
+  renderCustomCalendar();
+}
+
+function onCustomCalMonthSelect(e) {
+  if (e) {
+    try { e.stopPropagation(); } catch(err){}
+  }
+  const val = parseInt(e.target.value, 10);
+  if (!isNaN(val)) {
+    calCurrentMonth = val;
+    renderCustomCalendar();
+  }
+}
+
+function onCustomCalYearSelect(e) {
+  if (e) {
+    try { e.stopPropagation(); } catch(err){}
+  }
+  const val = parseInt(e.target.value, 10);
+  if (!isNaN(val)) {
+    calCurrentYear = val;
+    renderCustomCalendar();
+  }
+}
+
+window.selectQuickPresetDate = selectQuickPresetDate;
+window.toggleCustomCalendarDropdown = toggleCustomCalendarDropdown;
+window.closeCustomCalendarDropdown = closeCustomCalendarDropdown;
+window.changeCustomCalMonth = changeCustomCalMonth;
+window.onCustomCalMonthSelect = onCustomCalMonthSelect;
+window.onCustomCalYearSelect = onCustomCalYearSelect;
+
 function initCustomCalendar() {
   const toggleBtn = document.getElementById('btn-toggle-custom-calendar');
   const dropdown = document.getElementById('custom-calendar-dropdown');
@@ -1581,9 +1704,7 @@ function initCustomCalendar() {
   const monthSelect = document.getElementById('cal-select-month');
   const yearSelect = document.getElementById('cal-select-year');
 
-  if (!toggleBtn || !dropdown) return;
-
-  if (monthSelect) {
+  if (monthSelect && monthSelect.options.length === 0) {
     monthSelect.innerHTML = '';
     MONTH_NAMES_ES.forEach((mName, idx) => {
       const opt = document.createElement('option');
@@ -1591,27 +1712,19 @@ function initCustomCalendar() {
       opt.textContent = mName;
       monthSelect.appendChild(opt);
     });
-    monthSelect.addEventListener('change', (e) => {
-      e.stopPropagation();
-      calCurrentMonth = parseInt(e.target.value, 10);
-      renderCustomCalendar();
-    });
+    monthSelect.addEventListener('change', onCustomCalMonthSelect);
   }
 
-  if (yearSelect) {
+  if (yearSelect && yearSelect.options.length === 0) {
     yearSelect.innerHTML = '';
     const baseYear = new Date().getFullYear();
-    for (let y = baseYear; y <= baseYear + 3; y++) {
+    for (let y = baseYear; y <= baseYear + 4; y++) {
       const opt = document.createElement('option');
       opt.value = y;
       opt.textContent = y;
       yearSelect.appendChild(opt);
     }
-    yearSelect.addEventListener('change', (e) => {
-      e.stopPropagation();
-      calCurrentYear = parseInt(e.target.value, 10);
-      renderCustomCalendar();
-    });
+    yearSelect.addEventListener('change', onCustomCalYearSelect);
   }
 
   if (state.date) {
@@ -1622,118 +1735,20 @@ function initCustomCalendar() {
     }
   }
 
-  // Abrir / Cerrar dropdown dinámico del calendario
-  toggleBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isHidden = dropdown.classList.contains('hidden');
-    if (isHidden) {
-      if (state.date) {
-        const p = state.date.split('-');
-        if (p.length === 3) {
-          calCurrentYear = parseInt(p[0], 10);
-          calCurrentMonth = parseInt(p[1], 10) - 1;
-        }
-      }
-      renderCustomCalendar();
-      dropdown.classList.remove('hidden');
-      toggleBtn.setAttribute('aria-expanded', 'true');
-    } else {
-      dropdown.classList.add('hidden');
-      toggleBtn.setAttribute('aria-expanded', 'false');
-    }
-  });
-
-  // Navegación entre meses
-  if (prevBtn) {
-    prevBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const now = new Date();
-      const curYear = now.getFullYear();
-      const curMonth = now.getMonth();
-      if (calCurrentYear > curYear || (calCurrentYear === curYear && calCurrentMonth > curMonth)) {
-        calCurrentMonth--;
-        if (calCurrentMonth < 0) {
-          calCurrentMonth = 11;
-          calCurrentYear--;
-        }
-        renderCustomCalendar();
-      }
-    });
-  }
-
-  if (nextBtn) {
-    nextBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      calCurrentMonth++;
-      if (calCurrentMonth > 11) {
-        calCurrentMonth = 0;
-        calCurrentYear++;
-      }
-      renderCustomCalendar();
-    });
-  }
-
-  if (closeBtn) {
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdown.classList.add('hidden');
-      toggleBtn.setAttribute('aria-expanded', 'false');
-    });
-  }
-
-  // Atajos rápidos
-  if (shortcutToday) {
-    shortcutToday.addEventListener('click', (e) => {
-      e.stopPropagation();
-      selectDateFromCalendar(formatDateToString(new Date()));
-      dropdown.classList.add('hidden');
-      toggleBtn.setAttribute('aria-expanded', 'false');
-      showToast('Fecha fijada en Hoy.');
-    });
-  }
-
-  if (shortcutTomorrow) {
-    shortcutTomorrow.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const tm = new Date();
-      tm.setDate(tm.getDate() + 1);
-      selectDateFromCalendar(formatDateToString(tm));
-      dropdown.classList.add('hidden');
-      toggleBtn.setAttribute('aria-expanded', 'false');
-      showToast('Fecha fijada en Mañana.');
-    });
-  }
-
-  if (shortcutWeekend) {
-    shortcutWeekend.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const d = new Date();
-      const day = d.getDay();
-      let addDays = 0;
-      if (day === 6 || day === 0) addDays = 0;
-      else addDays = 6 - day;
-      d.setDate(d.getDate() + addDays);
-      selectDateFromCalendar(formatDateToString(d));
-      dropdown.classList.add('hidden');
-      toggleBtn.setAttribute('aria-expanded', 'false');
-      showToast('Fecha fijada en Fin de Semana.');
-    });
-  }
-
   // Cerrar al hacer clic fuera del contenedor
   document.addEventListener('click', (e) => {
     const dateBlock = document.getElementById('schedule-date-block');
     if (dateBlock && !dateBlock.contains(e.target)) {
-      dropdown.classList.add('hidden');
-      toggleBtn.setAttribute('aria-expanded', 'false');
+      if (dropdown) dropdown.classList.add('hidden');
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
     }
   });
 
   // Cerrar con Escape
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !dropdown.classList.contains('hidden')) {
+    if (e.key === 'Escape' && dropdown && !dropdown.classList.contains('hidden')) {
       dropdown.classList.add('hidden');
-      toggleBtn.setAttribute('aria-expanded', 'false');
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
     }
   });
 
@@ -1765,10 +1780,8 @@ function selectDateFromCalendar(dateStr) {
   const btnToday = document.getElementById('btn-date-today');
   const btnTomorrow = document.getElementById('btn-date-tomorrow');
   const btnWeekend = document.getElementById('btn-date-weekend');
-  if (btnToday && btnTomorrow) {
-    btnToday.classList.toggle('active', dateStr === todayStr);
-    btnTomorrow.classList.toggle('active', dateStr === tomorrowStr);
-  }
+  if (btnToday) btnToday.classList.toggle('active', dateStr === todayStr);
+  if (btnTomorrow) btnTomorrow.classList.toggle('active', dateStr === tomorrowStr);
 
   // Comprobar si es fin de semana para el botón de atajo
   if (btnWeekend) {
@@ -1815,8 +1828,30 @@ function renderCustomCalendar() {
   const yearSelect = document.getElementById('cal-select-year');
   if (!daysGrid) return;
 
-  if (monthSelect) monthSelect.value = calCurrentMonth;
-  if (yearSelect) yearSelect.value = calCurrentYear;
+  if (monthSelect) {
+    if (monthSelect.options.length === 0) {
+      MONTH_NAMES_ES.forEach((mName, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = mName;
+        monthSelect.appendChild(opt);
+      });
+    }
+    monthSelect.value = calCurrentMonth;
+  }
+
+  if (yearSelect) {
+    if (yearSelect.options.length === 0) {
+      const baseYear = new Date().getFullYear();
+      for (let y = baseYear; y <= baseYear + 4; y++) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        yearSelect.appendChild(opt);
+      }
+    }
+    yearSelect.value = calCurrentYear;
+  }
 
   const now = new Date();
   const curYear = now.getFullYear();
@@ -1874,14 +1909,9 @@ function renderCustomCalendar() {
       }
 
       cellBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
+        try { e.stopPropagation(); } catch(err){}
         selectDateFromCalendar(thisDateStr);
-        setTimeout(() => {
-          const dropdown = document.getElementById('custom-calendar-dropdown');
-          const toggleBtn = document.getElementById('btn-toggle-custom-calendar');
-          if (dropdown) dropdown.classList.add('hidden');
-          if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
-        }, 120);
+        closeCustomCalendarDropdown();
         showToast(`Fecha fijada en ${formatDateWithWeekday(thisDateStr)}`);
       });
     }
@@ -3303,17 +3333,21 @@ function renderQuote() {
   const b = state.breakdown || {};
 
   // Métricas
-  document.getElementById('metric-distance').textContent = `${state.distanceKm.toFixed(1)} km`;
-  document.getElementById('metric-duration').textContent = `${state.durationMin} min`;
+  const distEl = document.getElementById('metric-distance');
+  if (distEl) distEl.textContent = `${(state.distanceKm || 0).toFixed(1)} km`;
+  
+  const durEl = document.getElementById('metric-duration');
+  if (durEl) durEl.textContent = `${state.durationMin || 0} min`;
 
   // Hora de llegada estimada
-  if (state.time) {
+  const arrEl = document.getElementById('metric-arrival');
+  if (arrEl && state.time) {
     const [hh, mm] = state.time.split(':').map(Number);
-    const totalMin = hh * 60 + mm + state.durationMin;
+    const totalMin = (hh || 0) * 60 + (mm || 0) + (state.durationMin || 0);
     const arrH = Math.floor(totalMin / 60) % 24;
     const arrM = totalMin % 60;
     const arrStr = `${String(arrH).padStart(2, '0')}:${String(arrM).padStart(2, '0')}`;
-    document.getElementById('metric-arrival').textContent = arrStr;
+    arrEl.textContent = arrStr;
   }
 
   // Actualizar Banner de Tráfico según el Horario de Reserva
@@ -3325,7 +3359,7 @@ function renderQuote() {
     const bBadge = document.getElementById('traffic-banner-badge');
     const bDesc = document.getElementById('traffic-banner-desc');
     const bIcon = document.getElementById('traffic-banner-icon');
-    if (bTitle) bTitle.textContent = `Tráfico para las ${state.time} hs: ${traffic.shortLabel}`;
+    if (bTitle) bTitle.textContent = `Tráfico para las ${state.time || '12:00'} hs: ${traffic.shortLabel}`;
     if (bBadge) bBadge.textContent = traffic.badgeText;
     if (bDesc) bDesc.textContent = traffic.description;
     if (bIcon) bIcon.textContent = traffic.icon;
@@ -3344,28 +3378,32 @@ function renderQuote() {
   const tollDesc = document.getElementById('toll-status-desc');
   const tollRow = document.getElementById('row-toll-line');
   const tollLabel = document.getElementById('row-toll-label');
+  const tollFare = document.getElementById('row-toll-fare');
 
-  if (state.routeHasTolls && b.tollCost > 0) {
-    tollBox.className = 'toll-status-box toll-active';
-    tollBadge.className = 'toll-badge badge-toll-active';
-    tollBadge.textContent = `Peaje Oficial (+${formatMoney(b.tollCost)})`;
+  if (state.routeHasTolls && (b.tollCost || 0) > 0) {
+    if (tollBox) tollBox.className = 'toll-status-box toll-active';
+    if (tollBadge) {
+      tollBadge.className = 'toll-badge badge-toll-active';
+      tollBadge.textContent = `Peaje Oficial (+${formatMoney(b.tollCost)})`;
+    }
+    if (tollTitle) tollTitle.textContent = `Peaje Detectado: ${(state.tollRoadNames || []).join(', ')}`;
+    if (tollDesc) tollDesc.textContent = `Calculado según tarifas obligatorias vigentes de cada autopista oficial.`;
     
-    tollTitle.textContent = `Peaje Detectado: ${state.tollRoadNames.join(', ')}`;
-    tollDesc.textContent = `Calculado según tarifas obligatorias vigentes de cada autopista oficial.`;
-    
-    tollRow.classList.remove('hidden');
-    tollLabel.textContent = `Peajes Oficiales (${state.tollRoadNames.join(' + ')}):`;
-    document.getElementById('row-toll-fare').textContent = `+${formatMoney(b.tollCost)}`;
+    if (tollRow) tollRow.classList.remove('hidden');
+    if (tollLabel) tollLabel.textContent = `Peajes Oficiales (${(state.tollRoadNames || []).join(' + ')}):`;
+    if (tollFare) tollFare.textContent = `+${formatMoney(b.tollCost)}`;
   } else {
-    tollBox.className = 'toll-status-box';
-    tollBadge.className = 'toll-badge badge-no-toll';
-    tollBadge.textContent = 'Sin peaje ($0)';
-    tollTitle.textContent = 'Ruta Sin Peajes';
-    tollDesc.textContent = 'Trayecto por calles y avenidas libres de peaje. No se aplica cargo de autopista.';
+    if (tollBox) tollBox.className = 'toll-status-box';
+    if (tollBadge) {
+      tollBadge.className = 'toll-badge badge-no-toll';
+      tollBadge.textContent = 'Sin peaje ($0)';
+    }
+    if (tollTitle) tollTitle.textContent = 'Ruta Sin Peajes';
+    if (tollDesc) tollDesc.textContent = 'Trayecto por calles y avenidas libres de peaje. No se aplica cargo de autopista.';
     
-    tollRow.classList.remove('hidden');
-    tollLabel.textContent = 'Peajes Oficiales de Autopista:';
-    document.getElementById('row-toll-fare').textContent = '$0 (Sin peaje)';
+    if (tollRow) tollRow.classList.remove('hidden');
+    if (tollLabel) tollLabel.textContent = 'Peajes Oficiales de Autopista:';
+    if (tollFare) tollFare.textContent = '$0';
   }
 
   // Garantizar precio mínimo de cotización inicial ($3.500 ARS) y actualizar en vivo inmediatamente
@@ -3373,11 +3411,15 @@ function renderQuote() {
   const quoteAmtEl = document.getElementById('quote-total-amount');
   if (quoteAmtEl) quoteAmtEl.textContent = formatNumber(finalPrice);
   animateValue('quote-total-amount', finalPrice);
+
   const rowTotalFare = document.getElementById('row-total-fare');
   if (rowTotalFare) rowTotalFare.textContent = '$' + formatNumber(finalPrice);
 
-  document.getElementById('quote-currency-symbol').textContent = CURRENCY_SYMBOLS[state.config.currency] || '$';
-  document.getElementById('quote-currency-code').textContent = state.config.currency;
+  const symEl = document.getElementById('quote-currency-symbol');
+  if (symEl) symEl.textContent = CURRENCY_SYMBOLS[state.config.currency] || '$';
+
+  const codeEl = document.getElementById('quote-currency-code');
+  if (codeEl) codeEl.textContent = state.config.currency;
 
   // Desglose: Base
   const baseFareEl = document.getElementById('row-base-fare');
@@ -3387,7 +3429,7 @@ function renderQuote() {
       baseFareEl.textContent = '$0 (Bonificada Ezeiza >30 km)';
       baseFareEl.classList.add('text-emerald');
     } else {
-      baseFareEl.textContent = formatMoney(b.baseFare);
+      baseFareEl.textContent = formatMoney(b.baseFare !== undefined ? b.baseFare : 3500);
       baseFareEl.classList.remove('text-emerald');
     }
   }
@@ -3401,23 +3443,27 @@ function renderQuote() {
   }
 
   // Desglose: Distancia
-  const distRateLabel = formatMoney(b.kmRate);
-  const distLabelText = `Distancia (${state.distanceKm.toFixed(1)} km x ${distRateLabel}/km • ${b.distBracketLabel}):`;
-  document.getElementById('row-distance-label').textContent = distLabelText;
-  document.getElementById('row-distance-fare').textContent = formatMoney(b.distanceCost);
+  const distRateLabel = formatMoney(b.kmRate || 0);
+  const distLabelText = `Distancia (${(state.distanceKm || 0).toFixed(1)} km x ${distRateLabel}/km • ${b.distBracketLabel || '0-5 km'}):`;
+  const rowDistLabel = document.getElementById('row-distance-label');
+  const rowDistFare = document.getElementById('row-distance-fare');
+  if (rowDistLabel) rowDistLabel.textContent = distLabelText;
+  if (rowDistFare) rowDistFare.textContent = formatMoney(b.distanceCost || 0);
 
   // Desglose: Tiempo
-  const durationRateLabel = formatMoney(b.minRate);
-  const durLabelText = `Tiempo de viaje (${state.durationMin} min x ${durationRateLabel}/min • ${b.durBracketLabel}):`;
-  document.getElementById('row-duration-label').textContent = durLabelText;
-  document.getElementById('row-duration-fare').textContent = formatMoney(b.durationCost);
+  const durationRateLabel = formatMoney(b.minRate || 0);
+  const durLabelText = `Tiempo de viaje (${state.durationMin || 0} min x ${durationRateLabel}/min • ${b.durBracketLabel || '0-15 min'}):`;
+  const rowDurLabel = document.getElementById('row-duration-label');
+  const rowDurFare = document.getElementById('row-duration-fare');
+  if (rowDurLabel) rowDurLabel.textContent = durLabelText;
+  if (rowDurFare) rowDurFare.textContent = formatMoney(b.durationCost || 0);
 
   // Recargo por horario / clima
   const surgeRow = document.getElementById('row-surge-line');
   const surgeLabel = document.getElementById('row-surge-label');
   const surgeFare = document.getElementById('row-surge-fare');
   if (surgeRow && surgeFare) {
-    if (b.timeSurgePercent > 0) {
+    if ((b.timeSurgePercent || 0) > 0) {
       if (surgeLabel) surgeLabel.textContent = `Ajuste (${b.timeSurgeReason}):`;
       surgeFare.textContent = `+${b.timeSurgePercent}%`;
       surgeFare.style.color = '#f59e0b';
@@ -3453,8 +3499,8 @@ function renderQuote() {
   const discountLine = document.getElementById('row-roundtrip-discount-line');
 
   if (b.isRoundtrip) {
-    returnLegLine.classList.remove('hidden');
-    discountLine.classList.remove('hidden');
+    if (returnLegLine) returnLegLine.classList.remove('hidden');
+    if (discountLine) discountLine.classList.remove('hidden');
     const discountLabel = document.querySelector('#row-roundtrip-discount-line span');
     if (discountLabel) {
       discountLabel.textContent = `✨ Descuento Ida y Vuelta (-${b.roundtripDiscountPercent || 15}% regreso):`;
@@ -3463,18 +3509,20 @@ function renderQuote() {
     if (badgeExtra) {
       badgeExtra.textContent = `-${b.roundtripDiscountPercent || 15}% Vuelta`;
     }
-    document.getElementById('row-roundtrip-leg-fare').textContent = `+${formatMoney(b.returnLegFullPrice)}`;
-    document.getElementById('row-roundtrip-discount-fare').textContent = `-${formatMoney(b.roundtripDiscount)}`;
+    const rowReturnFare = document.getElementById('row-roundtrip-leg-fare');
+    if (rowReturnFare) rowReturnFare.textContent = `+${formatMoney(b.returnLegFullPrice || 0)}`;
+    const rowDiscountFare = document.getElementById('row-roundtrip-discount-fare');
+    if (rowDiscountFare) rowDiscountFare.textContent = `-${formatMoney(b.roundtripDiscount || 0)}`;
   } else {
-    returnLegLine.classList.add('hidden');
-    discountLine.classList.add('hidden');
+    if (returnLegLine) returnLegLine.classList.add('hidden');
+    if (discountLine) discountLine.classList.add('hidden');
   }
 
   // Descuento Larga Distancia (>200 km: 40% OFF)
   const longDistLine = document.getElementById('row-long-distance-discount-line');
   const longDistFare = document.getElementById('row-long-distance-discount-fare');
   if (longDistLine) {
-    if (b.isLongDistance && b.longDistanceDiscount > 0) {
+    if (b.isLongDistance && (b.longDistanceDiscount || 0) > 0) {
       longDistLine.classList.remove('hidden');
       if (longDistFare) longDistFare.textContent = `-${formatMoney(b.longDistanceDiscount)}`;
     } else {
@@ -3495,9 +3543,9 @@ function renderQuote() {
     } else if (state.stopDetourKm >= 2) {
       sLabel = `Parada extra (Desvío >2 km: +${state.stopDetourKm} km)`;
     }
-    extrasLabels.push(`${sLabel} (+$${formatNumber(state.stopFee)})`);
+    extrasLabels.push(`${sLabel} (+$${formatNumber(state.stopFee || 500)})`);
   }
-  if (state.extras.pet) {
+  if (state.extras && state.extras.pet) {
     extrasLabels.push(`Mascota (+${formatMoney(state.config.petFee || 4000)})`);
   }
   const extrasRowLabel = document.getElementById('row-extras-label');
@@ -3507,10 +3555,10 @@ function renderQuote() {
       : 'Opciones adicionales:';
   }
 
-  document.getElementById('row-extras-fare').textContent = 
-    b.extrasCost > 0 ? `+${formatMoney(b.extrasCost)}` : '$0 (Sin extras)';
-
-  document.getElementById('row-total-fare').textContent = formatMoney(b.finalTotal);
+  const extrasFareEl = document.getElementById('row-extras-fare');
+  if (extrasFareEl) {
+    extrasFareEl.textContent = (b.extrasCost || 0) > 0 ? `+${formatMoney(b.extrasCost)}` : '$0';
+  }
 
   // Indicador de número de WhatsApp
   const displayPhoneEl = document.getElementById('display-wa-number');
