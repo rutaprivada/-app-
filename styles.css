@@ -5605,264 +5605,38 @@ html, body {
   gap: 4px;
 }
 
-/* Persistent Passenger Active Trip Floating Banner */
+/* Passenger Active Trip Recovery Banner & Pulsing Animation */
 .passenger-active-trip-banner {
-  position: sticky;
-  top: 60px;
-  z-index: 990;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 41, 59, 0.96) 100%);
-  border-bottom: 1.5px solid rgba(245, 158, 11, 0.45);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(245, 158, 11, 0.2);
-  padding: 10px 0;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  animation: slideDownBanner 0.3s ease-out;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 
-@keyframes slideDownBanner {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+.passenger-active-trip-banner.hidden {
+  display: none !important;
 }
 
-.active-trip-banner-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.banner-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  flex: 1;
-}
-
-.banner-pulse-icon {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: rgba(245, 158, 11, 0.15);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.banner-car-icon {
-  font-size: 1.3rem;
-}
-
-.pulse-dot-live {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
-  animation: pulseDot 1.5s infinite;
-}
-
-.banner-text-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.banner-text-info strong {
-  font-size: 0.92rem;
-  color: #fbbf24;
-  font-weight: 800;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.banner-text-info span {
-  font-size: 0.76rem;
-  color: #cbd5e1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.btn-banner-open-trip {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
-  color: #0f172a !important;
-  font-weight: 800 !important;
-  font-size: 0.82rem !important;
-  padding: 8px 16px !important;
-  border-radius: 10px !important;
-  border: none !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-  white-space: nowrap !important;
-  flex-shrink: 0 !important;
-  cursor: pointer !important;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35) !important;
-  transition: transform 0.2s, box-shadow 0.2s !important;
-}
-
-.btn-banner-open-trip:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.5) !important;
-}
-
-/* Header Button for Mis Reservas */
-.btn-header-reservas {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #fbbf24;
-  padding: 7px 12px;
-  border-radius: 10px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
-  position: relative;
-}
-
-.btn-header-reservas:hover {
-  background: rgba(245, 158, 11, 0.15);
-  border-color: #fbbf24;
-  transform: translateY(-1px);
-}
-
-.res-counter-badge {
-  background: #ef4444;
-  color: #ffffff;
-  font-size: 0.68rem;
-  font-weight: 800;
-  padding: 1px 6px;
-  border-radius: 999px;
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5);
-}
-
-/* Passenger Reservations Modal & Cards */
-.passenger-reservations-dialog {
-  max-width: 580px;
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.passenger-reservations-body {
-  overflow-y: auto;
-  padding: 14px 16px;
-}
-
-.passenger-reservations-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+@keyframes bannerPulseGlow {
+  0% {
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.2);
+    border-color: rgba(56, 189, 248, 0.5);
+  }
+  50% {
+    box-shadow: 0 8px 28px rgba(56, 189, 248, 0.45);
+    border-color: #38bdf8;
+  }
+  100% {
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.2);
+    border-color: rgba(56, 189, 248, 0.5);
+  }
 }
 
 .passenger-reserva-card {
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 14px;
-  padding: 14px 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
-.p-res-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.p-res-datetime {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.p-res-date-pill {
-  background: rgba(245, 158, 11, 0.15);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #fbbf24;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.p-res-time-bold {
-  color: #ffffff;
-  font-weight: 800;
-  font-size: 0.95rem;
-}
-
-.p-res-status-tag {
-  font-size: 0.72rem;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-}
-
-.p-res-status-tag.programada {
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.35);
-}
-
-.p-res-status-tag.asignada {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.35);
-}
-
-.p-res-route {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 0.84rem;
-}
-
-.p-res-point {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  color: #cbd5e1;
-}
-
-.p-res-point strong {
-  color: #ffffff;
-}
-
-.p-res-fare-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 0.82rem;
-}
-
-.p-res-driver-info {
-  background: rgba(56, 189, 248, 0.06);
-  border: 1px dashed rgba(56, 189, 248, 0.3);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 0.78rem;
-  color: #cbd5e1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.passenger-reserva-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(245, 158, 11, 0.4) !important;
 }
 
 

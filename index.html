@@ -53,10 +53,11 @@
   <meta name="twitter:image" content="https://rutaprivada.github.io/-app-/logo_rutaprivada.svg" />
 
   <!-- Favicon para Google Search y Navegadores (Compatible con Google Favicon User-Agent) -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=2" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="icon" type="image/png" sizes="192x192" href="favicon.svg" />
-  <link rel="icon" type="image/png" sizes="48x48" href="favicon.svg" />
-  <link rel="shortcut icon" href="favicon.svg" />
+  <link rel="apple-touch-icon" href="icon-192.png?v=2" />
+  <link rel="shortcut icon" href="icon-192.png?v=2" />
 
   <!-- Schema.org JSON-LD para Google Search (Site Name y Negocio) -->
   <script type="application/ld+json">
@@ -161,51 +162,46 @@
         <span class="badge badge-trust">🛡️ Choferes Verificados</span>
         <span class="badge badge-fair">⭐ Servicio 24 Horas</span>
       </div>
-      <div class="header-right-actions" style="display: flex; align-items: center; gap: 8px;">
-        <!-- Passenger Scheduled Reservations Button -->
-        <button type="button" class="btn-header-reservas" id="btnHeaderOpenReservations" title="Ver Mis Reservas Programadas">
-          <span class="res-icon">📅</span>
-          <span class="res-text web-only">Mis Reservas</span>
-          <span class="res-counter-badge hidden" id="headerReservationsBadge">0</span>
-        </button>
+      
+      <!-- Botón Acceso a Mis Reservas Programadas -->
+      <button type="button" class="btn-header-reservations clickable-header-profile" id="btnOpenPassengerReservations" title="Ver mis Reservas Programadas" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 6px 12px; color: #fbbf24; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 700; transition: all 0.2s;">
+        <span style="font-size: 1.1rem;">📅</span>
+        <span class="web-only">Mis Reservas</span>
+        <span class="reservations-badge-count" id="passengerReservationsBadge" style="background: #f59e0b; color: #000; font-size: 0.72rem; font-weight: 800; border-radius: 10px; padding: 1px 6px; display: none;">0</span>
+      </button>
 
-        <!-- Passenger Profile Avatar Trigger -->
-        <div class="passenger-header-profile clickable-header-profile" id="btnOpenPassengerProfile" title="Ver mi Perfil, Medios de Pago e Historial de Viajes">
-          <div class="passenger-avatar-wrap">
-            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Pasajero" class="passenger-avatar" id="headerPassengerAvatar" />
-            <span class="status-indicator online"></span>
-          </div>
-          <div class="passenger-meta web-only">
-            <span class="passenger-name" id="headerPassengerName">Mi Perfil</span>
-            <span class="passenger-status-sub">⭐ Pasajero VIP</span>
-          </div>
+      <!-- Passenger Profile Avatar Trigger -->
+      <div class="passenger-header-profile clickable-header-profile" id="btnOpenPassengerProfile" title="Ver mi Perfil, Medios de Pago e Historial de Viajes">
+        <div class="passenger-avatar-wrap">
+          <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Pasajero" class="passenger-avatar" id="headerPassengerAvatar" />
+          <span class="status-indicator online"></span>
+        </div>
+        <div class="passenger-meta web-only">
+          <span class="passenger-name" id="headerPassengerName">Mi Perfil</span>
+          <span class="passenger-status-sub">⭐ Pasajero VIP</span>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- Persistent / Floating Quick Access Banner: Active Trip in Progress -->
-  <div id="passengerActiveTripBanner" class="passenger-active-trip-banner hidden">
-    <div class="container active-trip-banner-container">
-      <div class="banner-left">
-        <div class="banner-pulse-icon">
-          <span class="pulse-dot-live"></span>
-          <span class="banner-car-icon">🚗</span>
-        </div>
-        <div class="banner-text-info">
-          <strong id="pActiveBannerTitle">Viaje en Curso</strong>
-          <span id="pActiveBannerSub">Tu solicitud está activa. Toca para ver el mapa y chofer.</span>
-        </div>
-      </div>
-      <button type="button" class="btn btn-banner-open-trip" id="btnOpenActiveTripModal">
-        <span>Ver Traslado</span>
-        <span class="arrow-icon">➔</span>
-      </button>
-    </div>
-  </div>
-
   <!-- Main Hero / Multi-Step Wizard Calculator Section -->
   <main class="container main-layout">
+    
+    <!-- ACCESO RÁPIDO: VIAJE ACTIVO O SOLICITUD EN CURSO -->
+    <div id="passengerActiveTripBanner" class="passenger-active-trip-banner hidden" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%); border: 1.5px solid #38bdf8; border-radius: 16px; padding: 12px 16px; margin-bottom: 16px; box-shadow: 0 8px 24px rgba(56, 189, 248, 0.25); display: flex; align-items: center; justify-content: space-between; gap: 12px; animation: bannerPulseGlow 2.5s infinite ease-in-out;">
+      <div class="active-banner-content" id="passengerActiveBannerContent" style="display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1;">
+        <div class="active-banner-pulse" style="width: 42px; height: 42px; border-radius: 50%; background: rgba(56, 189, 248, 0.2); border: 2px solid #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;">
+          <span id="passengerActiveBannerIcon">🚖</span>
+        </div>
+        <div class="active-banner-info">
+          <strong id="passengerActiveBannerTitle" style="color: #fff; font-size: 0.95rem; display: block;">Viaje en curso</strong>
+          <p id="passengerActiveBannerSub" style="color: #38bdf8; font-size: 0.78rem; margin: 0; font-weight: 600;">Chofer en camino · Toca para ver seguimiento en vivo</p>
+        </div>
+      </div>
+      <button type="button" class="btn-active-banner-action" id="btnGoToActiveTrip" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; border: none; border-radius: 10px; padding: 8px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);">
+        Ver Viaje ➔
+      </button>
+    </div>
     
     <div id="passenger-wizard-container" class="passenger-wizard-wrapper">
       
@@ -1353,26 +1349,22 @@
 
       </div>
     </div>
-  </div>
-
-  <!-- Modal de Mis Reservas Programadas (Pasajero) -->
-  <div id="passengerReservationsModal" class="modal-backdrop hidden" style="z-index: 10001;">
-    <div class="modal-dialog passenger-reservations-dialog">
-      <div class="modal-header">
+  <!-- MODAL: MIS RESERVAS PROGRAMADAS (PASAJERO) -->
+  <div id="passenger-reservations-modal" class="modal-backdrop hidden" style="z-index: 10005;">
+    <div class="modal-dialog" style="max-width: 540px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); overflow: hidden;">
+      <div class="modal-header" style="background: rgba(15, 23, 42, 0.9); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(245, 158, 11, 0.2); border: 1.5px solid #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #fbbf24;">
-            📅
-          </div>
+          <span style="font-size: 1.4rem;">📅</span>
           <div>
-            <h3 style="margin: 0; font-size: 1.1rem; color: #fff;">Mis Reservas Programadas</h3>
-            <p style="margin: 2px 0 0; font-size: 0.78rem; color: #94a3b8;">Seguimiento y estado de tus viajes agendados</p>
+            <h3 style="color: #fff; margin: 0; font-size: 1.1rem; font-weight: 700;">Mis Reservas Programadas</h3>
+            <p style="color: #94a3b8; margin: 0; font-size: 0.75rem;">Traslados agendados con anticipación</p>
           </div>
         </div>
-        <button id="btnClosePassengerReservations" class="modal-close" aria-label="Cerrar">&times;</button>
+        <button type="button" id="close-passenger-reservations-btn" class="modal-close" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
       </div>
 
-      <div class="modal-body passenger-reservations-body">
-        <div id="passengerReservationsListContainer" class="passenger-reservations-list">
+      <div class="modal-body" style="padding: 16px; max-height: 75vh; overflow-y: auto;">
+        <div id="passengerReservationsListContainer" style="display: flex; flex-direction: column; gap: 12px;">
           <!-- Inyectado dinámicamente -->
         </div>
       </div>

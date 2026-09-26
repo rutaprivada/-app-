@@ -5555,50 +5555,39 @@ function clearPassengerSearchTimeout() {
 
 function updatePassengerActiveTripBanner(trip) {
   const banner = document.getElementById('passengerActiveTripBanner');
-  const titleEl = document.getElementById('pActiveBannerTitle');
-  const subEl = document.getElementById('pActiveBannerSub');
-  const openBtn = document.getElementById('btnOpenActiveTripModal');
+  const bannerIcon = document.getElementById('passengerActiveBannerIcon');
+  const bannerTitle = document.getElementById('passengerActiveBannerTitle');
+  const bannerSub = document.getElementById('passengerActiveBannerSub');
   if (!banner) return;
 
-  if (!trip || !trip.estado || ['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_sistema', 'cancelado_por_conductor'].includes(trip.estado)) {
+  if (!trip || !trip.id || ['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_conductor', 'cancelado_por_sistema'].includes(trip.estado)) {
     banner.classList.add('hidden');
     return;
   }
 
   banner.classList.remove('hidden');
 
-  if (openBtn && !openBtn._bound) {
-    openBtn._bound = true;
-    openBtn.addEventListener('click', () => {
-      const curTrip = (window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null) || pActiveTripData || trip;
-      if (inappTripModal) {
-        inappTripModal.classList.remove('hidden');
-        if (curTrip && curTrip.estado && !['buscando_conductor', 'solicitado'].includes(curTrip.estado)) {
-          handlePassengerDriverAssigned(curTrip, false);
-        }
-      }
-    });
-  }
-
-  if (['buscando_conductor', 'solicitado'].includes(trip.estado)) {
-    if (titleEl) titleEl.textContent = 'Buscando Chofer Ejecutivo...';
-    if (subEl) subEl.textContent = `📍 Recogida: ${trip.origen || 'Origen'} · Conectando en vivo`;
+  if (trip.estado === 'buscando_conductor' || trip.estado === 'solicitado') {
+    if (bannerIcon) bannerIcon.textContent = '🔎';
+    if (bannerTitle) bannerTitle.textContent = 'Búsqueda de Chofer en curso...';
+    if (bannerSub) bannerSub.textContent = 'Conectando con la flota cercana · Toca para abrir radar';
   } else {
     const driverName = (trip.conductor && trip.conductor.nombre) ? trip.conductor.nombre : 'Daniel Pabon';
     const driverCar = (trip.conductor && trip.conductor.auto) ? trip.conductor.auto : 'Fiat Cronos';
-    if (titleEl) titleEl.textContent = `🚗 Chofer Asignado: ${driverName}`;
-    if (subEl) subEl.textContent = `📍 ${driverCar} · Toca para ver el mapa y llegada en tiempo real`;
+    const driverPlate = (trip.conductor && trip.conductor.patente) ? ` (${trip.conductor.patente})` : '';
+    
+    let stageText = 'Chofer asignado · En camino';
+    if (trip.estado === 'en_origen') stageText = '📍 ¡Chofer en el origen esperando!';
+    else if (trip.estado === 'en_viaje') stageText = '🚀 Viaje en curso hacia el destino';
+
+    if (bannerIcon) bannerIcon.textContent = '🚖';
+    if (bannerTitle) bannerTitle.textContent = `Viaje en curso · ${driverCar}${driverPlate}`;
+    if (bannerSub) bannerSub.textContent = `${driverName} · ${stageText} · Toca para ver`;
   }
 }
 
 function openInAppTripModal(trip) {
-  if (!inappTripModal || !trip) return;
-
-  pActiveTripData = trip;
-  try {
-    localStorage.setItem('rutaprivada_passenger_active_trip', JSON.stringify(trip));
-    if (window.RutaSync) window.RutaSync.guardarViajeActivo(trip);
-  } catch(e){}
+  if (!inappTripModal) return;
 
   const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto;
   const tripFare = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
@@ -5619,18 +5608,19 @@ function openInAppTripModal(trip) {
     if (pTripStopRow) pTripStopRow.style.display = 'none';
   }
 
-  // Si ya tiene chofer asignado, abrir directamente en estado asignado
-  if (trip.estado && !['buscando_conductor', 'solicitado'].includes(trip.estado)) {
+  updatePassengerActiveTripBanner(trip);
+
+  // Si ya tiene conductor asignado, mostrar pantalla asignado; si no, radar buscando
+  if (trip.estado && trip.estado !== 'buscando_conductor' && trip.estado !== 'solicitado') {
     handlePassengerDriverAssigned(trip, false);
   } else {
     if (pStateSearching) pStateSearching.classList.remove('hidden');
     if (pStateDriverAssigned) pStateDriverAssigned.classList.add('hidden');
     if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Buscando Chofer Ejecutivo...';
     startPassengerSearchTimeout(trip);
+    startPassengerRealtimePoll(trip.id);
   }
 
-  updatePassengerActiveTripBanner(trip);
-  startPassengerRealtimePoll(trip.id);
   inappTripModal.classList.remove('hidden');
 }
 
@@ -5639,13 +5629,12 @@ let passengerFastPollTimer = null;
 function handlePassengerDriverAssigned(viaje, showNotification = true) {
   if (!viaje) return;
   clearPassengerSearchTimeout();
+  if (passengerFastPollTimer) {
+    clearInterval(passengerFastPollTimer);
+    passengerFastPollTimer = null;
+  }
 
-  pActiveTripData = { ...(pActiveTripData || {}), ...viaje };
-
-  try {
-    localStorage.setItem('rutaprivada_passenger_active_trip', JSON.stringify(pActiveTripData));
-    if (window.RutaSync) window.RutaSync.guardarViajeActivo(pActiveTripData);
-  } catch(e) {}
+  updatePassengerActiveTripBanner(viaje);
 
   if (pStateSearching) pStateSearching.classList.add('hidden');
   if (pStateDriverAssigned) pStateDriverAssigned.classList.remove('hidden');
@@ -5688,10 +5677,10 @@ function handlePassengerDriverAssigned(viaje, showNotification = true) {
     if (pTripStopRow) pTripStopRow.style.display = 'none';
   }
 
-  updatePassengerActiveTripBanner(pActiveTripData);
+  pActiveTripData = { ...(pActiveTripData || {}), ...viaje };
 
   try {
-    initPassengerLiveMap(pActiveTripData);
+    initPassengerLiveMap(viaje);
   } catch(e){}
 
   const activeStage = (viaje.estado && viaje.estado !== 'buscando_conductor' && viaje.estado !== 'solicitado') ? viaje.estado : 'en_camino';
@@ -5711,14 +5700,8 @@ function startPassengerRealtimePoll(tripId) {
     if (window.RutaSync) {
       activeTrip = window.RutaSync.obtenerViajeActivo();
     }
-    if (!activeTrip) {
-      try {
-        const raw = localStorage.getItem('rutaprivada_passenger_active_trip') || localStorage.getItem('rutaprivada_viaje_activo');
-        if (raw) activeTrip = JSON.parse(raw);
-      } catch(e){}
-    }
     
-    // Check Firestore directly for instant real-time sync across devices
+    // Check Firestore directly for instant real-time sync
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
       try {
         const doc = await firebase.firestore().collection('live_trips').doc('current_active_trip').get();
@@ -5731,32 +5714,24 @@ function startPassengerRealtimePoll(tripId) {
       } catch(e){}
     }
 
-    if (activeTrip && activeTrip.estado) {
-      if (['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_conductor', 'cancelado_por_sistema'].includes(activeTrip.estado)) {
-        if (passengerFastPollTimer) {
-          clearInterval(passengerFastPollTimer);
-          passengerFastPollTimer = null;
-        }
-        updatePassengerActiveTripBanner(null);
-      } else if (!['buscando_conductor', 'solicitado'].includes(activeTrip.estado)) {
-        if (pStateSearching && !pStateSearching.classList.contains('hidden')) {
-          handlePassengerDriverAssigned(activeTrip, true);
-        }
-      }
+    if (activeTrip && activeTrip.estado && activeTrip.estado !== 'buscando_conductor' && activeTrip.estado !== 'solicitado') {
+      handlePassengerDriverAssigned(activeTrip, true);
     }
-  }, 600); // Polling ultra-rápido de 600ms
+  }, 1000); // Polling ultra-rápido de 1 segundo
 }
 
 function closeInAppTripModal() {
+  clearPassengerSearchTimeout();
+  if (passengerFastPollTimer) {
+    clearInterval(passengerFastPollTimer);
+    passengerFastPollTimer = null;
+  }
   if (inappTripModal) {
     inappTripModal.classList.add('hidden');
   }
-  const curTrip = (window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null) || pActiveTripData;
-  if (curTrip && curTrip.estado && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_sistema'].includes(curTrip.estado)) {
-    updatePassengerActiveTripBanner(curTrip);
-  } else {
-    updatePassengerActiveTripBanner(null);
-  }
+  // Mantener visible el banner de acceso rápido en el home
+  const active = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+  if (active) updatePassengerActiveTripBanner(active);
 }
 
 let passengerAudioCtx = null;
@@ -7579,247 +7554,244 @@ if (btnRecenterPassengerMap) {
   }
 
   // ==========================================
-  // MODAL DE MIS RESERVAS PROGRAMADAS (PASAJERO)
+  // GESTIÓN DE RESERVAS DEL PASAJERO ("MIS RESERVAS")
   // ==========================================
-  function renderPassengerReservationsList() {
-    const listContainer = document.getElementById('passengerReservationsListContainer');
-    const badgeEl = document.getElementById('headerReservationsBadge');
-    if (!listContainer) return;
+  const modalReservations = document.getElementById('passenger-reservations-modal');
+  const btnOpenReservations = document.getElementById('btnOpenPassengerReservations');
+  const btnCloseReservations = document.getElementById('close-passenger-reservations-btn');
+  const reservationsListContainer = document.getElementById('passengerReservationsListContainer');
+  const reservationsBadge = document.getElementById('passengerReservationsBadge');
 
-    let bookings = [];
+  function loadPassengerReservations() {
     try {
-      const raw = localStorage.getItem('rutaprivada_bookings_v1');
-      if (raw) bookings = JSON.parse(raw);
-    } catch(e){}
-
-    let passengerHistory = [];
-    try {
-      const rawH = localStorage.getItem('rutaprivada_passenger_history');
-      if (rawH) passengerHistory = JSON.parse(rawH);
-    } catch(e){}
-
-    // Combinar y deduplicar reservas del pasajero
-    const combined = [...bookings, ...passengerHistory];
-    const uniqueMap = new Map();
-    combined.forEach(item => {
-      if (item && item.id && (item.isSchedule || item.tipo === 'reserva' || item.type === 'reserva' || (item.fecha && item.hora))) {
-        if (!uniqueMap.has(item.id)) {
-          uniqueMap.set(item.id, item);
-        }
+      let list = JSON.parse(localStorage.getItem('rutaprivada_passenger_reservations') || '[]');
+      // También sincronizar si hay reservas en agenda global creadas recientemente
+      const rawGlobal = localStorage.getItem('rutaprivada_bookings_v1');
+      if (rawGlobal) {
+        const globalList = JSON.parse(rawGlobal);
+        globalList.forEach(gb => {
+          if (gb && gb.id && gb.isSchedule) {
+            const idx = list.findIndex(r => r.id === gb.id);
+            if (idx >= 0) {
+              list[idx] = { ...list[idx], ...gb };
+            }
+          }
+        });
       }
-    });
-
-    const reservations = Array.from(uniqueMap.values()).sort((a, b) => {
-      const dateA = a.date || a.fecha || a.pickupDate || '';
-      const dateB = b.date || b.fecha || b.pickupDate || '';
-      if (dateA !== dateB) return dateA.localeCompare(dateB);
-      return (a.time || a.hora || a.pickupTime || '').localeCompare(b.time || b.hora || b.pickupTime || '');
-    });
-
-    const activeReservations = reservations.filter(r => {
-      const st = String(r.status || r.estado || '').toLowerCase();
-      return st !== 'cancelado' && st !== 'cancelada';
-    });
-
-    if (badgeEl) {
-      if (activeReservations.length > 0) {
-        badgeEl.textContent = activeReservations.length;
-        badgeEl.classList.remove('hidden');
-      } else {
-        badgeEl.classList.add('hidden');
-      }
+      return list;
+    } catch(e) {
+      return [];
     }
+  }
 
-    if (reservations.length === 0) {
-      listContainer.innerHTML = `
-        <div style="text-align: center; padding: 32px 16px; color: #94a3b8; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
-          <span style="font-size: 2.2rem; display: block; margin-bottom: 8px;">📅</span>
-          <h4 style="color: #fff; margin: 0 0 4px; font-size: 1rem;">No tienes reservas programadas</h4>
-          <p style="font-size: 0.78rem; margin: 0; color: #64748b;">Cuando programes un viaje con fecha y hora, aparecerá aquí con su estado y chofer asignado.</p>
+  function savePassengerReservations(list) {
+    try {
+      localStorage.setItem('rutaprivada_passenger_reservations', JSON.stringify(list));
+    } catch(e) {}
+    updatePassengerReservationsBadge();
+  }
+
+  function updatePassengerReservationsBadge() {
+    if (!reservationsBadge) return;
+    const list = loadPassengerReservations();
+    const activeUpcoming = list.filter(r => !['cancelada', 'completada'].includes(r.estado && r.estado.toLowerCase()));
+    if (activeUpcoming.length > 0) {
+      reservationsBadge.textContent = activeUpcoming.length;
+      reservationsBadge.style.display = 'inline-block';
+    } else {
+      reservationsBadge.style.display = 'none';
+    }
+  }
+  window.updatePassengerReservationsBadge = updatePassengerReservationsBadge;
+
+  function openPassengerReservationsModal() {
+    if (modalReservations) {
+      modalReservations.classList.remove('hidden');
+      renderPassengerReservationsList();
+    }
+  }
+  window.openPassengerReservationsModal = openPassengerReservationsModal;
+
+  function closePassengerReservationsModal() {
+    if (modalReservations) {
+      modalReservations.classList.add('hidden');
+    }
+  }
+  window.closePassengerReservationsModal = closePassengerReservationsModal;
+
+  function renderPassengerReservationsList() {
+    if (!reservationsListContainer) return;
+    const list = loadPassengerReservations();
+
+    if (list.length === 0) {
+      reservationsListContainer.innerHTML = `
+        <div style="text-align: center; padding: 36px 16px; color: #94a3b8;">
+          <div style="font-size: 3rem; margin-bottom: 12px;">📅</div>
+          <h4 style="color: #fff; font-size: 1rem; margin-bottom: 6px;">No tienes reservas agendadas</h4>
+          <p style="font-size: 0.82rem; line-height: 1.4; margin-bottom: 16px;">Programa tus traslados con anticipación para asegurar chofer ejecutivo en tu horario.</p>
+          <button type="button" class="btn btn-primary" onclick="closePassengerReservationsModal(); goToWizardStep(1);" style="font-size: 0.85rem; padding: 10px 18px; border-radius: 10px;">
+            ⚡ Cotizar y Reservar Ahora
+          </button>
         </div>
       `;
       return;
     }
 
-    listContainer.innerHTML = reservations.map(r => {
-      const dateStr = r.date || r.fecha || r.pickupDate || 'Hoy';
-      const timeStr = r.time || r.hora || r.pickupTime || '--:--';
-      const originStr = r.origin || r.origen || r.pickupAddress || 'Origen';
-      const destStr = r.destination || r.destino || r.dropoffAddress || 'Destino';
-      const stopStr = r.stop || r.parada || r.stopAddress || null;
-      const rawFare = r.totalFare || r.precio || r.precioEstimado || r.monto || 0;
-      const fareNum = Number(rawFare) || 0;
-      const tollFare = Number(r.tollFare || r.peajes || 0);
-      const tripFareOnly = Math.max(0, fareNum - tollFare);
+    reservationsListContainer.innerHTML = list.map(res => {
+      const rawPrice = res.precioEstimado || res.precio || res.totalFare || res.monto || 0;
+      const tollCost = Number(res.tollCost || res.tollFare || res.peajes || 0);
+      const tripFareOnly = Math.max(0, Number(rawPrice) - tollCost);
+      const isCancelled = res.estado === 'cancelada';
+      const isCompleted = res.estado === 'completada';
+      const isAccepted = res.estado === 'aceptada' || res.estado === 'tomada' || !!res.conductor;
 
-      const status = String(r.status || r.estado || 'Pendiente').toLowerCase();
-      const isAssigned = (status === 'aceptada' || status === 'en_curso' || !!r.driverAssigned);
-      const driverName = r.driverAssigned || (r.conductor && r.conductor.nombre) || 'Por asignar por la flota';
-      const driverCar = r.driverCar || (r.conductor && r.conductor.auto) || 'Sedán Ejecutivo';
-      const driverPlate = r.driverPlate || (r.conductor && r.conductor.patente) || '';
+      let statusBadge = `<span style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">🟡 Pendiente de asignación</span>`;
+      if (isCancelled) {
+        statusBadge = `<span style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">🔴 Cancelada</span>`;
+      } else if (isCompleted) {
+        statusBadge = `<span style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">✅ Viaje Completado</span>`;
+      } else if (isAccepted) {
+        const driverName = (res.conductor && res.conductor.nombre) ? res.conductor.nombre : 'Daniel Pabon';
+        statusBadge = `<span style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">🟢 Chofer Asignado: ${driverName}</span>`;
+      }
 
       return `
-        <div class="passenger-reserva-card" data-id="${r.id}">
-          <div class="p-res-header">
-            <div class="p-res-datetime">
-              <span class="p-res-date-pill">📅 ${dateStr}</span>
-              <span class="p-res-time-bold">⏰ ${timeStr} hs</span>
+        <div class="passenger-reserva-card" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.88rem; font-weight: 800; color: #fff;">📅 ${res.fecha || '--'} · 🕒 ${res.hora || '--'} hs</span>
             </div>
-            <span class="p-res-status-tag ${isAssigned ? 'asignada' : 'programada'}">
-              ${isAssigned ? '✓ Chofer Asignado' : '⏳ Solicitada'}
-            </span>
+            ${statusBadge}
           </div>
 
-          <div class="p-res-route">
-            <div class="p-res-point">
-              <span style="color: #10b981;">🟢</span>
-              <div>
-                <small style="font-size: 0.72rem; color: #94a3b8; display: block;">ORIGEN</small>
-                <strong>${escapeHtml(originStr)}</strong>
-              </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem;">
+            <div style="display: flex; gap: 8px; color: #e2e8f0;">
+              <span style="color: #34d399;">🟢</span>
+              <span style="font-weight: 600;">${res.origen || 'Origen'}</span>
             </div>
-            ${stopStr ? `
-              <div class="p-res-point">
-                <span style="color: #f59e0b;">🛑</span>
-                <div>
-                  <small style="font-size: 0.72rem; color: #f59e0b; display: block;">PARADA INTERMEDIA</small>
-                  <strong style="color: #fef08a;">${escapeHtml(stopStr)}</strong>
-                </div>
-              </div>
-            ` : ''}
-            <div class="p-res-point">
+            ${res.parada ? `
+            <div style="display: flex; gap: 8px; color: #fbbf24;">
+              <span>🛑</span>
+              <span>${res.parada}</span>
+            </div>` : ''}
+            <div style="display: flex; gap: 8px; color: #e2e8f0;">
               <span style="color: #38bdf8;">🏁</span>
-              <div>
-                <small style="font-size: 0.72rem; color: #94a3b8; display: block;">DESTINO</small>
-                <strong>${escapeHtml(destStr)}</strong>
+              <span style="font-weight: 600;">${res.destino || 'Destino'}</span>
+            </div>
+          </div>
+
+          <!-- Desglose de tarifa y peajes -->
+          <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem;">
+            <div>
+              <span style="color: #94a3b8;">Total: </span>
+              <strong style="color: #fbbf24; font-size: 0.95rem;">$${Number(rawPrice).toLocaleString('es-AR')}</strong>
+              <div style="font-size: 0.72rem; color: #cbd5e1; margin-top: 2px;">
+                <span>Viaje: $${tripFareOnly.toLocaleString('es-AR')}</span>
+                ${tollCost > 0 ? `<span style="color: #fbbf24; margin-left: 6px;">+ Peaje: $${tollCost.toLocaleString('es-AR')}</span>` : '<span style="color: #94a3b8; margin-left: 6px;">(Sin peaje)</span>'}
               </div>
             </div>
+            <span style="color: #94a3b8; font-size: 0.75rem;">${res.categoria || 'Sedán Ejecutivo'}</span>
           </div>
 
-          <div class="p-res-fare-row">
-            <div>
-              <span style="color: #94a3b8;">Tarifa Total: </span>
-              <strong style="color: #fbbf24; font-size: 0.95rem;">$${fareNum.toLocaleString('es-AR')}</strong>
-            </div>
-            <div style="font-size: 0.75rem; color: #94a3b8;">
-              ${tollFare > 0 ? `🚗 $${tripFareOnly.toLocaleString('es-AR')} + 🛣️ $${tollFare.toLocaleString('es-AR')} peajes` : `(Sin peajes)`}
-            </div>
-          </div>
-
-          <div class="p-res-driver-info">
-            <span style="font-size: 1.1rem;">🚘</span>
-            <div>
-              <span style="font-weight: 700; color: #fff;">${escapeHtml(driverName)}</span>
-              <span style="display: block; font-size: 0.72rem; color: #94a3b8;">${escapeHtml(driverCar)} ${driverPlate ? '· ' + driverPlate : ''}</span>
-            </div>
-          </div>
+          ${!isCancelled && !isCompleted ? `
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
+            <a href="https://wa.me/5491173738790?text=${encodeURIComponent(`Hola RutaPrivada, consulta por mi reserva para el ${res.fecha} a las ${res.hora} hs (Origen: ${res.origen})`)}" target="_blank" style="background: rgba(37, 211, 102, 0.15); border: 1px solid rgba(37, 211, 102, 0.4); color: #25d366; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 6px;">
+              💬 WhatsApp
+            </a>
+            <button type="button" class="btn-cancel-passenger-res" data-id="${res.id}" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">
+              ✕ Cancelar
+            </button>
+          </div>` : ''}
         </div>
       `;
     }).join('');
-  }
 
-  function initPassengerReservationsModule() {
-    const btnOpen = document.getElementById('btnHeaderOpenReservations');
-    const modal = document.getElementById('passengerReservationsModal');
-    const btnClose = document.getElementById('btnClosePassengerReservations');
-
-    function openResModal() {
-      if (modal) {
-        modal.classList.remove('hidden');
-        renderPassengerReservationsList();
-      }
-    }
-
-    function closeResModal() {
-      if (modal) modal.classList.add('hidden');
-    }
-
-    if (btnOpen) btnOpen.addEventListener('click', openResModal);
-    if (btnClose) btnClose.addEventListener('click', closeResModal);
-    if (modal) {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeResModal();
+    reservationsListContainer.querySelectorAll('.btn-cancel-passenger-res').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        cancelPassengerReservation(id);
       });
-    }
-
-    renderPassengerReservationsList();
+    });
   }
 
-  function restorePassengerActiveTripOnLoad() {
-    let trip = null;
-    if (window.RutaSync) {
-      trip = window.RutaSync.obtenerViajeActivo();
-    }
-    if (!trip) {
-      try {
-        const raw = localStorage.getItem('rutaprivada_passenger_active_trip') || localStorage.getItem('rutaprivada_viaje_activo');
-        if (raw) trip = JSON.parse(raw);
-      } catch(e){}
-    }
+  function cancelPassengerReservation(resId) {
+    if (!confirm('¿Estás seguro de que deseas cancelar esta reserva programada?')) return;
+    let list = loadPassengerReservations();
+    const item = list.find(r => r.id === resId);
+    if (item) {
+      item.estado = 'cancelada';
+      savePassengerReservations(list);
 
-    if (trip && trip.estado && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_sistema', 'cancelado_por_conductor'].includes(trip.estado)) {
-      pActiveTripData = trip;
-      updatePassengerActiveTripBanner(trip);
-
-      if (['buscando_conductor', 'solicitado'].includes(trip.estado)) {
-        startPassengerSearchTimeout(trip);
-        startPassengerRealtimePoll(trip.id);
-      } else {
-        handlePassengerDriverAssigned(trip, false);
-      }
-    }
-
-    // Escuchar eventos globales de sync en window
-    window.addEventListener('rutaprivada:trip_updated', (e) => {
-      if (e.detail) {
-        updatePassengerActiveTripBanner(e.detail);
-        if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(e.detail.estado)) {
-          handlePassengerDriverAssigned(e.detail, true);
-        }
+      if (window.RutaSync) {
+        window.RutaSync.actualizarReservaLocal(resId, { estado: 'cancelada' });
+        window.RutaSync.emit('RESERVA_LIBERADA', { id: resId, estado: 'cancelada' });
       }
       renderPassengerReservationsList();
-    });
+      showToast('❌ Reserva cancelada correctamente.');
+    }
+  }
 
-    window.addEventListener('rutaprivada:driver_assigned', (e) => {
-      if (e.detail) {
-        handlePassengerDriverAssigned(e.detail, true);
-      }
+  if (btnOpenReservations) btnOpenReservations.addEventListener('click', openPassengerReservationsModal);
+  if (btnCloseReservations) btnCloseReservations.addEventListener('click', closePassengerReservationsModal);
+  if (modalReservations) {
+    modalReservations.addEventListener('click', (e) => {
+      if (e.target === modalReservations) closePassengerReservationsModal();
     });
+  }
 
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'rutaprivada_viaje_activo' || e.key === 'rutaprivada_passenger_active_trip') {
-        if (e.newValue) {
-          try {
-            const parsed = JSON.parse(e.newValue);
-            if (parsed && parsed.estado) {
-              updatePassengerActiveTripBanner(parsed);
-              if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(parsed.estado)) {
-                handlePassengerDriverAssigned(parsed, true);
-              }
-            }
-          } catch(err){}
+  // Eventos de acceso rápido al viaje en curso
+  const btnGoToActive = document.getElementById('btnGoToActiveTrip');
+  const bannerContent = document.getElementById('passengerActiveBannerContent');
+  function handleOpenActiveTripModal() {
+    const active = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+    if (active && active.id) {
+      openInAppTripModal(active);
+    }
+  }
+  if (btnGoToActive) btnGoToActive.addEventListener('click', handleOpenActiveTripModal);
+  if (bannerContent) bannerContent.addEventListener('click', handleOpenActiveTripModal);
+
+  function showPassengerCompletionModal(viaje) {
+    const banner = document.getElementById('passengerActiveTripBanner');
+    if (banner) banner.classList.add('hidden');
+    alert(`🎉 ¡TRASLADO COMPLETADO CON ÉXITO!\n\nEsperamos que hayas tenido un excelente viaje con RutaPrivada.\n\nTotal abonado: $${Number(viaje.precio || viaje.precioEstimado || 0).toLocaleString('es-AR')}\n\n¡Gracias por elegir nuestro servicio ejecutivo!`);
+  }
+  window.showPassengerCompletionModal = showPassengerCompletionModal;
+
+  function checkAndRestoreActiveTripOnStartup() {
+    try {
+      updatePassengerReservationsBadge();
+      const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+      if (activeTrip && activeTrip.id && !['completado', 'cancelado', 'cancelado_por_pasajero', 'cancelado_por_conductor', 'cancelado_por_sistema'].includes(activeTrip.estado)) {
+        const tripAge = Date.now() - (activeTrip.creadoEn || activeTrip.timestamp || Date.now());
+        if (tripAge < 3 * 3600 * 1000) { // Menor a 3 horas
+          updatePassengerActiveTripBanner(activeTrip);
+          if (activeTrip.estado === 'buscando_conductor' || activeTrip.estado === 'solicitado') {
+            startPassengerSearchTimeout(activeTrip);
+            startPassengerRealtimePoll(activeTrip.id);
+          } else {
+            handlePassengerDriverAssigned(activeTrip, false);
+            startPassengerRealtimePoll(activeTrip.id);
+          }
         } else {
-          updatePassengerActiveTripBanner(null);
+          if (window.RutaSync) window.RutaSync.limpiarViajeActivo();
         }
       }
-      if (e.key === 'rutaprivada_bookings_v1' || e.key === 'rutaprivada_passenger_history') {
-        renderPassengerReservationsList();
-      }
-    });
+    } catch(e) {}
   }
 
   // Inicializar al cargar
-  const bootPassengerApp = () => {
-    initPassengerProfileModule();
-    initPassengerReservationsModule();
-    restorePassengerActiveTripOnLoad();
-  };
-
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bootPassengerApp);
+    document.addEventListener('DOMContentLoaded', () => {
+      initPassengerProfileModule();
+      checkAndRestoreActiveTripOnStartup();
+    });
   } else {
-    bootPassengerApp();
+    initPassengerProfileModule();
+    checkAndRestoreActiveTripOnStartup();
   }
+});
+
 
 
 

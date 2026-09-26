@@ -981,73 +981,81 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Helper para agrupar reservas por fecha de manera ordenada
-        const groupsByDate = {};
-        filtered.forEach(b => {
-            const rawDate = b.date || b.pickupDate || 'Hoy';
-            if (!groupsByDate[rawDate]) groupsByDate[rawDate] = [];
-            groupsByDate[rawDate].push(b);
+        // Ordenar reservas por fecha y hora ascendente
+        const sortedReservas = [...filtered].sort((a, b) => {
+            const dateA = a.date || a.pickupDate || '9999-99-99';
+            const dateB = b.date || b.pickupDate || '9999-99-99';
+            const timeA = a.time || a.pickupTime || '00:00';
+            const timeB = b.time || b.pickupTime || '00:00';
+            return `${dateA} ${timeA}`.localeCompare(`${dateB} ${timeB}`);
         });
 
-        const sortedDates = Object.keys(groupsByDate).sort((a, b) => {
-            if (a === 'Hoy') return -1;
-            if (b === 'Hoy') return 1;
-            return a.localeCompare(b);
+        // Agrupar reservas por día
+        const groupedByDay = {};
+        sortedReservas.forEach(b => {
+            const dateKey = b.date || b.pickupDate || 'Sin Fecha';
+            if (!groupedByDay[dateKey]) groupedByDay[dateKey] = [];
+            groupedByDay[dateKey].push(b);
         });
 
-        function formatDayHeading(dateString) {
-            if (dateString === 'Hoy') return 'Hoy';
-            try {
-                const parts = dateString.split('-');
-                if (parts.length === 3) {
-                    const year = parseInt(parts[0], 10);
-                    const month = parseInt(parts[1], 10) - 1;
-                    const day = parseInt(parts[2], 10);
-                    const d = new Date(year, month, day);
-                    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-                    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-                    return `${days[d.getDay()]} ${day} de ${months[month]}`;
-                }
-            } catch(e) {}
-            return dateString;
+        const todayDateStr = new Date().toISOString().split('T')[0];
+        const tomorrowObj = new Date();
+        tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+        const tomorrowDateStr = tomorrowObj.toISOString().split('T')[0];
+
+        function getDayHeaderLabel(dKey) {
+            if (!dKey || dKey === 'Sin Fecha') return '📅 Fechas Especiales';
+            const parts = dKey.split('-');
+            let dayName = '';
+            let formattedDate = dKey;
+            if (parts.length === 3) {
+                const dateObj = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                dayName = days[dateObj.getDay()];
+                formattedDate = `${String(parts[2]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')}/${parts[0]}`;
+            }
+            if (dKey === todayDateStr) {
+                return `📅 HOY · ${dayName} ${formattedDate}`;
+            } else if (dKey === tomorrowDateStr) {
+                return `📅 MAÑANA · ${dayName} ${formattedDate}`;
+            }
+            return `📅 ${dayName} ${formattedDate}`;
         }
 
-        let htmlBuffer = '';
-        sortedDates.forEach(dateKey => {
-            const listForDay = groupsByDate[dateKey];
-            const dayTitle = formatDayHeading(dateKey);
-            const countStr = listForDay.length === 1 ? '1 reserva' : `${listForDay.length} reservas`;
+        let htmlContent = '';
+        Object.keys(groupedByDay).forEach(dayKey => {
+            const dayItems = groupedByDay[dayKey];
+            const headerLabel = getDayHeaderLabel(dayKey);
 
-            htmlBuffer += `
-                <div class="reservation-day-separator">
-                    <div class="day-sep-pill">
-                        <i class="fa-solid fa-calendar-day"></i>
-                        <span>${dayTitle}</span>
-                        <span class="day-count-tag">(${countStr})</span>
+            htmlContent += `
+                <div class="reserva-day-section" style="margin-bottom: 20px;">
+                    <div class="reserva-day-divider" style="display: flex; align-items: center; justify-content: space-between; background: linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(15, 23, 42, 0.6) 100%); border-left: 4px solid #f59e0b; padding: 8px 14px; border-radius: 8px; margin: 16px 0 12px;">
+                        <span style="font-weight: 800; font-size: 0.88rem; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px;">${headerLabel}</span>
+                        <span style="background: rgba(245, 158, 11, 0.2); color: #fef08a; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 6px;">${dayItems.length} ${dayItems.length === 1 ? 'reserva' : 'reservas'}</span>
                     </div>
-                </div>
             `;
 
-            listForDay.forEach(b => {
+            dayItems.forEach(b => {
                 const status = String(b.status || b.estado || '').toLowerCase();
                 const isTomada = status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre;
                 const clientName = b.clientName || b.customerName || b.nombrePasajero || 'Cliente Ejecutivo';
                 const pickupAddr = b.pickupAddress || b.origin || b.origen || 'Punto de recogida';
                 const dropoffAddr = b.dropoffAddress || b.destination || b.destino || 'Destino';
                 const rawPhone = (b.clientPhone || b.customerPhone || b.telefono || '5491100000000').replace(/[^0-9]/g, '');
+                
                 const rawPrice = b.price || b.totalFare || b.monto || b.precioEstimado;
                 const priceVal = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
                     ? Number(rawPrice)
                     : 35000;
-                
-                const tollVal = Number(b.tollFare || b.peajes || b.tolls || 0);
-                const tripOnlyVal = Math.max(0, priceVal - tollVal);
+
+                const tollCost = Number(b.tollCost || b.peajes || b.tollFare || 0);
+                const tripFareOnly = Math.max(0, priceVal - tollCost);
 
                 const dateStr = b.date || b.pickupDate || 'Hoy';
                 const timeStr = b.time || b.pickupTime || '00:00';
                 const paymentStr = b.paymentMethod || b.metodoPago || 'Efectivo / Transferencia';
 
-                htmlBuffer += `
+                htmlContent += `
                     <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''}">
                         <div class="reserva-header-row">
                             <div class="reserva-datetime">
@@ -1082,21 +1090,17 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="m-val">${clientName}</span>
                             </div>
                             <div class="reserva-meta-item">
-                                <span class="m-title">Tarifa Total</span>
+                                <span class="m-title">Total a Cobrar</span>
                                 <span class="m-val text-gold">$${priceVal.toLocaleString('es-AR')}</span>
+                                <span style="font-size: 0.68rem; color: #94a3b8; display: block; margin-top: 2px;">
+                                    ${tollCost > 0 ? `($${tripFareOnly.toLocaleString('es-AR')} viaje + $${tollCost.toLocaleString('es-AR')} peaje)` : `($${tripFareOnly.toLocaleString('es-AR')} viaje · sin peaje)`}
+                                </span>
                             </div>
                             <div class="reserva-meta-item">
                                 <span class="m-title">Pago</span>
                                 <span class="m-val">${paymentStr}</span>
                             </div>
                         </div>
-
-                        ${tollVal > 0 ? `
-                            <div class="fare-split-chips" style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px;">
-                                <span class="fs-chip trip">🚗 Viaje: $${tripOnlyVal.toLocaleString('es-AR')}</span>
-                                <span class="fs-chip tolls">🛣️ Peajes: $${tollVal.toLocaleString('es-AR')}</span>
-                            </div>
-                        ` : ''}
 
                         ${b.notes ? `
                             <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(255,255,255,0.03); padding: 8px 10px; border-radius: 8px; margin-bottom: 12px;">
@@ -1130,9 +1134,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
             });
+
+            htmlContent += `</div>`;
         });
 
-        reservasContainer.innerHTML = htmlBuffer;
+        reservasContainer.innerHTML = htmlContent;
 
         // Listeners para botones Aceptar Reserva
         document.querySelectorAll('.btn-aceptar-reserva-action').forEach(btn => {
@@ -1558,7 +1564,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 driverState.onlineTimer = null;
             }
         }
-        updateDriverFloatingBubble();
     }
 
     const driverOnlineQuickWidget = document.getElementById('driverOnlineQuickWidget');
@@ -1830,28 +1835,32 @@ document.addEventListener('DOMContentLoaded', () => {
         incomingDistance.textContent = tripData.distancia || '15 km';
         incomingDuration.textContent = tripData.duracion || '25 min';
 
-        // Cálculo de tarifa desglosada y valor por km (Estilo Cabify)
-        const tollCost = Number(tripData.tollFare || tripData.peajes || tripData.tolls || 0);
-        const tripFareOnly = Math.max(0, tripPrice - tollCost);
-        const rawDistStr = String(tripData.distancia || tripData.distanceKm || '10');
-        const distKm = parseFloat(rawDistStr.replace(/[^0-9.]/g, '')) || 10;
-        const ratePerKm = Math.round(tripFareOnly / (distKm > 0 ? distKm : 1));
-
-        const incomingRatePerKm = document.getElementById('incomingRatePerKm');
-        const incomingTripFareOnly = document.getElementById('incomingTripFareOnly');
-        const incomingTollsFare = document.getElementById('incomingTollsFare');
-        if (incomingRatePerKm) incomingRatePerKm.textContent = `↑ $${ratePerKm.toLocaleString('es-AR')}/km`;
-        if (incomingTripFareOnly) incomingTripFareOnly.textContent = `🚗 Viaje: $${tripFareOnly.toLocaleString('es-AR')}`;
-        if (incomingTollsFare) incomingTollsFare.textContent = `🛣️ Peajes: $${tollCost.toLocaleString('es-AR')}`;
-
-        // Datos del pasajero
-        const incomingPassengerName = document.getElementById('incomingPassengerName');
-        const incomingPassengerRating = document.getElementById('incomingPassengerRating');
-        if (incomingPassengerName) {
-            incomingPassengerName.textContent = tripData.nombrePasajero || tripData.clientName || tripData.customerName || 'Pasajero';
+        // Desglose de Tarifa de Viaje vs Peajes
+        const tollAmount = Number(tripData.tollCost || tripData.tollPrice || tripData.peajes || (tripData.breakdown && tripData.breakdown.tollCost) || 0);
+        const tripFareOnly = Math.max(0, tripPrice - tollAmount);
+        const incomingTripFareOnlyEl = document.getElementById('incomingTripFareOnly');
+        const incomingTollFareOnlyEl = document.getElementById('incomingTollFareOnly');
+        if (incomingTripFareOnlyEl) {
+            incomingTripFareOnlyEl.innerHTML = `<i class="fa-solid fa-car text-emerald"></i> Viaje: $${tripFareOnly.toLocaleString('es-AR')}`;
         }
-        if (incomingPassengerRating) {
-            incomingPassengerRating.textContent = tripData.rating || '4.98';
+        if (incomingTollFareOnlyEl) {
+            if (tollAmount > 0) {
+                incomingTollFareOnlyEl.innerHTML = `<i class="fa-solid fa-road"></i> Peaje: +$${tollAmount.toLocaleString('es-AR')}`;
+                incomingTollFareOnlyEl.style.display = 'inline-flex';
+            } else {
+                incomingTollFareOnlyEl.innerHTML = `<i class="fa-solid fa-road"></i> Sin peaje`;
+                incomingTollFareOnlyEl.style.display = 'inline-flex';
+            }
+        }
+
+        // Datos del Pasajero
+        const incomingPassengerNameEl = document.getElementById('incomingPassengerName');
+        const incomingPassengerRatingEl = document.getElementById('incomingPassengerRating');
+        if (incomingPassengerNameEl) {
+            incomingPassengerNameEl.textContent = tripData.pasajero || tripData.passengerName || tripData.cliente || tripData.nombrePasajero || 'Pasajero';
+        }
+        if (incomingPassengerRatingEl) {
+            incomingPassengerRatingEl.textContent = tripData.passengerRating || tripData.calificacionPasajero || '4.95';
         }
 
         // Parada intermedia si existe
@@ -4265,138 +4274,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
 
-    // ==========================================
-    // 12. BURBUJA FLOTANTE SUPERPUESTA ("APARECER ENCIMA" / CABIFY STYLE OVERLAY)
-    // ==========================================
-    function updateDriverFloatingBubble() {
-        const bubble = document.getElementById('driverFloatingBubbleOverlay');
-        if (!bubble) return;
-
-        const isOnline = !!driverState.isOnline;
-        const hasActiveTrip = !!driverState.activeTrip;
-        const hasIncoming = !!driverState.incomingTrip;
-
-        // El widget flotante de acceso rápido está activo si el chofer está en línea o con viaje
-        if (isOnline || hasActiveTrip) {
-            bubble.classList.add('visible');
-        } else {
-            bubble.classList.remove('visible');
-        }
-
-        const badge = document.getElementById('bubbleActiveTripBadge');
-        if (badge) {
-            if (hasActiveTrip) {
-                badge.textContent = '● En viaje';
-                badge.style.display = 'block';
-                badge.style.background = '#10b981';
-            } else if (hasIncoming) {
-                badge.textContent = '¡Viaje!';
-                badge.style.display = 'block';
-                badge.style.background = '#ef4444';
-            } else {
-                badge.style.display = 'none';
-            }
-        }
-
-        const dot = document.getElementById('bubbleOnlineIndicator');
-        if (dot) {
-            dot.style.background = isOnline ? '#10b981' : '#64748b';
-        }
-    }
-
-    function initDriverFloatingBubble() {
-        const bubble = document.getElementById('driverFloatingBubbleOverlay');
-        if (!bubble) return;
-
-        let isDragging = false;
-        let startX = 0, startY = 0;
-        let initialLeft = 0, initialTop = 0;
-        let hasMoved = false;
-
-        function onPointerDown(e) {
-            isDragging = true;
-            hasMoved = false;
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            startX = clientX;
-            startY = clientY;
-
-            const rect = bubble.getBoundingClientRect();
-            initialLeft = rect.left;
-            initialTop = rect.top;
-
-            bubble.style.transition = 'none';
-        }
-
-        function onPointerMove(e) {
-            if (!isDragging) return;
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            const deltaX = clientX - startX;
-            const deltaY = clientY - startY;
-
-            if (Math.abs(deltaX) > 6 || Math.abs(deltaY) > 6) {
-                hasMoved = true;
-            }
-
-            let newLeft = initialLeft + deltaX;
-            let newTop = initialTop + deltaY;
-
-            const maxLeft = window.innerWidth - bubble.offsetWidth - 10;
-            const maxTop = window.innerHeight - bubble.offsetHeight - 10;
-
-            newLeft = Math.max(10, Math.min(newLeft, maxLeft));
-            newTop = Math.max(10, Math.min(newTop, maxTop));
-
-            bubble.style.left = `${newLeft}px`;
-            bubble.style.top = `${newTop}px`;
-            bubble.style.right = 'auto';
-            bubble.style.bottom = 'auto';
-        }
-
-        function onPointerUp() {
-            if (!isDragging) return;
-            isDragging = false;
-            bubble.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
-
-            if (hasMoved) {
-                const rect = bubble.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                if (centerX < window.innerWidth / 2) {
-                    bubble.style.left = '16px';
-                } else {
-                    bubble.style.left = `${window.innerWidth - bubble.offsetWidth - 16}px`;
-                }
-            } else {
-                switchTab('viewLive');
-                try { window.focus(); } catch(e){}
-                showDriverToast('🚗 Acceso Rápido Chofer RutaPrivada');
-                if (driverState.activeTrip) {
-                    stateActiveTrip.classList.add('active');
-                    stateSearching.classList.remove('active');
-                    stateOffline.classList.remove('active');
-                }
-            }
-        }
-
-        bubble.addEventListener('touchstart', onPointerDown, { passive: true });
-        window.addEventListener('touchmove', onPointerMove, { passive: true });
-        window.addEventListener('touchend', onPointerUp);
-
-        bubble.addEventListener('mousedown', onPointerDown);
-        window.addEventListener('mousemove', onPointerMove);
-        window.addEventListener('mouseup', onPointerUp);
-
-        updateDriverFloatingBubble();
-    }
-
     // Limpieza de datos de prueba y arranque
     purgeTestBookings();
     renderDriverProfileInfo();
     loadSavedStats();
     initFirebaseConductor();
     renderReservas();
-    initDriverFloatingBubble();
 
     // 1. Iniciar estado online base
     try {

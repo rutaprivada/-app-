@@ -57,20 +57,18 @@ class RutaSyncManager {
                         .onSnapshot((doc) => {
                             if (doc.exists) {
                                 const data = doc.data();
-                                if (data) {
+                                if (data && data.senderId !== this.deviceId) {
                                     if (data.estado === 'buscando_conductor' || data.estado === 'solicitado') {
-                                        if (data.senderId !== this.deviceId) {
-                                            this.handleIncoming({
-                                                id: 'fs_' + (data.id || Date.now()) + '_' + (data.timestamp || Date.now()),
-                                                type: 'NUEVO_VIAJE_SOLICITADO',
-                                                payload: data,
-                                                senderId: data.senderId,
-                                                timestamp: data.timestamp || Date.now()
-                                            });
-                                        }
+                                        this.handleIncoming({
+                                            id: 'fs_' + (data.id || Date.now()),
+                                            type: 'NUEVO_VIAJE_SOLICITADO',
+                                            payload: data,
+                                            senderId: data.senderId,
+                                            timestamp: data.timestamp || Date.now()
+                                        });
                                     } else if (data.estado === 'aceptado' || data.estado === 'en_camino') {
                                         this.handleIncoming({
-                                            id: 'fs_acc_' + (data.id || Date.now()) + '_' + (data.ultimoEstadoEn || data.aceptadoEn || Date.now()),
+                                            id: 'fs_acc_' + (data.id || Date.now()) + '_' + (data.ultimoEstadoEn || Date.now()),
                                             type: 'VIAJE_ACEPTADO',
                                             payload: data,
                                             senderId: data.senderId,
@@ -103,10 +101,8 @@ class RutaSyncManager {
                         .onSnapshot((doc) => {
                             if (doc.exists) {
                                 const msg = doc.data();
-                                if (msg && msg.type) {
-                                    if (msg.senderId !== this.deviceId || msg.type === 'VIAJE_ACEPTADO' || msg.type === 'ESTADO_VIAJE_CAMBIADO') {
-                                        this.handleIncoming(msg);
-                                    }
+                                if (msg && msg.senderId !== this.deviceId && msg.type) {
+                                    this.handleIncoming(msg);
                                 }
                             }
                         }, (err) => {
@@ -361,14 +357,6 @@ class RutaSyncManager {
         if (message.type === 'NUEVO_VIAJE_SOLICITADO' || message.type === 'VIAJE_ACEPTADO' || message.type === 'ESTADO_VIAJE_CAMBIADO') {
             if (message.payload) {
                 this.guardarViajeActivo(message.payload);
-
-                // Disparar custom events para reactividad 0ms en todas las vistas
-                try {
-                    window.dispatchEvent(new CustomEvent('rutaprivada:trip_updated', { detail: message.payload }));
-                    if (message.type === 'VIAJE_ACEPTADO' || message.payload.estado === 'aceptado' || message.payload.estado === 'en_camino') {
-                        window.dispatchEvent(new CustomEvent('rutaprivada:driver_assigned', { detail: message.payload }));
-                    }
-                } catch(e) {}
 
                 // Si el viaje fue completado, registrarlo automáticamente en el historial de Partners / Agenda
                 if (message.payload.estado === 'completado') {
