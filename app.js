@@ -6307,6 +6307,8 @@ document.querySelectorAll('.chat-quick-replies .quick-chip-btn').forEach(btn => 
 // Sincronización en tiempo real de eventos
 if (window.RutaSync) {
   window.RutaSync.on('VIAJE_ACEPTADO', (viaje) => {
+    if (!viaje) return;
+    openInAppTripModal(viaje);
     handlePassengerDriverAssigned(viaje, true);
   });
 
@@ -6342,11 +6344,10 @@ if (window.RutaSync) {
       }
     }
 
-    // Si el viaje está asignado o en camino pero el panel de búsqueda seguía visible, actualizar
+    // Si el viaje está asignado o en camino, actualizar siempre
     if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(viaje.estado)) {
-      if (pStateSearching && !pStateSearching.classList.contains('hidden')) {
-        handlePassengerDriverAssigned(viaje, false);
-      }
+      openInAppTripModal(viaje);
+      handlePassengerDriverAssigned(viaje, false);
     }
 
     // Actualizar datos de ruta y precio en vivo en caso de modificación

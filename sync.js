@@ -130,6 +130,32 @@ class RutaSyncManager {
                         }, (err) => {
                             console.warn('Firestore drivers collection listener warning:', err);
                         });
+
+                    // Escuchar colección de reservas 'bookings' en tiempo real (Multi-dispositivo Pasajero <-> Chofer)
+                    this.firestore.collection('bookings')
+                        .onSnapshot((snapshot) => {
+                            snapshot.docChanges().forEach((change) => {
+                                const data = change.doc.data();
+                                if (data) {
+                                    data.id = data.id || change.doc.id;
+                                    if (data.senderId !== this.deviceId) {
+                                        this.guardarReservaEnAgenda(data);
+                                        const eventType = data.estado === 'aceptada' ? 'RESERVA_ACEPTADA' : 
+                                                         (data.estado === 'cancelada' ? 'RESERVA_LIBERADA' : 
+                                                         (data.estado === 'completada' ? 'RESERVA_COMPLETADA' : 'RESERVA_CREADA'));
+                                        this.handleIncoming({
+                                            id: 'fs_bk_' + data.id + '_' + (data.timestamp || Date.now()) + '_' + change.type,
+                                            type: eventType,
+                                            payload: data,
+                                            senderId: data.senderId,
+                                            timestamp: Date.now()
+                                        });
+                                    }
+                                }
+                            });
+                        }, (err) => {
+                            console.warn('Firestore bookings collection listener warning:', err);
+                        });
                 } catch (err) {
                     console.warn('Firebase init error in sync.js:', err);
                 }
@@ -297,6 +323,19 @@ class RutaSyncManager {
                         senderId: this.deviceId,
                         timestamp: now
                     }).catch(() => {});
+                } else if (type === 'RESERVA_CREADA' && payload && payload.id) {
+                    this.firestore.collection('bookings').doc(String(payload.id)).set({
+                        ...payload,
+                        senderId: this.deviceId,
+                        timestamp: now
+                    }).catch(() => {});
+                } else if ((type === 'RESERVA_ACEPTADA' || type === 'RESERVA_LIBERADA' || type === 'RESERVA_COMPLETADA') && payload && (payload.reservaId || payload.id)) {
+                    const bkId = String(payload.reservaId || payload.id);
+                    this.firestore.collection('bookings').doc(bkId).set({
+                        ...payload,
+                        senderId: this.deviceId,
+                        timestamp: now
+                    }, { merge: true }).catch(() => {});
                 }
             } catch (e) {}
         }
@@ -678,34 +717,30 @@ class RutaSyncManager {
         return viaje;
     }
 
-    aceptarViaje(viajeId, conductorData) {
-        let viaje = this.obtenerViajeActivo();
-        if (!viaje) {
-            viaje = { id: viajeId };
+    aceptarViaje(viajeOrId, conductorData) {
+        let viaje = this.obtenerViajeActivo() || {};
+        if (typeof viajeOrId === 'object' && viajeOrId !== null) {
+            viaje = { ...viaje, ...viajeOrId };
+        } else if (viajeOrId) {
+            viaje.id = viajeOrId;
         }
         viaje.estado = 'aceptado';
         viaje.conductor = conductorData;
         viaje.aceptadoEn = Date.now();
+        viaje.ultimoEstadoEn = Date.now();
         this.guardarViajeActivo(viaje);
         this.emit('VIAJE_ACEPTADO', viaje);
         return viaje;
     }
 
     actualizarEstadoViaje(nuevoEstado, metadata = {}) {
-        const viaje = this.obtenerViajeActivo();
-        if (viaje) {
-            viaje.estado = nuevoEstado;
-            viaje.ultimoEstadoEn = Date.now();
-            Object.assign(viaje, metadata);
-            this.guardarViajeActivo(viaje);
-            this.emit('ESTADO_VIAJE_CAMBIADO', viaje);
-            return viaje;
-        } else {
-            const tempViaje = { estado: nuevoEstado, ultimoEstadoEn: Date.now(), ...metadata };
-            this.guardarViajeActivo(tempViaje);
-            this.emit('ESTADO_VIAJE_CAMBIADO', tempViaje);
-            return tempViaje;
-        }
+        let viaje = this.obtenerViajeActivo() || {};
+        viaje.estado = nuevoEstado;
+        viaje.ultimoEstadoEn = Date.now();
+        Object.assign(viaje, metadata);
+        this.guardarViajeActivo(viaje);
+        this.emit('ESTADO_VIAJE_CAMBIADO', viaje);
+        return viaje;
     }
 
     guardarViajeActivo(viaje) {

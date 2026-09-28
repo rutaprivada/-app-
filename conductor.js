@@ -783,23 +783,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!b) return true;
         const id = String(b.id || '');
         const name = String(b.clientName || b.customerName || b.nombrePasajero || '');
-        const notes = String(b.notes || '');
-        const origin = String(b.pickupAddress || b.origin || b.origen || '');
-
-        if (id.includes('_1') || id.includes('_2') || id.startsWith('mock_') || id.startsWith('test_')) {
-            if (name.includes('Alejandro Morales') || name.includes('Carla V.') || name.includes('Daniel Test')) return true;
-        }
-        if (name.toLowerCase().includes('simulación') || name.toLowerCase().includes('simulacion') ||
-            name.toLowerCase().includes('prueba') || name.toLowerCase().includes('test') ||
-            name.toLowerCase().includes('alejandro morales') || name.toLowerCase().includes('carla v.')) {
-            return true;
-        }
-        if (notes.toLowerCase().includes('simulación') || notes.toLowerCase().includes('simulacion') ||
-            notes.toLowerCase().includes('prueba') || notes.toLowerCase().includes('test')) {
-            return true;
-        }
-        if (origin.toLowerCase().includes('prueba') || origin.toLowerCase().includes('test')) {
-            return true;
+        // Solo filtrar seeds prefabricados antiguos
+        if (id === '1' || id === '2' || id === 'mock_1' || id === 'mock_2') {
+            if (name.includes('Alejandro Morales') || name.includes('Carla V.')) return true;
         }
         return false;
     }
@@ -1359,17 +1345,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Escuchar colección 'bookings' en tiempo real
                 firestoreDb.collection('bookings')
-                    .orderBy('createdAt', 'desc')
-                    .limit(100)
                     .onSnapshot((snapshot) => {
                         const cloudBookings = [];
                         snapshot.forEach((doc) => {
                             const data = doc.data();
-                            data.id = doc.id;
-                            if (isTestBooking(data)) {
-                                firestoreDb.collection('bookings').doc(doc.id).delete().catch(() => {});
-                            } else {
-                                cloudBookings.push(data);
+                            if (data) {
+                                data.id = data.id || doc.id;
+                                if (!isTestBooking(data)) {
+                                    cloudBookings.push(data);
+                                }
                             }
                         });
 
@@ -2084,6 +2068,24 @@ document.addEventListener('DOMContentLoaded', () => {
         // Configurar contacto pasajero
         const telPasajero = (trip.telefono || trip.clientPhone || trip.customerPhone || '5491100000000').replace(/[^0-9]/g, '');
         btnCallPassenger.href = `tel:${telPasajero}`;
+
+        // Sincronizar con la app de Pasajero (Uber / Cabify style)
+        if (window.RutaSync) {
+            const conductorProfile = {
+                nombre: driverState.info.nombre || 'Daniel Pabon',
+                auto: driverState.info.auto || 'Fiat Cronos Negro',
+                patente: driverState.info.patente || 'AE927CN',
+                calificacion: driverState.info.calificacion || '4.98',
+                telefono: driverState.info.telefono || '+5491122558226',
+                fotoPerfil: driverState.info.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
+            };
+
+            window.RutaSync.aceptarViaje(driverState.activeTrip, conductorProfile);
+            window.RutaSync.actualizarEstadoViaje(driverState.activeTrip.etapa || 'en_camino', {
+                ...driverState.activeTrip,
+                conductor: conductorProfile
+            });
+        }
 
         updateTripStageUI();
         initDriverLiveMap(driverState.activeTrip);
