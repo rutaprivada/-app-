@@ -111,6 +111,45 @@ class RutaSyncManager {
                             console.warn('Firestore latest event listener warning:', err);
                         });
 
+                    // Escuchar colección completa 'live_trips' para multi-dispositivo garantizado
+                    this.firestore.collection('live_trips')
+                        .onSnapshot((snapshot) => {
+                            snapshot.docChanges().forEach((change) => {
+                                if (change.doc.id === 'latest_event' || change.doc.id === 'driver_location') return;
+                                const data = change.doc.data();
+                                if (data && data.senderId !== this.deviceId) {
+                                    data.id = data.id || change.doc.id;
+                                    if (data.estado === 'buscando_conductor' || data.estado === 'solicitado') {
+                                        this.handleIncoming({
+                                            id: 'fs_req_' + data.id + '_' + (data.ultimoEstadoEn || data.timestamp || Date.now()),
+                                            type: 'NUEVO_VIAJE_SOLICITADO',
+                                            payload: data,
+                                            senderId: data.senderId,
+                                            timestamp: data.timestamp || Date.now()
+                                        });
+                                    } else if (data.estado === 'aceptado' || data.estado === 'en_camino') {
+                                        this.handleIncoming({
+                                            id: 'fs_acc_' + data.id + '_' + (data.ultimoEstadoEn || Date.now()),
+                                            type: 'VIAJE_ACEPTADO',
+                                            payload: data,
+                                            senderId: data.senderId,
+                                            timestamp: data.timestamp || Date.now()
+                                        });
+                                    } else if (data.estado) {
+                                        this.handleIncoming({
+                                            id: 'fs_st_' + data.id + '_' + data.estado + '_' + (data.ultimoEstadoEn || Date.now()),
+                                            type: 'ESTADO_VIAJE_CAMBIADO',
+                                            payload: data,
+                                            senderId: data.senderId,
+                                            timestamp: data.timestamp || Date.now()
+                                        });
+                                    }
+                                }
+                            });
+                        }, (err) => {
+                            console.warn('Firestore live_trips collection listener warning:', err);
+                        });
+
                     // Escuchar colección de conductores y documentos para sync en tiempo real con Administración
                     this.firestore.collection('drivers')
                         .onSnapshot((snapshot) => {
@@ -311,12 +350,16 @@ class RutaSyncManager {
                 this.firestore.collection('live_trips').doc('latest_event').set(message).catch(() => {});
                 this.firestore.collection('fleet_events').doc(message.id).set(message).catch(() => {});
                 if (type === 'NUEVO_VIAJE_SOLICITADO' || type === 'VIAJE_ACEPTADO' || type === 'ESTADO_VIAJE_CAMBIADO') {
-                    this.firestore.collection('live_trips').doc('current_active_trip').set({
+                    const tripDocData = {
                         ...payload,
                         senderId: this.deviceId,
                         timestamp: now,
                         ultimoEstadoEn: now
-                    }).catch(() => {});
+                    };
+                    this.firestore.collection('live_trips').doc('current_active_trip').set(tripDocData).catch(() => {});
+                    if (payload && payload.id) {
+                        this.firestore.collection('live_trips').doc(String(payload.id)).set(tripDocData, { merge: true }).catch(() => {});
+                    }
                 } else if (type === 'UBICACION_CHOFER_ACTUALIZADA') {
                     this.firestore.collection('live_trips').doc('driver_location').set({
                         ...payload,
@@ -768,6 +811,30 @@ class RutaSyncManager {
         }
     }
 
+    guardarDocumentosConductor(driverData) {
+        try {
+            if (!driverData) return;
+            const dniClean = (driverData.dni || '').replace(/\D/g, '') || String(Date.now());
+            const docId = driverData.id || ('drv_' + dniClean);
+            const enriched = {
+                ...driverData,
+                id: docId,
+                actualizadoEn: Date.now()
+            };
+
+            if (this.firestore) {
+                this.firestore.collection('drivers').doc(docId).set(enriched, { merge: true }).catch(() => {});
+            }
+
+            try {
+                const currentDocs = JSON.parse(localStorage.getItem('rutaprivada_driver_docs_v1') || '{}');
+                if (currentDocs.dni === driverData.dni || !currentDocs.dni) {
+                    localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify({ ...currentDocs, ...enriched }));
+                }
+            } catch(e) {}
+        } catch(e) {}
+    }
+
     limpiarViajeActivo() {
         try {
             const activo = this.obtenerViajeActivo();
@@ -780,6 +847,9 @@ class RutaSyncManager {
             if (this.firestore) {
                 this.firestore.collection('live_trips').doc('current_active_trip').delete().catch(() => {});
                 this.firestore.collection('live_trips').doc('driver_location').delete().catch(() => {});
+                if (activo && activo.id) {
+                    this.firestore.collection('live_trips').doc(activo.id).delete().catch(() => {});
+                }
             }
         } catch (e) {}
     }

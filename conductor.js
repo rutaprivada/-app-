@@ -25,39 +25,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const defaultPhoto = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
 
-        try {
-            const raw = localStorage.getItem('rutaprivada_drivers_v1');
-            if (raw) {
-                const list = JSON.parse(raw);
-                if (Array.isArray(list) && list.length > 0) {
-                    const d = list[0];
-                    return {
-                        nombre: docs ? docs.nombre : (d.name || 'Daniel Pabon'),
-                        auto: docs ? `${docs.autoMarcaModelo} ${docs.color}` : (d.vehicle || 'Fiat Cronos Negro'),
-                        patente: docs ? docs.patente : (d.plate || 'AE927CN'),
-                        calificacion: 4.98,
-                        telefono: docs ? docs.telefono : (d.phone ? ('+54 9 ' + d.phone.replace(/^(\+?54\s?9?|\+)/, '')) : '+54 9 11 2255-8226'),
-                        fotoPerfil: (docs && docs.fotoPerfil) ? docs.fotoPerfil : defaultPhoto,
-                        categoria: docs ? docs.categoria : 'Sedán Ejecutivo / Premium'
-                    };
-                }
-            }
-        } catch(e) {}
+        if (docs && docs.nombre) {
+            return {
+                nombre: docs.nombre,
+                auto: `${docs.autoMarcaModelo || 'Vehículo'} ${docs.color ? '(' + docs.color + ')' : ''}`.trim(),
+                patente: docs.patente || 'S/P',
+                calificacion: 4.98,
+                telefono: docs.telefono || '',
+                fotoPerfil: docs.fotoPerfil || defaultPhoto,
+                categoria: docs.categoria || 'Sedán Ejecutivo / Premium',
+                estadoVerificacion: docs.estadoVerificacion || 'pendiente',
+                isRegistered: !!docs.isRegistered
+            };
+        }
 
         return {
-            nombre: docs ? docs.nombre : 'Daniel Pabon',
-            auto: docs ? `${docs.autoMarcaModelo} ${docs.color}` : 'Fiat Cronos Negro',
-            patente: docs ? docs.patente : 'AE927CN',
+            nombre: 'Conductor Partner',
+            auto: 'Vehículo Ejecutivo',
+            patente: 'S/P',
             calificacion: 4.98,
-            telefono: docs ? docs.telefono : '+54 9 11 2255-8226',
-            fotoPerfil: (docs && docs.fotoPerfil) ? docs.fotoPerfil : defaultPhoto,
-            categoria: docs ? docs.categoria : 'Sedán Ejecutivo / Premium'
+            telefono: '',
+            fotoPerfil: defaultPhoto,
+            categoria: 'Sedán Ejecutivo / Premium',
+            estadoVerificacion: 'pendiente',
+            isRegistered: false
         };
     }
 
     const currentFleetDriver = getFleetDriverInfo();
 
-    // ESTADO DEL CONDUCTOR (Online por defecto al ingresar a la app)
+    // ESTADO DEL CONDUCTOR (Online solo si está registrado y aprobado)
     const driverState = {
         isOnline: true,
         activeTrip: null,
@@ -1580,7 +1577,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 firestoreDb = firebase.firestore();
 
-                // Escuchar colección 'bookings' en tiempo real
+                // 1. Escuchar colección 'bookings' en tiempo real
                 firestoreDb.collection('bookings')
                     .onSnapshot((snapshot) => {
                         const cloudBookings = [];
@@ -1611,10 +1608,164 @@ document.addEventListener('DOMContentLoaded', () => {
                     }, (err) => {
                         console.warn('Firestore bookings listener error in conductor.js:', err);
                     });
+
+                // 2. Escuchar documento de viaje activo 'current_active_trip' directamente
+                firestoreDb.collection('live_trips').doc('current_active_trip')
+                    .onSnapshot((doc) => {
+                        if (doc.exists) {
+                            const trip = doc.data();
+                            if (trip && trip.id && (trip.estado === 'buscando_conductor' || trip.estado === 'solicitado')) {
+                                const tripAge = Date.now() - (trip.creadoEn || trip.timestamp || Date.now());
+                                if (tripAge < 10 * 60 * 1000 && !driverState.rejectedTrips.includes(trip.id)) {
+                                    if (driverState.isOnline && !driverState.activeTrip) {
+                                        enqueueIncomingTrip(trip);
+                                    }
+                                }
+                            } else if (trip && (trip.estado === 'aceptado' || trip.estado === 'en_camino' || trip.estado === 'completado')) {
+                                if (trip.id && driverState.incomingTrip && driverState.incomingTrip.id === trip.id) {
+                                    if (trip.conductor && trip.conductor.nombre !== driverState.info.nombre) {
+                                        closeIncomingModal();
+                                        showDriverToast('ℹ️ El viaje fue tomado por otro chofer.');
+                                    }
+                                }
+                            }
+                        }
+                    }, (err) => console.warn('Firestore live trip snapshot err:', err));
+
+                // 3. Escuchar colección completa 'live_trips' para multi-dispositivo sin fisuras
+                firestoreDb.collection('live_trips')
+                    .onSnapshot((snapshot) => {
+                        snapshot.docChanges().forEach((change) => {
+                            if (change.doc.id === 'latest_event' || change.doc.id === 'driver_location' || change.doc.id === 'current_active_trip') return;
+                            const trip = change.doc.data();
+                            if (trip && (trip.estado === 'buscando_conductor' || trip.estado === 'solicitado')) {
+                                trip.id = trip.id || change.doc.id;
+                                const tripAge = Date.now() - (trip.creadoEn || trip.timestamp || Date.now());
+                                if (tripAge < 10 * 60 * 1000 && !driverState.rejectedTrips.includes(trip.id)) {
+                                    if (driverState.isOnline && !driverState.activeTrip) {
+                                        enqueueIncomingTrip(trip);
+                                    }
+                                }
+                            }
+                        });
+                    }, (err) => console.warn('Firestore live_trips collection listener err:', err));
+
+                // 4. Escuchar colección de conductores para actualización de estado por el Administrador
+                firestoreDb.collection('drivers')
+                    .onSnapshot((snapshot) => {
+                        const docsData = loadDocsData();
+                        const myDniClean = (docsData.dni || '').replace(/\D/g, '');
+                        snapshot.forEach((doc) => {
+                            const d = doc.data();
+                            if (d) {
+                                const dDniClean = (d.dni || '').replace(/\D/g, '');
+                                if ((doc.id === ('drv_' + myDniClean)) || (myDniClean && dDniClean === myDniClean) || (d.nombre && d.nombre === docsData.nombre)) {
+                                    if (d.estadoVerificacion && d.estadoVerificacion !== docsData.estadoVerificacion) {
+                                        docsData.estadoVerificacion = d.estadoVerificacion;
+                                        docsData.observaciones = d.observaciones || '';
+                                        try {
+                                            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(docsData));
+                                        } catch(e) {}
+                                        renderDriverProfileInfo();
+                                        updateDocsStatusBanner(d.estadoVerificacion);
+
+                                        if (d.estadoVerificacion === 'aprobado') {
+                                            playAlertSound('success');
+                                            showDriverToast('🎉 ¡Cuenta aprobada por la Administración!');
+                                        } else if (d.estadoVerificacion === 'rechazado') {
+                                            playAlertSound('warning');
+                                            showDriverToast('⚠️ Tu documentación ha sido observada.');
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }, (err) => console.warn('Firestore drivers listener error:', err));
             }
         } catch (e) {
             console.warn('Firebase init error in conductor.js:', e);
         }
+    }
+
+    async function refreshAllDriverTripsAndBookings(showFeedback = false) {
+        const iconEl = document.getElementById('iconRefreshDriverTrips');
+        if (iconEl) iconEl.classList.add('fa-spin');
+
+        // Refrescar reservas en UI
+        renderReservas();
+
+        // Consultar Firestore
+        if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+            try {
+                const db = firebase.firestore();
+
+                // 1. Consultar viaje activo en vivo
+                const activeSnap = await db.collection('live_trips').doc('current_active_trip').get();
+                if (activeSnap.exists) {
+                    const trip = activeSnap.data();
+                    if (trip && trip.id && (trip.estado === 'buscando_conductor' || trip.estado === 'solicitado')) {
+                        const tripAge = Date.now() - (trip.creadoEn || trip.timestamp || Date.now());
+                        if (tripAge < 10 * 60 * 1000 && !driverState.rejectedTrips.includes(trip.id)) {
+                            if (driverState.isOnline && !driverState.activeTrip) {
+                                enqueueIncomingTrip(trip);
+                            }
+                        }
+                    }
+                }
+
+                // 2. Consultar lista completa de solicitudes en live_trips
+                const liveSnap = await db.collection('live_trips').get();
+                liveSnap.forEach(doc => {
+                    if (doc.id === 'latest_event' || doc.id === 'driver_location' || doc.id === 'current_active_trip') return;
+                    const trip = doc.data();
+                    if (trip && (trip.estado === 'buscando_conductor' || trip.estado === 'solicitado')) {
+                        const tripAge = Date.now() - (trip.creadoEn || trip.timestamp || Date.now());
+                        if (tripAge < 10 * 60 * 1000 && !driverState.rejectedTrips.includes(doc.id)) {
+                            trip.id = trip.id || doc.id;
+                            if (driverState.isOnline && !driverState.activeTrip) {
+                                enqueueIncomingTrip(trip);
+                            }
+                        }
+                    }
+                });
+
+                // 3. Consultar reservas programadas
+                const bookSnap = await db.collection('bookings').get();
+                const cloudBookings = [];
+                bookSnap.forEach(doc => {
+                    const bData = doc.data();
+                    if (bData && !isTestBooking(bData)) {
+                        bData.id = bData.id || doc.id;
+                        cloudBookings.push(bData);
+                    }
+                });
+                if (cloudBookings.length > 0) {
+                    const localBookings = getStoredBookings().filter(b => !isTestBooking(b));
+                    const map = new Map();
+                    localBookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
+                    cloudBookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
+                    const unified = Array.from(map.values()).sort((a, b) => {
+                        const dateA = a.date || a.pickupDate || '';
+                        const dateB = b.date || b.pickupDate || '';
+                        if (dateA !== dateB) return dateA.localeCompare(dateB);
+                        return (a.time || a.pickupTime || '').localeCompare(b.time || b.pickupTime || '');
+                    });
+                    saveStoredBookings(unified);
+                    renderReservas();
+                }
+            } catch(e) {
+                console.warn('Error refreshing trips from Firestore:', e);
+            }
+        }
+
+        setTimeout(() => {
+            if (iconEl) iconEl.classList.remove('fa-spin');
+            if (showFeedback) {
+                const count = driverState.availableTrips.length;
+                showDriverToast(count > 0 ? `⚡ ${count} viaje(s) disponible(s) en radar` : '✓ Radar actualizado (Buscando viajes)');
+                playAlertSound('incoming');
+            }
+        }, 350);
     }
 
     // ==========================================
@@ -1809,6 +1960,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const btnRefreshDriverTrips = document.getElementById('btnRefreshDriverTrips');
+    if (btnRefreshDriverTrips) {
+        btnRefreshDriverTrips.addEventListener('click', () => {
+            refreshAllDriverTripsAndBookings(true);
+        });
+    }
+
     btnToggleStatus.addEventListener('click', () => {
         if (driverState.activeTrip) {
             alert('Tienes un viaje activo en curso. Debes finalizarlo antes de desconectarte.');
@@ -1816,6 +1974,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!driverState.isOnline) {
+            // Validar aprobación de documentación por Administración
+            const docsData = loadDocsData();
+            if (docsData.estadoVerificacion !== 'aprobado') {
+                const isRejected = docsData.estadoVerificacion === 'rechazado';
+                const obsMsg = docsData.observaciones ? `\n\nObservación de Administración: "${docsData.observaciones}"` : '';
+                alert(`⚠️ CUENTA ${isRejected ? 'OBSERVADA' : 'PENDIENTE DE VALIDACIÓN'}:\n\nTu documentación se encuentra ${isRejected ? 'observada o rechazada' : 'en proceso de revisión por la Administración'}.${obsMsg}\n\nPodrás ponerte En Línea en cuanto tus documentos sean validados.`);
+                const modalDocsUpload = document.getElementById('modalDocsUpload');
+                if (modalDocsUpload) {
+                    populateDocsForm();
+                    modalDocsUpload.classList.add('active');
+                }
+                return;
+            }
+
             // Validar encendido obligatorio de GPS antes de ponerse En Línea
             if (!('geolocation' in navigator)) {
                 alert('⚠️ GPS NO DISPONIBLE:\n\nTu dispositivo no cuenta con servicio de localización GPS.');
@@ -1824,6 +1996,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Poner en línea de inmediato para fluidez instantánea en la UI
             setOnlineStatus(true);
+            refreshAllDriverTripsAndBookings(false);
 
             // Obtener coordenadas de alta precisión sin bloquear
             navigator.geolocation.getCurrentPosition(
@@ -3779,18 +3952,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch(e) {}
             return {
-                nombre: driverState.info.nombre || 'Daniel Pabon',
-                dni: '38.452.910',
-                telefono: driverState.info.telefono || '+54 9 11 2255-8226',
-                autoMarcaModelo: driverState.info.auto ? driverState.info.auto.replace(/\s*·.*$/, '') : 'Fiat Cronos',
-                patente: driverState.info.patente || 'AE927CN',
+                nombre: '',
+                dni: '',
+                telefono: '',
+                autoMarcaModelo: '',
+                patente: '',
                 color: 'Negro',
                 categoria: 'Sedán Ejecutivo / Premium',
-                fotoPerfil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                banco: 'Mercado Pago / Banco Galicia',
-                cbu: '0000003100084592039481',
-                titularCuenta: driverState.info.nombre || 'Daniel Pabon',
-                estadoVerificacion: 'aprobado'
+                fotoPerfil: '',
+                banco: '',
+                cbu: '',
+                titularCuenta: '',
+                estadoVerificacion: 'pendiente',
+                isRegistered: false
             };
         }
 
@@ -3809,7 +3983,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (docInputCbu) docInputCbu.value = data.cbu || '';
             if (docInputBankHolder) docInputBankHolder.value = data.titularCuenta || data.nombre || '';
 
-            updateDocsStatusBanner(data.estadoVerificacion || 'aprobado');
+            updateDocsStatusBanner(data.estadoVerificacion || 'pendiente');
         }
 
         function updateDocsStatusBanner(status) {
@@ -3902,7 +4076,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function saveDocsData(status = 'pendiente') {
             const current = loadDocsData();
-            const photoSrc = previewFotoPerfil ? previewFotoPerfil.src : current.fotoPerfil;
+            const photoSrc = previewFotoPerfil ? previewFotoPerfil.src : (current.fotoPerfil || '');
 
             const updatedDocs = {
                 nombre: docInputDriverName ? docInputDriverName.value.trim() : current.nombre,
@@ -3912,12 +4086,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 patente: docInputPlate ? docInputPlate.value.trim() : current.patente,
                 color: docInputColor ? docInputColor.value.trim() : current.color,
                 categoria: docSelectCategory ? docSelectCategory.value : current.categoria,
-                fotoPerfil: photoSrc,
+                fotoPerfil: photoSrc || current.fotoPerfil,
                 banco: docInputBankName ? docInputBankName.value.trim() : current.banco,
                 cbu: docInputCbu ? docInputCbu.value.trim() : current.cbu,
                 titularCuenta: docInputBankHolder ? docInputBankHolder.value.trim() : current.titularCuenta,
                 docsImages: loadedDocsImages,
                 estadoVerificacion: status,
+                isRegistered: true,
                 updatedAt: Date.now()
             };
 
@@ -3932,6 +4107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const db = firebase.firestore();
                     const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '') || String(Date.now());
                     const docId = 'drv_' + cleanDni;
+                    updatedDocs.id = docId;
                     db.collection('drivers').doc(docId).set({
                         id: docId,
                         ...updatedDocs,
@@ -3939,6 +4115,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         timestamp: Date.now()
                     }, { merge: true }).catch(err => console.warn('Firestore driver sync warn:', err));
                 } catch(e) {}
+            }
+
+            if (window.RutaSync && typeof window.RutaSync.guardarDocumentosConductor === 'function') {
+                window.RutaSync.guardarDocumentosConductor(updatedDocs);
             }
 
             try {
@@ -3958,10 +4138,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch(e) {}
 
-            driverState.info.nombre = updatedDocs.nombre;
-            driverState.info.auto = `${updatedDocs.autoMarcaModelo} ${updatedDocs.color}`;
-            driverState.info.patente = updatedDocs.patente;
-            driverState.info.telefono = updatedDocs.telefono;
+            driverState.info.nombre = updatedDocs.nombre || 'Conductor Partner';
+            driverState.info.auto = `${updatedDocs.autoMarcaModelo || 'Vehículo'} ${updatedDocs.color || ''}`.trim();
+            driverState.info.patente = updatedDocs.patente || 'S/P';
+            driverState.info.telefono = updatedDocs.telefono || '';
+            driverState.info.estadoVerificacion = status;
 
             renderDriverProfileInfo();
             return updatedDocs;
@@ -3970,10 +4151,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (formDocsUpload) {
             formDocsUpload.addEventListener('submit', (e) => {
                 e.preventDefault();
+                if (!docInputDriverName.value.trim() || !docInputDniNum.value.trim() || !docInputPhone.value.trim() || !docInputPlate.value.trim()) {
+                    alert('Por favor completa todos los datos obligatorios marcados con asterisco (*).');
+                    return;
+                }
                 const saved = saveDocsData('pendiente');
                 updateDocsStatusBanner('pendiente');
-                showDriverToast('📄 Documentación y datos bancarios enviados a revisión.');
-                alert('✓ Documentación y Datos Bancarios guardados correctamente.\n\nLos archivos y tu constancia de CBU han sido enviados para su verificación.');
+                showDriverToast('📄 Documentación y datos enviados para verificación.');
+                alert('✓ Documentación y Datos del Conductor enviados correctamente.\n\nEl Administrador revisará tus documentos en el Panel de Administración para habilitar tu cuenta.');
+                if (modalDocsUpload) modalDocsUpload.classList.remove('active');
             });
         }
 
@@ -3982,13 +4168,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 const saved = saveDocsData('aprobado');
                 updateDocsStatusBanner('aprobado');
                 if (modalDocsUpload) modalDocsUpload.classList.remove('active');
-                showDriverToast('✅ Perfil, vehículo y CBU aprobados');
+                showDriverToast('✅ Perfil y vehículo verificados');
                 alert(
                     `✅ ¡DOCUMENTACIÓN Y VEHÍCULO APROBADOS!\n\n` +
                     `Se han verificado los 7 requerimientos (DNI, Licencia, Seguro, Cédula, Antecedentes, Foto y Cuenta Bancaria del Titular).\n\n` +
                     `Tu perfil se ha actualizado automáticamente con los datos de ${saved.nombre} y el vehículo ${saved.autoMarcaModelo} (${saved.patente}).`
                 );
             });
+        }
+
+        // Auto-abrir modal si es la primera vez que ingresa un nuevo chofer
+        const checkInitial = loadDocsData();
+        if (!checkInitial.isRegistered || !checkInitial.nombre) {
+            setTimeout(() => {
+                populateDocsForm();
+                if (modalDocsUpload) modalDocsUpload.classList.add('active');
+            }, 800);
         }
 
         // ==========================================

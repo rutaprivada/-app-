@@ -726,20 +726,29 @@
             let cloudDriversList = [];
 
             function initFirestoreRealtimeSync() {
-                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
-                    try {
-                        const db = firebase.firestore();
-                        db.collection('drivers').onSnapshot((snapshot) => {
-                            cloudDriversList = [];
-                            snapshot.forEach(doc => {
-                                if (doc.exists) {
-                                    cloudDriversList.push(doc.data());
-                                }
-                            });
-                            loadDriversData();
-                        }, (err) => console.warn('Firestore admin listener warning:', err));
-                    } catch(e) {}
-                }
+                const tryConnect = () => {
+                    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                        try {
+                            const db = firebase.firestore();
+                            db.collection('drivers').onSnapshot((snapshot) => {
+                                cloudDriversList = [];
+                                snapshot.forEach(doc => {
+                                    if (doc.exists) {
+                                        const data = doc.data();
+                                        data.id = data.id || doc.id;
+                                        cloudDriversList.push(data);
+                                    }
+                                });
+                                loadDriversData();
+                            }, (err) => console.warn('Firestore admin listener warning:', err));
+                        } catch(e) {
+                            console.warn('Error in initFirestoreRealtimeSync:', e);
+                        }
+                    } else {
+                        setTimeout(tryConnect, 400);
+                    }
+                };
+                tryConnect();
             }
 
             initFirestoreRealtimeSync();
@@ -1128,7 +1137,20 @@
                     }
                 } catch(e) {}
 
-                // Emitir y sincronizar evento en tiempo real mediante sync.js y Cloud Firestore
+                // Actualizar directamente en Firebase Cloud Firestore
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                    try {
+                        const db = firebase.firestore();
+                        const docId = activeReviewDriver.id || ('drv_' + (activeReviewDriver.dni || '').replace(/\D/g, ''));
+                        db.collection('drivers').doc(docId).set({
+                            estadoVerificacion: newStatus,
+                            observaciones: revAdminNotes.value.trim(),
+                            actualizadoEn: Date.now()
+                        }, { merge: true }).catch((err) => console.warn('Firestore update driver err:', err));
+                    } catch(e) {}
+                }
+
+                // Emitir y sincronizar evento en tiempo real mediante sync.js
                 if (window.RutaSync) {
                     const driverPayload = {
                         id: activeReviewDriver.id || ('drv_' + (activeReviewDriver.dni || '').replace(/\D/g, '')),
@@ -1137,7 +1159,9 @@
                         estadoVerificacion: newStatus,
                         observaciones: revAdminNotes.value.trim()
                     };
-                    window.RutaSync.guardarDocumentosConductor(driverPayload);
+                    if (typeof window.RutaSync.guardarDocumentosConductor === 'function') {
+                        window.RutaSync.guardarDocumentosConductor(driverPayload);
+                    }
                     window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driverPayload);
                 }
 
