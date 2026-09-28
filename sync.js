@@ -27,6 +27,8 @@ class RutaSyncManager {
         this.initLocalChannels();
         this.initNtfySseSync();
         this.initServerHttpSync();
+        this.initNotificationManager();
+        this.iniciarMotorMonitoreoReservas();
     }
 
     // ==========================================
@@ -396,15 +398,90 @@ class RutaSyncManager {
                     completedAt: Date.now()
                 });
             }
-        } else if (message.type === 'CHAT_MENSAJE_ENVIADO') {
+        } else if (message.type === 'CHAT_MENSAJE_ENVIADO' || message.type === 'NUEVO_MENSAJE_CHAT') {
             if (message.payload && message.payload.texto) {
                 this.guardarMensajeChatLocal(message.payload);
+                if (!isSelf) {
+                    const remitenteName = message.payload.remitente || 'Mensaje de Chofer';
+                    this.mostrarNotificacion({
+                        title: remitenteName,
+                        body: message.payload.texto,
+                        tag: 'chat_' + (message.payload.id || Date.now()),
+                        icon: 'logo_rutaprivada.svg'
+                    });
+                }
             }
         } else if (message.type === 'UBICACION_CHOFER_ACTUALIZADA') {
             if (message.payload && message.payload.lat && message.payload.lng) {
                 try {
                     localStorage.setItem('rutaprivada_driver_location', JSON.stringify(message.payload));
                 } catch (e) {}
+            }
+        }
+
+        // Notificaciones nativas inteligentes para eventos clave de viaje
+        if (!isSelf) {
+            if (message.type === 'NUEVO_VIAJE_SOLICITADO') {
+                const isConductor = window.location.pathname.includes('conductor') || document.title.toLowerCase().includes('chofer');
+                if (isConductor) {
+                    const priceFormatted = Number(message.payload.precio || message.payload.precioEstimado || message.payload.totalFare || 0).toLocaleString('es-AR');
+                    this.mostrarNotificacion({
+                        title: `🚨 Solicitud de Viaje ($${priceFormatted})`,
+                        body: `${message.payload.origen || 'Origen'} ➔ ${message.payload.destino || 'Destino'}`,
+                        tag: 'solicitud_' + (message.payload.id || Date.now()),
+                        icon: 'logo_chofer.svg'
+                    });
+                }
+            } else if (message.type === 'VIAJE_ACEPTADO') {
+                const isPassenger = !window.location.pathname.includes('conductor') && !document.title.toLowerCase().includes('chofer');
+                if (isPassenger) {
+                    const driverName = (message.payload.conductor && message.payload.conductor.nombre) ? message.payload.conductor.nombre : 'Tu Chofer';
+                    const driverCar = (message.payload.conductor && message.payload.conductor.auto) ? message.payload.conductor.auto : 'Sedán Ejecutivo';
+                    this.mostrarNotificacion({
+                        title: `🚘 Chofer Asignado: ${driverName}`,
+                        body: `Tu chofer va en camino en un ${driverCar}. Toca para ver seguimiento en vivo.`,
+                        tag: 'viaje_aceptado_' + (message.payload.id || Date.now()),
+                        icon: 'favicon.svg'
+                    });
+                }
+            } else if (message.type === 'ESTADO_VIAJE_CAMBIADO') {
+                const isPassenger = !window.location.pathname.includes('conductor') && !document.title.toLowerCase().includes('chofer');
+                if (isPassenger) {
+                    if (message.payload.estado === 'en_origen') {
+                        this.mostrarNotificacion({
+                            title: '📍 Chofer en el Punto de Recogida',
+                            body: 'Tu chofer ha llegado y te está esperando en la puerta.',
+                            tag: 'chofer_en_origen',
+                            icon: 'favicon.svg'
+                        });
+                    } else if (message.payload.estado === 'en_viaje') {
+                        this.mostrarNotificacion({
+                            title: '🚀 Viaje Iniciado',
+                            body: 'Disfruta de tu traslado con RutaPrivada.',
+                            tag: 'viaje_en_curso',
+                            icon: 'favicon.svg'
+                        });
+                    } else if (message.payload.estado === 'completado') {
+                        const total = Number(message.payload.totalCobrado || message.payload.precio || 0).toLocaleString('es-AR');
+                        this.mostrarNotificacion({
+                            title: '🏁 Traslado Completado con Éxito',
+                            body: `Has llegado a tu destino. Total abonado: $${total}. ¡Gracias por viajar con nosotros!`,
+                            tag: 'viaje_completado',
+                            icon: 'favicon.svg'
+                        });
+                    }
+                }
+            } else if (message.type === 'RESERVA_LIBERADA_URGENTE') {
+                const isConductor = window.location.pathname.includes('conductor') || document.title.toLowerCase().includes('chofer');
+                if (isConductor) {
+                    const priceFmt = Number(message.payload.precio || message.payload.totalFare || 0).toLocaleString('es-AR');
+                    this.mostrarNotificacion({
+                        title: `🚨 ¡Reserva Urgente Disponible! ($${priceFmt})`,
+                        body: `Traslado a las ${message.payload.hora || '--:--'} hs en ${message.payload.origen || 'Origen'}. ¡Toca para aceptarla!`,
+                        tag: 'reserva_urgente_' + (message.payload.id || Date.now()),
+                        icon: 'logo_chofer.svg'
+                    });
+                }
             }
         }
 
@@ -1007,6 +1084,327 @@ class RutaSyncManager {
         }
 
         this.emit('DOCUMENTOS_CONDUCTOR_ACTUALIZADOS', payload);
+    }
+
+    // ==========================================
+    // 7. SISTEMA NATIVO DE NOTIFICACIONES MÓVILES (CABIFY STYLE)
+    // ==========================================
+    initNotificationManager() {
+        this.notifAudioCtx = null;
+        this.notifPermissionRequested = false;
+
+        // Solicitar permiso en la primera interacción del usuario o al iniciar
+        const requestPerm = () => {
+            if (!this.notifPermissionRequested) {
+                this.notifPermissionRequested = true;
+                this.solicitarPermisoNotificaciones();
+            }
+        };
+
+        if (typeof document !== 'undefined') {
+            document.addEventListener('click', requestPerm, { once: true });
+            document.addEventListener('touchstart', requestPerm, { once: true });
+            if (document.readyState === 'complete') {
+                setTimeout(requestPerm, 1000);
+            } else {
+                window.addEventListener('load', () => setTimeout(requestPerm, 1000));
+            }
+        }
+    }
+
+    solicitarPermisoNotificaciones() {
+        try {
+            if (typeof window !== 'undefined' && 'Notification' in window) {
+                if (Notification.permission === 'default') {
+                    Notification.requestPermission().then(permission => {
+                        console.log('Permiso de notificaciones:', permission);
+                    }).catch(() => {});
+                }
+            }
+            // Soporte nativo para Capacitor LocalNotifications
+            if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+                window.Capacitor.Plugins.LocalNotifications.requestPermissions().catch(() => {});
+            }
+        } catch(e) {}
+    }
+
+    reproducirTonoNotificacion(tipo = 'mensaje') {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            if (!this.notifAudioCtx) {
+                this.notifAudioCtx = new AudioContext();
+            }
+            if (this.notifAudioCtx.state === 'suspended') {
+                this.notifAudioCtx.resume();
+            }
+
+            const now = this.notifAudioCtx.currentTime;
+            const osc = this.notifAudioCtx.createOscillator();
+            const gain = this.notifAudioCtx.createGain();
+
+            osc.connect(gain);
+            gain.connect(this.notifAudioCtx.destination);
+
+            if (tipo === 'urgente' || tipo === 'solicitud') {
+                // Doble tono agudo de alerta ejecutiva
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.setValueAtTime(880.00, now + 0.12); // A5
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } else {
+                // Tono suave estilo mensaje Cabify / WhatsApp
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+                osc.start(now);
+                osc.stop(now + 0.28);
+            }
+        } catch(e) {}
+    }
+
+    mostrarNotificacion(options = {}) {
+        const title = options.title || 'RutaPrivada';
+        const body = options.body || '';
+        const tag = options.tag || ('rp_notif_' + Date.now());
+        const icon = options.icon || 'icon-192.png';
+
+        // 1. Reproducir sonido y vibración
+        this.reproducirTonoNotificacion(options.tipo || (title.includes('🚨') ? 'urgente' : 'mensaje'));
+        try {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate([200, 100, 200]);
+            }
+        } catch(e) {}
+
+        // 2. Soporte para plugin nativo de Capacitor (Android status bar)
+        if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+            try {
+                window.Capacitor.Plugins.LocalNotifications.schedule({
+                    notifications: [{
+                        id: Math.floor(Math.random() * 1000000),
+                        title: title,
+                        body: body,
+                        schedule: { at: new Date(Date.now() + 100) },
+                        sound: 'default',
+                        attachments: null,
+                        actionTypeId: '',
+                        extra: options.data || null
+                    }]
+                }).catch(() => {});
+            } catch(e) {}
+        }
+
+        // 3. Soporte estándar Web / PWA Notification API
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            if (Notification.permission === 'granted') {
+                try {
+                    const n = new Notification(title, {
+                        body: body,
+                        icon: icon,
+                        badge: 'favicon.svg',
+                        tag: tag,
+                        renotify: true,
+                        vibrate: [200, 100, 200],
+                        data: options.data || {}
+                    });
+                    n.onclick = function() {
+                        try {
+                            window.focus();
+                            n.close();
+                        } catch(e) {}
+                    };
+                } catch(e) {
+                    // Fallback para ServiceWorkerRegistration si aplica
+                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.ready.then(reg => {
+                            reg.showNotification(title, {
+                                body: body,
+                                icon: icon,
+                                badge: 'favicon.svg',
+                                tag: tag,
+                                vibrate: [200, 100, 200]
+                            });
+                        }).catch(() => {});
+                    }
+                }
+            } else if (Notification.permission === 'default') {
+                Notification.requestPermission().then(perm => {
+                    if (perm === 'granted') {
+                        this.mostrarNotificacion(options);
+                    }
+                }).catch(() => {});
+            }
+        }
+    }
+
+    // ==========================================
+    // 8. MOTOR DE MONITOREO INTELIGENTE DE RESERVAS (UBER / CABIFY PROTOCOL)
+    // ==========================================
+    iniciarMotorMonitoreoReservas() {
+        // Ejecutar cada 25 segundos para supervisar puntualidad estricta
+        setInterval(() => {
+            this.supervisarReservasProgramadas();
+        }, 25000);
+        setTimeout(() => this.supervisarReservasProgramadas(), 3000);
+    }
+
+    calcularDistanciaKm(lat1, lon1, lat2, lon2) {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return 999;
+        const R = 6371; // Radio de la Tierra en km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    supervisarReservasProgramadas() {
+        try {
+            const isConductor = typeof window !== 'undefined' && (window.location.pathname.includes('conductor') || document.title.toLowerCase().includes('chofer'));
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+
+            let bookings = [];
+            const raw = localStorage.getItem('rutaprivada_bookings_v1');
+            if (raw) bookings = JSON.parse(raw);
+
+            let passReservations = [];
+            const rawPass = localStorage.getItem('rutaprivada_passenger_reservations');
+            if (rawPass) passReservations = JSON.parse(rawPass);
+
+            // Obtener última ubicación conocida del chofer y timestamp
+            let driverLoc = null;
+            try {
+                const locRaw = localStorage.getItem('rutaprivada_driver_location');
+                if (locRaw) driverLoc = JSON.parse(locRaw);
+            } catch(e) {}
+
+            let modified = false;
+
+            // 1. MONITOREO DE RESERVAS PARA CHOFER Y PASAJERO
+            bookings.forEach(res => {
+                const status = (res.status || res.estado || 'disponible').toLowerCase();
+                if (['completada', 'cancelada', 'finalizada'].includes(status)) return;
+
+                const resDateStr = res.date || res.pickupDate || res.fecha;
+                const resTimeStr = res.time || res.pickupTime || res.hora;
+                if (!resDateStr || !resTimeStr) return;
+
+                // Construir fecha y hora exacta del viaje
+                const [y, m, d] = resDateStr.split('-').map(Number);
+                const [hh, mm] = resTimeStr.split(':').map(Number);
+                if (!y || !m || !d || isNaN(hh) || isNaN(mm)) return;
+
+                const resDateTime = new Date(y, m - 1, d, hh, mm, 0);
+                const diffMin = (resDateTime.getTime() - now.getTime()) / (60 * 1000);
+
+                // --- REGLA A: RECORDATORIO 40 MINUTOS AL CHOFER ASIGNADO ---
+                if (diffMin > 32 && diffMin <= 43 && !res.notificado_chofer_40m) {
+                    res.notificado_chofer_40m = true;
+                    modified = true;
+
+                    if (isConductor) {
+                        const driverInfoRaw = localStorage.getItem('rutaprivada_driver_profile');
+                        const driverName = driverInfoRaw ? (JSON.parse(driverInfoRaw).nombre || 'Daniel Pabon') : 'Daniel Pabon';
+
+                        if (res.driverAssigned && (res.driverAssigned === driverName || res.driverAssigned.includes(driverName))) {
+                            this.mostrarNotificacion({
+                                title: `⏰ Reserva Próxima (Faltan ${Math.round(diffMin)} min)`,
+                                body: `Debes mantenerte conectado para tu traslado de las ${resTimeStr} hs en ${res.pickupAddress || res.origen || 'Origen'}.`,
+                                tag: 'recordatorio_chofer_40m_' + res.id,
+                                icon: 'logo_chofer.svg',
+                                tipo: 'urgente'
+                            });
+                        }
+                    }
+                }
+
+                // --- REGLA B: RECORDATORIO 30 MINUTOS AL PASAJERO ---
+                if (diffMin > 22 && diffMin <= 32 && !res.notificado_pasajero_30m) {
+                    res.notificado_pasajero_30m = true;
+                    modified = true;
+
+                    if (!isConductor) {
+                        this.mostrarNotificacion({
+                            title: `⏰ Recordatorio de Reserva (En 30 min)`,
+                            body: `Tu traslado programado para las ${resTimeStr} hs desde ${res.pickupAddress || res.origen || 'Origen'} comenzará en breve. Tu chofer fue notificado.`,
+                            tag: 'recordatorio_pasajero_30m_' + res.id,
+                            icon: 'favicon.svg'
+                        });
+                    }
+                }
+
+                // --- REGLA C: CONTROL DE FACTIBILIDAD Y AUTO-LIBERACIÓN (30 MIN ANTES) ---
+                // Si faltan 30 min o menos, el chofer asignado está desconectado o se encuentra a más de 30 km:
+                // Se libera la reserva para que otro chofer cercano la tome y no se pierda el viaje.
+                if (diffMin > 10 && diffMin <= 30 && res.driverAssigned && !res.autoReasignada) {
+                    let isDriverTooFar = false;
+                    let isDriverOffline = false;
+
+                    // Validar si el chofer envió ubicación reciente (menos de 15 minutos)
+                    if (!driverLoc || !driverLoc.timestamp || (Date.now() - driverLoc.timestamp > 15 * 60 * 1000)) {
+                        isDriverOffline = true;
+                    }
+
+                    // Validar distancia geográfica si hay coordenadas de origen
+                    if (driverLoc && driverLoc.lat && driverLoc.lng && res.originLat && res.originLng) {
+                        const distKm = this.calcularDistanciaKm(driverLoc.lat, driverLoc.lng, res.originLat, res.originLng);
+                        // Si está a más de 25 km y faltan menos de 30 min, no llegará puntual
+                        if (distKm > 25) {
+                            isDriverTooFar = true;
+                        }
+                    }
+
+                    if (isDriverOffline || isDriverTooFar) {
+                        console.warn(`[Auto-Safeguard] Liberando reserva ${res.id} por chofer inactivo o distante.`);
+                        res.driverAssigned = null;
+                        res.driverCar = null;
+                        res.driverPlate = null;
+                        res.status = 'disponible';
+                        res.estado = 'disponible';
+                        res.autoReasignada = true;
+                        res.reasignadaEn = Date.now();
+                        modified = true;
+
+                        // Emitir alerta a todos los choferes en radar
+                        this.emit('RESERVA_LIBERADA_URGENTE', {
+                            id: res.id,
+                            reservaId: res.id,
+                            hora: resTimeStr,
+                            fecha: resDateStr,
+                            origen: res.pickupAddress || res.origen || 'Origen',
+                            destino: res.dropoffAddress || res.destino || 'Destino',
+                            precio: res.price || res.totalFare || res.monto || 0,
+                            motivo: 'Chofer previo inactivo o lejano. Reasignación para cumplimiento de horario.'
+                        });
+
+                        // Notificar al pasajero de la reasignación automática transparente
+                        if (!isConductor) {
+                            this.mostrarNotificacion({
+                                title: `🔄 Optimizando tu Chofer`,
+                                body: `Estamos reasignando automáticamente un chofer más cercano a tu ubicación para garantizar puntualidad a las ${resTimeStr} hs.`,
+                                tag: 'optimizacion_chofer_' + res.id,
+                                icon: 'favicon.svg'
+                            });
+                        }
+                    }
+                }
+            });
+
+            if (modified) {
+                localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(bookings));
+            }
+        } catch(e) {
+            console.warn('Error en supervisarReservasProgramadas:', e);
+        }
     }
 }
 

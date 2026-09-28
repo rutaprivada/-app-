@@ -1443,19 +1443,30 @@ document.addEventListener('DOMContentLoaded', () => {
             (pos) => {
                 const lat = pos.coords.latitude;
                 const lng = pos.coords.longitude;
-                const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 38;
-                let heading = pos.coords.heading;
-
-                if (heading === null || isNaN(heading) || heading === undefined) {
-                    if (currentDriverCoords) {
-                        heading = calculateBearing(currentDriverCoords.lat, currentDriverCoords.lng, lat, lng);
-                    } else {
-                        heading = 0;
-                    }
-                }
+                const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+                let heading = pos.coords.heading || 0;
 
                 driverState.currentRealGpsCoords = { lat, lng, heading, speed };
-                onDriverLocationUpdate(lat, lng, heading, speed);
+
+                try {
+                    localStorage.setItem('rutaprivada_driver_location', JSON.stringify({
+                        lat: lat,
+                        lng: lng,
+                        heading: heading,
+                        speed: speed,
+                        timestamp: Date.now()
+                    }));
+                } catch(e) {}
+
+                if (window.RutaSync) {
+                    window.RutaSync.emit('ACTUALIZACION_UBICACION_CHOFER', {
+                        lat: lat,
+                        lng: lng,
+                        heading: heading,
+                        speed: speed,
+                        choferNombre: (driverState.info && driverState.info.nombre) || 'Daniel Pabon'
+                    });
+                }
             },
             (err) => {
                 console.warn('Fallo de señal GPS del Chofer:', err);

@@ -7187,24 +7187,50 @@ if (btnRecenterPassengerMap) {
     showToast('💳 Tarjeta eliminada.');
   };
 
-  // Historial de viajes del pasajero (Vacío inicialmente, guardando viajes reales)
+  // Historial de viajes del pasajero (Filtra registros de prueba y almacena viajes reales)
   function getPassengerTripHistory() {
     try {
       const saved = localStorage.getItem('rutaprivada_passenger_history');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          // Filtrar viajes de prueba con precio $0 o nombres genéricos vacíos
+          const validTrips = parsed.filter(t => {
+            const price = Number(t.precioTotal || t.totalFare || 0);
+            const origStr = String(t.origen || '').trim().toLowerCase();
+            const destStr = String(t.destino || '').trim().toLowerCase();
+            const isPlaceholder = (origStr === 'origen' && destStr === 'destino') || (origStr === '' && destStr === '');
+            return price > 0 && !isPlaceholder;
+          });
+
+          if (validTrips.length !== parsed.length) {
+            localStorage.setItem('rutaprivada_passenger_history', JSON.stringify(validTrips));
+          }
+          return validTrips;
+        }
       }
     } catch(e) {}
     return [];
   }
 
   function addTripToPassengerHistory(trip) {
+    if (!trip) return;
+    const price = Number(trip.precioTotal || trip.totalFare || 0);
+    const origStr = String(trip.origen || '').trim().toLowerCase();
+    const destStr = String(trip.destino || '').trim().toLowerCase();
+    if (price <= 0 || (origStr === 'origen' && destStr === 'destino')) {
+      console.warn('Omitiendo registro de viaje de prueba inválido en historial:', trip);
+      return;
+    }
+
     try {
       const history = getPassengerTripHistory();
-      history.unshift(trip);
-      localStorage.setItem('rutaprivada_passenger_history', JSON.stringify(history));
-      renderPassengerHistoryUI();
+      // Evitar duplicados inmediatos por mismo ID o timestamp
+      if (!history.some(h => h.id === trip.id)) {
+        history.unshift(trip);
+        localStorage.setItem('rutaprivada_passenger_history', JSON.stringify(history));
+        renderPassengerHistoryUI();
+      }
     } catch(e) {}
   }
   window.addTripToPassengerHistory = addTripToPassengerHistory;
@@ -7226,29 +7252,30 @@ if (btnRecenterPassengerMap) {
         <div style="text-align: center; padding: 40px 20px; color: #94a3b8;">
           <span style="font-size: 2.5rem; display: block; margin-bottom: 10px;">📜</span>
           <strong style="color: #f8fafc; font-size: 0.95rem; display: block; margin-bottom: 4px;">Aún no tienes viajes realizados</strong>
-          <p style="font-size: 0.8rem; color: #64748b; margin: 0;">Cuando realices traslados con nuestros choferes ejecutivos, tus recibos y rutas aparecerán aquí.</p>
+          <p style="font-size: 0.8rem; color: #64748b; margin: 0;">Cuando realices traslados con nuestros choferes ejecutivos, tus viajes y recibos detallados aparecerán aquí.</p>
         </div>
       `;
       return;
     }
 
     listView.innerHTML = trips.map(t => {
-      const distStr = t.distanciaKm ? `${t.distanciaKm} km` : (t.distancia || '1.6 km');
+      const distStr = t.distanciaKm ? `${t.distanciaKm} km` : (t.distancia || 'Ruta calculada');
       const totalStr = '$' + Number(t.precioTotal || t.totalFare || 0).toLocaleString('es-AR');
 
       return `
-        <div class="history-compact-card" onclick="showPassengerTripDetail('${t.id}')">
-          <div class="history-card-header-row">
-            <span class="history-card-date">📅 ${escapeHtml(t.fechaAmigable || 'Viaje')}</span>
-            <span class="history-card-price">${totalStr} ARS</span>
+        <div class="history-compact-card" onclick="showPassengerTripDetail('${t.id}')" style="cursor: pointer;">
+          <div class="history-card-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span class="history-card-date" style="color: #cbd5e1; font-size: 0.82rem; font-weight: 700;">📅 ${escapeHtml(t.fechaAmigable || 'Traslado')}</span>
+            <span class="history-card-price" style="color: #34d399; font-size: 1rem; font-weight: 800;">${totalStr} ARS</span>
           </div>
-          <div class="history-card-route">
-            <div>🟢 <strong>Origen:</strong> ${escapeHtml(t.origen || 'Origen')}</div>
-            <div>🔴 <strong>Destino:</strong> ${escapeHtml(t.destino || 'Destino')}</div>
+          <div class="history-card-route" style="display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; margin-bottom: 8px;">
+            <div style="color: #e2e8f0;">🟢 <strong style="color: #94a3b8;">Origen:</strong> ${escapeHtml(t.origen || 'Punto de partida')}</div>
+            ${t.parada ? `<div style="color: #fef08a;">🛑 <strong style="color: #f59e0b;">Parada:</strong> ${escapeHtml(t.parada)}</div>` : ''}
+            <div style="color: #e2e8f0;">🏁 <strong style="color: #94a3b8;">Destino:</strong> ${escapeHtml(t.destino || 'Destino final')}</div>
           </div>
-          <div class="history-card-footer">
-            <span>🚗 ${escapeHtml(t.categoria || 'RutaPrivada Ejecutivo')} · ${distStr}</span>
-            <span class="history-btn-view-detail">Ver detalle ➔</span>
+          <div class="history-card-footer" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; font-size: 0.75rem; color: #94a3b8;">
+            <span>🚘 ${escapeHtml(t.categoria || 'RutaPrivada Ejecutivo')} · ${distStr}</span>
+            <span class="history-btn-view-detail" style="color: #38bdf8; font-weight: 700;">Ver detalle ➔</span>
           </div>
         </div>
       `;
