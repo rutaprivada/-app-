@@ -5989,18 +5989,11 @@ if (btnRequestInapp) {
 
     const nameInput = document.getElementById('passenger-name-input');
     const phoneInput = document.getElementById('passenger-phone-input');
-    const emailInput = document.getElementById('passenger-email-input');
     const notesInput = document.getElementById('passenger-notes-input');
 
-    const prof = (typeof loadPassengerProfile === 'function') ? loadPassengerProfile() : {};
-    let passName = nameInput ? nameInput.value.trim() : '';
-    let passPhone = phoneInput ? phoneInput.value.trim() : '';
-    let passEmail = emailInput ? emailInput.value.trim() : '';
+    const passName = nameInput ? nameInput.value.trim() : '';
+    const passPhone = phoneInput ? phoneInput.value.trim() : '';
     const passNotes = notesInput ? notesInput.value.trim() : '';
-
-    if (!passName && prof.nombre) passName = prof.nombre;
-    if (!passPhone && prof.telefono) passPhone = prof.telefono;
-    if (!passEmail && prof.email) passEmail = prof.email;
 
     if (!passName) {
       showToast('⚠️ Por favor ingresa el Nombre y Apellido del pasajero.');
@@ -6022,30 +6015,6 @@ if (btnRequestInapp) {
         setTimeout(() => { phoneInput.style.borderColor = ''; }, 3000);
       }
       return;
-    }
-
-    if (!passEmail || !passEmail.includes('@')) {
-      showToast('⚠️ Por favor ingresa tu correo electrónico para enviarte la factura y recibo del viaje.');
-      if (emailInput) {
-        emailInput.focus();
-        emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        emailInput.style.borderColor = '#ef4444';
-        setTimeout(() => { emailInput.style.borderColor = ''; }, 3000);
-      }
-      return;
-    }
-
-    // Auto-actualizar y persistir el perfil del pasajero
-    if (typeof savePassengerProfile === 'function') {
-      if (prof.nombre !== passName || prof.telefono !== passPhone || prof.email !== passEmail || !prof.isRegistered) {
-        savePassengerProfile({
-          ...prof,
-          nombre: passName,
-          telefono: passPhone,
-          email: passEmail,
-          isRegistered: true
-        });
-      }
     }
 
     // Obtener la cotización exacta activa
@@ -6133,9 +6102,6 @@ if (btnRequestInapp) {
         telefono: passPhone,
         clientPhone: passPhone,
         customerPhone: passPhone,
-        email: passEmail,
-        emailPasajero: passEmail,
-        customerEmail: passEmail,
         notas: passNotes,
         categoria: 'Sedán Ejecutivo',
         originCoords: state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null,
@@ -6186,7 +6152,7 @@ if (btnRequestInapp) {
 
       try { playPassengerTone('confirmed'); } catch(e){}
       showToast('📅 ¡Reserva agendada con éxito!');
-      alert(`📅 ¡SOLICITUD DE RESERVA CONFIRMADA!\n\nTu traslado para el ${formatDateWithWeekday(reservaData.fecha)} a las ${reservaData.hora} hs ha sido agendado exitosamente.\n\nComprobante y factura serán enviados a: ${passEmail}\n\n¡Muchas gracias por elegir RutaPrivada!`);
+      alert(`📅 ¡SOLICITUD DE RESERVA CONFIRMADA!\n\nTu traslado para el ${formatDateWithWeekday(reservaData.fecha)} a las ${reservaData.hora} hs ha sido agendado exitosamente.\n\nLa reserva fue cargada en el sistema para que los conductores disponibles la tomen.\n\n¡Muchas gracias por elegir RutaPrivada!`);
       goToWizardStep(1);
       return;
     }
@@ -6223,9 +6189,6 @@ if (btnRequestInapp) {
       telefono: passPhone,
       clientPhone: passPhone,
       customerPhone: passPhone,
-      email: passEmail,
-      emailPasajero: passEmail,
-      customerEmail: passEmail,
       notas: passNotes,
       categoria: 'Sedán Ejecutivo',
       fecha: curTodayStr,
@@ -7182,21 +7145,18 @@ if (btnRecenterPassengerMap) {
   // 16. SISTEMA DE PERFIL DEL PASAJERO, MEDIOS DE PAGO E HISTORIAL CABIFY
   // ====================================================
   const DEFAULT_PASSENGER_PROFILE = {
-    id: 'pass_' + Math.random().toString(36).substring(2, 9),
-    nombre: '',
-    telefono: '',
-    email: '',
+    nombre: 'Daniel Felipe',
+    telefono: '11 7373 8790',
+    email: 'pasajero@rutaprivada.com',
     avatar: '', // Sin foto por defecto (icono silueta)
-    metodoPagoPredeterminado: 'efectivo',
-    isRegistered: false
+    metodoPagoPredeterminado: 'efectivo'
   };
 
   function loadPassengerProfile() {
     try {
       const saved = localStorage.getItem('rutaprivada_passenger_profile');
       if (saved) {
-        const parsed = JSON.parse(saved);
-        return { ...DEFAULT_PASSENGER_PROFILE, ...parsed };
+        return { ...DEFAULT_PASSENGER_PROFILE, ...JSON.parse(saved) };
       }
     } catch(e) {}
     return { ...DEFAULT_PASSENGER_PROFILE };
@@ -7206,9 +7166,7 @@ if (btnRecenterPassengerMap) {
     try {
       localStorage.setItem('rutaprivada_passenger_profile', JSON.stringify(data));
       updatePassengerHeaderAndInputs(data);
-      if (data.isRegistered && data.nombre) {
-        showToast('✅ Perfil y cuenta de pasajero guardada.');
-      }
+      showToast('✅ Perfil guardado correctamente.');
     } catch(e) {}
   }
 
@@ -7232,8 +7190,8 @@ if (btnRecenterPassengerMap) {
       }
     }
 
-    if (headerName) headerName.textContent = profile.nombre || 'Crear Cuenta';
-    if (modalTitle) modalTitle.textContent = profile.nombre || 'Mi Perfil de Pasajero';
+    if (headerName && profile.nombre) headerName.textContent = profile.nombre;
+    if (modalTitle && profile.nombre) modalTitle.textContent = profile.nombre;
 
     if (modalAvatar && modalPlaceholder) {
       if (hasPhoto) {
@@ -7251,7 +7209,6 @@ if (btnRecenterPassengerMap) {
     // Autocompletar inputs en el Paso 5
     const nameInp = document.getElementById('passenger-name-input');
     const phoneInp = document.getElementById('passenger-phone-input');
-    const emailInp = document.getElementById('passenger-email-input');
     const statusMsg = document.getElementById('passengerProfileStatusMsg');
 
     if (nameInp && profile.nombre && !nameInp.value) {
@@ -7260,24 +7217,17 @@ if (btnRecenterPassengerMap) {
     if (phoneInp && profile.telefono && !phoneInp.value) {
       phoneInp.value = profile.telefono;
     }
-    if (emailInp && profile.email && !emailInp.value) {
-      emailInp.value = profile.email;
-    }
-    if (statusMsg) {
-      if (profile.nombre && profile.telefono && profile.email) {
-        statusMsg.innerHTML = `Viajando como <strong style="color: #38bdf8;">${escapeHtml(profile.nombre)}</strong> (${escapeHtml(profile.telefono)} · ${escapeHtml(profile.email)})`;
-      } else {
-        statusMsg.innerHTML = `Indica tu nombre, WhatsApp y correo para que el chofer te contacte y recibas tu factura.`;
-      }
+    if (statusMsg && profile.nombre) {
+      statusMsg.innerHTML = `Viajando como <strong style="color: #38bdf8;">${escapeHtml(profile.nombre)}</strong> (Celular: ${escapeHtml(profile.telefono)})`;
     }
 
     // Modal form fields
     const pName = document.getElementById('profPassengerName');
     const pPhone = document.getElementById('profPassengerPhone');
     const pEmail = document.getElementById('profPassengerEmail');
-    if (pName && !pName.value) pName.value = profile.nombre || '';
-    if (pPhone && !pPhone.value) pPhone.value = profile.telefono || '';
-    if (pEmail && !pEmail.value) pEmail.value = profile.email || '';
+    if (pName) pName.value = profile.nombre || '';
+    if (pPhone) pPhone.value = profile.telefono || '';
+    if (pEmail) pEmail.value = profile.email || '';
   }
 
   // Medios de pago / Tarjetas vinculadas
@@ -7542,14 +7492,6 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // Si es un pasajero nuevo que acaba de descargar la app, invitarlo a crear su cuenta
-    if (!prof.isRegistered || !prof.nombre || !prof.telefono || !prof.email) {
-      setTimeout(() => {
-        openModal();
-        showToast('👋 ¡Bienvenido! Por favor ingresa tus datos y correo para tu cuenta de pasajero.');
-      }, 700);
-    }
-
     // Subida de foto personalizada desde archivo o celular
     const fileInput = document.getElementById('passengerPhotoFileInput');
     const btnTriggerUpload = document.getElementById('btnTriggerPhotoUpload');
@@ -7619,42 +7561,15 @@ if (btnRecenterPassengerMap) {
     if (formProf) {
       formProf.addEventListener('submit', (e) => {
         e.preventDefault();
-        const pName = document.getElementById('profPassengerName')?.value.trim() || '';
-        const pPhone = document.getElementById('profPassengerPhone')?.value.trim() || '';
-        const pEmail = document.getElementById('profPassengerEmail')?.value.trim() || '';
-
-        if (!pName || pName.length < 2) {
-          showToast('⚠️ Ingresa tu nombre y apellido.');
-          return;
-        }
-        if (!pPhone || pPhone.length < 6) {
-          showToast('⚠️ Ingresa tu número de WhatsApp / celular.');
-          return;
-        }
-        if (!pEmail || !pEmail.includes('@')) {
-          showToast('⚠️ Ingresa un correo electrónico válido para enviarte el comprobante y factura.');
-          return;
-        }
-
         const current = loadPassengerProfile();
         const updated = {
           ...current,
-          nombre: pName,
-          telefono: pPhone,
-          email: pEmail,
-          isRegistered: true,
-          actualizadoEn: Date.now()
+          nombre: document.getElementById('profPassengerName')?.value.trim() || current.nombre,
+          telefono: document.getElementById('profPassengerPhone')?.value.trim() || current.telefono,
+          email: document.getElementById('profPassengerEmail')?.value.trim() || current.email
         };
 
         savePassengerProfile(updated);
-
-        // Guardar en Firestore si está disponible
-        if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
-          try {
-            firebase.firestore().collection('passengers').doc(updated.id || ('pass_' + Date.now())).set(updated, { merge: true });
-          } catch(err){}
-        }
-
         closeModal();
       });
     }
