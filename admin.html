@@ -721,20 +721,43 @@
             let cloudDriversList = [];
 
             function initFirestoreRealtimeSync() {
-                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
-                    try {
-                        const db = firebase.firestore();
-                        db.collection('drivers').onSnapshot((snapshot) => {
-                            cloudDriversList = [];
-                            snapshot.forEach(doc => {
-                                if (doc.exists) {
-                                    cloudDriversList.push(doc.data());
-                                }
-                            });
-                            loadDriversData();
-                        }, (err) => console.warn('Firestore admin listener warning:', err));
-                    } catch(e) {}
-                }
+                const FIREBASE_CONFIG = {
+                    apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
+                    authDomain: "rutaprivada-app.firebaseapp.com",
+                    projectId: "rutaprivada-app",
+                    storageBucket: "rutaprivada-app.firebasestorage.app",
+                    messagingSenderId: "349256222860",
+                    appId: "1:349256222860:web:6bdac96975582de57093a9",
+                    measurementId: "G-EXXS3VHD14"
+                };
+
+                let retries = 0;
+                const attachListener = () => {
+                    if (typeof firebase !== 'undefined') {
+                        try {
+                            if (!firebase.apps || !firebase.apps.length) {
+                                firebase.initializeApp(FIREBASE_CONFIG);
+                            }
+                            const db = firebase.firestore();
+                            db.collection('drivers').onSnapshot((snapshot) => {
+                                cloudDriversList = [];
+                                snapshot.forEach(doc => {
+                                    if (doc.exists) {
+                                        cloudDriversList.push(doc.data());
+                                    }
+                                });
+                                loadDriversData();
+                            }, (err) => console.warn('Firestore admin listener warning:', err));
+                        } catch(e) {
+                            console.warn('Error setting up admin firestore sync:', e);
+                        }
+                    } else if (retries < 10) {
+                        retries++;
+                        setTimeout(attachListener, 300);
+                    }
+                };
+
+                attachListener();
             }
 
             initFirestoreRealtimeSync();
@@ -771,7 +794,7 @@
                             autoMarcaModelo: c.autoMarcaModelo || 'Vehículo',
                             patente: c.patente || 'S/P',
                             color: c.color || 'Negro',
-                            categoria: c.categoria || 'Sedán Ejecutivo / Premium',
+                            categoria: c.categoria || 'Sedán Estándar',
                             fotoPerfil: c.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
                             estadoVerificacion: c.estadoVerificacion || 'pendiente',
                             isOnline: !!c.isOnline,
@@ -786,7 +809,7 @@
                 }
 
                 // B. Incorporar el Conductor Real Activo Local si ya ha registrado datos
-                if (activeDocs && !drivers.some(d => d.nombre === activeDocs.nombre || d.dni === activeDocs.dni)) {
+                if (activeDocs && activeDocs.nombre && !drivers.some(d => d.nombre === activeDocs.nombre || (d.dni && activeDocs.dni && d.dni === activeDocs.dni))) {
                     drivers.unshift({
                         id: 'drv_active_user',
                         nombre: activeDocs.nombre || 'Conductor Registrado',
@@ -795,7 +818,7 @@
                         autoMarcaModelo: activeDocs.autoMarcaModelo || 'Vehículo',
                         patente: activeDocs.patente || 'S/P',
                         color: activeDocs.color || 'Negro',
-                        categoria: activeDocs.categoria || 'Sedán Ejecutivo / Premium',
+                        categoria: activeDocs.categoria || 'Sedán Estándar',
                         fotoPerfil: activeDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
                         estadoVerificacion: activeDocs.estadoVerificacion || 'pendiente',
                         isOnline: isOnlineLocal,
@@ -812,7 +835,7 @@
                 if (Array.isArray(storedDrivers) && storedDrivers.length > 0) {
                     storedDrivers.forEach(d => {
                         const driverName = d.nombre || d.name;
-                        if (!drivers.some(ex => ex.nombre === driverName || ex.id === d.id)) {
+                        if (driverName && !drivers.some(ex => ex.nombre === driverName || ex.id === d.id)) {
                             drivers.push({
                                 id: d.id || ('drv_' + Math.random().toString(36).substr(2, 6)),
                                 nombre: driverName || 'Conductor Flota',
@@ -820,10 +843,10 @@
                                 telefono: d.telefono || d.phone || 'S/T',
                                 autoMarcaModelo: d.autoMarcaModelo || d.vehicle || 'Vehículo',
                                 patente: d.patente || d.plate || 'S/P',
-                                color: d.color || 'Plata',
-                                categoria: d.categoria || 'Sedán Ejecutivo',
+                                color: d.color || 'Negro',
+                                categoria: d.categoria || 'Sedán Estándar',
                                 fotoPerfil: d.fotoPerfil || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-                                estadoVerificacion: d.estadoVerificacion || 'aprobado',
+                                estadoVerificacion: d.estadoVerificacion || 'pendiente',
                                 isOnline: !!d.isOnline,
                                 banco: d.banco || 'BBVA Argentina',
                                 cbu: d.cbu || '0170020620000001928374',
@@ -833,29 +856,6 @@
                             });
                         }
                     });
-                }
-
-                // 3. Fallback inicial si no hay ningún registro en memoria
-                if (drivers.length === 0) {
-                    drivers = [
-                        {
-                            id: 'drv_101',
-                            nombre: 'Daniel Pabón',
-                            dni: '38.492.102',
-                            telefono: '+54 9 11 2255-8226',
-                            autoMarcaModelo: 'Fiat Cronos Drive',
-                            patente: 'AE927CN',
-                            color: 'Negro Azabache',
-                            categoria: 'Sedán Ejecutivo / Premium',
-                            fotoPerfil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                            estadoVerificacion: 'pendiente',
-                            isOnline: isOnlineLocal,
-                            banco: 'Mercado Pago / Banco Galicia',
-                            cbu: '0000003100084592039481',
-                            titularCuenta: 'Daniel Pabón',
-                            updatedAt: Date.now()
-                        }
-                    ];
                 }
 
                 currentDrivers = drivers;
@@ -1037,14 +1037,14 @@
                 // Extraer imágenes reales cargadas por el conductor
                 const userImgs = driver.docsImages || {};
 
-                // Generar los 6 documentos de revisión (se quita foto de CBU)
+                // Generar los 6 documentos de revisión
                 const docItems = [
-                    { title: '1. Documento Nacional de Identidad (DNI)', key: 'dni', img: userImgs.dni || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80', isReal: !!userImgs.dni },
-                    { title: '2. Licencia de Conducir (Vigente)', key: 'licencia', img: userImgs.licencia || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80', isReal: !!userImgs.licencia },
-                    { title: '3. Póliza de Seguro del Vehículo', key: 'seguro', img: userImgs.seguro || 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=400&q=80', isReal: !!userImgs.seguro },
-                    { title: '4. Cédula Verde / Azul del Auto', key: 'cedula', img: userImgs.cedula || 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80', isReal: !!userImgs.cedula },
-                    { title: '5. Certificado de Antecedentes Penales', key: 'antecedentes', img: userImgs.antecedentes || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=400&q=80', isReal: !!userImgs.antecedentes },
-                    { title: '6. Foto de Perfil Clara y Reciente', key: 'foto', img: userImgs.foto || driver.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80', isReal: !!(userImgs.foto || driver.fotoPerfil) }
+                    { title: '1. Documento Nacional de Identidad (DNI)', key: 'dni', img: userImgs.dni || '', isReal: Boolean(userImgs.dni && userImgs.dni.length > 20) },
+                    { title: '2. Licencia de Conducir (Vigente)', key: 'licencia', img: userImgs.licencia || '', isReal: Boolean(userImgs.licencia && userImgs.licencia.length > 20) },
+                    { title: '3. Póliza de Seguro del Vehículo', key: 'seguro', img: userImgs.seguro || '', isReal: Boolean(userImgs.seguro && userImgs.seguro.length > 20) },
+                    { title: '4. Cédula Verde / Azul del Auto', key: 'cedula', img: userImgs.cedula || '', isReal: Boolean(userImgs.cedula && userImgs.cedula.length > 20) },
+                    { title: '5. Certificado de Antecedentes Penales', key: 'antecedentes', img: userImgs.antecedentes || '', isReal: Boolean(userImgs.antecedentes && userImgs.antecedentes.length > 20) },
+                    { title: '6. Foto de Perfil Clara y Reciente', key: 'foto', img: userImgs.foto || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com') ? driver.fotoPerfil : ''), isReal: Boolean((userImgs.foto && userImgs.foto.length > 20) || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com'))) }
                 ];
 
                 docsReviewGrid.innerHTML = docItems.map(item => `
@@ -1052,9 +1052,9 @@
                         <div>
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <strong style="font-size: 0.8rem; color: #e2e8f0;">${item.title}</strong>
-                                ${item.isReal ? '<span style="font-size: 0.65rem; background: rgba(16,185,129,0.2); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✓ Archivo Subido</span>' : '<span style="font-size: 0.65rem; background: rgba(245,158,11,0.2); color: #fbbf24; padding: 2px 6px; border-radius: 4px;">Demostración</span>'}
+                                ${item.isReal ? '<span style="font-size: 0.65rem; background: rgba(16,185,129,0.2); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✓ Archivo Subido</span>' : '<span style="font-size: 0.65rem; background: rgba(239,68,68,0.2); color: #fca5a5; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✕ Sin Archivo</span>'}
                             </div>
-                            <img src="${item.img}" class="doc-preview-img zoomable-doc-img" title="Clic para ampliar documento">
+                            ${item.isReal && item.img ? `<img src="${item.img}" class="doc-preview-img zoomable-doc-img" title="Clic para ampliar documento">` : `<div style="height:120px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); border:1px dashed rgba(255,255,255,0.15); border-radius:8px; margin:10px 0; color:#94a3b8; font-size:0.8rem;"><i class="fa-solid fa-file-circle-xmark" style="margin-right:6px;"></i> No adjuntado aún</div>`}
                         </div>
                         <div style="display: flex; gap: 8px; margin-top: 6px;">
                             <button class="admin-btn btn-doc-approve" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">

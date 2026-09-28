@@ -7653,6 +7653,27 @@ if (btnRecenterPassengerMap) {
       });
     }
 
+    // Botón Cerrar Sesión del Pasajero
+    const btnLogoutPassenger = document.getElementById('btnLogoutPassenger');
+    if (btnLogoutPassenger) {
+      btnLogoutPassenger.addEventListener('click', () => {
+        if (!confirm('¿Seguro que deseas cerrar la sesión actual del pasajero?')) return;
+        localStorage.removeItem('rutaprivada_passenger_profile');
+        closeModal();
+        updatePassengerHeaderAndInputs(DEFAULT_PASSENGER_PROFILE);
+        showToast('🚪 Sesión de pasajero cerrada correctamente.');
+
+        const modalOnboarding = document.getElementById('modalPassengerOnboarding');
+        const onbName = document.getElementById('onboardingPassName');
+        const onbPhone = document.getElementById('onboardingPassPhone');
+        const onbEmail = document.getElementById('onboardingPassEmail');
+        if (onbName) onbName.value = '';
+        if (onbPhone) onbPhone.value = '';
+        if (onbEmail) onbEmail.value = '';
+        if (modalOnboarding) modalOnboarding.classList.remove('hidden');
+      });
+    }
+
     // Gestión de múltiples tarjetas
     const btnToggleCard = document.getElementById('btnToggleAddCard');
     const formCard = document.getElementById('addCardFormWrap');
@@ -8099,16 +8120,118 @@ if (btnRecenterPassengerMap) {
     }
   }
 
+  // ==========================================
+  // ANDROID NATIVE BACK BUTTON & MODAL/STEP HISTORY HANDLER (PASAJERO)
+  // ==========================================
+  function setupAndroidBackButtonHandler() {
+    function handleAppBackAction() {
+      // 1. Modal SOS / Seguridad
+      const modalSos = document.getElementById('modalPassengerSosShare');
+      if (modalSos && !modalSos.classList.contains('hidden')) {
+        modalSos.classList.add('hidden');
+        return true;
+      }
+
+      // 2. Modal Mis Reservas
+      const modalReservas = document.getElementById('passenger-reservations-modal');
+      if (modalReservas && !modalReservas.classList.contains('hidden')) {
+        modalReservas.classList.add('hidden');
+        return true;
+      }
+
+      // 3. Modal Perfil Pasajero
+      const modalProfile = document.getElementById('modalPassengerProfile');
+      if (modalProfile && (!modalProfile.classList.contains('hidden') || modalProfile.classList.contains('active'))) {
+        modalProfile.classList.add('hidden');
+        modalProfile.classList.remove('active');
+        return true;
+      }
+
+      // 4. Modal Config Admin
+      const modalAdmin = document.getElementById('admin-config-modal');
+      if (modalAdmin && !modalAdmin.classList.contains('hidden')) {
+        modalAdmin.classList.add('hidden');
+        return true;
+      }
+
+      // 5. Modal de Onboarding si el usuario ya tenía perfil guardado
+      const modalOnboard = document.getElementById('modalPassengerOnboarding');
+      if (modalOnboard && !modalOnboard.classList.contains('hidden')) {
+        try {
+          const profile = JSON.parse(localStorage.getItem('rutaprivada_passenger_profile') || '{}');
+          if (profile && profile.nombre) {
+            modalOnboard.classList.add('hidden');
+            return true;
+          }
+        } catch(e) {}
+      }
+
+      // 6. Cerrar cualquier otro modal o backdrop visible
+      const openModals = document.querySelectorAll('.modal-backdrop:not(.hidden), .modal.active, .modal-overlay.active, .dialog-overlay.active');
+      let modalClosed = false;
+      openModals.forEach(m => {
+        m.classList.add('hidden');
+        m.classList.remove('active');
+        modalClosed = true;
+      });
+      if (modalClosed) return true;
+
+      // 7. Cerrar listas desplegables de autocompletado si están abiertas
+      const suggestions = document.querySelectorAll('.suggestions-list:not(.hidden)');
+      let suggestionsClosed = false;
+      suggestions.forEach(s => {
+        s.classList.add('hidden');
+        suggestionsClosed = true;
+      });
+      if (suggestionsClosed) return true;
+
+      // 8. Si está en un paso avanzado del cotizador (Pasos 2, 3, 4, 5), volver al paso anterior
+      if (typeof currentWizardStep === 'number' && currentWizardStep > 1) {
+        goToWizardStep(currentWizardStep - 1);
+        return true;
+      }
+
+      return false; // No había ninguna ventana que cerrar (está en la pantalla principal)
+    }
+
+    // Integración directa con el botón nativo de Android en Capacitor
+    if (typeof window !== 'undefined' && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+      try {
+        window.Capacitor.Plugins.App.addListener('backButton', ({ canGoBack }) => {
+          const handled = handleAppBackAction();
+          if (!handled) {
+            // Si está en el Paso 1 y sin modales, permitir salir de la aplicación
+            window.Capacitor.Plugins.App.exitApp();
+          }
+        });
+      } catch(e) {}
+    }
+
+    // Integración con navegador móvil / PWA
+    window.addEventListener('popstate', (e) => {
+      handleAppBackAction();
+    });
+
+    // Helper global para registrar un punto en el historial
+    window.pushNavigationState = function(stateName) {
+      try {
+        history.pushState({ modal: stateName || 'open', timestamp: Date.now() }, '');
+      } catch(e) {}
+    };
+  }
+
   // Inicializar al cargar
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       initPassengerProfileModule();
       initPassengerSosModule();
+      setupAndroidBackButtonHandler();
       checkAndRestoreActiveTripOnStartup();
     });
   } else {
     initPassengerProfileModule();
     initPassengerSosModule();
+    setupAndroidBackButtonHandler();
     checkAndRestoreActiveTripOnStartup();
   }
 

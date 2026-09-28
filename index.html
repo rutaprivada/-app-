@@ -169,27 +169,30 @@
           <p class="brand-subtitle">Traslados Ejecutivos & Chofer Profesional</p>
         </div>
       </div>
-      <div class="header-badges">
+      <div class="header-badges web-only">
         <span class="badge badge-trust">🛡️ Choferes Verificados</span>
         <span class="badge badge-fair">⭐ Servicio 24 Horas</span>
       </div>
       
-      <!-- Botón Acceso a Mis Reservas Programadas -->
-      <button type="button" class="btn-header-reservations clickable-header-profile" id="btnOpenPassengerReservations" title="Ver mis Reservas Programadas" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 6px 12px; color: #fbbf24; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
-        <span style="font-size: 1.1rem;">📅</span>
-        <span class="header-reservas-label">Mis Reservas</span>
-        <span class="reservations-badge-count" id="passengerReservationsBadge" style="background: #f59e0b; color: #000; font-size: 0.72rem; font-weight: 800; border-radius: 10px; padding: 1px 6px; display: none;">0</span>
-      </button>
+      <!-- Contenedor Ejecutivo Unificado de Acciones del Pasajero -->
+      <div class="passenger-header-actions">
+        <!-- Botón Acceso a Mis Reservas Programadas -->
+        <button type="button" class="btn-header-reservations clickable-header-profile" id="btnOpenPassengerReservations" title="Ver mis Reservas Programadas">
+          <i class="fa-solid fa-calendar-days" style="font-size: 1.05rem; color: #fbbf24;"></i>
+          <span class="header-reservas-label">Mis Reservas</span>
+          <span class="reservations-badge-count" id="passengerReservationsBadge" style="display: none;">0</span>
+        </button>
 
-      <!-- Passenger Profile Avatar Trigger -->
-      <div class="passenger-header-profile clickable-header-profile" id="btnOpenPassengerProfile" title="Ver mi Perfil, Medios de Pago e Historial de Viajes">
-        <div class="passenger-avatar-wrap">
-          <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Pasajero" class="passenger-avatar" id="headerPassengerAvatar" />
-          <span class="status-indicator online"></span>
-        </div>
-        <div class="passenger-meta header-profile-meta">
-          <span class="passenger-name" id="headerPassengerName">Daniel Felipe</span>
-          <span class="passenger-status-sub">⭐ Pasajero VIP</span>
+        <!-- Passenger Profile Avatar Trigger -->
+        <div class="passenger-header-profile clickable-header-profile" id="btnOpenPassengerProfile" title="Ver mi Perfil, Medios de Pago e Historial de Viajes">
+          <div class="passenger-avatar-wrap">
+            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Pasajero" class="passenger-avatar" id="headerPassengerAvatar" />
+            <span class="status-indicator online"></span>
+          </div>
+          <div class="passenger-meta header-profile-meta">
+            <span class="passenger-name" id="headerPassengerName">Mi Perfil</span>
+            <span class="passenger-status-sub">⭐ Pasajero VIP</span>
+          </div>
         </div>
       </div>
     </div>
@@ -222,7 +225,6 @@
       <div class="wizard-step-panel active-wizard-step" id="wizard-step-panel-1">
         <div class="compact-wizard-header">
           <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 1 de 5</span>
             <h2 class="compact-step-title">📍 ¿A dónde deseas viajar?</h2>
           </div>
         </div>
@@ -306,7 +308,6 @@
       <div class="wizard-step-panel hidden" id="wizard-step-panel-2">
         <div class="compact-wizard-header">
           <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 2 de 5</span>
             <h2 class="compact-step-title">🗺️ Verificación de Ruta & Tráfico</h2>
           </div>
           <div id="step-datetime-summary-step2" class="step-summary-badge">📍 Ruta</div>
@@ -371,7 +372,6 @@
       <div class="wizard-step-panel hidden" id="wizard-step-panel-3">
         <div class="compact-wizard-header">
           <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 3 de 5</span>
             <h2 class="compact-step-title">📅 ¿Cuándo deseas realizar tu traslado?</h2>
           </div>
           <div id="step-datetime-summary-step3" class="step-summary-badge">📅 Hoy</div>
@@ -476,7 +476,6 @@
       <div class="wizard-step-panel hidden" id="wizard-step-panel-4">
         <div class="compact-wizard-header">
           <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 4 de 5</span>
             <h2 class="compact-step-title">🕒 Hora de Recogida (Formato 24 hs)</h2>
           </div>
           <div id="step-datetime-summary-step4" class="step-summary-badge">📅 Hoy</div>
@@ -550,7 +549,6 @@
       <div class="wizard-step-panel hidden" id="wizard-step-panel-5">
         <div class="compact-wizard-header">
           <div class="compact-header-left">
-            <span class="compact-step-tag">Paso 5 de 5</span>
             <h2 class="compact-step-title">💳 Cotización Final & Confirmación</h2>
           </div>
           <div id="step-datetime-summary-step5" class="step-summary-badge">📅 Hoy • 🕒 --:--</div>
@@ -1304,9 +1302,14 @@
               <input type="email" id="profPassengerEmail" placeholder="Ej: roberto.gomez@gmail.com" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" />
             </div>
 
-            <button type="submit" class="btn btn-primary full-width" style="margin-top: 10px;">
-              💾 Guardar Mi Perfil
-            </button>
+            <div style="display: flex; gap: 10px; margin-top: 12px; align-items: center;">
+              <button type="submit" class="btn btn-primary" style="flex: 1; padding: 11px; font-size: 0.88rem; font-weight: 700; border-radius: 10px;">
+                💾 Guardar Mi Perfil
+              </button>
+              <button type="button" id="btnLogoutPassenger" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; font-size: 0.8rem; font-weight: 700; padding: 10px 14px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: all 0.2s;" title="Cerrar sesión actual para ingresar con otra cuenta">
+                <i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión
+              </button>
+            </div>
           </form>
         </div>
 
