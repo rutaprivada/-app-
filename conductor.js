@@ -108,6 +108,128 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3500);
     }
 
+    /**
+     * Motor de Comisión Dinámica de Plataforma (RutaPrivada)
+     * Reglas configuradas:
+     * - Horario pico laboral: 16%
+     * - Alta demanda / Surge: 16%
+     * - Lluvia / Tormenta: 15%
+     * - Madrugada (00:00 a 06:00): 10%
+     * - Larga distancia (25 a 35 km: 15%, > 35 km: 20%)
+     * - Reservas programadas: 12%
+     * - Base estándar / Valle: 10%
+     */
+    function calculatePlatformCommission(trip) {
+        if (!trip) {
+            return {
+                percent: 10,
+                rateLabel: 'Estándar (10%)',
+                commissionAmount: 0,
+                netAmount: 0
+            };
+        }
+
+        const rawPrice = Number(trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0);
+        const tollAmt = Number(trip.tollActual !== undefined && trip.tollActual !== null ? trip.tollActual : (trip.tollFare || trip.peajes || (trip.breakdown && trip.breakdown.tollCost) || 0)) || 0;
+        const baseFare = Math.max(0, rawPrice - tollAmt);
+
+        let distKm = 0;
+        if (trip.distanceKm !== undefined && trip.distanceKm !== null && !isNaN(Number(trip.distanceKm))) {
+            distKm = Number(trip.distanceKm);
+        } else if (trip.distancia) {
+            const m = String(trip.distancia).replace(',', '.').match(/([\d\.]+)/);
+            if (m) distKm = parseFloat(m[1]) || 0;
+        }
+
+        const isReserva = Boolean(trip.reservaId || trip.isReservation || trip.tripType === 'schedule' || trip.tipo === 'reserva');
+        const isRain = Boolean(trip.isRain || (trip.weather && trip.weather.isRain) || trip.climaLluvia);
+        const isHighDemand = Boolean(trip.isHighDemand || trip.surgeLevel === 'high' || trip.altaDemanda);
+        const isPeakHour = Boolean(trip.isPeakHour || trip.horarioPico);
+        const isMadrugada = Boolean(trip.isMadrugada || trip.horarioMadrugada);
+
+        let percent = 10;
+        let rateLabel = 'Estándar (10%)';
+
+        // 1. Reservas programadas VIP -> 12%
+        if (isReserva) {
+            percent = 12;
+            rateLabel = 'Reserva Programada (12%)';
+        }
+        // 2. Larga Distancia (> 35 km: 20%, 25 a 35 km: 15%)
+        else if (distKm > 35) {
+            percent = 20;
+            rateLabel = `Larga Distancia >35km (20%)`;
+        } else if (distKm >= 25 && distKm <= 35) {
+            percent = 15;
+            rateLabel = `Larga Distancia 25-35km (15%)`;
+        }
+        // 3. Alta Demanda / Surge -> 16%
+        else if (isHighDemand) {
+            percent = 16;
+            rateLabel = 'Alta Demanda (16%)';
+        }
+        // 4. Horario Pico Laboral -> 16%
+        else if (isPeakHour) {
+            percent = 16;
+            rateLabel = 'Horario Pico Laboral (16%)';
+        }
+        // 5. Lluvia / Tormenta -> 15%
+        else if (isRain) {
+            percent = 15;
+            rateLabel = 'Lluvia / Tormenta (15%)';
+        }
+        // 6. Madrugada / Nocturno -> 10%
+        else if (isMadrugada) {
+            percent = 10;
+            rateLabel = 'Madrugada (10%)';
+        }
+
+        const commissionAmount = Math.round(baseFare * (percent / 100));
+        const netAmount = rawPrice - commissionAmount;
+
+        return {
+            percent,
+            rateLabel,
+            commissionAmount,
+            netAmount,
+            baseFare,
+            tollAmt,
+            totalFare: rawPrice
+        };
+    }
+
+    function formatDriverTripPriceDisplay(trip) {
+        if (!trip) return { displayHeroFormatted: '$0', isCard: false };
+
+        const rawPrice = Number(trip.precioEstimado ?? trip.precio ?? trip.totalFare ?? trip.monto ?? 0);
+        const tollCost = Number(trip.tollActual !== undefined && trip.tollActual !== null ? trip.tollActual : (trip.tollCost || trip.peajes || trip.tollFare || (trip.breakdown && trip.breakdown.tollCost) || 0));
+        const tripFareOnly = Math.max(0, rawPrice - tollCost);
+        const payMethod = String(trip.metodoPago || trip.paymentMethod || 'Efectivo').toLowerCase();
+        const isCard = payMethod.includes('tarjeta') || payMethod.includes('card') || payMethod.includes('inapp');
+
+        const commInfo = calculatePlatformCommission(trip);
+        // Para viajes con tarjeta: la ganancia neta del chofer es la tarifa neta del traslado + 100% peajes
+        const netTripFare = Math.max(0, tripFareOnly - commInfo.commissionAmount);
+        const driverNetTotal = isCard ? (netTripFare + tollCost) : rawPrice;
+
+        return {
+            isCard,
+            payMethodLabel: isCard ? 'Tarjeta In-App' : 'Efectivo / Transferencia',
+            displayHeroPrice: driverNetTotal,
+            displayHeroFormatted: '$' + driverNetTotal.toLocaleString('es-AR'),
+            grossTotalFormatted: '$' + rawPrice.toLocaleString('es-AR'),
+            tripFareOnly,
+            tripFareFormatted: '$' + (isCard ? netTripFare : tripFareOnly).toLocaleString('es-AR'),
+            tollCost,
+            tollFormatted: tollCost > 0 ? `+$${tollCost.toLocaleString('es-AR')}` : 'Sin peaje',
+            commissionPercent: commInfo.percent,
+            commissionAmount: commInfo.commissionAmount,
+            commissionLabel: commInfo.rateLabel,
+            heroBadgeLabel: isCard ? '💳 Tu Ganancia Neta' : '💵 Cobro al Pasajero',
+            cardNoteHtml: isCard ? `<span style="font-size: 0.7rem; color: #38bdf8; display: block; margin-top: 2px;">💳 Tarjeta (Comisión ${commInfo.percent}% ya descontada)</span>` : ''
+        };
+    }
+
     // ==========================================
     // ELEMENTOS DEL DOM
     // ==========================================
@@ -1126,6 +1248,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dateStr = b.date || b.pickupDate || 'Hoy';
                 const timeStr = b.time || b.pickupTime || '00:00';
                 const paymentStr = b.paymentMethod || b.metodoPago || 'Efectivo / Transferencia';
+                const pInfo = formatDriverTripPriceDisplay(b);
 
                 // Comprobar regla de conflicto de 45 minutos si es una reserva disponible
                 const conflictInfo = !isTomada ? tieneConflictoHorario45Min(b, tomadas) : { conflicto: false };
@@ -1165,15 +1288,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span class="m-val">${clientName}</span>
                             </div>
                             <div class="reserva-meta-item">
-                                <span class="m-title">Total a Cobrar</span>
-                                <span class="m-val text-gold">$${priceVal.toLocaleString('es-AR')}</span>
+                                <span class="m-title">${pInfo.isCard ? 'Tu Ganancia (Tarjeta)' : 'Total a Cobrar'}</span>
+                                <span class="m-val text-gold">${pInfo.displayHeroFormatted}</span>
                                 <span style="font-size: 0.68rem; color: #94a3b8; display: block; margin-top: 2px;">
-                                    ${tollCost > 0 ? `($${tripFareOnly.toLocaleString('es-AR')} viaje + $${tollCost.toLocaleString('es-AR')} peaje)` : `($${tripFareOnly.toLocaleString('es-AR')} viaje · sin peaje)`}
+                                    ${pInfo.tollCost > 0 ? `(${pInfo.tripFareFormatted} viaje + ${pInfo.tollFormatted} peaje)` : `(${pInfo.tripFareFormatted} viaje · sin peaje)`}
                                 </span>
+                                ${pInfo.cardNoteHtml}
                             </div>
                             <div class="reserva-meta-item">
                                 <span class="m-title">Pago</span>
-                                <span class="m-val">${paymentStr}</span>
+                                <span class="m-val">${pInfo.payMethodLabel}</span>
                             </div>
                         </div>
 
@@ -1769,8 +1893,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (section) section.style.display = 'block';
 
         container.innerHTML = driverState.availableTrips.map(trip => {
-            const rawPrice = trip.precioEstimado ?? trip.precio ?? trip.totalFare ?? trip.monto ?? 0;
-            const fareStr = '$' + Number(rawPrice).toLocaleString('es-AR');
+            const pInfo = formatDriverTripPriceDisplay(trip);
             const distPickup = (trip._distFromDriverKm || 1.2).toFixed(1);
             const stopAddr = trip.parada || trip.stopAddress || trip.intermediateStop || '';
 
@@ -1780,9 +1903,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.15); padding: 4px 10px; border-radius: 8px;">
                             📍 a ${distPickup} km de ti
                         </span>
-                        <span style="font-size: 1.25rem; font-weight: 800; color: #fbbf24;">
-                            ${fareStr}
-                        </span>
+                        <div style="text-align: right;">
+                            <span style="font-size: 1.25rem; font-weight: 800; color: #fbbf24;">
+                                ${pInfo.displayHeroFormatted}
+                            </span>
+                            <small style="display: block; font-size: 0.7rem; color: ${pInfo.isCard ? '#38bdf8' : '#34d399'}; font-weight: 700;">
+                                ${pInfo.isCard ? '💳 Tu Ganancia' : '💵 Cobro Total'}
+                            </small>
+                        </div>
                     </div>
 
                     <div style="display: flex; flex-direction: column; gap: 5px; font-size: 0.85rem; margin: 2px 0;">
@@ -1802,9 +1930,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">
-                        <span style="font-size: 0.78rem; color: #94a3b8;">
-                            ${trip.distancia || '15 km'} · ${trip.duracion || '25 min'}
-                        </span>
+                        <div style="font-size: 0.76rem; color: #94a3b8;">
+                            <span>${trip.distancia || '15 km'} · ${trip.duracion || '25 min'}</span>
+                            <span style="display: block; color: #cbd5e1; font-size: 0.72rem; margin-top: 2px;">
+                                ${pInfo.tollCost > 0 ? `(${pInfo.tripFareFormatted} viaje + ${pInfo.tollFormatted} peaje)` : `(${pInfo.tripFareFormatted} viaje)`}
+                            </span>
+                            ${pInfo.cardNoteHtml}
+                        </div>
                         <button type="button" class="btn-accept-available-trip" data-id="${trip.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 0.88rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);">
                             <i class="fa-solid fa-check"></i> Aceptar Traslado
                         </button>
@@ -1910,16 +2042,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!driverState.isOnline || driverState.activeTrip || !tripData) return;
 
         driverState.incomingTrip = tripData;
-        const rawPrice = tripData.precioEstimado ?? tripData.precio ?? tripData.totalFare ?? tripData.monto;
-        const tripPrice = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)))
-            ? Number(rawPrice)
-            : 0;
+        const pInfo = formatDriverTripPriceDisplay(tripData);
 
         // Notificación flotante de sistema por encima de otras aplicaciones si está en background o pantalla de inicio
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
-                const notif = new Notification(`🚨 NUEVA SOLICITUD DE VIAJE - $${tripPrice.toLocaleString('es-AR')}`, {
-                    body: `📍 ${tripData.origen || tripData.pickupAddress || 'Origen'} ➔ 🏁 ${tripData.destino || tripData.dropoffAddress || 'Destino'}`,
+                const notif = new Notification(`🚨 ${pInfo.isCard ? 'VIAJE TARJETA - GANANCIA' : 'NUEVA SOLICITUD'} ${pInfo.displayHeroFormatted}`, {
+                    body: `📍 ${tripData.origen || tripData.pickupAddress || 'Origen'} ➔ 🏁 ${tripData.destino || tripData.dropoffAddress || 'Destino'}\n${pInfo.isCard ? '💳 Comisión ya descontada' : '💵 Cobro en efectivo'}`,
                     icon: 'icon-192.png',
                     tag: 'incoming-trip-system-alert',
                     renotify: true,
@@ -1936,24 +2065,28 @@ document.addEventListener('DOMContentLoaded', () => {
             try { navigator.vibrate([400, 200, 400]); } catch(e) {}
         }
 
-        incomingPrice.textContent = '$' + tripPrice.toLocaleString('es-AR');
+        // Título del monto (Ganancia Neta vs Cobro al Pasajero)
+        const incomingPriceTitleEl = document.querySelector('.incoming-price-box .price-title');
+        if (incomingPriceTitleEl) {
+            incomingPriceTitleEl.textContent = pInfo.isCard ? 'Tu Ganancia Neta' : 'Total a Cobrar';
+        }
+
+        incomingPrice.textContent = pInfo.displayHeroFormatted;
         incomingCategory.textContent = tripData.categoria || tripData.category || 'Sedán Ejecutivo';
         incomingOrigin.textContent = tripData.origen || tripData.pickupAddress || tripData.origin || 'Punto de recogida';
         incomingDestination.textContent = tripData.destino || tripData.dropoffAddress || tripData.destination || 'Punto de destino';
         incomingDistance.textContent = tripData.distancia || '15 km';
         incomingDuration.textContent = tripData.duracion || '25 min';
 
-        // Desglose de Tarifa de Viaje vs Peajes
-        const tollAmount = Number(tripData.tollCost || tripData.tollPrice || tripData.peajes || (tripData.breakdown && tripData.breakdown.tollCost) || 0);
-        const tripFareOnly = Math.max(0, tripPrice - tollAmount);
+        // Desglose explícito de Tarifa vs Peajes
         const incomingTripFareOnlyEl = document.getElementById('incomingTripFareOnly');
         const incomingTollFareOnlyEl = document.getElementById('incomingTollFareOnly');
         if (incomingTripFareOnlyEl) {
-            incomingTripFareOnlyEl.innerHTML = `<i class="fa-solid fa-car text-emerald"></i> Viaje: $${tripFareOnly.toLocaleString('es-AR')}`;
+            incomingTripFareOnlyEl.innerHTML = `<i class="fa-solid fa-car text-emerald"></i> ${pInfo.isCard ? 'Traslado neto' : 'Traslado'}: ${pInfo.tripFareFormatted}`;
         }
         if (incomingTollFareOnlyEl) {
-            if (tollAmount > 0) {
-                incomingTollFareOnlyEl.innerHTML = `<i class="fa-solid fa-road"></i> Peaje: +$${tollAmount.toLocaleString('es-AR')}`;
+            if (pInfo.tollCost > 0) {
+                incomingTollFareOnlyEl.innerHTML = `<i class="fa-solid fa-road"></i> Peaje: ${pInfo.tollFormatted}`;
                 incomingTollFareOnlyEl.style.display = 'inline-flex';
             } else {
                 incomingTollFareOnlyEl.innerHTML = `<i class="fa-solid fa-road"></i> Sin peaje`;
@@ -2142,8 +2275,11 @@ document.addEventListener('DOMContentLoaded', () => {
         activeTripOrigin.textContent = trip.origen || trip.pickupAddress || trip.origin || 'Origen';
         activeTripDestination.textContent = trip.destino || trip.dropoffAddress || trip.destination || 'Destino';
         activeTripDistance.textContent = trip.distancia || 'Calculando';
-        activeTripEarnings.textContent = '$' + tripPrice.toLocaleString('es-AR');
-        activeTripPayment.innerHTML = `<i class="fa-solid fa-money-bill-wave"></i> ${trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia'}`;
+        const pInfo = formatDriverTripPriceDisplay(trip);
+        activeTripEarnings.textContent = pInfo.displayHeroFormatted;
+        activeTripPayment.innerHTML = pInfo.isCard
+            ? `<i class="fa-solid fa-credit-card" style="color: #38bdf8;"></i> Tarjeta In-App (Ganancia Neta)`
+            : `<i class="fa-solid fa-money-bill-wave" style="color: #34d399;"></i> ${trip.metodoPago || trip.paymentMethod || 'Efectivo / Transferencia'}`;
 
         // Mostrar u ocultar Parada Intermedia
         const activeTripStopStep = document.getElementById('activeTripStopStep');
@@ -2161,9 +2297,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Mostrar Peajes según corresponda en el viaje
         const activeTripTolls = document.getElementById('activeTripTolls');
         if (activeTripTolls) {
-            const tollAmt = Number(trip.tollFare || trip.peajes || 0);
-            if (tollAmt > 0) {
-                activeTripTolls.textContent = `$${tollAmt.toLocaleString('es-AR')} (Incluidos)`;
+            if (pInfo.tollCost > 0) {
+                activeTripTolls.textContent = `${pInfo.tollFormatted} (100% Chofer)`;
                 activeTripTolls.style.color = '#34d399';
             } else {
                 activeTripTolls.textContent = 'Sin peajes';
@@ -2842,21 +2977,46 @@ document.addEventListener('DOMContentLoaded', () => {
         const trip = driverState.activeTrip;
         if (!trip) return;
 
-        const rawPrice = trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0;
-        const montoGanado = Number(rawPrice) || 0;
-        const tollAmt = Number(trip.tollFare || trip.peajes || 0);
+        const pInfo = formatDriverTripPriceDisplay(trip);
         const passName = trip.nombrePasajero || trip.clientName || trip.customerName || 'Pasajero';
         const initialPayMethod = trip.metodoPago || trip.paymentMethod || 'Efectivo';
 
-        // Preseleccionar método
-        driverSelectedPaymentMethod = initialPayMethod.includes('Transfer') ? 'Transferencia Bancaria' : 'Efectivo';
-        updateDriverPaymentPills();
+        const heroSubtitleEl = document.getElementById('driverFareHeroSubtitle');
+        const selectorBox = document.getElementById('driverPaymentSelectorBox');
 
-        if (driverFareHeroTotal) driverFareHeroTotal.textContent = '$' + montoGanado.toLocaleString('es-AR');
-        if (driverFareBaseAmount) driverFareBaseAmount.textContent = '$' + (montoGanado - tollAmt > 0 ? (montoGanado - tollAmt) : montoGanado).toLocaleString('es-AR');
+        // Preseleccionar método
+        if (pInfo.isCard) {
+            driverSelectedPaymentMethod = 'Tarjeta de Crédito / Débito (In-App)';
+            if (selectorBox) selectorBox.style.display = 'none';
+            if (heroSubtitleEl) heroSubtitleEl.textContent = 'TU GANANCIA NETA ACREDITADA';
+        } else {
+            driverSelectedPaymentMethod = initialPayMethod.includes('Transfer') ? 'Transferencia Bancaria' : 'Efectivo';
+            if (selectorBox) selectorBox.style.display = 'block';
+            if (heroSubtitleEl) heroSubtitleEl.textContent = 'TOTAL A COBRAR AL PASAJERO';
+            updateDriverPaymentPills();
+        }
+
+        if (driverFareHeroTotal) driverFareHeroTotal.textContent = pInfo.displayHeroFormatted;
+        if (driverFarePaymentMethod) {
+            driverFarePaymentMethod.innerHTML = pInfo.isCard
+                ? `<i class="fa-solid fa-credit-card" style="color: #38bdf8;"></i> Tarjeta In-App (Acreditación Automática)`
+                : `<i class="fa-solid fa-money-bill-wave" style="color: #34d399;"></i> ${driverSelectedPaymentMethod}`;
+        }
+
+        if (driverFareBaseAmount) {
+            driverFareBaseAmount.textContent = '$' + pInfo.tripFareOnly.toLocaleString('es-AR');
+        }
+
+        const driverFareCommissionRow = document.getElementById('driverFareCommissionRow');
+        const driverFareCommissionAmount = document.getElementById('driverFareCommissionAmount');
+        if (driverFareCommissionRow && driverFareCommissionAmount) {
+            driverFareCommissionRow.style.display = 'flex';
+            driverFareCommissionAmount.textContent = `-$${pInfo.commissionAmount.toLocaleString('es-AR')} (${pInfo.commissionPercent}% · ${pInfo.commissionLabel})`;
+        }
+
         if (driverFareTollsAmount) {
-            driverFareTollsAmount.textContent = tollAmt > 0 ? `$${tollAmt.toLocaleString('es-AR')} (Incluidos)` : 'Sin peajes';
-            driverFareTollsAmount.style.color = tollAmt > 0 ? '#34d399' : '#94a3b8';
+            driverFareTollsAmount.textContent = pInfo.tollCost > 0 ? `${pInfo.tollFormatted} (100% Chofer)` : 'Sin peajes';
+            driverFareTollsAmount.style.color = pInfo.tollCost > 0 ? '#34d399' : '#94a3b8';
         }
         if (driverFarePassengerName) driverFarePassengerName.textContent = passName;
 

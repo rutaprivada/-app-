@@ -880,7 +880,7 @@
             </div>
 
             <div class="fare-summary-card">
-                <span class="fare-summary-subtitle">TOTAL A COBRAR AL PASAJERO</span>
+                <span class="fare-summary-subtitle" id="driverFareHeroSubtitle">TOTAL A COBRAR AL PASAJERO</span>
                 <div class="fare-summary-hero" id="driverFareHeroTotal">$0</div>
                 <div class="fare-summary-method" id="driverFarePaymentMethod">
                     <i class="fa-solid fa-money-bill-wave"></i> Efectivo / Transferencia
@@ -892,8 +892,12 @@
                     <span class="fb-label"><i class="fa-solid fa-route"></i> Tarifa del Traslado</span>
                     <strong class="fb-value" id="driverFareBaseAmount">$0</strong>
                 </div>
+                <div class="fare-breakdown-item" id="driverFareCommissionRow">
+                    <span class="fb-label"><i class="fa-solid fa-percent text-gold"></i> Comisión RutaPrivada</span>
+                    <strong class="fb-value" id="driverFareCommissionAmount" style="color: #fbbf24;">-$0</strong>
+                </div>
                 <div class="fare-breakdown-item">
-                    <span class="fb-label"><i class="fa-solid fa-road"></i> Peajes</span>
+                    <span class="fb-label"><i class="fa-solid fa-road"></i> Peajes (100% Chofer)</span>
                     <strong class="fb-value" id="driverFareTollsAmount">Sin peajes</strong>
                 </div>
                 <div class="fare-breakdown-item">
@@ -903,7 +907,7 @@
             </div>
 
             <!-- Selector Interactivo de Método de Cobro -->
-            <div class="driver-payment-selector-box" style="margin-top: 14px; text-align: left;">
+            <div class="driver-payment-selector-box" id="driverPaymentSelectorBox" style="margin-top: 14px; text-align: left;">
                 <label style="font-size: 0.78rem; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px;">
                     <i class="fa-solid fa-hand-holding-dollar"></i> Método de Pago Abonado:
                 </label>
@@ -919,7 +923,7 @@
 
             <div class="fare-actions-wrap" style="margin-top: 16px;">
                 <button type="button" class="btn-accept-trip full-width" id="btnConfirmDriverFareAndComplete" style="width: 100%; border-radius: 12px; font-size: 1rem; justify-content: center; padding: 14px;">
-                    <i class="fa-solid fa-circle-check"></i> Confirmar Cobro y Calificar
+                    <i class="fa-solid fa-circle-check"></i> Finalizar y Calificar
                 </button>
             </div>
         </div>
