@@ -4631,6 +4631,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 switchTab(savedTab);
             }
         } catch(e) {}
+    }
 
     // ==========================================
     // 14. BILLETERA VIRTUAL PARTNER & SALDO DEL CONDUCTOR
@@ -4747,96 +4748,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }).join('');
         }
-    }
-
-    /**
-     * Motor de Comisión Dinámica de Plataforma (RutaPrivada)
-     * Reglas configuradas:
-     * - Horario pico laboral: 16%
-     * - Alta demanda / Surge: 16%
-     * - Lluvia / Tormenta: 15%
-     * - Madrugada (00:00 a 06:00): 10%
-     * - Larga distancia (25 a 35 km: 15%, > 35 km: 20%)
-     * - Reservas programadas: 12%
-     * - Base estándar / Valle: 10%
-     */
-    function calculatePlatformCommission(trip) {
-        if (!trip) {
-            return {
-                percent: 10,
-                rateLabel: 'Estándar (10%)',
-                commissionAmount: 0,
-                netAmount: 0
-            };
-        }
-
-        const rawPrice = Number(trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0);
-        const tollAmt = Number(trip.tollActual !== undefined && trip.tollActual !== null ? trip.tollActual : (trip.tollFare || trip.peajes || 0)) || 0;
-        const baseFare = Math.max(0, rawPrice - tollAmt);
-
-        let distKm = 0;
-        if (trip.distanceKm !== undefined && trip.distanceKm !== null && !isNaN(Number(trip.distanceKm))) {
-            distKm = Number(trip.distanceKm);
-        } else if (trip.distancia) {
-            const m = String(trip.distancia).replace(',', '.').match(/([\d\.]+)/);
-            if (m) distKm = parseFloat(m[1]) || 0;
-        }
-
-        const isReserva = Boolean(trip.reservaId || trip.isReservation || trip.tripType === 'schedule' || trip.tipo === 'reserva');
-        const isRain = Boolean(trip.isRain || (trip.weather && trip.weather.isRain) || trip.climaLluvia);
-        const isHighDemand = Boolean(trip.isHighDemand || trip.surgeLevel === 'high' || trip.altaDemanda);
-        const isPeakHour = Boolean(trip.isPeakHour || trip.horarioPico);
-        const isMadrugada = Boolean(trip.isMadrugada || trip.horarioMadrugada);
-
-        let percent = 10;
-        let rateLabel = 'Estándar (10%)';
-
-        // 1. Reservas programadas VIP
-        if (isReserva) {
-            percent = 12;
-            rateLabel = 'Reserva Programada (12%)';
-        }
-        // 2. Larga Distancia (> 35 km: 20%, 25 a 35 km: 15%)
-        else if (distKm > 35) {
-            percent = 20;
-            rateLabel = `Larga Distancia >35km (20%)`;
-        } else if (distKm >= 25 && distKm <= 35) {
-            percent = 15;
-            rateLabel = `Larga Distancia 25-35km (15%)`;
-        }
-        // 3. Alta Demanda / Surge
-        else if (isHighDemand) {
-            percent = 16;
-            rateLabel = 'Alta Demanda (16%)';
-        }
-        // 4. Horario Pico Laboral
-        else if (isPeakHour) {
-            percent = 16;
-            rateLabel = 'Horario Pico Laboral (16%)';
-        }
-        // 5. Lluvia / Tormenta
-        else if (isRain) {
-            percent = 15;
-            rateLabel = 'Lluvia / Tormenta (15%)';
-        }
-        // 6. Madrugada / Nocturno
-        else if (isMadrugada) {
-            percent = 10;
-            rateLabel = 'Madrugada (10%)';
-        }
-
-        const commissionAmount = Math.round(baseFare * (percent / 100));
-        const netAmount = rawPrice - commissionAmount;
-
-        return {
-            percent,
-            rateLabel,
-            commissionAmount,
-            netAmount,
-            baseFare,
-            tollAmt,
-            totalFare: rawPrice
-        };
     }
 
     function applyTripToWallet(montoGanado, metodoPago, tripId, tripObj = null) {
