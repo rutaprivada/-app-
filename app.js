@@ -7653,6 +7653,27 @@ if (btnRecenterPassengerMap) {
       });
     }
 
+    // Botón Cerrar Sesión del Pasajero
+    const btnLogoutPassenger = document.getElementById('btnLogoutPassenger');
+    if (btnLogoutPassenger) {
+      btnLogoutPassenger.addEventListener('click', () => {
+        if (!confirm('¿Seguro que deseas cerrar la sesión actual del pasajero?')) return;
+        localStorage.removeItem('rutaprivada_passenger_profile');
+        closeModal();
+        updatePassengerHeaderAndInputs(DEFAULT_PASSENGER_PROFILE);
+        showToast('🚪 Sesión de pasajero cerrada correctamente.');
+
+        const modalOnboarding = document.getElementById('modalPassengerOnboarding');
+        const onbName = document.getElementById('onboardingPassName');
+        const onbPhone = document.getElementById('onboardingPassPhone');
+        const onbEmail = document.getElementById('onboardingPassEmail');
+        if (onbName) onbName.value = '';
+        if (onbPhone) onbPhone.value = '';
+        if (onbEmail) onbEmail.value = '';
+        if (modalOnboarding) modalOnboarding.classList.remove('hidden');
+      });
+    }
+
     // Gestión de múltiples tarjetas
     const btnToggleCard = document.getElementById('btnToggleAddCard');
     const formCard = document.getElementById('addCardFormWrap');

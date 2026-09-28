@@ -504,7 +504,7 @@
                     </div>
                     <div class="profile-info-item">
                         <span class="info-lbl">Categoría</span>
-                        <strong class="info-val" id="profileCategoryVal">Sedán Ejecutivo / Premium</strong>
+                        <strong class="info-val" id="profileCategoryVal">Sedán Estándar</strong>
                     </div>
                     <div class="profile-info-item">
                         <span class="info-lbl">Teléfono de Contacto</span>
@@ -516,7 +516,7 @@
                     </div>
                     <div class="profile-info-item" style="grid-column: 1 / -1;">
                         <span class="info-lbl">Estado de Cuenta</span>
-                        <strong class="info-val text-gold" id="profileStatusVal"><i class="fa-solid fa-clock"></i> Pendiente de Verificación</strong>
+                        <strong class="info-val text-gold" id="profileStatusVal"><i class="fa-solid fa-clock"></i> Documentación Sin Cargar</strong>
                     </div>
                 </div>
             </div>
@@ -537,6 +537,9 @@
             <button type="button" class="btn-cancel-trip full-width" id="btnCerrarPerfilSheet" style="width: 100%; border-radius: 12px; justify-content: center; padding: 12px; font-size: 0.95rem;">
                 Cerrar Perfil
             </button>
+            <button type="button" id="btnLogoutDriver" style="width: 100%; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 12px; padding: 11px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; transition: all 0.2s;" title="Cerrar sesión actual de chofer">
+                <i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión Chofer
+            </button>
         </div>
     </div>
 
@@ -552,10 +555,10 @@
 
             <!-- Banner Estado de Verificación -->
             <div class="docs-status-banner" id="docsStatusBanner" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; display: flex; align-items: center; gap: 12px;">
-                <i class="fa-solid fa-clock text-gold" id="docsStatusIcon" style="font-size: 1.4rem;"></i>
+                <i class="fa-solid fa-triangle-exclamation text-gold" id="docsStatusIcon" style="font-size: 1.4rem;"></i>
                 <div>
-                    <strong style="color: #fff; font-size: 0.9rem;" id="docsStatusTitle">Pendiente de Validación por Administración</strong>
-                    <p style="color: #94a3b8; font-size: 0.78rem; margin: 0;" id="docsStatusDesc">Completa tus datos y sube los documentos requeridos para que el Administrador valide tu cuenta.</p>
+                    <strong style="color: #fff; font-size: 0.9rem;" id="docsStatusTitle">Documentación Pendiente de Envío</strong>
+                    <p style="color: #94a3b8; font-size: 0.78rem; margin: 0;" id="docsStatusDesc">Completa tus datos personales, auto y sube los 6 documentos para enviar a validación por Administración.</p>
                 </div>
             </div>
 
@@ -602,15 +605,14 @@
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             <div>
                                 <label style="font-size: 0.75rem; color: #94a3b8;">Color del Vehículo</label>
-                                <input type="text" id="docInputColor" class="driver-form-input" placeholder="Ej. Negro / Blanco" style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                                <input type="text" id="docInputColor" class="driver-form-input" placeholder="Ej. Negro / Blanco / Gris" style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
                             </div>
                             <div>
                                 <label style="font-size: 0.75rem; color: #94a3b8;">Categoría</label>
                                 <select id="docSelectCategory" class="driver-form-input" style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
-                                    <option value="Sedán Ejecutivo / Premium">Sedán Ejecutivo / Premium</option>
-                                    <option value="Sedán Standard">Sedán Standard</option>
-                                    <option value="SUV Ejecutivo">SUV Ejecutivo</option>
-                                    <option value="Minivan Flota">Minivan Flota</option>
+                                    <option value="Sedán Estándar">Sedán Estándar (Fiat Cronos, Onix, Logan, etc.)</option>
+                                    <option value="Sedán Confort">Sedán Confort (VW Virtus, Yaris, Versa, etc.)</option>
+                                    <option value="Sedán Ejecutivo">Sedán Ejecutivo (Toyota Corolla, Vento, Cruze, etc.)</option>
                                 </select>
                             </div>
                         </div>

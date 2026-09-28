@@ -25,41 +25,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const defaultPhoto = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
 
-        try {
-            const raw = localStorage.getItem('rutaprivada_drivers_v1');
-            if (raw) {
-                const list = JSON.parse(raw);
-                if (Array.isArray(list) && list.length > 0) {
-                    const d = list[0];
-                    return {
-                        nombre: docs ? docs.nombre : (d.name || 'Daniel Pabon'),
-                        auto: docs ? `${docs.autoMarcaModelo} ${docs.color}` : (d.vehicle || 'Fiat Cronos Negro'),
-                        patente: docs ? docs.patente : (d.plate || 'AE927CN'),
-                        calificacion: 4.98,
-                        telefono: docs ? docs.telefono : (d.phone ? ('+54 9 ' + d.phone.replace(/^(\+?54\s?9?|\+)/, '')) : '+54 9 11 2255-8226'),
-                        fotoPerfil: (docs && docs.fotoPerfil) ? docs.fotoPerfil : defaultPhoto,
-                        categoria: docs ? docs.categoria : 'Sedán Ejecutivo / Premium'
-                    };
-                }
-            }
-        } catch(e) {}
+        if (docs && (docs.nombre || docs.dni)) {
+            return {
+                nombre: docs.nombre || 'Nuevo Chofer Partner',
+                auto: docs.autoMarcaModelo ? `${docs.autoMarcaModelo} ${docs.color ? '(' + docs.color + ')' : ''}` : 'Vehículo Sin Registrar',
+                patente: docs.patente || 'S/P',
+                calificacion: 5.0,
+                telefono: docs.telefono || 'Sin teléfono',
+                fotoPerfil: docs.fotoPerfil || defaultPhoto,
+                categoria: docs.categoria || 'Sedán Estándar'
+            };
+        }
 
         return {
-            nombre: docs ? docs.nombre : 'Daniel Pabon',
-            auto: docs ? `${docs.autoMarcaModelo} ${docs.color}` : 'Fiat Cronos Negro',
-            patente: docs ? docs.patente : 'AE927CN',
-            calificacion: 4.98,
-            telefono: docs ? docs.telefono : '+54 9 11 2255-8226',
-            fotoPerfil: (docs && docs.fotoPerfil) ? docs.fotoPerfil : defaultPhoto,
-            categoria: docs ? docs.categoria : 'Sedán Ejecutivo / Premium'
+            nombre: 'Nuevo Chofer Partner',
+            auto: 'Vehículo Sin Registrar',
+            patente: 'S/P',
+            calificacion: 5.0,
+            telefono: 'Sin teléfono',
+            fotoPerfil: defaultPhoto,
+            categoria: 'Sedán Estándar'
         };
     }
 
     const currentFleetDriver = getFleetDriverInfo();
 
-    // ESTADO DEL CONDUCTOR (Online por defecto al ingresar a la app)
+    const initialDocs = (() => {
+        try {
+            const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
+            return raw ? JSON.parse(raw) : null;
+        } catch(e) { return null; }
+    })();
+
+    const isInitiallyApproved = Boolean(initialDocs && initialDocs.estadoVerificacion === 'aprobado');
+
+    // ESTADO DEL CONDUCTOR (Offline por defecto si no está aprobado)
     const driverState = {
-        isOnline: true,
+        isOnline: isInitiallyApproved,
         activeTrip: null,
         incomingTrip: null,
         availableTrips: [],
@@ -3721,13 +3723,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) {}
 
         const info = driverState.info;
-        const driverName = docs ? docs.nombre : info.nombre;
-        const vehicleStr = docs ? `${docs.autoMarcaModelo} ${docs.color ? '(' + docs.color + ')' : ''}` : info.auto;
-        const plateStr = docs ? docs.patente : info.patente;
-        const phoneStr = docs ? docs.telefono : info.telefono;
+        const driverName = (docs && docs.nombre) ? docs.nombre : (info.nombre || 'Nuevo Chofer Partner');
+        const vehicleStr = (docs && docs.autoMarcaModelo) ? `${docs.autoMarcaModelo} ${docs.color ? '(' + docs.color + ')' : ''}` : (info.auto || 'Vehículo Sin Registrar');
+        const plateStr = (docs && docs.patente) ? docs.patente : (info.patente || 'S/P');
+        const phoneStr = (docs && docs.telefono) ? docs.telefono : (info.telefono || 'Sin registrar');
         const photoStr = (docs && docs.fotoPerfil) ? docs.fotoPerfil : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
-        const categoryStr = docs ? docs.categoria : 'Sedán Ejecutivo / Premium';
-        const statusState = docs ? docs.estadoVerificacion : 'aprobado';
+        const categoryStr = (docs && docs.categoria) ? docs.categoria : 'Sedán Estándar';
+        const statusState = (docs && docs.estadoVerificacion) ? docs.estadoVerificacion : 'sin_subir';
 
         const nameEl = document.getElementById('driverName');
         const badgeEl = document.getElementById('driverCarBadge');
@@ -3744,7 +3746,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (fullNameEl) fullNameEl.textContent = driverName;
         if (vehicleValEl) vehicleValEl.textContent = `${vehicleStr} (Patente: ${plateStr})`;
         if (phoneValEl) phoneValEl.textContent = phoneStr;
-        if (ratingNumEl) ratingNumEl.textContent = info.calificacion || '4.98';
+        if (ratingNumEl) ratingNumEl.textContent = info.calificacion || '5.00';
         if (categoryValEl) categoryValEl.textContent = categoryStr;
 
         if (avatarLargeEl) avatarLargeEl.src = photoStr;
@@ -3757,9 +3759,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (statusState === 'aprobado') {
                 statusValEl.className = 'info-val text-emerald';
                 statusValEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Activo & Verificado para Traslados';
+            } else if (statusState === 'pendiente') {
+                statusValEl.className = 'info-val text-gold';
+                statusValEl.innerHTML = '<i class="fa-solid fa-clock"></i> Pendiente de Aprobación por Administración';
+            } else if (statusState === 'rechazado') {
+                statusValEl.className = 'info-val text-danger';
+                statusValEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Documentación Rechazada / Observada';
             } else {
                 statusValEl.className = 'info-val text-gold';
-                statusValEl.innerHTML = '<i class="fa-solid fa-clock"></i> Pendiente de Verificación de Documentación';
+                statusValEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Documentación Sin Cargar';
             }
         }
     }
@@ -3769,7 +3777,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const modalDocsUpload = document.getElementById('modalDocsUpload');
         const btnCloseDocsUpload = document.getElementById('btnCloseDocsUpload');
         const formDocsUpload = document.getElementById('formDocsUpload');
-        const btnSimulateApproval = document.getElementById('btnSimulateApproval');
 
         const docInputDriverName = document.getElementById('docInputDriverName');
         const docInputDniNum = document.getElementById('docInputDniNum');
@@ -3784,8 +3791,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const docInputBankName = document.getElementById('docInputBankName');
         const docInputCbu = document.getElementById('docInputCbu');
         const docInputBankHolder = document.getElementById('docInputBankHolder');
-        const fileComprobanteBanco = document.getElementById('fileComprobanteBanco');
-        const badgeComprobanteBanco = document.getElementById('badgeComprobanteBanco');
         const btnTogglePipMode = document.getElementById('btnTogglePipMode');
 
         function loadDocsData() {
@@ -3793,7 +3798,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
                 if (raw) {
                     const parsed = JSON.parse(raw);
-                    if (parsed && (parsed.nombre || parsed.dni)) {
+                    if (parsed && (parsed.nombre || parsed.dni || parsed.estadoVerificacion)) {
                         return parsed;
                     }
                 }
@@ -3805,16 +3810,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 autoMarcaModelo: '',
                 patente: '',
                 color: 'Negro',
-                categoria: 'Sedán Ejecutivo / Premium',
+                categoria: 'Sedán Estándar',
                 fotoPerfil: '',
                 banco: '',
                 cbu: '',
                 titularCuenta: '',
-                estadoVerificacion: 'pendiente',
+                estadoVerificacion: 'sin_subir',
                 observaciones: '',
                 docsImages: {}
             };
         }
+
+        const docInputsConfig = [
+            { id: 'fileDni', key: 'dni', badgeId: 'badgeDni' },
+            { id: 'fileLicencia', key: 'licencia', badgeId: 'badgeLicencia' },
+            { id: 'fileSeguro', key: 'seguro', badgeId: 'badgeSeguro' },
+            { id: 'fileCedula', key: 'cedula', badgeId: 'badgeCedula' },
+            { id: 'fileAntecedentes', key: 'antecedentes', badgeId: 'badgeAntecedentes' }
+        ];
 
         function populateDocsForm() {
             const data = loadDocsData();
@@ -3824,14 +3837,48 @@ document.addEventListener('DOMContentLoaded', () => {
             if (docInputVehicleModel) docInputVehicleModel.value = data.autoMarcaModelo || '';
             if (docInputPlate) docInputPlate.value = data.patente || '';
             if (docInputColor) docInputColor.value = data.color || 'Negro';
-            if (docSelectCategory) docSelectCategory.value = data.categoria || 'Sedán Ejecutivo / Premium';
-            if (previewFotoPerfil && data.fotoPerfil) previewFotoPerfil.src = data.fotoPerfil;
+            if (docSelectCategory) docSelectCategory.value = data.categoria || 'Sedán Estándar';
+            if (previewFotoPerfil) {
+                previewFotoPerfil.src = (data.fotoPerfil && data.fotoPerfil.trim().length > 0) ? data.fotoPerfil : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+            }
 
             if (docInputBankName) docInputBankName.value = data.banco || '';
             if (docInputCbu) docInputCbu.value = data.cbu || '';
             if (docInputBankHolder) docInputBankHolder.value = data.titularCuenta || data.nombre || '';
 
-            updateDocsStatusBanner(data.estadoVerificacion || 'aprobado');
+            // Actualizar dinámicamente cada badge según si hay archivo subido
+            const userImgs = data.docsImages || {};
+            docInputsConfig.forEach(item => {
+                const badge = document.getElementById(item.badgeId);
+                if (badge) {
+                    const hasFile = Boolean(userImgs[item.key] && userImgs[item.key].length > 10);
+                    if (hasFile) {
+                        badge.textContent = 'Cargado ✓';
+                        badge.style.background = 'rgba(16, 185, 129, 0.2)';
+                        badge.style.color = '#34d399';
+                    } else {
+                        badge.textContent = 'Sin cargar';
+                        badge.style.background = 'rgba(239, 68, 68, 0.15)';
+                        badge.style.color = '#fca5a5';
+                    }
+                }
+            });
+
+            const badgeFoto = document.getElementById('badgeFotoPerfil');
+            if (badgeFoto) {
+                const hasCustomPhoto = Boolean(data.fotoPerfil && !data.fotoPerfil.includes('unsplash.com') && data.fotoPerfil.length > 20);
+                if (hasCustomPhoto) {
+                    badgeFoto.textContent = 'Cargado ✓';
+                    badgeFoto.style.background = 'rgba(16, 185, 129, 0.2)';
+                    badgeFoto.style.color = '#34d399';
+                } else {
+                    badgeFoto.textContent = 'Sin cargar';
+                    badgeFoto.style.background = 'rgba(239, 68, 68, 0.15)';
+                    badgeFoto.style.color = '#fca5a5';
+                }
+            }
+
+            updateDocsStatusBanner(data.estadoVerificacion || 'sin_subir');
         }
 
         function updateDocsStatusBanner(status) {
@@ -3854,7 +3901,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     homeVerifBanner.style.borderColor = 'rgba(245, 158, 11, 0.3)';
                     if (homeVerifIcon) homeVerifIcon.className = 'fa-solid fa-clock text-gold';
                     if (homeVerifTitle) homeVerifTitle.textContent = 'Documentación en Revisión';
-                    if (homeVerifSub) homeVerifSub.textContent = 'En proceso de aprobación por el Administrador. Toca para ver tus datos.';
+                    if (homeVerifSub) homeVerifSub.textContent = 'En proceso de validación por el Administrador. Toca para ver tus datos.';
                 } else if (status === 'rechazado') {
                     homeVerifBanner.style.display = 'block';
                     homeVerifBanner.style.background = 'rgba(239, 68, 68, 0.12)';
@@ -3862,6 +3909,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (homeVerifIcon) homeVerifIcon.className = 'fa-solid fa-circle-xmark text-danger';
                     if (homeVerifTitle) homeVerifTitle.textContent = 'Documentación Observada / Rechazada';
                     if (homeVerifSub) homeVerifSub.textContent = 'Revisa las observaciones del Administrador para corregir tus datos.';
+                } else {
+                    homeVerifBanner.style.display = 'block';
+                    homeVerifBanner.style.background = 'rgba(245, 158, 11, 0.15)';
+                    homeVerifBanner.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+                    if (homeVerifIcon) homeVerifIcon.className = 'fa-solid fa-triangle-exclamation text-gold';
+                    if (homeVerifTitle) homeVerifTitle.textContent = 'Documentación Sin Cargar';
+                    if (homeVerifSub) homeVerifSub.textContent = 'Toca aquí para completar tus datos y subir tus documentos para revisión.';
                 }
             }
 
@@ -3871,20 +3925,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 docsStatusBanner.style.background = 'rgba(16, 185, 129, 0.12)';
                 docsStatusBanner.style.borderColor = 'rgba(16, 185, 129, 0.3)';
                 if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-circle-check text-emerald';
-                if (docsStatusTitle) docsStatusTitle.textContent = 'Documentación y Cuenta Bancaria Aprobadas';
-                if (docsStatusDesc) docsStatusDesc.textContent = 'Tu cuenta, vehículo y cuenta bancaria titular están activos para operar en RutaPrivada.';
+                if (docsStatusTitle) docsStatusTitle.textContent = 'Documentación y Vehículo Aprobados';
+                if (docsStatusDesc) docsStatusDesc.textContent = 'Tu cuenta, vehículo y datos bancarios están activos y verificados para operar.';
             } else if (status === 'pendiente') {
                 docsStatusBanner.style.background = 'rgba(245, 158, 11, 0.12)';
                 docsStatusBanner.style.borderColor = 'rgba(245, 158, 11, 0.3)';
                 if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-clock text-gold';
                 if (docsStatusTitle) docsStatusTitle.textContent = 'Pendiente de Validación por Administración';
-                if (docsStatusDesc) docsStatusDesc.textContent = 'Los documentos y datos bancarios subidos se encuentran en proceso de revisión.';
+                if (docsStatusDesc) docsStatusDesc.textContent = 'Los documentos y datos subidos se encuentran en proceso de revisión.';
             } else if (status === 'rechazado') {
                 docsStatusBanner.style.background = 'rgba(239, 68, 68, 0.12)';
                 docsStatusBanner.style.borderColor = 'rgba(239, 68, 68, 0.3)';
                 if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-circle-xmark text-danger';
                 if (docsStatusTitle) docsStatusTitle.textContent = 'Solicitud Rechazada u Observada';
                 if (docsStatusDesc) docsStatusDesc.textContent = 'Por favor revisa tus documentos o datos bancarios y vuelve a enviarlos para revisión.';
+            } else {
+                docsStatusBanner.style.background = 'rgba(245, 158, 11, 0.12)';
+                docsStatusBanner.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+                if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-triangle-exclamation text-gold';
+                if (docsStatusTitle) docsStatusTitle.textContent = 'Documentación Pendiente de Envío';
+                if (docsStatusDesc) docsStatusDesc.textContent = 'Completa tus datos personales, vehículo y sube los 6 documentos requeridos.';
             }
         }
 
@@ -3919,19 +3979,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     reader.onload = function(evt) {
                         previewFotoPerfil.src = evt.target.result;
                         loadedDocsImages.foto = evt.target.result;
+                        const badge = document.getElementById('badgeFotoPerfil');
+                        if (badge) {
+                            badge.textContent = 'Cargado ✓';
+                            badge.style.background = 'rgba(16, 185, 129, 0.2)';
+                            badge.style.color = '#34d399';
+                        }
                     };
                     reader.readAsDataURL(file);
                 }
             });
         }
-
-        const docInputsConfig = [
-            { id: 'fileDni', key: 'dni', badgeId: 'badgeDni' },
-            { id: 'fileLicencia', key: 'licencia', badgeId: 'badgeLicencia' },
-            { id: 'fileSeguro', key: 'seguro', badgeId: 'badgeSeguro' },
-            { id: 'fileCedula', key: 'cedula', badgeId: 'badgeCedula' },
-            { id: 'fileAntecedentes', key: 'antecedentes', badgeId: 'badgeAntecedentes' }
-        ];
 
         docInputsConfig.forEach(item => {
             const el = document.getElementById(item.id);
@@ -3957,7 +4015,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function saveDocsData(status = 'pendiente') {
             const current = loadDocsData();
-            const photoSrc = previewFotoPerfil ? previewFotoPerfil.src : current.fotoPerfil;
+            const photoSrc = (previewFotoPerfil && previewFotoPerfil.src && !previewFotoPerfil.src.includes('unsplash.com')) ? previewFotoPerfil.src : (current.fotoPerfil || '');
 
             const updatedDocs = {
                 nombre: docInputDriverName ? docInputDriverName.value.trim() : current.nombre,
@@ -4027,22 +4085,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
                 const saved = saveDocsData('pendiente');
                 updateDocsStatusBanner('pendiente');
-                showDriverToast('📄 Documentación y datos bancarios enviados a revisión.');
-                alert('✓ Documentación y Datos Bancarios guardados correctamente.\n\nLos archivos y tu constancia de CBU han sido enviados para su verificación.');
-            });
-        }
-
-        if (btnSimulateApproval) {
-            btnSimulateApproval.addEventListener('click', () => {
-                const saved = saveDocsData('aprobado');
-                updateDocsStatusBanner('aprobado');
-                if (modalDocsUpload) modalDocsUpload.classList.remove('active');
-                showDriverToast('✅ Perfil, vehículo y CBU aprobados');
-                alert(
-                    `✅ ¡DOCUMENTACIÓN Y VEHÍCULO APROBADOS!\n\n` +
-                    `Se han verificado los 7 requerimientos (DNI, Licencia, Seguro, Cédula, Antecedentes, Foto y Cuenta Bancaria del Titular).\n\n` +
-                    `Tu perfil se ha actualizado automáticamente con los datos de ${saved.nombre} y el vehículo ${saved.autoMarcaModelo} (${saved.patente}).`
-                );
+                showDriverToast('📄 Documentación enviada a revisión.');
+                alert('✓ Documentación y Datos Guardados Correctamente.\n\nTus archivos y datos han sido enviados para su verificación por parte de la Administración.');
             });
         }
 
@@ -4297,6 +4341,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modalDriverProfile) modalDriverProfile.classList.remove('active');
     }
 
+    const btnLogoutDriver = document.getElementById('btnLogoutDriver');
+    if (btnLogoutDriver) {
+        btnLogoutDriver.addEventListener('click', () => {
+            if (!confirm('¿Seguro que deseas cerrar la sesión actual de conductor en este dispositivo?')) return;
+            localStorage.removeItem('rutaprivada_driver_docs_v1');
+            setOnlineStatus(false);
+            closeDriverProfileModal();
+            showDriverToast('🚪 Sesión de chofer cerrada correctamente.');
+            driverState.info = getFleetDriverInfo();
+            renderDriverProfileInfo();
+            const modalDocs = document.getElementById('modalDocsUpload');
+            if (modalDocs) {
+                populateDocsForm();
+                modalDocs.classList.add('active');
+            }
+        });
+    }
+
     if (btnOpenDriverProfile) btnOpenDriverProfile.addEventListener('click', openDriverProfileModal);
     if (btnCloseDriverProfile) btnCloseDriverProfile.addEventListener('click', closeDriverProfileModal);
     if (btnCerrarPerfilSheet) btnCerrarPerfilSheet.addEventListener('click', closeDriverProfileModal);
@@ -4305,6 +4367,52 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target === modalDriverProfile) closeDriverProfileModal();
         });
     }
+
+    // Escucha en tiempo real de Firestore para aprobación/rechazo instantáneo
+    function startFirestoreDriverListener() {
+        if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
+        try {
+            const db = firebase.firestore();
+            db.collection('drivers').onSnapshot(snapshot => {
+                snapshot.docChanges().forEach(change => {
+                    const data = change.doc.data();
+                    if (!data) return;
+                    const localDocs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+                    if (!localDocs) return;
+
+                    const cleanDniIncoming = (data.dni || data.id || '').replace(/\D/g, '');
+                    const cleanDniLocal = (localDocs.dni || '').replace(/\D/g, '');
+
+                    if ((cleanDniIncoming && cleanDniLocal && cleanDniIncoming === cleanDniLocal) || data.id === 'driver_local' || data.id === 'drv_' + cleanDniLocal) {
+                        const prevStatus = localDocs.estadoVerificacion;
+                        const newStatus = data.estadoVerificacion || data.estado || 'sin_subir';
+                        
+                        if (prevStatus !== newStatus || data.observaciones !== localDocs.observaciones) {
+                            localDocs.estadoVerificacion = newStatus;
+                            localDocs.observaciones = data.observaciones || '';
+                            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
+                            window.dispatchEvent(new Event('storage'));
+                            
+                            if (typeof updateDocsStatusBanner === 'function') updateDocsStatusBanner(newStatus);
+                            renderDriverProfileInfo();
+                            
+                            if (newStatus === 'aprobado' && prevStatus !== 'aprobado') {
+                                showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el Administrador!');
+                                try { playAlertSound('success'); } catch(e){}
+                                alert('🎉 ¡ENHORABUENA!\n\nTu documentación y vehículo han sido APROBADOS por el Administrador de RutaPrivada.\n\nYa puedes presionar "ESTÁS EN LÍNEA" para conectarte y empezar a recibir viajes en tiempo real.');
+                            } else if (newStatus === 'rechazado' && prevStatus !== 'rechazado') {
+                                showDriverToast('⚠️ Tu documentación fue observada o rechazada.');
+                                if (driverState.isOnline) setOnlineStatus(false);
+                                alert(`❌ DOCUMENTACIÓN OBSERVADA O RECHAZADA:\n\nEl Administrador indicó:\n\n"${data.observaciones || 'Documentación incompleta o ilegible'}"\n\nPor favor actualiza o vuelve a subir los documentos requeridos en tu perfil.`);
+                            }
+                        }
+                    }
+                });
+            }, err => console.warn('Firestore driver onSnapshot warn:', err));
+        } catch(e) {}
+    }
+
+    setTimeout(startFirestoreDriverListener, 1000);
 
     // ==========================================
     // 14. MODAL: MODIFICAR RUTA DEL VIAJE EN CURSO
