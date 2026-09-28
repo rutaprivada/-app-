@@ -834,8 +834,62 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dateStr) return false;
 
         const todayKey = getTodayKey();
-        // Mostrar reservas de hoy y reservas futuras
-        return dateStr >= todayKey;
+        if (dateStr < todayKey) {
+            // Reserva de fecha pasada: descartar automáticamente
+            return false;
+        }
+
+        // Si es de hoy y es una reserva NO aceptada/pendiente que ya pasó su horario
+        const isTomada = status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre;
+        if (dateStr === todayKey && !isTomada) {
+            const timeStr = b.time || b.pickupTime || '00:00';
+            const scheduled = getReservationScheduledDate(dateStr, timeStr);
+            if (scheduled) {
+                const now = new Date();
+                // Si la hora de la reserva ya pasó por más de 15 minutos sin ser tomada, expira y no se muestra
+                if (now.getTime() - scheduled.getTime() > 15 * 60 * 1000) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // Regla de Protección: 45 minutos de separación mínima entre reservas aceptadas
+    function getDriverBookingConflict45Min(candidateBooking, tomadasBookings) {
+        if (!candidateBooking || !Array.isArray(tomadasBookings) || tomadasBookings.length === 0) return null;
+
+        const candDate = candidateBooking.date || candidateBooking.pickupDate;
+        const candTime = candidateBooking.time || candidateBooking.pickupTime || '00:00';
+        const candScheduled = getReservationScheduledDate(candDate, candTime);
+        if (!candScheduled) return null;
+
+        for (const accepted of tomadasBookings) {
+            if (accepted.id === candidateBooking.id) continue;
+            const accDate = accepted.date || accepted.pickupDate;
+            if (accDate !== candDate) continue; // Días distintos no generan conflicto directo
+            
+            const accTime = accepted.time || accepted.pickupTime || '00:00';
+            const accScheduled = getReservationScheduledDate(accDate, accTime);
+            if (!accScheduled) continue;
+
+            const diffMs = Math.abs(candScheduled.getTime() - accScheduled.getTime());
+            const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+            // Si hay menos de 45 minutos de separación
+            if (diffMinutes < 45) {
+                return {
+                    tieneConflicto: true,
+                    acceptedItem: accepted,
+                    acceptedTime: accTime,
+                    candTime: candTime,
+                    diffMinutes: diffMinutes,
+                    separacionRequerida: 45
+                };
+            }
+        }
+        return null;
     }
 
     function getReservationScheduledDate(dateStr, timeStr) {
@@ -1094,6 +1148,20 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         ` : ''}
 
+                        ${(() => {
+                            if (isTomada) return '';
+                            const conflict = getDriverBookingConflict45Min(b, tomadas);
+                            if (conflict && conflict.tieneConflicto) {
+                                return `
+                                    <div style="font-size: 0.76rem; color: #fbbf24; background: rgba(245, 158, 11, 0.12); border: 1px dashed rgba(245, 158, 11, 0.4); padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                        <span><strong>Conflicto 45 min:</strong> Ya tienes una reserva agendada a las <strong>${conflict.acceptedTime} hs</strong>. Debe haber al menos 45 min de margen entre traslados.</span>
+                                    </div>
+                                `;
+                            }
+                            return '';
+                        })()}
+
                         <div class="reserva-actions-row">
                             ${isTomada ? `
                                 <button type="button" class="btn-tomar-reserva btn-iniciar-reserva" data-id="${b.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;">
@@ -1108,11 +1176,21 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <i class="fa-solid fa-xmark"></i> Cancelar Reserva
                                     </button>
                                 `}
-                            ` : `
-                                <button type="button" class="btn-tomar-reserva btn-aceptar-reserva-action" data-id="${b.id}">
-                                    <i class="fa-solid fa-check"></i> Aceptar & Agendar Reserva
-                                </button>
-                            `}
+                            ` : (() => {
+                                const conflict = getDriverBookingConflict45Min(b, tomadas);
+                                if (conflict && conflict.tieneConflicto) {
+                                    return `
+                                        <button type="button" class="btn-tomar-reserva" disabled style="opacity: 0.45; cursor: not-allowed; background: #334155; color: #94a3b8; border: 1px solid #475569;" title="No disponible por conflicto de horario">
+                                            <i class="fa-solid fa-clock"></i> No disponible (Margen &lt; 45 min)
+                                        </button>
+                                    `;
+                                }
+                                return `
+                                    <button type="button" class="btn-tomar-reserva btn-aceptar-reserva-action" data-id="${b.id}">
+                                        <i class="fa-solid fa-check"></i> Aceptar & Agendar Reserva
+                                    </button>
+                                `;
+                            })()}
                             <a href="https://wa.me/${rawPhone}?text=Hola%20${encodeURIComponent(clientName)},%20soy%20tu%20chofer%20ejecutivo%20de%20RutaPrivada.%20Tengo%20tu%20reserva%20agendada%20para%20el%20${encodeURIComponent(dateStr)}%20a%20las%20${encodeURIComponent(timeStr)}hs." target="_blank" class="btn-ver-reserva-whatsapp" title="Chatear por WhatsApp">
                                 <i class="fa-brands fa-whatsapp"></i>
                             </a>
@@ -1168,7 +1246,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function aceptarReservaProgramada(resId) {
-        // Regla: No aceptar ninguna reserva si se tiene un viaje en curso
+        // Regla 1: No aceptar ninguna reserva si se tiene un viaje en curso
         if (driverState.activeTrip) {
             alert('⚠️ TIENES UN VIAJE EN CURSO\n\nDebes completar el viaje actual antes de aceptar o agendar una reserva.');
             return;
@@ -1177,6 +1255,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const bookings = getStoredBookings();
         const item = bookings.find(b => b.id === resId);
         if (!item) return;
+
+        // Regla 2: Regla de 45 minutos de separación mínima respecto a reservas ya aceptadas
+        const tomadas = bookings.filter(b => {
+            const status = String(b.status || b.estado || '').toLowerCase();
+            return (status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre) && b.id !== resId;
+        });
+
+        const conflict = getDriverBookingConflict45Min(item, tomadas);
+        if (conflict && conflict.tieneConflicto) {
+            alert(
+                `⚠️ CONFLICTO DE HORARIO (REGLA DE 45 MINUTOS):\n\n` +
+                `Tienes una reserva ya aceptada a las ${conflict.acceptedTime} hs.\n\n` +
+                `Para garantizar el cumplimiento y puntualidad de cada traslado, debe existir al menos 45 minutos de margen entre servicios.`
+            );
+            return;
+        }
 
         item.status = 'aceptada';
         item.estado = 'aceptada';

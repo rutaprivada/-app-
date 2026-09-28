@@ -4318,41 +4318,83 @@ html, body {
   }
 
   .main-header {
-    padding: 10px 12px !important;
+    padding: 8px 12px !important;
   }
 
   .header-container {
     display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 8px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    width: 100% !important;
   }
 
   .brand {
     display: flex !important;
     align-items: center !important;
-    gap: 10px !important;
-    width: 100% !important;
+    gap: 8px !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .brand-icon {
+    width: 38px !important;
+    height: 38px !important;
+    flex-shrink: 0 !important;
   }
 
   .brand-logo-img {
-    width: 36px !important;
-    height: 36px !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 
   .brand-title {
-    font-size: 1.35rem !important;
+    font-size: 1.2rem !important;
     line-height: 1.1 !important;
   }
 
   .brand-subtitle {
-    font-size: 0.72rem !important;
-    line-height: 1.2 !important;
-    white-space: normal !important;
+    font-size: 0.68rem !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
   }
 
   .header-badges {
     display: none !important;
+  }
+
+  .passenger-header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .btn-header-reservations {
+    padding: 5px 10px !important;
+    font-size: 0.78rem !important;
+    border-radius: 20px !important;
+  }
+
+  .passenger-header-profile {
+    padding: 3px 8px 3px 4px !important;
+    border-radius: 20px !important;
+  }
+
+  .passenger-meta {
+    display: flex !important;
+  }
+
+  .passenger-name {
+    font-size: 0.78rem !important;
+  }
+
+  .passenger-status-sub {
+    font-size: 0.65rem !important;
   }
 
   .section-title-wrap h2 {
