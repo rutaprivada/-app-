@@ -305,6 +305,15 @@ class RutaSyncManager {
 
         this.processedEvents.add(message.id);
 
+        // Ensure Firestore is initialized if firebase is available
+        if (!this.firestore && typeof firebase !== 'undefined') {
+            try {
+                if (firebase.apps && firebase.apps.length) {
+                    this.firestore = firebase.firestore();
+                }
+            } catch (e) {}
+        }
+
         // 1. Firebase Firestore Cloud Sync
         if (this.firestore) {
             try {
@@ -316,13 +325,23 @@ class RutaSyncManager {
                         senderId: this.deviceId,
                         timestamp: now,
                         ultimoEstadoEn: now
-                    }).catch(() => {});
+                    }, { merge: true }).catch(() => {});
                 } else if (type === 'UBICACION_CHOFER_ACTUALIZADA') {
                     this.firestore.collection('live_trips').doc('driver_location').set({
                         ...payload,
                         senderId: this.deviceId,
                         timestamp: now
                     }).catch(() => {});
+                } else if (type === 'ESTADO_CONDUCTOR_ACTUALIZADO' || type === 'DOCUMENTOS_CONDUCTOR_ACTUALIZADOS') {
+                    if (payload && (payload.id || payload.dni)) {
+                        const cleanDni = String(payload.dni || '').replace(/\D/g, '');
+                        const drvDocId = String(payload.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
+                        this.firestore.collection('drivers').doc(drvDocId).set({
+                            ...payload,
+                            id: drvDocId,
+                            actualizadoEn: now
+                        }, { merge: true }).catch(() => {});
+                    }
                 } else if (type === 'RESERVA_CREADA' && payload && payload.id) {
                     this.firestore.collection('bookings').doc(String(payload.id)).set({
                         ...payload,
@@ -1111,24 +1130,26 @@ class RutaSyncManager {
 
     guardarDocumentosConductor(docsData) {
         if (!docsData) return;
-        try {
-            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(docsData));
-        } catch(e){}
-
-        const driverId = docsData.id || docsData.dni || docsData.telefono || 'driver_local';
+        const cleanDni = String(docsData.dni || '').replace(/\D/g, '');
+        const driverId = String(docsData.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
         const payload = {
             ...docsData,
             id: driverId,
             actualizadoEn: Date.now()
         };
 
+        try {
+            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(payload));
+        } catch(e){}
+
         if (this.firestore) {
             try {
-                this.firestore.collection('drivers').doc(driverId).set(payload, { merge: true });
+                this.firestore.collection('drivers').doc(driverId).set(payload, { merge: true }).catch(() => {});
             } catch(e){}
         }
 
         this.emit('DOCUMENTOS_CONDUCTOR_ACTUALIZADOS', payload);
+        this.emit('ESTADO_CONDUCTOR_ACTUALIZADO', payload);
     }
 
     // ==========================================

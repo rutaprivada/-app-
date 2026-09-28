@@ -1816,6 +1816,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!driverState.isOnline) {
+            const docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+            const statusVerif = (docs && docs.estadoVerificacion) ? docs.estadoVerificacion : 'pendiente';
+
+            if (statusVerif !== 'aprobado') {
+                if (statusVerif === 'rechazado') {
+                    alert(`❌ DOCUMENTACIÓN RECHAZADA:\n\nEl Administrador indicó lo siguiente sobre tus documentos:\n\n"${docs.observaciones || 'Documentación incompleta o no cumple los requisitos'}"\n\nPor favor actualiza o vuelve a subir los documentos requeridos para solicitar una nueva revisión.`);
+                } else {
+                    alert('⏳ CUENTA PENDIENTE DE VALIDACIÓN:\n\nTu cuenta y documentación están en proceso de revisión por el Administrador de RutaPrivada.\n\nEn cuanto tu cuenta sea aprobada por Administración, podrás conectarte en línea y empezar a recibir solicitudes de viajes.');
+                }
+                const modalDocsUpload = document.getElementById('modalDocsUpload');
+                if (modalDocsUpload) {
+                    if (typeof populateDocsForm === 'function') populateDocsForm();
+                    modalDocsUpload.classList.add('active');
+                }
+                return;
+            }
+
             // Validar encendido obligatorio de GPS antes de ponerse En Línea
             if (!('geolocation' in navigator)) {
                 alert('⚠️ GPS NO DISPONIBLE:\n\nTu dispositivo no cuenta con servicio de localización GPS.');
@@ -3775,22 +3792,27 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
                 if (raw) {
-                    return JSON.parse(raw);
+                    const parsed = JSON.parse(raw);
+                    if (parsed && (parsed.nombre || parsed.dni)) {
+                        return parsed;
+                    }
                 }
             } catch(e) {}
             return {
-                nombre: driverState.info.nombre || 'Daniel Pabon',
-                dni: '38.452.910',
-                telefono: driverState.info.telefono || '+54 9 11 2255-8226',
-                autoMarcaModelo: driverState.info.auto ? driverState.info.auto.replace(/\s*·.*$/, '') : 'Fiat Cronos',
-                patente: driverState.info.patente || 'AE927CN',
+                nombre: '',
+                dni: '',
+                telefono: '',
+                autoMarcaModelo: '',
+                patente: '',
                 color: 'Negro',
                 categoria: 'Sedán Ejecutivo / Premium',
-                fotoPerfil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                banco: 'Mercado Pago / Banco Galicia',
-                cbu: '0000003100084592039481',
-                titularCuenta: driverState.info.nombre || 'Daniel Pabon',
-                estadoVerificacion: 'aprobado'
+                fotoPerfil: '',
+                banco: '',
+                cbu: '',
+                titularCuenta: '',
+                estadoVerificacion: 'pendiente',
+                observaciones: '',
+                docsImages: {}
             };
         }
 
@@ -3818,6 +3840,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const docsStatusTitle = document.getElementById('docsStatusTitle');
             const docsStatusDesc = document.getElementById('docsStatusDesc');
 
+            const homeVerifBanner = document.getElementById('driverHomeVerifBanner');
+            const homeVerifIcon = document.getElementById('homeVerifIcon');
+            const homeVerifTitle = document.getElementById('homeVerifTitle');
+            const homeVerifSub = document.getElementById('homeVerifSub');
+
+            if (homeVerifBanner) {
+                if (status === 'aprobado') {
+                    homeVerifBanner.style.display = 'none';
+                } else if (status === 'pendiente') {
+                    homeVerifBanner.style.display = 'block';
+                    homeVerifBanner.style.background = 'rgba(245, 158, 11, 0.12)';
+                    homeVerifBanner.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+                    if (homeVerifIcon) homeVerifIcon.className = 'fa-solid fa-clock text-gold';
+                    if (homeVerifTitle) homeVerifTitle.textContent = 'Documentación en Revisión';
+                    if (homeVerifSub) homeVerifSub.textContent = 'En proceso de aprobación por el Administrador. Toca para ver tus datos.';
+                } else if (status === 'rechazado') {
+                    homeVerifBanner.style.display = 'block';
+                    homeVerifBanner.style.background = 'rgba(239, 68, 68, 0.12)';
+                    homeVerifBanner.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                    if (homeVerifIcon) homeVerifIcon.className = 'fa-solid fa-circle-xmark text-danger';
+                    if (homeVerifTitle) homeVerifTitle.textContent = 'Documentación Observada / Rechazada';
+                    if (homeVerifSub) homeVerifSub.textContent = 'Revisa las observaciones del Administrador para corregir tus datos.';
+                }
+            }
+
             if (!docsStatusBanner) return;
 
             if (status === 'aprobado') {
@@ -3839,6 +3886,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (docsStatusTitle) docsStatusTitle.textContent = 'Solicitud Rechazada u Observada';
                 if (docsStatusDesc) docsStatusDesc.textContent = 'Por favor revisa tus documentos o datos bancarios y vuelve a enviarlos para revisión.';
             }
+        }
+
+        const driverHomeVerifBannerEl = document.getElementById('driverHomeVerifBanner');
+        if (driverHomeVerifBannerEl) {
+            driverHomeVerifBannerEl.addEventListener('click', () => {
+                populateDocsForm();
+                if (modalDocsUpload) modalDocsUpload.classList.add('active');
+            });
         }
 
         if (btnOpenDocsUpload) {
@@ -4151,26 +4206,76 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cleanDniIncoming = (data.dni || data.id || '').replace(/\D/g, '');
                 
                 // Si la actualización corresponde a este chofer o es global
-                if (!cleanDniIncoming || cleanDniIncoming === cleanDniLocal || data.id === 'driver_local' || data.id === ('drv_' + cleanDniLocal)) {
+                if (!cleanDniIncoming || !cleanDniLocal || cleanDniIncoming === cleanDniLocal || data.id === 'driver_local' || data.id === ('drv_' + cleanDniLocal)) {
                     const newStatus = data.estadoVerificacion || data.estado || 'aprobado';
+                    const prevStatus = localDocs.estadoVerificacion;
                     localDocs.estadoVerificacion = newStatus;
-                    if (data.observaciones) localDocs.observaciones = data.observaciones;
+                    if (data.observaciones !== undefined) localDocs.observaciones = data.observaciones;
                     
                     try {
                         localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
+                        window.dispatchEvent(new Event('storage'));
                     } catch(e){}
                     
                     updateDocsStatusBanner(newStatus);
+                    renderDriverProfileInfo();
                     
                     if (newStatus === 'aprobado') {
-                        showDriverToast('🎉 ¡Tu documentación ha sido APROBADA por el Administrador!');
+                        showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el Administrador!');
                         try { playAlertSound('success'); } catch(e){}
+                        if (prevStatus !== 'aprobado') {
+                            alert('🎉 ¡ENHORABUENA!\n\nTu cuenta y documentación han sido APROBADAS por el Administrador de RutaPrivada.\n\nYa puedes presionar "ESTÁS EN LÍNEA" para conectarte y empezar a recibir viajes en tiempo real.');
+                        }
                     } else if (newStatus === 'rechazado') {
-                        showDriverToast('⚠️ Tu documentación tiene observaciones o fue rechazada por el Administrador.');
+                        showDriverToast('⚠️ Tu documentación fue observada o rechazada.');
+                        if (driverState.isOnline) {
+                            setOnlineStatus(false);
+                        }
+                        if (prevStatus !== 'rechazado') {
+                            alert(`❌ DOCUMENTACIÓN OBSERVADA O RECHAZADA:\n\nEl Administrador ha indicado lo siguiente:\n\n"${data.observaciones || 'Documentación incompleta o ilegible'}"\n\nPor favor ingresa a tu perfil para corregir o subir nuevamente los documentos requeridos.`);
+                        }
                     }
                 }
             });
         }
+
+        // Motor de Radar en Vivo de Alta Frecuencia (1.5s) para Choferes Conectados
+        setInterval(async () => {
+            if (!driverState.isOnline || driverState.activeTrip) return;
+
+            // 1. Consulta al bus de sincronización local
+            if (window.RutaSync) {
+                const activeSync = window.RutaSync.obtenerViajeActivo();
+                if (activeSync && ['buscando_conductor', 'solicitado'].includes(activeSync.estado)) {
+                    const tripAge = Date.now() - (activeSync.timestamp || activeSync.creadoEn || 0);
+                    if (tripAge < 15 * 60 * 1000) {
+                        if (!driverState.incomingTrip || driverState.incomingTrip.id !== activeSync.id) {
+                            enqueueIncomingTrip(activeSync);
+                            showIncomingTrip(activeSync);
+                        }
+                    }
+                }
+            }
+
+            // 2. Consulta directa a Firebase Cloud Firestore
+            if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                try {
+                    const docSnap = await firebase.firestore().collection('live_trips').doc('current_active_trip').get();
+                    if (docSnap.exists) {
+                        const fsData = docSnap.data();
+                        if (fsData && ['buscando_conductor', 'solicitado'].includes(fsData.estado)) {
+                            const tripAge = Date.now() - (fsData.timestamp || fsData.creadoEn || fsData.ultimoEstadoEn || 0);
+                            if (tripAge < 15 * 60 * 1000) {
+                                if (!driverState.incomingTrip || driverState.incomingTrip.id !== fsData.id) {
+                                    enqueueIncomingTrip(fsData);
+                                    showIncomingTrip(fsData);
+                                }
+                            }
+                        }
+                    }
+                } catch(e) {}
+            }
+        }, 1500);
     }
 
     initDocsUploadModule();
@@ -4610,14 +4715,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Iniciar estado online base
     try {
+        const docs = loadDocsData();
+        const isApproved = docs && docs.estadoVerificacion === 'aprobado';
         const savedOnline = localStorage.getItem('rutaprivada_driver_is_online');
-        if (savedOnline === 'false') {
-            setOnlineStatus(false);
-        } else {
+        
+        if (isApproved && savedOnline === 'true') {
             setOnlineStatus(true);
+        } else {
+            setOnlineStatus(false);
+        }
+        
+        if (typeof updateDocsStatusBanner === 'function') {
+            updateDocsStatusBanner(docs.estadoVerificacion || 'pendiente');
         }
     } catch(e) {
-        setOnlineStatus(true);
+        setOnlineStatus(false);
     }
 
     // 2. Restaurar viaje activo si existe (tiene máxima prioridad sobre cualquier otra vista)

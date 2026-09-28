@@ -655,12 +655,7 @@
     <!-- FIREBASE & SYNC SCRIPTS -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <script src="sync.js"></script>
-
-    <!-- Firebase SDKs & Realtime Sync -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <script src="sync.js?v=55"></script>
+    <script src="sync.js?v=60"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -1129,14 +1124,26 @@
                 } catch(e) {}
 
                 // Emitir y sincronizar evento en tiempo real mediante sync.js y Cloud Firestore
+                const cleanDni = String(activeReviewDriver.dni || '').replace(/\D/g, '');
+                const driverDocId = String(activeReviewDriver.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
+                
+                const driverPayload = {
+                    ...activeReviewDriver,
+                    id: driverDocId,
+                    nombre: activeReviewDriver.nombre,
+                    dni: activeReviewDriver.dni,
+                    estadoVerificacion: newStatus,
+                    observaciones: revAdminNotes.value.trim(),
+                    updatedAt: Date.now()
+                };
+
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                    try {
+                        firebase.firestore().collection('drivers').doc(driverDocId).set(driverPayload, { merge: true }).catch(() => {});
+                    } catch(e){}
+                }
+
                 if (window.RutaSync) {
-                    const driverPayload = {
-                        id: activeReviewDriver.id || ('drv_' + (activeReviewDriver.dni || '').replace(/\D/g, '')),
-                        nombre: activeReviewDriver.nombre,
-                        dni: activeReviewDriver.dni,
-                        estadoVerificacion: newStatus,
-                        observaciones: revAdminNotes.value.trim()
-                    };
                     window.RutaSync.guardarDocumentosConductor(driverPayload);
                     window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driverPayload);
                 }

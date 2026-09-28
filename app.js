@@ -5991,29 +5991,23 @@ if (btnRequestInapp) {
     const phoneInput = document.getElementById('passenger-phone-input');
     const notesInput = document.getElementById('passenger-notes-input');
 
-    const passName = nameInput ? nameInput.value.trim() : '';
-    const passPhone = phoneInput ? phoneInput.value.trim() : '';
+    const profileData = loadPassengerProfile();
+    const passName = nameInput ? (nameInput.value.trim() || profileData.nombre) : profileData.nombre;
+    const passPhone = phoneInput ? (phoneInput.value.trim() || profileData.telefono) : profileData.telefono;
+    const passEmail = profileData.email || document.getElementById('profPassengerEmail')?.value?.trim() || '';
     const passNotes = notesInput ? notesInput.value.trim() : '';
 
     if (!passName) {
-      showToast('⚠️ Por favor ingresa el Nombre y Apellido del pasajero.');
-      if (nameInput) {
-        nameInput.focus();
-        nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        nameInput.style.borderColor = '#ef4444';
-        setTimeout(() => { nameInput.style.borderColor = ''; }, 3000);
-      }
+      showToast('⚠️ Por favor ingresa tu Nombre y Apellido.');
+      const modalOnboarding = document.getElementById('modalPassengerOnboarding');
+      if (modalOnboarding) modalOnboarding.classList.remove('hidden');
       return;
     }
 
     if (!passPhone || passPhone.length < 6) {
-      showToast('⚠️ Por favor ingresa el número de WhatsApp de contacto del pasajero.');
-      if (phoneInput) {
-        phoneInput.focus();
-        phoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        phoneInput.style.borderColor = '#ef4444';
-        setTimeout(() => { phoneInput.style.borderColor = ''; }, 3000);
-      }
+      showToast('⚠️ Por favor ingresa el número de WhatsApp de contacto.');
+      const modalOnboarding = document.getElementById('modalPassengerOnboarding');
+      if (modalOnboarding) modalOnboarding.classList.remove('hidden');
       return;
     }
 
@@ -6102,6 +6096,10 @@ if (btnRequestInapp) {
         telefono: passPhone,
         clientPhone: passPhone,
         customerPhone: passPhone,
+        email: passEmail,
+        clientEmail: passEmail,
+        customerEmail: passEmail,
+        emailPasajero: passEmail,
         notas: passNotes,
         categoria: 'Sedán Ejecutivo',
         originCoords: state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null,
@@ -6189,6 +6187,10 @@ if (btnRequestInapp) {
       telefono: passPhone,
       clientPhone: passPhone,
       customerPhone: passPhone,
+      email: passEmail,
+      clientEmail: passEmail,
+      customerEmail: passEmail,
+      emailPasajero: passEmail,
       notas: passNotes,
       categoria: 'Sedán Ejecutivo',
       fecha: curTodayStr,
@@ -7145,28 +7147,48 @@ if (btnRecenterPassengerMap) {
   // 16. SISTEMA DE PERFIL DEL PASAJERO, MEDIOS DE PAGO E HISTORIAL CABIFY
   // ====================================================
   const DEFAULT_PASSENGER_PROFILE = {
-    nombre: 'Daniel Felipe',
-    telefono: '11 7373 8790',
-    email: 'pasajero@rutaprivada.com',
+    nombre: '',
+    telefono: '',
+    email: '',
     avatar: '', // Sin foto por defecto (icono silueta)
-    metodoPagoPredeterminado: 'efectivo'
+    metodoPagoPredeterminado: 'efectivo',
+    isRegistered: false
   };
 
   function loadPassengerProfile() {
     try {
       const saved = localStorage.getItem('rutaprivada_passenger_profile');
       if (saved) {
-        return { ...DEFAULT_PASSENGER_PROFILE, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.nombre || parsed.isRegistered)) {
+          return { ...DEFAULT_PASSENGER_PROFILE, ...parsed };
+        }
       }
     } catch(e) {}
     return { ...DEFAULT_PASSENGER_PROFILE };
   }
 
-  function savePassengerProfile(data) {
+  function savePassengerProfile(data, showNotification = true) {
     try {
       localStorage.setItem('rutaprivada_passenger_profile', JSON.stringify(data));
       updatePassengerHeaderAndInputs(data);
-      showToast('✅ Perfil guardado correctamente.');
+      if (showNotification) showToast('✅ Perfil guardado correctamente.');
+
+      // Sincronizar con Firebase Cloud Firestore
+      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+        try {
+          const cleanPhone = String(data.telefono || '').replace(/\D/g, '') || String(Date.now());
+          const passId = 'pass_' + cleanPhone;
+          firebase.firestore().collection('passengers').doc(passId).set({
+            id: passId,
+            nombre: data.nombre,
+            telefono: data.telefono,
+            email: data.email,
+            isRegistered: true,
+            actualizadoEn: Date.now()
+          }, { merge: true }).catch(() => {});
+        } catch(e){}
+      }
     } catch(e) {}
   }
 
@@ -7190,8 +7212,9 @@ if (btnRecenterPassengerMap) {
       }
     }
 
-    if (headerName && profile.nombre) headerName.textContent = profile.nombre;
-    if (modalTitle && profile.nombre) modalTitle.textContent = profile.nombre;
+    const displayName = profile.nombre || 'Mi Perfil';
+    if (headerName) headerName.textContent = displayName;
+    if (modalTitle) modalTitle.textContent = displayName;
 
     if (modalAvatar && modalPlaceholder) {
       if (hasPhoto) {
@@ -7211,14 +7234,14 @@ if (btnRecenterPassengerMap) {
     const phoneInp = document.getElementById('passenger-phone-input');
     const statusMsg = document.getElementById('passengerProfileStatusMsg');
 
-    if (nameInp && profile.nombre && !nameInp.value) {
+    if (nameInp && profile.nombre) {
       nameInp.value = profile.nombre;
     }
-    if (phoneInp && profile.telefono && !phoneInp.value) {
+    if (phoneInp && profile.telefono) {
       phoneInp.value = profile.telefono;
     }
     if (statusMsg && profile.nombre) {
-      statusMsg.innerHTML = `Viajando como <strong style="color: #38bdf8;">${escapeHtml(profile.nombre)}</strong> (Celular: ${escapeHtml(profile.telefono)})`;
+      statusMsg.innerHTML = `Viajando como <strong style="color: #38bdf8;">${escapeHtml(profile.nombre)}</strong> (${escapeHtml(profile.telefono)}${profile.email ? ' · ' + escapeHtml(profile.email) : ''})`;
     }
 
     // Modal form fields
@@ -7464,6 +7487,62 @@ if (btnRecenterPassengerMap) {
     const prof = loadPassengerProfile();
     updatePassengerHeaderAndInputs(prof);
     renderSavedCardsUI();
+
+    // Check if passenger has completed onboarding registration
+    const modalOnboarding = document.getElementById('modalPassengerOnboarding');
+    const formOnboarding = document.getElementById('formPassengerOnboarding');
+    const onbName = document.getElementById('onboardingPassName');
+    const onbPhone = document.getElementById('onboardingPassPhone');
+    const onbEmail = document.getElementById('onboardingPassEmail');
+
+    if (modalOnboarding && (!prof.nombre || !prof.telefono || !prof.isRegistered)) {
+      if (onbName && prof.nombre) onbName.value = prof.nombre;
+      if (onbPhone && prof.telefono) onbPhone.value = prof.telefono;
+      if (onbEmail && prof.email) onbEmail.value = prof.email;
+      modalOnboarding.classList.remove('hidden');
+    }
+
+    if (formOnboarding) {
+      formOnboarding.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const nameVal = onbName ? onbName.value.trim() : '';
+        const phoneVal = onbPhone ? onbPhone.value.trim() : '';
+        const emailVal = onbEmail ? onbEmail.value.trim() : '';
+
+        if (!nameVal || nameVal.length < 3) {
+          showToast('⚠️ Ingresa tu nombre y apellido completo.');
+          if (onbName) onbName.focus();
+          return;
+        }
+
+        if (!phoneVal || phoneVal.length < 6) {
+          showToast('⚠️ Ingresa un número de celular de contacto válido.');
+          if (onbPhone) onbPhone.focus();
+          return;
+        }
+
+        if (!emailVal || !emailVal.includes('@') || !emailVal.includes('.')) {
+          showToast('⚠️ Ingresa un correo electrónico válido para enviarte los comprobantes.');
+          if (onbEmail) onbEmail.focus();
+          return;
+        }
+
+        const newProfile = {
+          nombre: nameVal,
+          telefono: phoneVal,
+          email: emailVal,
+          avatar: prof.avatar || '',
+          metodoPagoPredeterminado: prof.metodoPagoPredeterminado || 'efectivo',
+          isRegistered: true,
+          createdAt: Date.now()
+        };
+
+        savePassengerProfile(newProfile, false);
+        if (modalOnboarding) modalOnboarding.classList.add('hidden');
+        showToast(`🎉 ¡Bienvenido a RutaPrivada, ${nameVal.split(' ')[0]}! Cuenta lista para viajar.`);
+        try { playPassengerTone('confirmed'); } catch(e){}
+      });
+    }
 
     // Abrir modal desde el botón de la barra superior
     const btnOpenProf = document.getElementById('btnOpenPassengerProfile');
