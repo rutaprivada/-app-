@@ -7826,11 +7826,33 @@ if (btnRecenterPassengerMap) {
     const item = list.find(r => r.id === resId);
     if (item) {
       item.estado = 'cancelada';
+      item.status = 'cancelada';
+      item.isCancelled = true;
+      item.canceladoPor = 'pasajero';
+      item.canceladoEn = Date.now();
       savePassengerReservations(list);
 
+      const cancelPayload = {
+        id: String(resId),
+        reservaId: String(resId),
+        estado: 'cancelada',
+        status: 'cancelada',
+        isCancelled: true,
+        canceladoPor: 'pasajero',
+        canceladoEn: Date.now(),
+        fecha: item.fecha || item.date || 'Hoy',
+        hora: item.hora || item.time || '00:00',
+        origen: item.origen || item.pickupAddress || 'Origen',
+        destino: item.destino || item.dropoffAddress || 'Destino',
+        cliente: item.nombrePasajero || item.clientName || 'Pasajero'
+      };
+
       if (window.RutaSync) {
-        window.RutaSync.actualizarReservaLocal(resId, { estado: 'cancelada' });
-        window.RutaSync.emit('RESERVA_LIBERADA', { id: resId, estado: 'cancelada' });
+        window.RutaSync.actualizarReservaLocal(resId, cancelPayload);
+        window.RutaSync.emit('RESERVA_CANCELADA', cancelPayload);
+        if (window.RutaSync.firestore) {
+          window.RutaSync.firestore.collection('bookings').doc(String(resId)).set(cancelPayload, { merge: true }).catch(() => {});
+        }
       }
       renderPassengerReservationsList();
       showToast('❌ Reserva cancelada correctamente.');

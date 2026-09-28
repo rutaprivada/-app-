@@ -139,9 +139,8 @@ class RutaSyncManager {
                                 if (data) {
                                     data.id = data.id || change.doc.id;
                                     if (data.senderId !== this.deviceId) {
-                                        this.guardarReservaEnAgenda(data);
                                         const eventType = data.estado === 'aceptada' ? 'RESERVA_ACEPTADA' : 
-                                                         (data.estado === 'cancelada' ? 'RESERVA_LIBERADA' : 
+                                                         (data.estado === 'cancelada' ? 'RESERVA_CANCELADA' : 
                                                          (data.estado === 'completada' ? 'RESERVA_COMPLETADA' : 'RESERVA_CREADA'));
                                         this.handleIncoming({
                                             id: 'fs_bk_' + data.id + '_' + (data.timestamp || Date.now()) + '_' + change.type,
@@ -329,7 +328,7 @@ class RutaSyncManager {
                         senderId: this.deviceId,
                         timestamp: now
                     }).catch(() => {});
-                } else if ((type === 'RESERVA_ACEPTADA' || type === 'RESERVA_LIBERADA' || type === 'RESERVA_COMPLETADA') && payload && (payload.reservaId || payload.id)) {
+                } else if ((type === 'RESERVA_ACEPTADA' || type === 'RESERVA_LIBERADA' || type === 'RESERVA_CANCELADA' || type === 'RESERVA_COMPLETADA') && payload && (payload.reservaId || payload.id)) {
                     const bkId = String(payload.reservaId || payload.id);
                     this.firestore.collection('bookings').doc(bkId).set({
                         ...payload,
@@ -426,6 +425,17 @@ class RutaSyncManager {
                     driverAssigned: null,
                     driverCar: null,
                     driverPlate: null
+                });
+            }
+        } else if (message.type === 'RESERVA_CANCELADA') {
+            const bkId = message.payload ? (message.payload.id || message.payload.reservaId) : null;
+            if (bkId) {
+                this.actualizarReservaLocal(bkId, {
+                    status: 'cancelada',
+                    estado: 'cancelada',
+                    isCancelled: true,
+                    canceladoPor: 'pasajero',
+                    canceladoEn: Date.now()
                 });
             }
         } else if (message.type === 'RESERVA_COMPLETADA') {
