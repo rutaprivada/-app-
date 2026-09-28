@@ -827,25 +827,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const status = String(b.status || b.estado || '').toLowerCase();
         const isCompleted = status === 'completada' || status === 'completado' || b.isCompleted === true;
-        const isCancelled = status === 'cancelada' || status === 'cancelado' || b.isCancelled === true;
+        const isCancelled = status === 'cancelada' || status === 'cancelado';
         if (isCompleted || isCancelled) return false;
 
         const dateStr = b.date || b.pickupDate;
         if (!dateStr) return false;
 
         const todayKey = getTodayKey();
-        // 1. Descartar reservas de fechas pasadas
         if (dateStr < todayKey) return false;
 
-        // 2. Si la reserva es para hoy y aún no fue aceptada por ningún chofer, verificar si ya expiró su horario
+        // Si es de hoy, verificar si la hora ya venció (más de 15 minutos en el pasado) para reservas no asignadas
         if (dateStr === todayKey) {
             const timeStr = b.time || b.pickupTime || '00:00';
             const scheduled = getReservationScheduledDate(dateStr, timeStr);
             if (scheduled) {
-                const diffMin = Math.floor((new Date().getTime() - scheduled.getTime()) / (1000 * 60));
-                const isTomada = status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre;
-                // Si la reserva no fue tomada y ya pasaron más de 15 minutos de su horario de inicio, se considera expirada
-                if (!isTomada && diffMin > 15) {
+                const now = new Date();
+                const diffMin = (scheduled.getTime() - now.getTime()) / (60 * 1000);
+                if (diffMin < -15 && status !== 'aceptada' && status !== 'en_curso' && b.driverAssigned !== driverState.info.nombre) {
                     return false;
                 }
             }
@@ -854,43 +852,32 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
-    function check45MinReservationConflict(candidateRes, allBookings = []) {
-        if (!candidateRes) return { hasConflict: false };
-        const candidateDate = candidateRes.date || candidateRes.pickupDate;
-        const candidateTime = candidateRes.time || candidateRes.pickupTime || '00:00';
-        if (!candidateDate) return { hasConflict: false };
+    function tieneConflictoHorario45Min(item, driverTomadas) {
+        if (!item) return { conflicto: false };
+        const itemDate = item.date || item.pickupDate || 'Hoy';
+        const [h1, m1] = (item.time || item.pickupTime || '00:00').split(':').map(Number);
+        if (isNaN(h1) || isNaN(m1)) return { conflicto: false };
+        const itemMinutes = h1 * 60 + m1;
 
-        const [cH, cM] = candidateTime.split(':').map(Number);
-        const candidateTotalMin = (cH || 0) * 60 + (cM || 0);
+        for (const tomada of driverTomadas) {
+            if (tomada.id === item.id) continue;
+            const tomadaDate = tomada.date || tomada.pickupDate || 'Hoy';
+            if (tomadaDate === itemDate) {
+                const [h2, m2] = (tomada.time || tomada.pickupTime || '00:00').split(':').map(Number);
+                if (isNaN(h2) || isNaN(m2)) continue;
+                const tomadaMinutes = h2 * 60 + m2;
 
-        // Buscar reservas aceptadas por este conductor en la misma fecha
-        const driverName = driverState.info.nombre;
-        const acceptedResList = (allBookings || []).filter(b => {
-            if (!b || b.id === candidateRes.id) return false;
-            const bDate = b.date || b.pickupDate;
-            if (bDate !== candidateDate) return false;
-            const bStatus = String(b.status || b.estado || '').toLowerCase();
-            return (bStatus === 'aceptada' || bStatus === 'en_curso' || b.driverAssigned === driverName) &&
-                   bStatus !== 'completada' && bStatus !== 'completado' && bStatus !== 'cancelada' && bStatus !== 'cancelado';
-        });
-
-        for (const accepted of acceptedResList) {
-            const aTime = accepted.time || accepted.pickupTime || '00:00';
-            const [aH, aM] = aTime.split(':').map(Number);
-            const acceptedTotalMin = (aH || 0) * 60 + (aM || 0);
-
-            const diff = Math.abs(candidateTotalMin - acceptedTotalMin);
-            if (diff < 45) {
-                return {
-                    hasConflict: true,
-                    conflictRes: accepted,
-                    diffMin: diff,
-                    acceptedTime: aTime
-                };
+                // Conflicto si la diferencia es menor a 45 minutos (ej: si tengo una a las 7:00, no puedo tomar antes de 7:45)
+                if (Math.abs(itemMinutes - tomadaMinutes) < 45) {
+                    return {
+                        conflicto: true,
+                        horaTomada: tomada.time || tomada.pickupTime || '00:00',
+                        fecha: tomadaDate
+                    };
+                }
             }
         }
-
-        return { hasConflict: false };
+        return { conflicto: false };
     }
 
     function getReservationScheduledDate(dateStr, timeStr) {
@@ -1096,62 +1083,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const timeStr = b.time || b.pickupTime || '00:00';
                 const paymentStr = b.paymentMethod || b.metodoPago || 'Efectivo / Transferencia';
 
-                // Verificar conflicto de 45 minutos contra las reservas aceptadas por este chofer
-                const conflictCheck = !isTomada ? check45MinReservationConflict(b, allBookings) : { hasConflict: false };
-
-                // Si la reserva es para hoy, no está tomada y faltan 15 minutos o menos para el horario de inicio, promocionar al radar de viajes en vivo
-                if (!isTomada && dateStr === todayDateStr) {
-                    const scheduledDate = getReservationScheduledDate(dateStr, timeStr);
-                    if (scheduledDate) {
-                        const minRemaining = Math.floor((scheduledDate.getTime() - new Date().getTime()) / (1000 * 60));
-                        if (minRemaining <= 15 && minRemaining >= -15 && !driverState.activeTrip) {
-                            const promoTrip = {
-                                id: 'promo_' + b.id,
-                                reservaId: b.id,
-                                origen: pickupAddr,
-                                pickupAddress: pickupAddr,
-                                destino: dropoffAddr,
-                                dropoffAddress: dropoffAddr,
-                                parada: b.parada || b.stopAddress,
-                                stopAddress: b.parada || b.stopAddress,
-                                precioEstimado: priceVal,
-                                precio: priceVal,
-                                totalFare: priceVal,
-                                monto: priceVal,
-                                distancia: b.distancia || (b.distanceKm ? `${b.distanceKm} km` : '15 km'),
-                                duracion: b.duracion || (b.durationMin ? `${b.durationMin} min` : '25 min'),
-                                nombrePasajero: clientName,
-                                clientName: clientName,
-                                customerName: clientName,
-                                telefono: rawPhone,
-                                estado: 'solicitado',
-                                isPromotedFromSchedule: true
-                            };
-                            if (!driverState.availableTrips.some(t => t.id === promoTrip.id || t.id === b.id)) {
-                                driverState.availableTrips.push(promoTrip);
-                                renderAvailableTripsList();
-                            }
-                        }
-                    }
-                }
+                // Comprobar regla de conflicto de 45 minutos si es una reserva disponible
+                const conflictInfo = !isTomada ? tieneConflictoHorario45Min(b, tomadas) : { conflicto: false };
 
                 htmlContent += `
-                    <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''}">
+                    <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''} ${conflictInfo.conflicto ? 'reserva-conflicto' : ''}">
                         <div class="reserva-header-row">
                             <div class="reserva-datetime">
                                 <span class="reserva-date-pill">📅 ${dateStr}</span>
                                 <span class="reserva-time-bold">⏰ ${timeStr} hs</span>
                             </div>
-                            <div style="display: flex; gap: 6px; align-items: center;">
-                                ${conflictCheck.hasConflict ? `
-                                    <span class="reserva-conflict-badge" style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700;">
-                                        ⛔ Margen < 45m (${conflictCheck.acceptedTime} hs)
-                                    </span>
-                                ` : ''}
-                                <span class="reserva-status-tag ${isTomada ? 'tomada' : 'disponible'}">
-                                    ${isTomada ? '✓ Agendada en tu Hoja' : '⚡ Disponible'}
-                                </span>
-                            </div>
+                            <span class="reserva-status-tag ${isTomada ? 'tomada' : (conflictInfo.conflicto ? 'conflicto' : 'disponible')}">
+                                ${isTomada ? '✓ Agendada en tu Hoja' : (conflictInfo.conflicto ? '🔒 Conflicto Horario' : '⚡ Disponible')}
+                            </span>
                         </div>
 
                         <div class="reserva-route-box">
@@ -1195,6 +1139,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         ` : ''}
 
+                        ${conflictInfo.conflicto ? `
+                            <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 7px 10px; font-size: 0.76rem; color: #fca5a5; display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                <span>No disponible: Ya tienes una reserva aceptada a las <strong>${conflictInfo.horaTomada} hs</strong> (Margen mínimo 45 min).</span>
+                            </div>
+                        ` : ''}
+
                         <div class="reserva-actions-row">
                             ${isTomada ? `
                                 <button type="button" class="btn-tomar-reserva btn-iniciar-reserva" data-id="${b.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;">
@@ -1209,9 +1160,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <i class="fa-solid fa-xmark"></i> Cancelar Reserva
                                     </button>
                                 `}
-                            ` : (conflictCheck.hasConflict ? `
-                                <button type="button" class="btn-tomar-reserva btn-reserva-con-conflicto" data-id="${b.id}" data-accepted-time="${conflictCheck.acceptedTime}" data-diff="${conflictCheck.diffMin}" style="background: rgba(239, 68, 68, 0.12); border: 1.5px dashed rgba(239, 68, 68, 0.5); color: #fca5a5; cursor: pointer;">
-                                    <i class="fa-solid fa-triangle-exclamation"></i> Conflicto 45 min (${conflictCheck.acceptedTime} hs)
+                            ` : (conflictInfo.conflicto ? `
+                                <button type="button" class="btn-tomar-reserva" disabled style="background: rgba(51, 65, 85, 0.7); color: #94a3b8; cursor: not-allowed; border: 1px solid rgba(255,255,255,0.06);">
+                                    <i class="fa-solid fa-ban"></i> Solapamiento (&lt; 45 min de ${conflictInfo.horaTomada} hs)
                                 </button>
                             ` : `
                                 <button type="button" class="btn-tomar-reserva btn-aceptar-reserva-action" data-id="${b.id}">
@@ -1236,20 +1187,6 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', () => {
                 const resId = btn.getAttribute('data-id');
                 aceptarReservaProgramada(resId);
-            });
-        });
-
-        // Listeners para botones con Conflicto de 45 minutos
-        document.querySelectorAll('.btn-reserva-con-conflicto').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const acceptedTime = btn.getAttribute('data-accepted-time') || '--:--';
-                const diffMin = btn.getAttribute('data-diff') || '0';
-                alert(
-                    `⛔ CONFLICTO DE HORARIO (REGLA DE 45 MINUTOS)\n\n` +
-                    `Ya tienes una reserva aceptada para las ${acceptedTime} hs.\n\n` +
-                    `Por políticas de puntualidad, descanso y tiempo de viaje en la plataforma, no es posible tomar otra reserva con menos de 45 minutos de margen (diferencia actual: ${diffMin} minutos).\n\n` +
-                    `Solo podrás aceptar reservas disponibles a partir de 45 minutos después o antes de las ${acceptedTime} hs.`
-                );
             });
         });
 
@@ -1287,7 +1224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function aceptarReservaProgramada(resId) {
-        // Regla 1: No aceptar ninguna reserva si se tiene un viaje en curso
+        // Regla: No aceptar ninguna reserva si se tiene un viaje en curso
         if (driverState.activeTrip) {
             alert('⚠️ TIENES UN VIAJE EN CURSO\n\nDebes completar el viaje actual antes de aceptar o agendar una reserva.');
             return;
@@ -1297,15 +1234,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const item = bookings.find(b => b.id === resId);
         if (!item) return;
 
-        // Regla 2: Validar conflicto de 45 minutos contra las reservas ya tomadas
-        const conflict = check45MinReservationConflict(item, bookings);
-        if (conflict.hasConflict) {
-            alert(
-                `⛔ CONFLICTO DE HORARIO (REGLA DE 45 MINUTOS)\n\n` +
-                `Tienes una reserva agendada para las ${conflict.acceptedTime} hs.\n\n` +
-                `Para asegurar la puntualidad y el cumplimiento de cada servicio, no puedes tomar otra reserva con menos de 45 minutos de separación (diferencia actual: ${conflict.diffMin} minutos).\n\n` +
-                `Podrás aceptar reservas programadas con al menos 45 minutos de margen.`
-            );
+        // Validar conflicto de 45 minutos antes de aceptar
+        const validFutureBookings = bookings.filter(isReservaValidaHojaDeRuta);
+        const tomadas = validFutureBookings.filter(b => {
+            const status = String(b.status || b.estado || '').toLowerCase();
+            return status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre;
+        });
+
+        const conflictCheck = tieneConflictoHorario45Min(item, tomadas);
+        if (conflictCheck.conflicto) {
+            alert(`⚠️ CONFLICTO DE HORARIO (45 MINUTOS)\n\nYa tienes una reserva agendada a las ${conflictCheck.horaTomada} hs (${conflictCheck.fecha}).\n\nPor políticas de puntualidad y cumplimiento de RutaPrivada, debes tener al menos 45 minutos de margen entre reservas.`);
             return;
         }
 
@@ -1482,19 +1420,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             const data = doc.data();
                             if (data) {
                                 data.id = data.id || doc.id;
-                                const status = String(data.status || data.estado || '').toLowerCase();
-                                if (!isTestBooking(data) && status !== 'cancelada' && status !== 'cancelado') {
+                                if (!isTestBooking(data)) {
                                     cloudBookings.push(data);
                                 }
                             }
                         });
 
-                        const localBookings = getStoredBookings().filter(b => {
-                            if (!b || isTestBooking(b)) return false;
-                            const st = String(b.status || b.estado || '').toLowerCase();
-                            return st !== 'cancelada' && st !== 'cancelado';
-                        });
-
+                        const localBookings = getStoredBookings().filter(b => !isTestBooking(b));
                         const map = new Map();
                         localBookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
                         cloudBookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
@@ -3308,7 +3240,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!driverState.isOnline) {
                     setOnlineStatus(true);
                 }
+                switchTab('viewLive');
                 enqueueIncomingTrip(viaje);
+                showIncomingTrip(viaje);
             }
         });
 
@@ -3348,70 +3282,40 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         window.RutaSync.on('RESERVA_CANCELADA', (data) => {
-            const resId = data ? String(data.id || data.reservaId) : null;
-            if (resId) {
-                let bookings = getStoredBookings();
-                const found = bookings.find(b => String(b.id) === resId);
-                const isMine = found && (found.status === 'aceptada' || found.driverAssigned === driverState.info.nombre);
-                
-                // Remover o marcar como cancelada
-                const filtered = bookings.filter(b => String(b.id) !== resId);
-                saveStoredBookings(filtered);
-                renderReservas();
+            if (!data) return;
+            const resId = data.reservaId || data.id;
+            let bookings = getStoredBookings();
+            const targetRes = bookings.find(b => b.id === resId);
 
-                if (isMine) {
-                    try { playAlertSound('warning'); } catch(e){}
-                    const dateStr = found.date || found.pickupDate || data.fecha || 'Hoy';
-                    const timeStr = found.time || found.pickupTime || data.hora || '--:--';
-                    const origStr = found.pickupAddress || found.origin || data.origen || 'Origen';
-                    alert(
-                        `🚨 RESERVA CANCELADA POR EL PASAJERO\n\n` +
-                        `El pasajero ha cancelado el traslado programado para el ${dateStr} a las ${timeStr} hs.\n\n` +
-                        `📍 Origen: ${origStr}\n\n` +
-                        `El servicio ha sido eliminado automáticamente de tu Hoja de Ruta.`
-                    );
-                    showDriverToast('🚨 Una reserva de tu agenda fue cancelada por el pasajero.');
-                }
-            } else {
-                renderReservas();
+            // Filtrar y eliminar de la lista local
+            bookings = bookings.filter(b => b.id !== resId);
+            saveStoredBookings(bookings);
+            renderReservas();
+
+            // Si el chofer estaba asignado a esta reserva, alertarlo con sonido y aviso
+            const driverName = (driverState.info && driverState.info.nombre) || 'Daniel Pabon';
+            const wasAssigned = targetRes && (
+                targetRes.driverAssigned === driverName ||
+                (data.driverAssigned && data.driverAssigned === driverName) ||
+                (targetRes.status === 'aceptada' || targetRes.estado === 'aceptada')
+            );
+
+            if (wasAssigned) {
+                playAlertSound('incoming');
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
+                
+                const fechaStr = data.fecha || (targetRes ? (targetRes.date || targetRes.pickupDate) : 'Hoy');
+                const horaStr = data.hora || (targetRes ? (targetRes.time || targetRes.pickupTime) : '00:00');
+                const clienteStr = data.cliente || (targetRes ? (targetRes.clientName || targetRes.customerName) : 'El pasajero');
+                
+                alert(`⚠️ RESERVA CANCELADA POR EL PASAJERO\n\n${clienteStr} ha cancelado la reserva programada para el ${fechaStr} a las ${horaStr} hs.\n\nLa reserva ha sido removida automáticamente de tu Hoja de Ruta.`);
+                showDriverToast(`⚠️ Reserva de ${horaStr} hs cancelada por el pasajero.`);
             }
         });
 
         window.RutaSync.on('RESERVA_COMPLETADA', () => {
             renderReservas();
         });
-
-        // BÚSQUEDA AUTOMÁTICA CONTINUA EN RADAR (1.5s): Conectar solicitudes directas de pasajeros al instante
-        setInterval(async () => {
-            if (!driverState.isOnline || driverState.activeTrip) return;
-
-            // 1. Revisar estado activo en RutaSync
-            try {
-                const active = window.RutaSync.obtenerViajeActivo();
-                if (active && active.id && ['buscando_conductor', 'solicitado'].includes(active.estado)) {
-                    const tripAge = Date.now() - (active.creadoEn || active.timestamp || Date.now());
-                    if (tripAge < 5 * 60 * 1000) {
-                        enqueueIncomingTrip(active);
-                    }
-                }
-            } catch(e){}
-
-            // 2. Consultar directamente el documento Firestore de viaje activo en la nube
-            if (window.RutaSync && window.RutaSync.firestore) {
-                try {
-                    const docSnap = await window.RutaSync.firestore.collection('live_trips').doc('current_active_trip').get();
-                    if (docSnap.exists) {
-                        const fsData = docSnap.data();
-                        if (fsData && ['buscando_conductor', 'solicitado'].includes(fsData.estado)) {
-                            const fsAge = Date.now() - (fsData.creadoEn || fsData.timestamp || Date.now());
-                            if (fsAge < 5 * 60 * 1000 && !driverState.activeTrip) {
-                                enqueueIncomingTrip(fsData);
-                            }
-                        }
-                    }
-                } catch(e){}
-            }
-        }, 1500);
 
         window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', (viaje) => {
             renderReservas();

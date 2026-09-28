@@ -62,7 +62,7 @@ class RutaSyncManager {
                                 if (data && data.senderId !== this.deviceId) {
                                     if (data.estado === 'buscando_conductor' || data.estado === 'solicitado') {
                                         this.handleIncoming({
-                                            id: 'fs_' + (data.id || Date.now()),
+                                            id: 'fs_req_' + (data.id || 't') + '_' + (data.ultimoEstadoEn || data.timestamp || Date.now()),
                                             type: 'NUEVO_VIAJE_SOLICITADO',
                                             payload: data,
                                             senderId: data.senderId,
@@ -139,8 +139,9 @@ class RutaSyncManager {
                                 if (data) {
                                     data.id = data.id || change.doc.id;
                                     if (data.senderId !== this.deviceId) {
+                                        this.guardarReservaEnAgenda(data);
                                         const eventType = data.estado === 'aceptada' ? 'RESERVA_ACEPTADA' : 
-                                                         (data.estado === 'cancelada' ? 'RESERVA_CANCELADA' : 
+                                                         (data.estado === 'cancelada' ? 'RESERVA_LIBERADA' : 
                                                          (data.estado === 'completada' ? 'RESERVA_COMPLETADA' : 'RESERVA_CREADA'));
                                         this.handleIncoming({
                                             id: 'fs_bk_' + data.id + '_' + (data.timestamp || Date.now()) + '_' + change.type,
@@ -328,7 +329,7 @@ class RutaSyncManager {
                         senderId: this.deviceId,
                         timestamp: now
                     }).catch(() => {});
-                } else if ((type === 'RESERVA_ACEPTADA' || type === 'RESERVA_LIBERADA' || type === 'RESERVA_CANCELADA' || type === 'RESERVA_COMPLETADA') && payload && (payload.reservaId || payload.id)) {
+                } else if ((type === 'RESERVA_ACEPTADA' || type === 'RESERVA_LIBERADA' || type === 'RESERVA_COMPLETADA' || type === 'RESERVA_CANCELADA') && payload && (payload.reservaId || payload.id)) {
                     const bkId = String(payload.reservaId || payload.id);
                     this.firestore.collection('bookings').doc(bkId).set({
                         ...payload,
@@ -417,6 +418,16 @@ class RutaSyncManager {
                     driverPlate: (message.payload.conductor && message.payload.conductor.patente) ? message.payload.conductor.patente : 'AE927CN'
                 });
             }
+        } else if (message.type === 'RESERVA_CANCELADA') {
+            if (message.payload && (message.payload.reservaId || message.payload.id)) {
+                const bId = message.payload.reservaId || message.payload.id;
+                this.actualizarReservaLocal(bId, {
+                    status: 'cancelada',
+                    estado: 'cancelada',
+                    canceladoPor: message.payload.canceladoPor || 'pasajero',
+                    canceladoEn: message.payload.canceladoEn || Date.now()
+                });
+            }
         } else if (message.type === 'RESERVA_LIBERADA') {
             if (message.payload && message.payload.reservaId) {
                 this.actualizarReservaLocal(message.payload.reservaId, {
@@ -425,17 +436,6 @@ class RutaSyncManager {
                     driverAssigned: null,
                     driverCar: null,
                     driverPlate: null
-                });
-            }
-        } else if (message.type === 'RESERVA_CANCELADA') {
-            const bkId = message.payload ? (message.payload.id || message.payload.reservaId) : null;
-            if (bkId) {
-                this.actualizarReservaLocal(bkId, {
-                    status: 'cancelada',
-                    estado: 'cancelada',
-                    isCancelled: true,
-                    canceladoPor: 'pasajero',
-                    canceladoEn: Date.now()
                 });
             }
         } else if (message.type === 'RESERVA_COMPLETADA') {
@@ -1334,6 +1334,35 @@ class RutaSyncManager {
 
             let modified = false;
 
+            // 0. PURGA AUTOMÁTICA DE RESERVAS VENCIDAS (Pasadas > 15 min sin chofer / no completadas / canceladas)
+            bookings = bookings.filter(res => {
+                const status = (res.status || res.estado || 'disponible').toLowerCase();
+                if (['completada', 'finalizada'].includes(status)) return true;
+                if (status === 'cancelada' || status === 'cancelado') return false;
+
+                const resDateStr = res.date || res.pickupDate || res.fecha;
+                const resTimeStr = res.time || res.pickupTime || res.hora;
+                if (!resDateStr || !resTimeStr) return true;
+
+                const [y, m, d] = resDateStr.split('-').map(Number);
+                const [hh, mm] = resTimeStr.split(':').map(Number);
+                if (!y || !m || !d || isNaN(hh) || isNaN(mm)) return true;
+
+                const resDateTime = new Date(y, m - 1, d, hh, mm, 0);
+                const diffMin = (resDateTime.getTime() - now.getTime()) / (60 * 1000);
+
+                // Si la reserva venció hace más de 15 minutos y no fue aceptada ni está en curso:
+                if (diffMin < -15 && status !== 'en_curso' && status !== 'aceptada') {
+                    modified = true;
+                    if (this.firestore) {
+                        this.firestore.collection('bookings').doc(res.id).delete().catch(() => {});
+                        this.firestore.collection('fleet_bookings').doc(res.id).delete().catch(() => {});
+                    }
+                    return false;
+                }
+                return true;
+            });
+
             // 1. MONITOREO DE RESERVAS PARA CHOFER Y PASAJERO
             bookings.forEach(res => {
                 const status = (res.status || res.estado || 'disponible').toLowerCase();
@@ -1388,8 +1417,6 @@ class RutaSyncManager {
                 }
 
                 // --- REGLA C: CONTROL DE FACTIBILIDAD Y AUTO-LIBERACIÓN (30 MIN ANTES) ---
-                // Si faltan 30 min o menos, el chofer asignado está desconectado o se encuentra a más de 30 km:
-                // Se libera la reserva para que otro chofer cercano la tome y no se pierda el viaje.
                 if (diffMin > 10 && diffMin <= 30 && res.driverAssigned && !res.autoReasignada) {
                     let isDriverTooFar = false;
                     let isDriverOffline = false;
@@ -1402,7 +1429,6 @@ class RutaSyncManager {
                     // Validar distancia geográfica si hay coordenadas de origen
                     if (driverLoc && driverLoc.lat && driverLoc.lng && res.originLat && res.originLng) {
                         const distKm = this.calcularDistanciaKm(driverLoc.lat, driverLoc.lng, res.originLat, res.originLng);
-                        // Si está a más de 25 km y faltan menos de 30 min, no llegará puntual
                         if (distKm > 25) {
                             isDriverTooFar = true;
                         }
@@ -1441,6 +1467,36 @@ class RutaSyncManager {
                             });
                         }
                     }
+                }
+
+                // --- REGLA D: AUTO-DESPACHO A RADAR DE VIAJES EN VIVO (10 MIN ANTES SI NO FUE TOMADA) ---
+                // Si la reserva no fue aceptada por ningún chofer y faltan 10 minutos o menos para el horario:
+                // Se envía de forma automática como solicitud de viaje en vivo para que los choferes conectados la tomen
+                if (diffMin <= 10 && diffMin >= -10 && (!res.driverAssigned || res.driverAssigned === '') && (status === 'disponible' || status === 'pendiente') && !res.despachadaComoViajeEnVivo) {
+                    res.despachadaComoViajeEnVivo = true;
+                    modified = true;
+
+                    const liveTripPayload = {
+                        id: 'live_res_' + res.id,
+                        reservaId: res.id,
+                        esReservaEnVivo: true,
+                        nombrePasajero: res.clientName || res.customerName || res.nombrePasajero || 'Pasajero (Reserva Programada)',
+                        telefono: res.clientPhone || res.customerPhone || res.telefono || '+5491100000000',
+                        origen: res.pickupAddress || res.origin || res.origen || 'Punto de recogida',
+                        destino: res.dropoffAddress || res.destination || res.destino || 'Destino',
+                        parada: res.parada || res.stopAddress || null,
+                        precioEstimado: Number(res.price || res.totalFare || res.monto || 35000),
+                        categoria: res.category || res.categoria || 'Sedán Ejecutivo',
+                        distancia: res.distancia || (res.distanceKm ? `${res.distanceKm} km` : '15 km'),
+                        duracion: res.duracion || (res.durationMin ? `${res.durationMin} min` : '25 min'),
+                        metodoPago: res.paymentMethod || res.metodoPago || 'Efectivo / Transferencia',
+                        tollFare: Number(res.tollCost || res.peajes || res.tollFare || 0),
+                        originCoords: res.originCoords || res._originCoords || null,
+                        destinationCoords: res.destinationCoords || res._destCoords || null,
+                        timestamp: Date.now()
+                    };
+
+                    this.solicitarViaje(liveTripPayload);
                 }
             });
 

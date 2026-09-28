@@ -4644,9 +4644,17 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
         </div>
       `;
 
-      item.addEventListener('click', () => {
+      const handleSelect = (e) => {
+        if (e) {
+          try { e.preventDefault(); e.stopPropagation(); } catch(err){}
+        }
         selectItem(place);
-      });
+      };
+
+      item.addEventListener('pointerdown', handleSelect);
+      item.addEventListener('touchstart', handleSelect, { passive: false });
+      item.addEventListener('mousedown', handleSelect);
+      item.addEventListener('click', handleSelect);
 
       list.appendChild(item);
     });
@@ -7827,33 +7835,39 @@ if (btnRecenterPassengerMap) {
     if (item) {
       item.estado = 'cancelada';
       item.status = 'cancelada';
-      item.isCancelled = true;
-      item.canceladoPor = 'pasajero';
-      item.canceladoEn = Date.now();
       savePassengerReservations(list);
 
       const cancelPayload = {
-        id: String(resId),
-        reservaId: String(resId),
+        id: resId,
+        reservaId: resId,
         estado: 'cancelada',
         status: 'cancelada',
-        isCancelled: true,
+        fecha: item.fecha || item.date || '',
+        hora: item.hora || item.time || '',
+        origen: item.origen || item.pickupAddress || '',
+        destino: item.destino || item.dropoffAddress || '',
+        driverAssigned: item.driverAssigned || (item.conductor ? item.conductor.nombre : null),
         canceladoPor: 'pasajero',
-        canceladoEn: Date.now(),
-        fecha: item.fecha || item.date || 'Hoy',
-        hora: item.hora || item.time || '00:00',
-        origen: item.origen || item.pickupAddress || 'Origen',
-        destino: item.destino || item.dropoffAddress || 'Destino',
-        cliente: item.nombrePasajero || item.clientName || 'Pasajero'
+        canceladoEn: Date.now()
       };
 
       if (window.RutaSync) {
-        window.RutaSync.actualizarReservaLocal(resId, cancelPayload);
+        window.RutaSync.actualizarReservaLocal(resId, { estado: 'cancelada', status: 'cancelada' });
         window.RutaSync.emit('RESERVA_CANCELADA', cancelPayload);
-        if (window.RutaSync.firestore) {
-          window.RutaSync.firestore.collection('bookings').doc(String(resId)).set(cancelPayload, { merge: true }).catch(() => {});
-        }
       }
+
+      // Sincronizar en Firestore
+      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+        try {
+          firebase.firestore().collection('bookings').doc(String(resId)).set({
+            estado: 'cancelada',
+            status: 'cancelada',
+            canceladoPor: 'pasajero',
+            canceladoEn: Date.now()
+          }, { merge: true }).catch(() => {});
+        } catch(e) {}
+      }
+
       renderPassengerReservationsList();
       showToast('❌ Reserva cancelada correctamente.');
     }
