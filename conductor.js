@@ -854,29 +854,63 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
+    function getBookingTimestamp(b) {
+        if (!b) return null;
+        const dateStr = b.date || b.pickupDate || '';
+        let timeStr = b.time || b.pickupTime || '00:00';
+        timeStr = String(timeStr).replace(/[^\d:]/g, '');
+        if (!timeStr.includes(':')) timeStr = '00:00';
+
+        let y, m, d;
+        if (dateStr.includes('-')) {
+            const parts = dateStr.split('-').map(Number);
+            if (parts[0] > 1000) {
+                [y, m, d] = parts;
+            } else {
+                [d, m, y] = parts;
+            }
+        } else if (dateStr.includes('/')) {
+            const parts = dateStr.split('/').map(Number);
+            if (parts[2] > 1000) {
+                [d, m, y] = parts;
+            } else {
+                [y, m, d] = parts;
+            }
+        } else {
+            return null;
+        }
+        const [hh, min] = timeStr.split(':').map(Number);
+        return new Date(y, m - 1, d, hh || 0, min || 0, 0, 0).getTime();
+    }
+
     function tieneConflictoHorario45Min(item, driverTomadas) {
         if (!item) return { conflicto: false };
-        const itemDate = item.date || item.pickupDate || 'Hoy';
-        const [h1, m1] = (item.time || item.pickupTime || '00:00').split(':').map(Number);
-        if (isNaN(h1) || isNaN(m1)) return { conflicto: false };
-        const itemMinutes = h1 * 60 + m1;
+        const tsItem = getBookingTimestamp(item);
+        if (!tsItem) return { conflicto: false };
+
+        const driverName = (driverState.info && driverState.info.nombre) || 'Daniel Pabon';
 
         for (const tomada of driverTomadas) {
             if (tomada.id === item.id) continue;
-            const tomadaDate = tomada.date || tomada.pickupDate || 'Hoy';
-            if (tomadaDate === itemDate) {
-                const [h2, m2] = (tomada.time || tomada.pickupTime || '00:00').split(':').map(Number);
-                if (isNaN(h2) || isNaN(m2)) continue;
-                const tomadaMinutes = h2 * 60 + m2;
+            const statusTomada = String(tomada.status || tomada.estado || '').toLowerCase();
+            const isTomadaValida = statusTomada === 'aceptada' || statusTomada === 'en_curso' || tomada.driverAssigned === driverName;
+            if (!isTomadaValida) continue;
 
-                // Conflicto si la diferencia es menor a 45 minutos (ej: si tengo una a las 7:00, no puedo tomar antes de 7:45)
-                if (Math.abs(itemMinutes - tomadaMinutes) < 45) {
-                    return {
-                        conflicto: true,
-                        horaTomada: tomada.time || tomada.pickupTime || '00:00',
-                        fecha: tomadaDate
-                    };
-                }
+            const tsTomada = getBookingTimestamp(tomada);
+            if (!tsTomada) continue;
+
+            const diffMinutes = Math.abs(tsItem - tsTomada) / (60 * 1000);
+
+            // Si la diferencia es estrictamente menor a 45 minutos (ej: 20 min, 30 min, 44 min)
+            if (diffMinutes < 45) {
+                const tomadaHora = tomada.time || tomada.pickupTime || '00:00';
+                const tomadaFecha = tomada.date || tomada.pickupDate || 'Hoy';
+                return {
+                    conflicto: true,
+                    horaTomada: tomadaHora,
+                    fecha: tomadaFecha,
+                    diferenciaMinutos: Math.round(diffMinutes)
+                };
             }
         }
         return { conflicto: false };
@@ -942,7 +976,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (scheduled) {
                     const diffMs = scheduled.getTime() - now.getTime();
                     const diffMinutes = Math.floor(diffMs / (1000 * 60));
-                    // Si faltan 30 minutos o menos para que inicie la reserva (o hasta 120 min de tolerancia)
                     if (diffMinutes <= 30 && diffMinutes >= -120) {
                         return {
                             tieneProxima: true,
@@ -962,14 +995,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderReservas() {
         const allBookings = getStoredBookings();
         const filter = driverState.reservaFilter;
+        const driverName = (driverState.info && driverState.info.nombre) || 'Daniel Pabon';
 
         // Filtrar exclusivamente reservas válidas que corresponden a Hoja de Ruta
         const validFutureBookings = allBookings.filter(isReservaValidaHojaDeRuta);
 
-        const disponibles = validFutureBookings.filter(b => {
+        // 1. Reservas ya tomadas / aceptadas por este chofer
+        const tomadas = validFutureBookings.filter(b => {
             const status = String(b.status || b.estado || '').toLowerCase();
-            return (!b.driverAssigned || b.driverAssigned === '' || status === 'pendiente' || status === 'solicitada' || status === 'disponible') &&
-                   status !== 'aceptada' && status !== 'en_curso' && status !== 'completado' && status !== 'completada' && status !== 'cancelado';
+            return status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverName;
         }).sort((a, b) => {
             const dateA = a.date || a.pickupDate || '';
             const dateB = b.date || b.pickupDate || '';
@@ -977,9 +1011,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return (a.time || a.pickupTime || '').localeCompare(b.time || b.pickupTime || '');
         });
 
-        const tomadas = validFutureBookings.filter(b => {
+        // 2. Reservas disponibles en la red general
+        const rawDisponibles = validFutureBookings.filter(b => {
             const status = String(b.status || b.estado || '').toLowerCase();
-            return status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre;
+            return (!b.driverAssigned || b.driverAssigned === '' || status === 'pendiente' || status === 'solicitada' || status === 'disponible') &&
+                   status !== 'aceptada' && status !== 'en_curso' && status !== 'completado' && status !== 'completada' && status !== 'cancelado';
+        });
+
+        // 3. Regla Estricta: Ocultar de la vista del chofer cualquier reserva disponible que esté en el rango de +/- 45 minutos de alguna reserva aceptada
+        const disponibles = rawDisponibles.filter(disp => {
+            const conflict = tieneConflictoHorario45Min(disp, tomadas);
+            return !conflict.conflicto; // No mostrar si tiene conflicto de 45 minutos
         }).sort((a, b) => {
             const dateA = a.date || a.pickupDate || '';
             const dateB = b.date || b.pickupDate || '';
@@ -2909,9 +2951,9 @@ document.addEventListener('DOMContentLoaded', () => {
             driverState.stats.historial.unshift(nuevoHistorialItem);
             saveStats();
 
-            // Descontar automáticamente la comisión del 10% en Billetera Virtual Partner
+            // Descontar automáticamente la comisión dinámica en Billetera Virtual Partner
             try {
-                applyTripToWallet(montoGanado, driverSelectedPaymentMethod, nuevoHistorialItem.id);
+                applyTripToWallet(montoGanado, driverSelectedPaymentMethod, nuevoHistorialItem.id, { ...trip, ...nuevoHistorialItem });
             } catch(e) {
                 console.warn('Error al actualizar billetera:', e);
             }
@@ -4547,15 +4589,110 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function applyTripToWallet(montoGanado, metodoPago, tripId) {
+    /**
+     * Motor de Comisión Dinámica de Plataforma (RutaPrivada)
+     * Reglas configuradas:
+     * - Horario pico laboral: 16%
+     * - Alta demanda / Surge: 16%
+     * - Lluvia / Tormenta: 15%
+     * - Madrugada (00:00 a 06:00): 10%
+     * - Larga distancia (25 a 35 km: 15%, > 35 km: 20%)
+     * - Reservas programadas: 12%
+     * - Base estándar / Valle: 10%
+     */
+    function calculatePlatformCommission(trip) {
+        if (!trip) {
+            return {
+                percent: 10,
+                rateLabel: 'Estándar (10%)',
+                commissionAmount: 0,
+                netAmount: 0
+            };
+        }
+
+        const rawPrice = Number(trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0);
+        const tollAmt = Number(trip.tollActual !== undefined && trip.tollActual !== null ? trip.tollActual : (trip.tollFare || trip.peajes || 0)) || 0;
+        const baseFare = Math.max(0, rawPrice - tollAmt);
+
+        let distKm = 0;
+        if (trip.distanceKm !== undefined && trip.distanceKm !== null && !isNaN(Number(trip.distanceKm))) {
+            distKm = Number(trip.distanceKm);
+        } else if (trip.distancia) {
+            const m = String(trip.distancia).replace(',', '.').match(/([\d\.]+)/);
+            if (m) distKm = parseFloat(m[1]) || 0;
+        }
+
+        const isReserva = Boolean(trip.reservaId || trip.isReservation || trip.tripType === 'schedule' || trip.tipo === 'reserva');
+        const isRain = Boolean(trip.isRain || (trip.weather && trip.weather.isRain) || trip.climaLluvia);
+        const isHighDemand = Boolean(trip.isHighDemand || trip.surgeLevel === 'high' || trip.altaDemanda);
+        const isPeakHour = Boolean(trip.isPeakHour || trip.horarioPico);
+        const isMadrugada = Boolean(trip.isMadrugada || trip.horarioMadrugada);
+
+        let percent = 10;
+        let rateLabel = 'Estándar (10%)';
+
+        // 1. Reservas programadas VIP
+        if (isReserva) {
+            percent = 12;
+            rateLabel = 'Reserva Programada (12%)';
+        }
+        // 2. Larga Distancia (> 35 km: 20%, 25 a 35 km: 15%)
+        else if (distKm > 35) {
+            percent = 20;
+            rateLabel = `Larga Distancia >35km (20%)`;
+        } else if (distKm >= 25 && distKm <= 35) {
+            percent = 15;
+            rateLabel = `Larga Distancia 25-35km (15%)`;
+        }
+        // 3. Alta Demanda / Surge
+        else if (isHighDemand) {
+            percent = 16;
+            rateLabel = 'Alta Demanda (16%)';
+        }
+        // 4. Horario Pico Laboral
+        else if (isPeakHour) {
+            percent = 16;
+            rateLabel = 'Horario Pico Laboral (16%)';
+        }
+        // 5. Lluvia / Tormenta
+        else if (isRain) {
+            percent = 15;
+            rateLabel = 'Lluvia / Tormenta (15%)';
+        }
+        // 6. Madrugada / Nocturno
+        else if (isMadrugada) {
+            percent = 10;
+            rateLabel = 'Madrugada (10%)';
+        }
+
+        const commissionAmount = Math.round(baseFare * (percent / 100));
+        const netAmount = rawPrice - commissionAmount;
+
+        return {
+            percent,
+            rateLabel,
+            commissionAmount,
+            netAmount,
+            baseFare,
+            tollAmt,
+            totalFare: rawPrice
+        };
+    }
+
+    function applyTripToWallet(montoGanado, metodoPago, tripId, tripObj = null) {
         const wallet = loadDriverWallet();
         const now = new Date();
         const fecha = now.toLocaleDateString('es-AR');
         const hora = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const cleanId = String(tripId || '000000').slice(-6);
 
+        const commInfo = calculatePlatformCommission(tripObj || { precio: montoGanado });
+        const comision = commInfo.commissionAmount;
+        const netoChofer = commInfo.netAmount;
+        const pct = commInfo.percent;
+        const lbl = commInfo.rateLabel;
+
         if (metodoPago && metodoPago.toLowerCase().includes('tarjeta')) {
-            const netoChofer = Math.round(montoGanado * 0.90);
             wallet.balance += netoChofer;
             wallet.viajesTarjeta = (wallet.viajesTarjeta || 0) + netoChofer;
             wallet.movimientos.unshift({
@@ -4563,12 +4700,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 fecha,
                 hora,
                 tipo: 'tarjeta',
-                descripcion: `Abono 90% Traslado Tarjeta (ID: #${cleanId})`,
+                descripcion: `Abono ${100 - pct}% Traslado Tarjeta [${lbl}] (ID: #${cleanId})`,
                 monto: netoChofer,
                 saldoPosterior: wallet.balance
             });
         } else {
-            const comision = Math.round(montoGanado * 0.10);
             wallet.balance -= comision;
             wallet.comisionesPagadas = (wallet.comisionesPagadas || 0) + comision;
             wallet.movimientos.unshift({
@@ -4576,7 +4712,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fecha,
                 hora,
                 tipo: 'comision',
-                descripcion: `Comisión Plataforma 10% Traslado #${cleanId}`,
+                descripcion: `Comisión ${lbl} Traslado #${cleanId}`,
                 monto: -comision,
                 saldoPosterior: wallet.balance
             });
