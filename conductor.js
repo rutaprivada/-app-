@@ -216,11 +216,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Si se abre la pestaña de reservas o ganancias, refrescar datos
+        // Si se abre la pestaña de reservas, ganancias o billetera, refrescar datos
         if (tabId === 'viewReservas') {
             renderReservas();
         } else if (tabId === 'viewGanancias') {
             updateFinancialView();
+        } else if (tabId === 'viewBilletera') {
+            updateWalletUI();
         }
     }
 
@@ -2907,6 +2909,13 @@ document.addEventListener('DOMContentLoaded', () => {
             driverState.stats.historial.unshift(nuevoHistorialItem);
             saveStats();
 
+            // Descontar automáticamente la comisión del 10% en Billetera Virtual Partner
+            try {
+                applyTripToWallet(montoGanado, driverSelectedPaymentMethod, nuevoHistorialItem.id);
+            } catch(e) {
+                console.warn('Error al actualizar billetera:', e);
+            }
+
             // Si este viaje provino de una reserva o coincide con una reserva tomada, marcarla como completada
             try {
                 const resId = trip.reservaId || (trip.id ? trip.id.replace('trip_', '') : null);
@@ -4421,19 +4430,299 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch(e) {}
 
-        // 4. Si hay un viaje recién solicitado en espera en la red (menos de 5 minutos), cargarlo en el radar de inmediato
-        setTimeout(() => {
-            if (window.RutaSync && !driverState.activeTrip) {
+    // ==========================================
+    // 14. BILLETERA VIRTUAL PARTNER & SALDO DEL CONDUCTOR
+    // ==========================================
+    function loadDriverWallet() {
+        try {
+            const raw = localStorage.getItem('rutaprivada_driver_wallet_v1');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed.balance === 'number') {
+                    return parsed;
+                }
+            }
+        } catch(e) {}
+
+        const initialWallet = {
+            balance: 15000,
+            totalRecargas: 15000,
+            comisionesPagadas: 0,
+            viajesTarjeta: 0,
+            movimientos: [
+                {
+                    id: 'mov_init_1',
+                    fecha: new Date().toLocaleDateString('es-AR'),
+                    hora: '08:00',
+                    tipo: 'recarga',
+                    descripcion: 'Bono / Saldo Inicial de Bienvenida Partner',
+                    monto: 15000,
+                    saldoPosterior: 15000
+                }
+            ]
+        };
+        saveDriverWallet(initialWallet);
+        return initialWallet;
+    }
+
+    function saveDriverWallet(wallet) {
+        try {
+            localStorage.setItem('rutaprivada_driver_wallet_v1', JSON.stringify(wallet));
+        } catch(e) {}
+    }
+
+    function updateWalletUI() {
+        const wallet = loadDriverWallet();
+        const walletBalanceAmount = document.getElementById('walletBalanceAmount');
+        const walletStatusBadge = document.getElementById('walletStatusBadge');
+        const walletTotalRecargas = document.getElementById('walletTotalRecargas');
+        const walletComisionesPagadas = document.getElementById('walletComisionesPagadas');
+        const walletViajesTarjeta = document.getElementById('walletViajesTarjeta');
+        const walletTransactionsContainer = document.getElementById('walletTransactionsContainer');
+
+        const bal = wallet.balance || 0;
+        const isNegative = bal < 0;
+        const isLocked = bal < -10000;
+
+        if (walletBalanceAmount) {
+            walletBalanceAmount.textContent = (isNegative ? '-$' : '$') + Math.abs(bal).toLocaleString('es-AR');
+            walletBalanceAmount.style.color = isLocked ? '#ef4444' : (isNegative ? '#f59e0b' : '#34d399');
+        }
+
+        if (walletStatusBadge) {
+            if (isLocked) {
+                walletStatusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+                walletStatusBadge.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                walletStatusBadge.style.color = '#f87171';
+                walletStatusBadge.innerHTML = '🔴 Límite Excedido (Recarga Requerida)';
+            } else if (isNegative) {
+                walletStatusBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+                walletStatusBadge.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+                walletStatusBadge.style.color = '#fbbf24';
+                walletStatusBadge.innerHTML = '🟡 Saldo Negativo (En Margen)';
+            } else {
+                walletStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+                walletStatusBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                walletStatusBadge.style.color = '#34d399';
+                walletStatusBadge.innerHTML = '🟢 Habilitado para Viajes';
+            }
+        }
+
+        if (walletTotalRecargas) walletTotalRecargas.textContent = '$' + (wallet.totalRecargas || 0).toLocaleString('es-AR');
+        if (walletComisionesPagadas) walletComisionesPagadas.textContent = '$' + (wallet.comisionesPagadas || 0).toLocaleString('es-AR');
+        if (walletViajesTarjeta) walletViajesTarjeta.textContent = '$' + (wallet.viajesTarjeta || 0).toLocaleString('es-AR');
+
+        if (walletTransactionsContainer) {
+            if (!wallet.movimientos || wallet.movimientos.length === 0) {
+                walletTransactionsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 0.85rem;">
+                        No hay movimientos registrados aún.
+                    </div>
+                `;
+                return;
+            }
+
+            walletTransactionsContainer.innerHTML = wallet.movimientos.slice(0, 30).map(m => {
+                const isCredit = m.monto > 0;
+                const sign = isCredit ? '+' : '';
+                const color = isCredit ? '#34d399' : '#f87171';
+                const icon = m.tipo === 'recarga' ? 'fa-plus-circle text-emerald' : (m.tipo === 'tarjeta' ? 'fa-credit-card text-sky' : 'fa-percent text-gold');
+
+                return `
+                    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fa-solid ${icon}" style="font-size: 1.1rem;"></i>
+                            <div>
+                                <strong style="color: #fff; font-size: 0.82rem; display: block;">${m.descripcion}</strong>
+                                <span style="color: #94a3b8; font-size: 0.72rem;">${m.fecha} · ${m.hora} hs</span>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <strong style="color: ${color}; font-size: 0.9rem; display: block;">${sign}$${Math.abs(m.monto).toLocaleString('es-AR')}</strong>
+                            <span style="color: #64748b; font-size: 0.7rem;">Saldo: $${m.saldoPosterior.toLocaleString('es-AR')}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    function applyTripToWallet(montoGanado, metodoPago, tripId) {
+        const wallet = loadDriverWallet();
+        const now = new Date();
+        const fecha = now.toLocaleDateString('es-AR');
+        const hora = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const cleanId = String(tripId || '000000').slice(-6);
+
+        if (metodoPago && metodoPago.toLowerCase().includes('tarjeta')) {
+            const netoChofer = Math.round(montoGanado * 0.90);
+            wallet.balance += netoChofer;
+            wallet.viajesTarjeta = (wallet.viajesTarjeta || 0) + netoChofer;
+            wallet.movimientos.unshift({
+                id: 'mov_' + Date.now(),
+                fecha,
+                hora,
+                tipo: 'tarjeta',
+                descripcion: `Abono 90% Traslado Tarjeta (ID: #${cleanId})`,
+                monto: netoChofer,
+                saldoPosterior: wallet.balance
+            });
+        } else {
+            const comision = Math.round(montoGanado * 0.10);
+            wallet.balance -= comision;
+            wallet.comisionesPagadas = (wallet.comisionesPagadas || 0) + comision;
+            wallet.movimientos.unshift({
+                id: 'mov_' + Date.now(),
+                fecha,
+                hora,
+                tipo: 'comision',
+                descripcion: `Comisión Plataforma 10% Traslado #${cleanId}`,
+                monto: -comision,
+                saldoPosterior: wallet.balance
+            });
+        }
+
+        saveDriverWallet(wallet);
+        updateWalletUI();
+    }
+
+    function initWalletModule() {
+        const btnOpenRechargeModal = document.getElementById('btnOpenRechargeModal');
+        const modalRecargarSaldo = document.getElementById('modalRecargarSaldo');
+        const btnCloseRechargeModal = document.getElementById('btnCloseRechargeModal');
+        const btnOpenSettlementInfo = document.getElementById('btnOpenSettlementInfo');
+        const modalSettlementInfo = document.getElementById('modalSettlementInfo');
+        const btnCloseSettlementModal = document.getElementById('btnCloseSettlementModal');
+        const btnGotItSettlement = document.getElementById('btnGotItSettlement');
+        const customRechargeAmount = document.getElementById('customRechargeAmount');
+        const btnCopyAdminCvu = document.getElementById('btnCopyAdminCvu');
+        const btnConfirmRechargeWhatsapp = document.getElementById('btnConfirmRechargeWhatsapp');
+
+        if (btnOpenRechargeModal && modalRecargarSaldo) {
+            btnOpenRechargeModal.addEventListener('click', () => {
+                modalRecargarSaldo.classList.add('active');
+            });
+        }
+
+        if (btnCloseRechargeModal && modalRecargarSaldo) {
+            btnCloseRechargeModal.addEventListener('click', () => {
+                modalRecargarSaldo.classList.remove('active');
+            });
+        }
+
+        if (modalRecargarSaldo) {
+            modalRecargarSaldo.addEventListener('click', (e) => {
+                if (e.target === modalRecargarSaldo) modalRecargarSaldo.classList.remove('active');
+            });
+        }
+
+        if (btnOpenSettlementInfo && modalSettlementInfo) {
+            btnOpenSettlementInfo.addEventListener('click', () => {
+                modalSettlementInfo.classList.add('active');
+            });
+        }
+
+        if (btnCloseSettlementModal && modalSettlementInfo) {
+            btnCloseSettlementModal.addEventListener('click', () => {
+                modalSettlementInfo.classList.remove('active');
+            });
+        }
+
+        if (btnGotItSettlement && modalSettlementInfo) {
+            btnGotItSettlement.addEventListener('click', () => {
+                modalSettlementInfo.classList.remove('active');
+            });
+        }
+
+        document.querySelectorAll('.btn-quick-amount').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.btn-quick-amount').forEach(b => {
+                    b.style.background = 'rgba(255,255,255,0.06)';
+                    b.style.borderColor = 'rgba(255,255,255,0.15)';
+                    b.style.color = '#fff';
+                });
+                btn.style.background = 'rgba(16, 185, 129, 0.2)';
+                btn.style.borderColor = '#10b981';
+                btn.style.color = '#34d399';
+
+                const amt = btn.getAttribute('data-amount');
+                if (customRechargeAmount && amt) {
+                    customRechargeAmount.value = amt;
+                }
+            });
+        });
+
+        if (btnCopyAdminCvu) {
+            btnCopyAdminCvu.addEventListener('click', () => {
+                const cvuText = 'CVU: 0000003100084592039481\nAlias: RUTAPRIVADA.OFICIAL\nTitular: RutaPrivada Argentina S.R.L.';
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(cvuText).then(() => {
+                        showDriverToast('✓ CVU y Alias copiados al portapapeles');
+                    }).catch(() => {
+                        prompt('Copia los datos de transferencia:', cvuText);
+                    });
+                } else {
+                    prompt('Copia los datos de transferencia:', cvuText);
+                }
+            });
+        }
+
+        if (btnConfirmRechargeWhatsapp) {
+            btnConfirmRechargeWhatsapp.addEventListener('click', () => {
+                const amount = Number(customRechargeAmount ? customRechargeAmount.value : 10000) || 10000;
+                if (amount < 1000) {
+                    alert('El monto mínimo de recarga es de $1.000 ARS.');
+                    return;
+                }
+
+                const wallet = loadDriverWallet();
+                wallet.balance += amount;
+                wallet.totalRecargas = (wallet.totalRecargas || 0) + amount;
+                const now = new Date();
+                wallet.movimientos.unshift({
+                    id: 'mov_' + Date.now(),
+                    fecha: now.toLocaleDateString('es-AR'),
+                    hora: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    tipo: 'recarga',
+                    descripcion: `Recarga de Saldo Billetera (${driverState.info.nombre})`,
+                    monto: amount,
+                    saldoPosterior: wallet.balance
+                });
+                saveDriverWallet(wallet);
+                updateWalletUI();
+
+                if (modalRecargarSaldo) modalRecargarSaldo.classList.remove('active');
+                showDriverToast(`✅ Saldo acreditado: +$${amount.toLocaleString('es-AR')}`);
+
+                const msg = `Hola Administración RutaPrivada, soy el conductor partner ${driverState.info.nombre} (Patente: ${driverState.info.patente}). Realicé una recarga de saldo de $${amount.toLocaleString('es-AR')} a la billetera virtual. Adjunto el comprobante de transferencia bancaria.`;
+                const waUrl = `https://wa.me/5491122558226?text=${encodeURIComponent(msg)}`;
+                window.open(waUrl, '_blank');
+            });
+        }
+
+        updateWalletUI();
+    }
+
+    // Inicializar módulo de documentos y módulo de billetera
+    initDocsUploadModule();
+    initWalletModule();
+
+    // Auto-actualización periódica de reservas y viajes pendientes (cada 12 segundos)
+    setInterval(() => {
+        if (!driverState.activeTrip) {
+            renderReservas();
+            // Si hay un viaje recién solicitado en espera en la red (menos de 5 minutos), cargarlo en el radar
+            if (window.RutaSync && driverState.isOnline && !driverState.incomingTrip) {
                 const activeTrip = window.RutaSync.obtenerViajeActivo();
                 if (activeTrip && activeTrip.id && (activeTrip.estado === 'buscando_conductor' || activeTrip.estado === 'solicitado')) {
                     const tripAge = Date.now() - (activeTrip.creadoEn || activeTrip.timestamp || Date.now());
-                    if (tripAge < 5 * 60 * 1000) {
+                    if (tripAge < 5 * 60 * 1000 && !driverState.rejectedTrips.includes(activeTrip.id)) {
                         enqueueIncomingTrip(activeTrip);
                     }
                 }
             }
-        }, 500);
-    }
+        }
+    }, 12000);
 
     // Registro y actualización de Service Worker para la PWA de Chofer
     if ('serviceWorker' in navigator) {

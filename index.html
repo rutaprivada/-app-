@@ -799,6 +799,16 @@
               <span id="pChatUnreadBadge" class="chat-badge-counter hidden" style="position: absolute; top: -6px; right: -6px; background: #ef4444; color: #fff; font-size: 0.72rem; font-weight: 800; border-radius: 12px; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; padding: 0 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); border: 2px solid #0f172a;">1</span>
             </button>
           </div>
+
+          <!-- Safety & Sharing Action Bar -->
+          <div class="inapp-safety-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+            <button type="button" id="btnPassengerShareTrip" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 10px; padding: 10px 8px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fa-solid fa-share-nodes"></i> Compartir Viaje
+            </button>
+            <button type="button" id="btnPassengerSos" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.5); color: #f87171; border-radius: 10px; padding: 10px 8px; font-size: 0.82rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fa-solid fa-shield-halved"></i> Seguridad / SOS
+            </button>
+          </div>
         </div>
 
         <!-- Trip Summary Details -->
@@ -1379,6 +1389,66 @@
       <div class="modal-body" style="padding: 16px; max-height: 75vh; overflow-y: auto;">
         <div id="passengerReservationsListContainer" style="display: flex; flex-direction: column; gap: 12px;">
           <!-- Inyectado dinámicamente -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Seguridad, SOS y Compartir Viaje en Tiempo Real -->
+  <div id="modalPassengerSosShare" class="modal-backdrop hidden" style="z-index: 10005;">
+    <div class="modal-dialog" style="max-width: 480px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.7);">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(15, 23, 42, 0.95) 100%); border-bottom: 1px solid rgba(239, 68, 68, 0.3); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.5rem; color: #ef4444;">🛡️</span>
+          <div>
+            <h3 style="color: #fff; margin: 0; font-size: 1.05rem; font-weight: 700;">Centro de Seguridad & SOS</h3>
+            <p style="color: #94a3b8; margin: 0; font-size: 0.75rem;">Monitoreo en vivo 24/7 y asistencia de viaje</p>
+          </div>
+        </div>
+        <button type="button" id="btnCloseSosModal" class="modal-close" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+        <!-- Opción 1: Compartir Viaje en Vivo por WhatsApp -->
+        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px; padding: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <i class="fa-solid fa-share-nodes text-sky" style="font-size: 1.2rem; color: #38bdf8;"></i>
+            <div>
+              <strong style="color: #fff; font-size: 0.92rem; display: block;">Compartir Viaje con Familiares</strong>
+              <span style="color: #94a3b8; font-size: 0.75rem;">Envía tu ruta, chofer asignado, auto y patente por WhatsApp</span>
+            </div>
+          </div>
+          <button type="button" id="btnActionShareWhatsapp" style="width: 100%; background: linear-gradient(135deg, #25d366 0%, #128c7e 100%); color: #fff; border: none; border-radius: 10px; padding: 12px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.35); margin-top: 6px;">
+            <i class="fa-brands fa-whatsapp" style="font-size: 1.1rem;"></i> Compartir Detalles del Viaje
+          </button>
+        </div>
+
+        <!-- Opción 2: Central de Asistencia 24hs RutaPrivada -->
+        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 14px; padding: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <i class="fa-solid fa-headset text-gold" style="font-size: 1.2rem; color: #fbbf24;"></i>
+            <div>
+              <strong style="color: #fff; font-size: 0.92rem; display: block;">Central de Seguridad 24/7</strong>
+              <span style="color: #94a3b8; font-size: 0.75rem;">Canal directo con el equipo de soporte y monitoreo satelital</span>
+            </div>
+          </div>
+          <a href="https://wa.me/5491122558226?text=EMERGENCIA%20VIAJE%20EN%20CURSO:%20Necesito%20asistencia%20inmediata%20de%20la%20Central%20de%20RutaPrivada." target="_blank" style="width: 100%; text-decoration: none; box-sizing: border-box; background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.4); color: #fbbf24; border-radius: 10px; padding: 11px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px;">
+            <i class="fa-solid fa-phone"></i> Contactar Central de Monitoreo
+          </a>
+        </div>
+
+        <!-- Opción 3: Llamada de Emergencia al 911 -->
+        <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 14px; padding: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.2rem; color: #ef4444;"></i>
+            <div>
+              <strong style="color: #f87171; font-size: 0.92rem; display: block;">Emergencias Policía 911</strong>
+              <span style="color: #fca5a5; font-size: 0.75rem;">Llamada telefónica inmediata a los servicios de emergencia</span>
+            </div>
+          </div>
+          <a href="tel:911" id="btnCall911Emergency" style="width: 100%; text-decoration: none; box-sizing: border-box; background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: #fff; border-radius: 10px; padding: 12px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.45); margin-top: 6px;">
+            <i class="fa-solid fa-phone-volume"></i> LLAMAR AL 911 AHORA
+          </a>
         </div>
       </div>
     </div>

@@ -53,6 +53,31 @@ const DEFAULT_CONFIG = {
 // ==========================================
 let currentWizardStep = 1;
 
+function formatDateToString(d) {
+  if (!d) d = new Date();
+  if (typeof d === 'string') return d;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+window.formatDateToString = formatDateToString;
+
+function formatDateWithWeekday(dateStr) {
+  if (!dateStr) return 'Hoy';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const dayName = days[d.getDay()];
+      return `${dayName} ${String(parts[2]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')}/${parts[0]}`;
+    }
+  } catch(e) {}
+  return dateStr;
+}
+window.formatDateWithWeekday = formatDateWithWeekday;
+
 function toggleFareBreakdown(e) {
   if (e && typeof e.preventDefault === 'function') {
     e.preventDefault();
@@ -7922,14 +7947,89 @@ if (btnRecenterPassengerMap) {
     } catch(e) {}
   }
 
+  // ==========================================
+  // MÓDULO DE SEGURIDAD, SOS 24/7 Y COMPARTIR VIAJE
+  // ==========================================
+  function initPassengerSosModule() {
+    const btnPassengerShareTrip = document.getElementById('btnPassengerShareTrip');
+    const btnPassengerSos = document.getElementById('btnPassengerSos');
+    const modalPassengerSosShare = document.getElementById('modalPassengerSosShare');
+    const btnCloseSosModal = document.getElementById('btnCloseSosModal');
+    const btnActionShareWhatsapp = document.getElementById('btnActionShareWhatsapp');
+
+    function openSosModal() {
+      if (modalPassengerSosShare) modalPassengerSosShare.classList.remove('hidden');
+    }
+
+    function closeSosModal() {
+      if (modalPassengerSosShare) modalPassengerSosShare.classList.add('hidden');
+    }
+
+    function sharePassengerTripDetails() {
+      const active = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+      const orig = (active && (active.origen || active.pickupAddress)) || (state.origin && state.origin.address) || 'Origen';
+      const dest = (active && (active.destino || active.dropoffAddress)) || (state.destination && state.destination.address) || 'Destino';
+      const driverName = (active && active.conductor && active.conductor.nombre) || 'Daniel Pabon (Chofer Ejecutivo)';
+      const car = (active && active.conductor && active.conductor.auto) || 'Fiat Cronos Negro';
+      const plate = (active && active.conductor && active.conductor.patente) || 'AE927CN';
+      const fare = (active && (active.precio || active.precioEstimado)) ? `$${Number(active.precio || active.precioEstimado).toLocaleString('es-AR')}` : '';
+
+      const shareText = `🛡️ *Viaje Seguro en RutaPrivada*\n\n` +
+        `👤 *Pasajero:* ${(state.passengerName || 'Pasajero RutaPrivada')}\n` +
+        `🚗 *Chofer:* ${driverName}\n` +
+        `🚘 *Vehículo:* ${car} (Patente: ${plate})\n` +
+        `🟢 *Origen:* ${orig}\n` +
+        `🏁 *Destino:* ${dest}\n` +
+        (fare ? `💰 *Tarifa pactada:* ${fare}\n` : '') +
+        `\n🔒 _Viaje monitoreado satelitalmente por la Central 24/7 de RutaPrivada._`;
+
+      if (navigator.share) {
+        navigator.share({
+          title: 'Mi viaje en tiempo real - RutaPrivada',
+          text: shareText
+        }).catch(() => {
+          const waUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+          window.open(waUrl, '_blank');
+        });
+      } else {
+        const waUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+        window.open(waUrl, '_blank');
+      }
+    }
+
+    if (btnPassengerShareTrip) {
+      btnPassengerShareTrip.addEventListener('click', sharePassengerTripDetails);
+    }
+
+    if (btnPassengerSos) {
+      btnPassengerSos.addEventListener('click', openSosModal);
+    }
+
+    if (btnCloseSosModal) {
+      btnCloseSosModal.addEventListener('click', closeSosModal);
+    }
+
+    if (btnActionShareWhatsapp) {
+      btnActionShareWhatsapp.addEventListener('click', sharePassengerTripDetails);
+    }
+
+    if (modalPassengerSosShare) {
+      modalPassengerSosShare.addEventListener('click', (e) => {
+        if (e.target === modalPassengerSosShare) closeSosModal();
+      });
+    }
+  }
+
   // Inicializar al cargar
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       initPassengerProfileModule();
+      initPassengerSosModule();
       checkAndRestoreActiveTripOnStartup();
     });
   } else {
     initPassengerProfileModule();
+    initPassengerSosModule();
     checkAndRestoreActiveTripOnStartup();
   }
 
