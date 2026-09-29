@@ -1288,8 +1288,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 htmlContent += `
                     <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''} ${conflictInfo.conflicto ? 'reserva-conflicto' : ''}">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span class="reserva-badge-anticipada">
-                                <i class="fa-solid fa-sparkles"></i> VISTA ANTICIPADA
+                            <span class="reserva-badge-rutaprivada">
+                                <i class="fa-solid fa-crown"></i> RESERVA RUTA PRIVADA
                             </span>
                             <span class="reserva-status-tag ${isTomada ? 'tomada' : (conflictInfo.conflicto ? 'conflicto' : 'disponible')}">
                                 ${isTomada ? '✓ Agendada en tu Hoja' : (conflictInfo.conflicto ? '🔒 Conflicto Horario' : '⚡ Disponible')}
@@ -1298,14 +1298,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         <div class="reserva-header-row">
                             <div class="reserva-datetime">
-                                <span class="reserva-date-pill">📅 ${dateBadgeCabify} · RUTA PRIVADA</span>
-                                <div class="reserva-price-cabify">
-                                    $ ${priceVal.toLocaleString('es-AR')} <small>en app</small>
+                                <span class="reserva-date-pill">📅 ${dateBadgeCabify}</span>
+                                <div class="reserva-price-rp">
+                                    $ ${priceVal.toLocaleString('es-AR')} <small>en app · partner</small>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Itinerario Visual Cabify con Distancia y Duración -->
+                        <!-- Itinerario Visual Exclusivo RutaPrivada con Distancia y Duración -->
                         <div class="reserva-route-timeline">
                             <div class="reserva-timeline-step">
                                 <div class="reserva-timeline-dot"></div>
@@ -1314,7 +1314,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
 
                             <div class="reserva-distance-duration-bar">
-                                <i class="fa-regular fa-clock"></i> ${durMinStr} &nbsp;·&nbsp; <i class="fa-solid fa-route"></i> ${distKmStr}
+                                <i class="fa-solid fa-bolt text-gold"></i> ${durMinStr} &nbsp;·&nbsp; <i class="fa-solid fa-road text-gold"></i> ${distKmStr}
                             </div>
 
                             <div class="reserva-timeline-step">
