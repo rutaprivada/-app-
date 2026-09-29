@@ -4,7 +4,7 @@ const path = require('path');
 const srcDir = __dirname;
 const targetDir = path.join(__dirname, 'android', 'app', 'src', 'main', 'assets', 'public');
 
-['index.html', 'styles.css', 'app.js', 'sync.js'].forEach(file => {
+['index.html', 'styles.css', 'app.js', 'sync.js', 'conductor.html', 'conductor.css', 'conductor.js', 'admin.html', 'agenda.html', 'agenda.js'].forEach(file => {
   const src = path.join(srcDir, file);
   const dst = path.join(targetDir, file);
   if (fs.existsSync(src)) {
