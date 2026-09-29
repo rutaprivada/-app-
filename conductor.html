@@ -626,59 +626,103 @@
                     </h4>
                     
                     <div style="display: flex; flex-direction: column; gap: 12px;">
-                        <!-- 1. DNI -->
-                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">1. Documento Nacional de Identidad (DNI Frente y Dorso)</span>
-                                <span class="doc-badge" id="badgeDni" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                        <!-- 1. DNI (FRENTE Y DORSO) -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px;">
+                            <div style="margin-bottom:8px;">
+                                <strong style="font-size: 0.82rem; color: #fbbf24;"><i class="fa-solid fa-id-card"></i> 1. Documento Nacional de Identidad (DNI)</strong>
                             </div>
-                            <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileDni" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.1);">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-size: 0.74rem; color: #e2e8f0; font-weight: 600;">DNI Frente *</span>
+                                        <span class="doc-badge" id="badgeDniFrente" style="font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                                    </div>
+                                    <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileDniFrente" style="font-size:0.72rem; color:#94a3b8; width:100%;">
+                                </div>
+                                <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.1);">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-size: 0.74rem; color: #e2e8f0; font-weight: 600;">DNI Dorso *</span>
+                                        <span class="doc-badge" id="badgeDniDorso" style="font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                                    </div>
+                                    <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileDniDorso" style="font-size:0.72rem; color:#94a3b8; width:100%;">
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- 2. Licencia de conducir -->
-                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">2. Licencia de Conducir (Vigente)</span>
-                                <span class="doc-badge" id="badgeLicencia" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                        <!-- 2. LICENCIA DE CONDUCIR (FRENTE Y DORSO) -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px;">
+                            <div style="margin-bottom:8px;">
+                                <strong style="font-size: 0.82rem; color: #fbbf24;"><i class="fa-solid fa-id-badge"></i> 2. Licencia de Conducir (Vigente)</strong>
                             </div>
-                            <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileLicencia" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.1);">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-size: 0.74rem; color: #e2e8f0; font-weight: 600;">Licencia Frente *</span>
+                                        <span class="doc-badge" id="badgeLicenciaFrente" style="font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                                    </div>
+                                    <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileLicenciaFrente" style="font-size:0.72rem; color:#94a3b8; width:100%;">
+                                </div>
+                                <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.1);">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-size: 0.74rem; color: #e2e8f0; font-weight: 600;">Licencia Dorso *</span>
+                                        <span class="doc-badge" id="badgeLicenciaDorso" style="font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                                    </div>
+                                    <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileLicenciaDorso" style="font-size:0.72rem; color:#94a3b8; width:100%;">
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- 3. Seguro del auto -->
-                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
+                        <!-- 3. SEGURO DEL AUTO (PDF O IMAGEN) -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">3. Seguro del Auto (Póliza al día)</span>
-                                <span class="doc-badge" id="badgeSeguro" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                                <strong style="font-size: 0.82rem; color: #fbbf24;"><i class="fa-solid fa-shield-halved"></i> 3. Seguro del Auto (Póliza al día)</strong>
+                                <span class="doc-badge" id="badgeSeguro" style="font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
                             </div>
-                            <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileSeguro" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                            <p style="font-size:0.72rem; color:#94a3b8; margin:0 0 6px;">Se acepta archivo en formato <strong>PDF</strong> o foto/captura de la póliza vigente.</p>
+                            <input type="file" accept="image/*,application/pdf,.pdf" class="doc-file-input" id="fileSeguro" style="font-size:0.75rem; color:#94a3b8; width:100%;">
                         </div>
 
-                        <!-- 4. Cédula verde o azul -->
-                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">4. Cédula Verde o Azul del Vehículo</span>
-                                <span class="doc-badge" id="badgeCedula" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                        <!-- 4. CÉDULA VERDE O AZUL (FRENTE Y DORSO) -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px;">
+                            <div style="margin-bottom:8px;">
+                                <strong style="font-size: 0.82rem; color: #fbbf24;"><i class="fa-solid fa-car"></i> 4. Cédula Verde o Azul del Vehículo</strong>
                             </div>
-                            <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileCedula" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.1);">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-size: 0.74rem; color: #e2e8f0; font-weight: 600;">Cédula Frente *</span>
+                                        <span class="doc-badge" id="badgeCedulaFrente" style="font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                                    </div>
+                                    <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileCedulaFrente" style="font-size:0.72rem; color:#94a3b8; width:100%;">
+                                </div>
+                                <div style="background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.1);">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-size: 0.74rem; color: #e2e8f0; font-weight: 600;">Cédula Dorso *</span>
+                                        <span class="doc-badge" id="badgeCedulaDorso" style="font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                                    </div>
+                                    <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileCedulaDorso" style="font-size:0.72rem; color:#94a3b8; width:100%;">
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- 5. Antecedentes penales -->
-                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
+                        <!-- 5. ANTECEDENTES PENALES (PDF O IMAGEN) -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">5. Certificado de Antecedentes Penales</span>
-                                <span class="doc-badge" id="badgeAntecedentes" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                                <strong style="font-size: 0.82rem; color: #fbbf24;"><i class="fa-solid fa-file-shield"></i> 5. Certificado de Antecedentes Penales</strong>
+                                <span class="doc-badge" id="badgeAntecedentes" style="font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
                             </div>
-                            <input type="file" accept="image/*,.pdf" class="doc-file-input" id="fileAntecedentes" style="font-size:0.75rem; color:#94a3b8; width:100%;">
+                            <p style="font-size:0.72rem; color:#94a3b8; margin:0 0 6px;">Se acepta archivo en formato <strong>PDF</strong> emitido por el RNR o foto clara del certificado.</p>
+                            <input type="file" accept="image/*,application/pdf,.pdf" class="doc-file-input" id="fileAntecedentes" style="font-size:0.75rem; color:#94a3b8; width:100%;">
                         </div>
 
-                        <!-- 6. Foto de Perfil -->
-                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;">
+                        <!-- 6. FOTO DE PERFIL -->
+                        <div class="doc-upload-item" style="background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <span style="font-size: 0.8rem; font-weight: 600; color: #e2e8f0;">6. Foto de Perfil Clara y Reciente</span>
-                                <span class="doc-badge" id="badgeFotoPerfil" style="font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
+                                <strong style="font-size: 0.82rem; color: #fbbf24;"><i class="fa-solid fa-user-tie"></i> 6. Foto de Perfil Clara y Reciente</strong>
+                                <span class="doc-badge" id="badgeFotoPerfil" style="font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.15); color:#fca5a5;">Sin cargar</span>
                             </div>
                             <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px;">
-                                <img id="previewFotoPerfil" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1px solid #fbbf24;">
+                                <img id="previewFotoPerfil" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 2px solid #fbbf24; flex-shrink:0;">
                                 <input type="file" accept="image/*" class="doc-file-input" id="fileFotoPerfil" style="flex:1; font-size:0.75rem; color:#94a3b8;">
                             </div>
                         </div>

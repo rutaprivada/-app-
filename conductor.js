@@ -3821,16 +3821,79 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
 
+        // Helper para comprimir imágenes de alta resolución antes de guardar en localStorage / Firestore (evita QuotaExceededError)
+        function readFileOrCompressImage(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) return resolve(null);
+                
+                // Si es un archivo PDF, leer como DataURL directamente
+                if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve({ type: 'pdf', name: file.name, data: e.target.result });
+                    reader.onerror = (err) => reject(err);
+                    reader.readAsDataURL(file);
+                    return;
+                }
+
+                // Si es imagen, redimensionar usando Canvas para que pese ~80KB-120KB y no sature memoria
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+                            const maxDim = 1200; // Resolución nítida para documentos
+
+                            if (width > maxDim || height > maxDim) {
+                                if (width > height) {
+                                    height = Math.round((height * maxDim) / width);
+                                    width = maxDim;
+                                } else {
+                                    width = Math.round((width * maxDim) / height);
+                                    height = maxDim;
+                                }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+
+                            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+                            resolve({ type: 'image', name: file.name, data: compressedBase64 });
+                        } catch(err) {
+                            resolve({ type: 'image', name: file.name, data: e.target.result });
+                        }
+                    };
+                    img.onerror = () => {
+                        resolve({ type: 'image', name: file.name, data: e.target.result });
+                    };
+                    img.src = e.target.result;
+                };
+                reader.onerror = (err) => reject(err);
+                reader.readAsDataURL(file);
+            });
+        }
+
         const docInputsConfig = [
-            { id: 'fileDni', key: 'dni', badgeId: 'badgeDni' },
-            { id: 'fileLicencia', key: 'licencia', badgeId: 'badgeLicencia' },
+            { id: 'fileDniFrente', key: 'dni_frente', legacyKey: 'dni', badgeId: 'badgeDniFrente' },
+            { id: 'fileDniDorso', key: 'dni_dorso', badgeId: 'badgeDniDorso' },
+            { id: 'fileLicenciaFrente', key: 'licencia_frente', legacyKey: 'licencia', badgeId: 'badgeLicenciaFrente' },
+            { id: 'fileLicenciaDorso', key: 'licencia_dorso', badgeId: 'badgeLicenciaDorso' },
             { id: 'fileSeguro', key: 'seguro', badgeId: 'badgeSeguro' },
-            { id: 'fileCedula', key: 'cedula', badgeId: 'badgeCedula' },
+            { id: 'fileCedulaFrente', key: 'cedula_frente', legacyKey: 'cedula', badgeId: 'badgeCedulaFrente' },
+            { id: 'fileCedulaDorso', key: 'cedula_dorso', badgeId: 'badgeCedulaDorso' },
             { id: 'fileAntecedentes', key: 'antecedentes', badgeId: 'badgeAntecedentes' }
         ];
 
+        let loadedDocsImages = {};
+
         function populateDocsForm() {
             const data = loadDocsData();
+            loadedDocsImages = data.docsImages || {};
+
             if (docInputDriverName) docInputDriverName.value = data.nombre || '';
             if (docInputDniNum) docInputDniNum.value = data.dni || '';
             if (docInputPhone) docInputPhone.value = data.telefono || '';
@@ -3838,8 +3901,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (docInputPlate) docInputPlate.value = data.patente || '';
             if (docInputColor) docInputColor.value = data.color || 'Negro';
             if (docSelectCategory) docSelectCategory.value = data.categoria || 'Sedán Estándar';
-            if (previewFotoPerfil) {
-                previewFotoPerfil.src = (data.fotoPerfil && data.fotoPerfil.trim().length > 0) ? data.fotoPerfil : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+            
+            const profileSrc = (data.fotoPerfil && data.fotoPerfil.trim().length > 0) ? data.fotoPerfil : (loadedDocsImages.foto || '');
+            if (previewFotoPerfil && profileSrc) {
+                previewFotoPerfil.src = profileSrc;
             }
 
             if (docInputBankName) docInputBankName.value = data.banco || '';
@@ -3847,11 +3912,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (docInputBankHolder) docInputBankHolder.value = data.titularCuenta || data.nombre || '';
 
             // Actualizar dinámicamente cada badge según si hay archivo subido
-            const userImgs = data.docsImages || {};
             docInputsConfig.forEach(item => {
                 const badge = document.getElementById(item.badgeId);
                 if (badge) {
-                    const hasFile = Boolean(userImgs[item.key] && userImgs[item.key].length > 10);
+                    const fileData = loadedDocsImages[item.key] || (item.legacyKey ? loadedDocsImages[item.legacyKey] : null);
+                    const hasFile = Boolean(fileData && fileData.length > 20);
                     if (hasFile) {
                         badge.textContent = 'Cargado ✓';
                         badge.style.background = 'rgba(16, 185, 129, 0.2)';
@@ -3866,7 +3931,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const badgeFoto = document.getElementById('badgeFotoPerfil');
             if (badgeFoto) {
-                const hasCustomPhoto = Boolean(data.fotoPerfil && !data.fotoPerfil.includes('unsplash.com') && data.fotoPerfil.length > 20);
+                const hasCustomPhoto = Boolean(data.fotoPerfil && !data.fotoPerfil.includes('unsplash.com') && data.fotoPerfil.length > 20) || Boolean(loadedDocsImages.foto && loadedDocsImages.foto.length > 20);
                 if (hasCustomPhoto) {
                     badgeFoto.textContent = 'Cargado ✓';
                     badgeFoto.style.background = 'rgba(16, 185, 129, 0.2)';
@@ -3944,7 +4009,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 docsStatusBanner.style.borderColor = 'rgba(245, 158, 11, 0.3)';
                 if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-triangle-exclamation text-gold';
                 if (docsStatusTitle) docsStatusTitle.textContent = 'Documentación Pendiente de Envío';
-                if (docsStatusDesc) docsStatusDesc.textContent = 'Completa tus datos personales, vehículo y sube los 6 documentos requeridos.';
+                if (docsStatusDesc) docsStatusDesc.textContent = 'Completa tus datos personales, vehículo y sube los documentos requeridos.';
             }
         }
 
@@ -3969,24 +4034,25 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        const loadedDocsImages = (loadDocsData() && loadDocsData().docsImages) || {};
-
-        if (fileFotoPerfil && previewFotoPerfil) {
-            fileFotoPerfil.addEventListener('change', (e) => {
+        if (fileFotoPerfil) {
+            fileFotoPerfil.addEventListener('change', async (e) => {
                 const file = e.target.files[0];
                 if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(evt) {
-                        previewFotoPerfil.src = evt.target.result;
-                        loadedDocsImages.foto = evt.target.result;
-                        const badge = document.getElementById('badgeFotoPerfil');
-                        if (badge) {
-                            badge.textContent = 'Cargado ✓';
-                            badge.style.background = 'rgba(16, 185, 129, 0.2)';
-                            badge.style.color = '#34d399';
+                    try {
+                        const res = await readFileOrCompressImage(file);
+                        if (res && res.data) {
+                            if (previewFotoPerfil) previewFotoPerfil.src = res.data;
+                            loadedDocsImages.foto = res.data;
+                            const badge = document.getElementById('badgeFotoPerfil');
+                            if (badge) {
+                                badge.textContent = 'Cargado ✓';
+                                badge.style.background = 'rgba(16, 185, 129, 0.2)';
+                                badge.style.color = '#34d399';
+                            }
                         }
-                    };
-                    reader.readAsDataURL(file);
+                    } catch(err) {
+                        console.error('Error cargando foto de perfil:', err);
+                    }
                 }
             });
         }
@@ -3994,20 +4060,23 @@ document.addEventListener('DOMContentLoaded', () => {
         docInputsConfig.forEach(item => {
             const el = document.getElementById(item.id);
             if (el) {
-                el.addEventListener('change', (e) => {
+                el.addEventListener('change', async (e) => {
                     const file = e.target.files[0];
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = function(evt) {
-                            loadedDocsImages[item.key] = evt.target.result;
-                            const badge = document.getElementById(item.badgeId);
-                            if (badge) {
-                                badge.textContent = 'Cargado ✓';
-                                badge.style.background = 'rgba(16, 185, 129, 0.2)';
-                                badge.style.color = '#34d399';
+                        try {
+                            const res = await readFileOrCompressImage(file);
+                            if (res && res.data) {
+                                loadedDocsImages[item.key] = res.data;
+                                const badge = document.getElementById(item.badgeId);
+                                if (badge) {
+                                    badge.textContent = res.type === 'pdf' ? 'PDF Cargado ✓' : 'Cargado ✓';
+                                    badge.style.background = 'rgba(16, 185, 129, 0.2)';
+                                    badge.style.color = '#34d399';
+                                }
                             }
-                        };
-                        reader.readAsDataURL(file);
+                        } catch(err) {
+                            console.error(`Error cargando ${item.key}:`, err);
+                        }
                     }
                 });
             }
@@ -4015,7 +4084,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function saveDocsData(status = 'pendiente') {
             const current = loadDocsData();
-            const photoSrc = (previewFotoPerfil && previewFotoPerfil.src && !previewFotoPerfil.src.includes('unsplash.com')) ? previewFotoPerfil.src : (current.fotoPerfil || '');
+            const photoSrc = (previewFotoPerfil && previewFotoPerfil.src && !previewFotoPerfil.src.includes('unsplash.com')) ? previewFotoPerfil.src : (loadedDocsImages.foto || current.fotoPerfil || '');
 
             const updatedDocs = {
                 nombre: docInputDriverName ? docInputDriverName.value.trim() : current.nombre,
@@ -4034,12 +4103,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatedAt: Date.now()
             };
 
+            // 1. Guardar localmente
             try {
                 localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(updatedDocs));
                 window.dispatchEvent(new Event('storage'));
-            } catch(e) {}
+            } catch(e) {
+                console.warn('LocalStorage save warning:', e);
+            }
 
-            // Sincronizar en tiempo real con Firebase Cloud Firestore
+            // 2. Sincronizar en tiempo real con Firebase Cloud Firestore
             if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                 try {
                     const db = firebase.firestore();
@@ -4051,24 +4123,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         isOnline: driverState.isOnline,
                         timestamp: Date.now()
                     }, { merge: true }).catch(err => console.warn('Firestore driver sync warn:', err));
-                } catch(e) {}
+                } catch(e) {
+                    console.warn('Firestore sync error:', e);
+                }
             }
 
+            // 3. Actualizar lista en memoria
             try {
-                const driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
-                if (driversList.length > 0) {
-                    driversList[0].nombre = updatedDocs.nombre;
-                    driversList[0].autoMarcaModelo = updatedDocs.autoMarcaModelo;
-                    driversList[0].color = updatedDocs.color;
-                    driversList[0].patente = updatedDocs.patente;
-                    driversList[0].telefono = updatedDocs.telefono;
-                    driversList[0].banco = updatedDocs.banco;
-                    driversList[0].cbu = updatedDocs.cbu;
-                    driversList[0].titularCuenta = updatedDocs.titularCuenta;
-                    driversList[0].docsImages = loadedDocsImages;
-                    driversList[0].estadoVerificacion = status;
-                    localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
+                let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+                const idx = driversList.findIndex(d => (d.dni && updatedDocs.dni && d.dni === updatedDocs.dni) || d.nombre === updatedDocs.nombre);
+                if (idx >= 0) {
+                    driversList[idx] = { ...driversList[idx], ...updatedDocs };
+                } else {
+                    driversList.unshift(updatedDocs);
                 }
+                localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
             } catch(e) {}
 
             driverState.info.nombre = updatedDocs.nombre;
@@ -4083,7 +4152,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (formDocsUpload) {
             formDocsUpload.addEventListener('submit', (e) => {
                 e.preventDefault();
-                const saved = saveDocsData('pendiente');
+                saveDocsData('pendiente');
                 updateDocsStatusBanner('pendiente');
                 showDriverToast('📄 Documentación enviada a revisión.');
                 alert('✓ Documentación y Datos Guardados Correctamente.\n\nTus archivos y datos han sido enviados para su verificación por parte de la Administración.');
