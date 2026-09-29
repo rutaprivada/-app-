@@ -1286,7 +1286,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const conflictInfo = !isTomada ? tieneConflictoHorario45Min(b, tomadas) : { conflicto: false };
 
                 htmlContent += `
-                    <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''} ${conflictInfo.conflicto ? 'reserva-conflicto' : ''}">
+                    <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''} ${conflictInfo.conflicto ? 'reserva-conflicto' : ''}" data-id="${b.id}" style="cursor: pointer;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <span class="reserva-badge-rutaprivada">
                                 <i class="fa-solid fa-crown"></i> RESERVA RUTA PRIVADA
@@ -1341,6 +1341,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: #38bdf8; margin: 4px 0 10px; padding: 4px 8px; background: rgba(56, 189, 248, 0.08); border-radius: 6px;">
+                            <span><i class="fa-solid fa-map-location-dot"></i> Toca la tarjeta para ver mapa de ruta y desglose</span>
+                            <i class="fa-solid fa-chevron-right" style="font-size: 0.65rem;"></i>
+                        </div>
+
                         ${b.notes ? `
                             <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(255,255,255,0.03); padding: 8px 10px; border-radius: 8px; margin-bottom: 12px;">
                                 <i class="fa-solid fa-circle-info text-gold"></i> <em>${b.notes}</em>
@@ -1390,9 +1395,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         reservasContainer.innerHTML = htmlContent;
 
+        // Listeners para tocar la tarjeta y abrir el modal con mapa interactivo
+        document.querySelectorAll('.reserva-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('button') || e.target.closest('.btn-tomar-reserva') || e.target.closest('.btn-ver-reserva-chat') || e.target.closest('.btn-cancelar-reserva')) {
+                    return; // Si tocó un botón interno, no abrir modal
+                }
+                const resId = card.getAttribute('data-id');
+                if (resId) abrirModalDetalleReserva(resId);
+            });
+        });
+
         // Listeners para botones Aceptar Reserva
         document.querySelectorAll('.btn-aceptar-reserva-action').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 const resId = btn.getAttribute('data-id');
                 aceptarReservaProgramada(resId);
             });
@@ -1400,7 +1417,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Listeners para Iniciar Traslado
         document.querySelectorAll('.btn-iniciar-reserva').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 const resId = btn.getAttribute('data-id');
                 iniciarViajeDesdeReserva(resId);
             });
@@ -1408,7 +1426,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Listeners para Chat In-App desde reservas
         document.querySelectorAll('.btn-chat-inapp').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 const resId = btn.getAttribute('data-id');
                 const client = decodeURIComponent(btn.getAttribute('data-client') || 'Pasajero');
                 openDriverChat(resId, client);
@@ -1417,10 +1436,251 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Listeners para Cancelar / Liberar Reserva
         document.querySelectorAll('.btn-cancelar-reserva-action').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 const resId = btn.getAttribute('data-id');
                 cancelarYDevolverReserva(resId);
             });
+        });
+    }
+
+    // ==========================================
+    // MODAL DE DETALLE COMPLETO Y MAPA DE RUTA DE RESERVA
+    // ==========================================
+    let reservaDetailMapInstance = null;
+
+    function renderReservaDetailMap(item) {
+        if (!item || typeof L === 'undefined') return;
+        const mapContainer = document.getElementById('reservaDetailMap');
+        if (!mapContainer) return;
+
+        const originCoords = item._originCoords || item.originCoords || resolveAddressCoords(item.pickupAddress || item.origin || item.origen, { lat: -34.5682, lng: -58.4371 });
+        const destCoords = item._destCoords || item.destinationCoords || resolveAddressCoords(item.dropoffAddress || item.destination || item.destino, { lat: -34.5658, lng: -58.4340 });
+        const stopAddr = item.parada || item.stopAddress;
+        const stopCoords = stopAddr ? (item._stopCoords || item.stopCoords || resolveAddressCoords(stopAddr, { lat: -34.5889, lng: -58.4306 })) : null;
+
+        if (!reservaDetailMapInstance) {
+            reservaDetailMapInstance = L.map('reservaDetailMap', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([originCoords.lat, originCoords.lng], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(reservaDetailMapInstance);
+        } else {
+            reservaDetailMapInstance.eachLayer(layer => {
+                if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+                    reservaDetailMapInstance.removeLayer(layer);
+                }
+            });
+        }
+
+        const bounds = L.latLngBounds([[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]]);
+
+        // Marcador Origen
+        L.marker([originCoords.lat, originCoords.lng], {
+            icon: createPointPinIcon('origin', 'Partida')
+        }).addTo(reservaDetailMapInstance);
+
+        // Marcador Parada si existe
+        if (stopCoords) {
+            bounds.extend([stopCoords.lat, stopCoords.lng]);
+            L.marker([stopCoords.lat, stopCoords.lng], {
+                icon: createPointPinIcon('stop', 'Parada')
+            }).addTo(reservaDetailMapInstance);
+        }
+
+        // Marcador Destino
+        L.marker([destCoords.lat, destCoords.lng], {
+            icon: createPointPinIcon('destination', 'Destino')
+        }).addTo(reservaDetailMapInstance);
+
+        // Trazar línea de ruta estimada con OSRM
+        const osrmCoordStr = stopCoords
+            ? `${originCoords.lng},${originCoords.lat};${stopCoords.lng},${stopCoords.lat};${destCoords.lng},${destCoords.lat}`
+            : `${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}`;
+
+        fetch(`https://router.project-osrm.org/route/v1/driving/${osrmCoordStr}?overview=full&geometries=geojson`)
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.routes && data.routes[0] && data.routes[0].geometry && reservaDetailMapInstance) {
+                    const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                    
+                    // Línea negra exterior de contraste
+                    L.polyline(coords, {
+                        color: '#000000',
+                        weight: 8,
+                        opacity: 0.8
+                    }).addTo(reservaDetailMapInstance);
+
+                    // Línea dorada Neón interior
+                    const osrmLine = L.polyline(coords, {
+                        color: '#fbbf24',
+                        weight: 4,
+                        opacity: 1.0
+                    }).addTo(reservaDetailMapInstance);
+
+                    reservaDetailMapInstance.fitBounds(osrmLine.getBounds(), { padding: [25, 25] });
+                } else {
+                    fallbackReservaPolyline();
+                }
+            })
+            .catch(() => fallbackReservaPolyline());
+
+        function fallbackReservaPolyline() {
+            if (!reservaDetailMapInstance) return;
+            const routePoints = stopCoords 
+                ? [[originCoords.lat, originCoords.lng], [stopCoords.lat, stopCoords.lng], [destCoords.lat, destCoords.lng]]
+                : [[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]];
+
+            L.polyline(routePoints, {
+                color: '#fbbf24',
+                weight: 4,
+                opacity: 0.95
+            }).addTo(reservaDetailMapInstance);
+            reservaDetailMapInstance.fitBounds(bounds, { padding: [25, 25] });
+        }
+
+        setTimeout(() => {
+            if (reservaDetailMapInstance) {
+                reservaDetailMapInstance.invalidateSize();
+                reservaDetailMapInstance.fitBounds(bounds, { padding: [25, 25] });
+            }
+        }, 180);
+    }
+
+    function abrirModalDetalleReserva(resId) {
+        const bookings = getStoredBookings();
+        const item = bookings.find(b => b.id === resId);
+        if (!item) return;
+
+        const modal = document.getElementById('modalDetalleReserva');
+        if (!modal) return;
+
+        const status = String(item.status || item.estado || '').toLowerCase();
+        const driverName = (driverState.info && driverState.info.nombre) || 'Daniel Pabon';
+        const isTomada = status === 'aceptada' || status === 'en_curso' || item.driverAssigned === driverName;
+
+        const clientName = item.clientName || item.customerName || item.nombrePasajero || 'Cliente Ejecutivo';
+        const pickupAddr = item.pickupAddress || item.origin || item.origen || 'Punto de recogida';
+        const dropoffAddr = item.dropoffAddress || item.destination || item.destino || 'Destino';
+        const stopAddr = item.parada || item.stopAddress;
+
+        const rawPrice = item.price || item.totalFare || item.monto || item.precioEstimado;
+        const priceVal = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
+            ? Number(rawPrice)
+            : 35000;
+
+        const dateStr = item.date || item.pickupDate || 'Hoy';
+        const timeStr = item.time || item.pickupTime || '00:00';
+        const pInfo = formatDriverTripPriceDisplay(item);
+
+        let distKmStr = '12.9 km';
+        let durMinStr = '28 min';
+        if (item.distanceKm && Number(item.distanceKm) > 0) distKmStr = `${Number(item.distanceKm).toFixed(1)} km`;
+        else if (item.distancia) distKmStr = String(item.distancia);
+
+        if (item.durationMin && Number(item.durationMin) > 0) durMinStr = `${Math.round(Number(item.durationMin))} min`;
+        else if (item.duracion) durMinStr = String(item.duracion);
+
+        // Llenar campos del modal
+        const elTitle = document.getElementById('resDetailHeaderTitle');
+        const elDate = document.getElementById('resDetailDateBadge');
+        const elPrice = document.getElementById('resDetailPriceAmount');
+        const elStatus = document.getElementById('resDetailStatusBadge');
+        const elDur = document.getElementById('resDetailDuration');
+        const elDist = document.getElementById('resDetailDistance');
+        const elPay = document.getElementById('resDetailPayment');
+        const elOrig = document.getElementById('resDetailOrigin');
+        const elStopWrap = document.getElementById('resDetailStopWrap');
+        const elStop = document.getElementById('resDetailStop');
+        const elDest = document.getElementById('resDetailDestination');
+        const elPass = document.getElementById('resDetailPassenger');
+        const elNotesWrap = document.getElementById('resDetailNotesWrap');
+        const elNotes = document.getElementById('resDetailNotes');
+        const btnAccept = document.getElementById('btnResDetailAccept');
+        const btnStart = document.getElementById('btnResDetailStart');
+        const btnChat = document.getElementById('btnResDetailChat');
+
+        if (elTitle) elTitle.textContent = `Traslado VIP #${String(item.id || '').slice(-6)}`;
+        if (elDate) elDate.textContent = `📅 ${dateStr} · ${timeStr} HS`;
+        if (elPrice) elPrice.textContent = `$${priceVal.toLocaleString('es-AR')}`;
+        if (elStatus) {
+            elStatus.textContent = isTomada ? '✓ Agendada en tu Hoja' : '⚡ Disponible';
+            elStatus.style.background = isTomada ? 'rgba(16, 185, 129, 0.2)' : 'rgba(56, 189, 248, 0.2)';
+            elStatus.style.color = isTomada ? '#34d399' : '#38bdf8';
+            elStatus.style.borderColor = isTomada ? 'rgba(16, 185, 129, 0.4)' : 'rgba(56, 189, 248, 0.4)';
+        }
+        if (elDur) elDur.innerHTML = `<i class="fa-solid fa-clock text-gold"></i> ${durMinStr}`;
+        if (elDist) elDist.innerHTML = `<i class="fa-solid fa-route text-gold"></i> ${distKmStr}`;
+        if (elPay) elPay.innerHTML = `<i class="fa-solid fa-wallet text-emerald"></i> ${pInfo.payMethodLabel}`;
+        if (elOrig) elOrig.textContent = pickupAddr;
+
+        if (elStopWrap && elStop) {
+            if (stopAddr) {
+                elStopWrap.style.display = 'block';
+                elStop.textContent = stopAddr;
+            } else {
+                elStopWrap.style.display = 'none';
+            }
+        }
+
+        if (elDest) elDest.textContent = dropoffAddr;
+        if (elPass) elPass.innerHTML = `<i class="fa-solid fa-user-shield text-sky"></i> ${clientName}`;
+
+        if (elNotesWrap && elNotes) {
+            if (item.notes) {
+                elNotesWrap.style.display = 'block';
+                elNotes.textContent = item.notes;
+            } else {
+                elNotesWrap.style.display = 'none';
+            }
+        }
+
+        if (btnAccept && btnStart) {
+            if (isTomada) {
+                btnAccept.classList.add('hidden');
+                btnStart.classList.remove('hidden');
+                btnStart.onclick = () => {
+                    cerrarModalDetalleReserva();
+                    iniciarViajeDesdeReserva(item.id);
+                };
+            } else {
+                btnAccept.classList.remove('hidden');
+                btnStart.classList.add('hidden');
+                btnAccept.onclick = () => {
+                    cerrarModalDetalleReserva();
+                    aceptarReservaProgramada(item.id);
+                };
+            }
+        }
+
+        if (btnChat) {
+            btnChat.onclick = () => {
+                cerrarModalDetalleReserva();
+                openDriverChat(item.id, clientName);
+            };
+        }
+
+        modal.classList.add('active');
+        renderReservaDetailMap(item);
+        playAlertSound('incoming');
+    }
+
+    function cerrarModalDetalleReserva() {
+        const modal = document.getElementById('modalDetalleReserva');
+        if (modal) modal.classList.remove('active');
+    }
+
+    const btnCloseDetalleReserva = document.getElementById('btnCloseDetalleReserva');
+    if (btnCloseDetalleReserva) {
+        btnCloseDetalleReserva.addEventListener('click', cerrarModalDetalleReserva);
+    }
+    const modalDetalleReservaEl = document.getElementById('modalDetalleReserva');
+    if (modalDetalleReservaEl) {
+        modalDetalleReservaEl.addEventListener('click', (e) => {
+            if (e.target === modalDetalleReservaEl) cerrarModalDetalleReserva();
         });
     }
 
@@ -1441,6 +1701,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function aceptarReservaProgramada(resId) {
+        // Regla 0: Guard estricto de aprobación de cuenta del chofer
+        const docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+        const statusVerif = (docs && docs.estadoVerificacion) ? docs.estadoVerificacion : 'pendiente';
+        if (statusVerif !== 'aprobado') {
+            alert(
+                '⏳ CUENTA EN PROCESO DE APROBACIÓN:\n\n' +
+                'Tu cuenta y documentación aún no han sido aprobadas por el Administrador de RutaPrivada.\n\n' +
+                'No puedes aceptar ni realizar reservas hasta que tu cuenta sea validada y habilitada.'
+            );
+            const modalDocsUpload = document.getElementById('modalDocsUpload');
+            if (modalDocsUpload) {
+                if (typeof populateDocsForm === 'function') populateDocsForm();
+                modalDocsUpload.classList.add('active');
+            }
+            return;
+        }
+
         // Regla: No aceptar ninguna reserva si se tiene un viaje en curso
         if (driverState.activeTrip) {
             alert('⚠️ TIENES UN VIAJE EN CURSO\n\nDebes completar el viaje actual antes de aceptar o agendar una reserva.');
@@ -1538,6 +1815,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function iniciarViajeDesdeReserva(resId) {
+        // Regla 0: Guard estricto de aprobación de cuenta del chofer
+        const docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+        const statusVerif = (docs && docs.estadoVerificacion) ? docs.estadoVerificacion : 'pendiente';
+        if (statusVerif !== 'aprobado') {
+            alert(
+                '⏳ CUENTA EN PROCESO DE APROBACIÓN:\n\n' +
+                'Tu cuenta aún no ha sido aprobada por el Administrador de RutaPrivada.\n\n' +
+                'No puedes realizar viajes hasta que tu cuenta sea validada y habilitada.'
+            );
+            return;
+        }
+
         // Regla 1: No permitir iniciar una reserva si se tiene un viaje en curso
         if (driverState.activeTrip) {
             alert('⚠️ TIENES UN VIAJE EN CURSO\n\nDebes completar el viaje actual antes de iniciar una reserva o tomar otro traslado.');
@@ -2519,15 +2808,21 @@ document.addEventListener('DOMContentLoaded', () => {
             playAlertSound('success');
         } else if (trip.etapa === 'en_viaje') {
             const dest = trip._destCoords || resolveAddressCoords(trip.destino, { lat: -34.8150, lng: -58.5348 });
+            const currentPos = driverState.currentRealGpsCoords || currentDriverCoords;
             let distM = 0;
             if (currentPos && dest) {
                 distM = Math.round(calculateDistanceKm(currentPos.lat, currentPos.lng, dest.lat, dest.lng) * 1000);
             }
 
+            // Regla Estricta: No permitir finalizar el viaje si no se está en la dirección de destino (margen 500m)
             if (distM > 500) {
-                if (!confirm(`⚠️ DESTINO A ${distM} METROS:\n\nTu GPS indica que aún no estás en el destino acordado (${trip.destino || 'Destino'}).\n\n¿El pasajero solicitó finalizar el viaje aquí o deseas terminar el servicio de todas formas?`)) {
-                    return;
-                }
+                const distFormatted = distM >= 1000 ? `${(distM / 1000).toFixed(1)} km` : `${distM} metros`;
+                alert(
+                    `⚠️ UBICACIÓN FUERA DEL DESTINO:\n\n` +
+                    `Tu ubicación GPS actual indica que estás a ${distFormatted} del destino final (${trip.destino || 'Destino acordado'}).\n\n` +
+                    `Por seguridad del pasajero y cumplimiento de la plataforma, debes arribar a la dirección correcta de destino (a menos de 500 metros) para poder finalizar el viaje y emitir el cobro.`
+                );
+                return;
             }
 
             stopDriverGpsTracking();
@@ -5330,6 +5625,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const modalTrip = document.getElementById('modalTripDetail');
             if (modalTrip && modalTrip.classList.contains('active')) {
                 modalTrip.classList.remove('active');
+                return true;
+            }
+
+            // 5.1 Modal detalle de reserva programada
+            const modalRes = document.getElementById('modalDetalleReserva');
+            if (modalRes && modalRes.classList.contains('active')) {
+                modalRes.classList.remove('active');
                 return true;
             }
 

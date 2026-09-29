@@ -1399,8 +1399,10 @@
 
   <!-- MODAL: REGISTRO / BIENVENIDA OBLIGATORIA DEL PASAJERO -->
   <div id="modalPassengerOnboarding" class="modal-backdrop hidden" style="z-index: 10010; backdrop-filter: blur(12px); background: rgba(5, 10, 20, 0.88);">
-    <div class="modal-dialog" style="max-width: 480px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 30px rgba(56, 189, 248, 0.2); overflow: hidden; padding: 0;">
-      <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 20px 22px; text-align: center; display: block;">
+    <div class="modal-dialog" style="max-width: 480px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 30px rgba(56, 189, 248, 0.2); overflow: hidden; padding: 0; position: relative;">
+      <button type="button" id="btnCloseOnboardingModal" style="position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; z-index: 10;">&times;</button>
+      
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 22px 22px 16px; text-align: center; display: block;">
         <div style="width: 56px; height: 56px; margin: 0 auto 12px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(56, 189, 248, 0.35);">
           <span style="font-size: 1.8rem;">✨</span>
         </div>
@@ -1419,10 +1421,10 @@
 
           <div>
             <label for="onboardingPassPhone" style="color: #e2e8f0; font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 6px;">
-              📱 Número de Teléfono / WhatsApp *
+              📱 Número de Teléfono *
             </label>
-            <input type="tel" id="onboardingPassPhone" placeholder="Ej: 11 5544 3322 o +54 9 11..." required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.92rem; outline: none; transition: border-color 0.2s;" />
-            <small style="color: #64748b; font-size: 0.72rem; display: block; margin-top: 4px;">Tu chofer asignado se comunicará a este número para coordinar el viaje.</small>
+            <input type="tel" id="onboardingPassPhone" placeholder="Ej: 11 5544 3322" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.92rem; outline: none; transition: border-color 0.2s;" />
+            <small style="color: #64748b; font-size: 0.72rem; display: block; margin-top: 4px;">Tu chofer asignado se comunicará por el chat in-app de manera privada.</small>
           </div>
 
           <div>
@@ -1430,12 +1432,18 @@
               ✉️ Correo Electrónico * (Facturación & Comprobantes)
             </label>
             <input type="email" id="onboardingPassEmail" placeholder="Ej: roberto.gomez@gmail.com" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.92rem; outline: none; transition: border-color 0.2s;" />
-            <small style="color: #38bdf8; font-size: 0.72rem; display: block; margin-top: 4px;">🔒 Te enviaremos automáticamente el comprobante oficial y la factura de cada traslado completado.</small>
+            <small style="color: #38bdf8; font-size: 0.72rem; display: block; margin-top: 4px;">🔒 Te enviaremos automáticamente el comprobante oficial y la factura de cada traslado.</small>
           </div>
 
-          <button type="submit" class="btn btn-primary full-width" style="margin-top: 10px; padding: 13px; font-size: 0.98rem; font-weight: 800; border-radius: 14px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; box-shadow: 0 6px 20px rgba(2, 132, 199, 0.4); cursor: pointer; transition: transform 0.15s ease;">
+          <button type="submit" class="btn btn-primary full-width" style="margin-top: 6px; padding: 13px; font-size: 0.98rem; font-weight: 800; border-radius: 14px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; box-shadow: 0 6px 20px rgba(2, 132, 199, 0.4); cursor: pointer; transition: transform 0.15s ease;">
             🚀 Crear Cuenta y Continuar
           </button>
+          
+          <div style="text-align: center; margin-top: 4px;">
+            <button type="button" id="btnSkipOnboarding" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; cursor: pointer; padding: 6px; text-decoration: underline;">
+              Continuar como pasajero invitado
+            </button>
+          </div>
         </form>
       </div>
     </div>

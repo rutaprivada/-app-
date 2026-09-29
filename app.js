@@ -7507,6 +7507,22 @@ if (btnRecenterPassengerMap) {
       modalOnboarding.classList.remove('hidden');
     }
 
+    const btnCloseOnboarding = document.getElementById('btnCloseOnboardingModal');
+    const btnSkipOnboarding = document.getElementById('btnSkipOnboarding');
+
+    if (btnCloseOnboarding && modalOnboarding) {
+      btnCloseOnboarding.addEventListener('click', () => {
+        modalOnboarding.classList.add('hidden');
+      });
+    }
+
+    if (btnSkipOnboarding && modalOnboarding) {
+      btnSkipOnboarding.addEventListener('click', () => {
+        modalOnboarding.classList.add('hidden');
+        showToast('ℹ️ Modo invitado activo. Podrás registrar tus datos al confirmar un traslado.');
+      });
+    }
+
     if (formOnboarding) {
       formOnboarding.addEventListener('submit', (e) => {
         e.preventDefault();
