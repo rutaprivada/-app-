@@ -5749,7 +5749,12 @@ function handlePassengerDriverAssigned(viaje, showNotification = true) {
   if (pChatDriverAvatar) pChatDriverAvatar.src = driverPhoto;
 
   if (btnPassengerCallDriver) {
-    btnPassengerCallDriver.href = `tel:${cond.telefono || '+5491122558226'}`;
+    btnPassengerCallDriver.href = 'javascript:void(0)';
+    btnPassengerCallDriver.onclick = (e) => {
+      e.preventDefault();
+      openPassengerChat();
+      showPassengerToast('🔒 Comunicación privada: Tu número y el del chofer se mantienen protegidos y confidenciales.');
+    };
   }
 
   // Actualizar precio de la solicitud
@@ -7932,11 +7937,9 @@ if (btnRecenterPassengerMap) {
             <span style="color: #94a3b8; font-size: 0.75rem;">${res.categoria || 'Sedán Ejecutivo'}</span>
           </div>
 
-          ${!isCancelled && !isCompleted ? `
-          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
-            <a href="https://wa.me/5491173738790?text=${encodeURIComponent(`Hola RutaPrivada, consulta por mi reserva para el ${res.fecha} a las ${res.hora} hs (Origen: ${res.origen})`)}" target="_blank" style="background: rgba(37, 211, 102, 0.15); border: 1px solid rgba(37, 211, 102, 0.4); color: #25d366; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 6px;">
-              💬 WhatsApp
-            </a>
+            <button type="button" class="btn-passenger-support-res" data-id="${res.id}" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-headset"></i> Soporte Central
+            </button>
             <button type="button" class="btn-cancel-passenger-res" data-id="${res.id}" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">
               ✕ Cancelar
             </button>

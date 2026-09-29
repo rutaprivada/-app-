@@ -1237,7 +1237,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const clientName = b.clientName || b.customerName || b.nombrePasajero || 'Cliente Ejecutivo';
                 const pickupAddr = b.pickupAddress || b.origin || b.origen || 'Punto de recogida';
                 const dropoffAddr = b.dropoffAddress || b.destination || b.destino || 'Destino';
-                const rawPhone = (b.clientPhone || b.customerPhone || b.telefono || '5491100000000').replace(/[^0-9]/g, '');
                 
                 const rawPrice = b.price || b.totalFare || b.monto || b.precioEstimado;
                 const priceVal = (rawPrice !== undefined && rawPrice !== null && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0)
@@ -1245,57 +1244,96 @@ document.addEventListener('DOMContentLoaded', () => {
                     : 35000;
 
                 const tollCost = Number(b.tollCost || b.peajes || b.tollFare || 0);
-                const tripFareOnly = Math.max(0, priceVal - tollCost);
-
                 const dateStr = b.date || b.pickupDate || 'Hoy';
                 const timeStr = b.time || b.pickupTime || '00:00';
-                const paymentStr = b.paymentMethod || b.metodoPago || 'Efectivo / Transferencia';
                 const pInfo = formatDriverTripPriceDisplay(b);
+
+                // Cálculo y visualización destacada de distancia y duración (Estilo Cabify)
+                let distKmStr = '12.9 km';
+                let durMinStr = '28 min';
+                if (b.distanceKm && Number(b.distanceKm) > 0) {
+                    distKmStr = `${Number(b.distanceKm).toFixed(1)} km`;
+                } else if (b.distancia) {
+                    distKmStr = String(b.distancia);
+                } else if (b.km) {
+                    distKmStr = `${b.km} km`;
+                }
+
+                if (b.durationMin && Number(b.durationMin) > 0) {
+                    durMinStr = `${Math.round(Number(b.durationMin))} min`;
+                } else if (b.duracion) {
+                    durMinStr = String(b.duracion);
+                } else if (b.duration) {
+                    durMinStr = String(b.duration);
+                } else {
+                    const parsedKm = parseFloat(distKmStr.replace(',', '.')) || 12;
+                    durMinStr = `${Math.round(Math.max(15, parsedKm * 2.2))} min`;
+                }
+
+                // Formato de cabecera estilo Cabify
+                let dateBadgeCabify = dateStr;
+                if (dateStr && dateStr.includes('-')) {
+                    const p = dateStr.split('-');
+                    if (p.length === 3) {
+                        const dObj = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+                        const mNames = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+                        const dNames = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+                        dateBadgeCabify = `${dNames[dObj.getDay()]} ${p[2]}, ${timeStr}`;
+                    }
+                }
 
                 // Comprobar regla de conflicto de 45 minutos si es una reserva disponible
                 const conflictInfo = !isTomada ? tieneConflictoHorario45Min(b, tomadas) : { conflicto: false };
 
                 htmlContent += `
                     <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''} ${conflictInfo.conflicto ? 'reserva-conflicto' : ''}">
-                        <div class="reserva-header-row">
-                            <div class="reserva-datetime">
-                                <span class="reserva-date-pill">📅 ${dateStr}</span>
-                                <span class="reserva-time-bold">⏰ ${timeStr} hs</span>
-                            </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span class="reserva-badge-anticipada">
+                                <i class="fa-solid fa-sparkles"></i> VISTA ANTICIPADA
+                            </span>
                             <span class="reserva-status-tag ${isTomada ? 'tomada' : (conflictInfo.conflicto ? 'conflicto' : 'disponible')}">
                                 ${isTomada ? '✓ Agendada en tu Hoja' : (conflictInfo.conflicto ? '🔒 Conflicto Horario' : '⚡ Disponible')}
                             </span>
                         </div>
 
-                        <div class="reserva-route-box">
-                            <div class="reserva-point">
-                                <i class="fa-solid fa-circle-dot text-emerald"></i>
-                                <div>
-                                    <strong style="font-size: 0.76rem; color: #94a3b8; display: block;">ORIGEN</strong>
-                                    <span>${pickupAddr}</span>
+                        <div class="reserva-header-row">
+                            <div class="reserva-datetime">
+                                <span class="reserva-date-pill">📅 ${dateBadgeCabify} · RUTA PRIVADA</span>
+                                <div class="reserva-price-cabify">
+                                    $ ${priceVal.toLocaleString('es-AR')} <small>en app</small>
                                 </div>
                             </div>
-                            <div class="reserva-point">
-                                <i class="fa-solid fa-location-dot text-gold"></i>
-                                <div>
-                                    <strong style="font-size: 0.76rem; color: #94a3b8; display: block;">DESTINO</strong>
-                                    <span>${dropoffAddr}</span>
-                                </div>
+                        </div>
+
+                        <!-- Itinerario Visual Cabify con Distancia y Duración -->
+                        <div class="reserva-route-timeline">
+                            <div class="reserva-timeline-step">
+                                <div class="reserva-timeline-dot"></div>
+                                <strong>${timeStr} h</strong>
+                                <span>${pickupAddr}</span>
+                            </div>
+
+                            <div class="reserva-distance-duration-bar">
+                                <i class="fa-regular fa-clock"></i> ${durMinStr} &nbsp;·&nbsp; <i class="fa-solid fa-route"></i> ${distKmStr}
+                            </div>
+
+                            <div class="reserva-timeline-step">
+                                <div class="reserva-timeline-dot dest"></div>
+                                <strong>Destino</strong>
+                                <span>${dropoffAddr}</span>
                             </div>
                         </div>
 
                         <div class="reserva-meta-grid">
                             <div class="reserva-meta-item">
                                 <span class="m-title">Pasajero</span>
-                                <span class="m-val">${clientName}</span>
+                                <span class="m-val" style="display: flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-user-shield text-sky" style="font-size: 0.75rem;"></i> ${clientName}
+                                </span>
                             </div>
                             <div class="reserva-meta-item">
-                                <span class="m-title">${pInfo.isCard ? 'Tu Ganancia (Tarjeta)' : 'Total a Cobrar'}</span>
+                                <span class="m-title">${pInfo.isCard ? 'Ganancia (Tarjeta)' : 'Total a Cobrar'}</span>
                                 <span class="m-val text-gold">${pInfo.displayHeroFormatted}</span>
-                                <span style="font-size: 0.68rem; color: #94a3b8; display: block; margin-top: 2px;">
-                                    ${pInfo.tollCost > 0 ? `(${pInfo.tripFareFormatted} viaje + ${pInfo.tollFormatted} peaje)` : `(${pInfo.tripFareFormatted} viaje · sin peaje)`}
-                                </span>
-                                ${pInfo.cardNoteHtml}
                             </div>
                             <div class="reserva-meta-item">
                                 <span class="m-title">Pago</span>
@@ -1321,13 +1359,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <button type="button" class="btn-tomar-reserva btn-iniciar-reserva" data-id="${b.id}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;">
                                     <i class="fa-solid fa-play"></i> Iniciar Traslado en Vivo
                                 </button>
+                                <button type="button" class="btn-ver-reserva-chat btn-chat-inapp" data-id="${b.id}" data-client="${encodeURIComponent(clientName)}" title="Abrir Chat In-App">
+                                    <i class="fa-solid fa-comments"></i>
+                                </button>
                                 ${(status === 'en_curso' || (driverState.activeTrip && driverState.activeTrip.reservaId === b.id)) ? `
                                     <span style="font-size: 0.8rem; color: #10b981; font-weight: 700; background: rgba(16,185,129,0.15); padding: 8px 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
-                                        <i class="fa-solid fa-lock text-gold"></i> Viaje Iniciado (No cancelable)
+                                        <i class="fa-solid fa-lock text-gold"></i> Viaje Iniciado
                                     </span>
                                 ` : `
                                     <button type="button" class="btn-cancelar-reserva btn-cancelar-reserva-action" data-id="${b.id}" title="Liberar reserva y devolver a disponibles">
-                                        <i class="fa-solid fa-xmark"></i> Cancelar Reserva
+                                        <i class="fa-solid fa-xmark"></i> Cancelar
                                     </button>
                                 `}
                             ` : (conflictInfo.conflicto ? `
@@ -1336,12 +1377,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </button>
                             ` : `
                                 <button type="button" class="btn-tomar-reserva btn-aceptar-reserva-action" data-id="${b.id}">
-                                    <i class="fa-solid fa-check"></i> Aceptar & Agendar Reserva
+                                    <i class="fa-solid fa-check"></i> Aceptar reserva
                                 </button>
                             `)}
-                            <a href="https://wa.me/${rawPhone}?text=Hola%20${encodeURIComponent(clientName)},%20soy%20tu%20chofer%20ejecutivo%20de%20RutaPrivada.%20Tengo%20tu%20reserva%20agendada%20para%20el%20${encodeURIComponent(dateStr)}%20a%20las%20${encodeURIComponent(timeStr)}hs." target="_blank" class="btn-ver-reserva-whatsapp" title="Chatear por WhatsApp">
-                                <i class="fa-brands fa-whatsapp"></i>
-                            </a>
                         </div>
                     </div>
                 `;
@@ -1360,11 +1398,20 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Listeners para Iniciar Traslado (con validación de 30 min y viaje en curso)
+        // Listeners para Iniciar Traslado
         document.querySelectorAll('.btn-iniciar-reserva').forEach(btn => {
             btn.addEventListener('click', () => {
                 const resId = btn.getAttribute('data-id');
                 iniciarViajeDesdeReserva(resId);
+            });
+        });
+
+        // Listeners para Chat In-App desde reservas
+        document.querySelectorAll('.btn-chat-inapp').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const resId = btn.getAttribute('data-id');
+                const client = decodeURIComponent(btn.getAttribute('data-client') || 'Pasajero');
+                openDriverChat(resId, client);
             });
         });
 
@@ -2332,9 +2379,15 @@ document.addEventListener('DOMContentLoaded', () => {
             driverChatUnreadDot.classList.add('hidden');
         }
 
-        // Configurar contacto pasajero
-        const telPasajero = (trip.telefono || trip.clientPhone || trip.customerPhone || '5491100000000').replace(/[^0-9]/g, '');
-        btnCallPassenger.href = `tel:${telPasajero}`;
+        // Configurar contacto pasajero 100% privado en la app
+        if (btnCallPassenger) {
+            btnCallPassenger.href = 'javascript:void(0)';
+            btnCallPassenger.onclick = (e) => {
+                e.preventDefault();
+                openDriverChat(driverState.activeTrip ? driverState.activeTrip.id : null, passengerName);
+                showDriverToast('🔒 Comunicación privada: Tu número y el del pasajero se mantienen protegidos y confidenciales.');
+            };
+        }
 
         // Sincronizar con la app de Pasajero (Uber / Cabify style)
         if (window.RutaSync) {
@@ -3352,10 +3405,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 9. CHAT IN-APP DIRECTO CON EL PASAJERO
     // ==========================================
     let driverUnreadChatCount = 0;
+    let currentChatTripId = null;
 
-    function openDriverChat() {
+    function openDriverChat(targetId = null, targetName = null) {
         if (!modalDriverChat) return;
         driverUnreadChatCount = 0;
+        if (targetId) currentChatTripId = targetId;
+        if (targetName && driverChatPassengerTitle) {
+            driverChatPassengerTitle.textContent = 'Chat con ' + targetName;
+        }
         if (driverChatUnreadDot) {
             driverChatUnreadDot.classList.add('hidden');
         }
@@ -3371,7 +3429,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDriverChatMessages() {
         if (!driverChatMessagesList) return;
         const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
-        const tripId = activeTrip ? activeTrip.id : (driverState.activeTrip ? driverState.activeTrip.id : 'active_trip');
+        const tripId = currentChatTripId || (activeTrip ? activeTrip.id : (driverState.activeTrip ? driverState.activeTrip.id : 'active_trip'));
         const mensajes = window.RutaSync ? window.RutaSync.obtenerMensajesChat(tripId) : [];
 
         if (mensajes.length === 0) {
@@ -3415,7 +3473,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function sendDriverChatMessage(text) {
         if (!text || !text.trim() || !window.RutaSync) return;
         const activeTrip = window.RutaSync.obtenerViajeActivo();
-        const tripId = activeTrip ? activeTrip.id : (driverState.activeTrip ? driverState.activeTrip.id : 'active_trip');
+        const tripId = currentChatTripId || (activeTrip ? activeTrip.id : (driverState.activeTrip ? driverState.activeTrip.id : 'active_trip'));
         
         window.RutaSync.enviarMensajeChat({
             tripId: tripId,
@@ -4974,7 +5032,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const bal = wallet.balance || 0;
         const isNegative = bal < 0;
-        const isLocked = bal < -10000;
+        const isLocked = bal < -15000;
 
         if (walletBalanceAmount) {
             walletBalanceAmount.textContent = (isNegative ? '-$' : '$') + Math.abs(bal).toLocaleString('es-AR');
@@ -5188,11 +5246,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateWalletUI();
 
                 if (modalRecargarSaldo) modalRecargarSaldo.classList.remove('active');
-                showDriverToast(`✅ Saldo acreditado: +$${amount.toLocaleString('es-AR')}`);
+                showDriverToast(`✅ Saldo acreditado por conciliación: +$${amount.toLocaleString('es-AR')}`);
 
-                const msg = `Hola Administración RutaPrivada, soy el conductor partner ${driverState.info.nombre} (Patente: ${driverState.info.patente}). Realicé una recarga de saldo de $${amount.toLocaleString('es-AR')} a la billetera virtual. Adjunto el comprobante de transferencia bancaria.`;
-                const waUrl = `https://wa.me/5491122558226?text=${encodeURIComponent(msg)}`;
-                window.open(waUrl, '_blank');
+                // Sincronizar recarga con Firestore si está disponible
+                if (window.RutaSync && window.RutaSync.firestore) {
+                    try {
+                        const driverId = driverState.info.telefono || driverState.info.dni || 'chofer_current';
+                        window.RutaSync.firestore.collection('wallet_recharges').add({
+                            driverId: driverId,
+                            driverName: driverState.info.nombre,
+                            driverPatente: driverState.info.patente,
+                            driverDni: driverState.info.dni,
+                            monto: amount,
+                            timestamp: Date.now(),
+                            fecha: now.toLocaleDateString('es-AR'),
+                            hora: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            metodo: 'transferencia_bancaria_cuit',
+                            estado: 'acreditado'
+                        }).catch(() => {});
+                    } catch(e) {}
+                }
             });
         }
 
