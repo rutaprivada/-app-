@@ -584,8 +584,14 @@
                             </div>
                         </div>
                         <div>
-                            <label style="font-size: 0.75rem; color: #94a3b8;"><i class="fa-solid fa-envelope"></i> Correo Electrónico (Para avisos, fechas de cobro y habilitación) *</label>
-                            <input type="email" id="docInputEmail" class="driver-form-input" placeholder="ejemplo@gmail.com" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                            <label style="font-size: 0.75rem; color: #94a3b8;">Correo Electrónico del Chofer *</label>
+                            <input type="email" id="docInputEmail" class="driver-form-input" placeholder="Ej. conductor@email.com" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                        </div>
+                        <div style="background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.25); border-radius: 8px; padding: 10px 12px; margin-top: 2px;">
+                            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.78rem; color: #e2e8f0; line-height: 1.35;">
+                                <input type="checkbox" id="docInputConsentEmail" required checked style="margin-top: 2px; width: 16px; height: 16px; accent-color: #10b981; cursor: pointer; flex-shrink: 0;">
+                                <span>Autorizo y habilito a recibir comunicaciones, novedades, comprobantes y notificaciones operativas oficiales por correo electrónico de <strong>Ruta Privada</strong>. <span style="color:#fbbf24; font-weight:700;">(Obligatorio para operar)</span></span>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -1433,11 +1439,8 @@
     <!-- Leaflet JS for Maps -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- PDF.js for ultra-compact document rendering -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-
     <!-- SCRIPTS -->
-    <script src="sync.js?v=75"></script>
-    <script src="conductor.js?v=75"></script>
+    <script src="sync.js?v=71"></script>
+    <script src="conductor.js?v=71"></script>
 </body>
 </html>

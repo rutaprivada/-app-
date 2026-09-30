@@ -647,27 +647,25 @@
     <div class="admin-modal-overlay" id="docReviewModalOverlay">
         <div class="admin-modal-card">
             <!-- Header Modal -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--admin-border); padding-bottom: 16px; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--admin-border); padding-bottom: 16px; margin-bottom: 20px;">
                 <div style="display: flex; gap: 14px; align-items: center;">
                     <img id="revDriverAvatar" src="" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid #fbbf24;">
                     <div>
-                        <h2 id="revDriverName" style="font-family: 'Outfit', sans-serif; margin: 0; color: #fff; font-size: 1.4rem;">Nombre Conductor</h2>
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <h2 id="revDriverName" style="font-family: 'Outfit', sans-serif; margin: 0; color: #fff; font-size: 1.4rem;">Nombre Conductor</h2>
+                            <span id="revDriverEmailConsentBadge" class="badge-status aprobado" style="font-size: 0.72rem; padding: 2px 8px;">✓ Notificaciones Email Habilitadas</span>
+                        </div>
                         <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px; font-size: 0.82rem; color: #94a3b8; flex-wrap: wrap;">
                             <span id="revDriverPhone"><i class="fa-solid fa-phone"></i> +54 9 11 ...</span>
-                            <span id="revDriverEmail" style="color: #38bdf8;"><i class="fa-solid fa-envelope"></i> email@ejemplo.com</span>
+                            <span id="revDriverEmail"><i class="fa-solid fa-envelope"></i> correo@email.com</span>
                             <span id="revDriverVehicle"><i class="fa-solid fa-car"></i> Fiat Cronos</span>
                             <span id="revDriverPlate" style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; font-family: monospace; color: #fff;">AE927CN</span>
                         </div>
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <a id="btnSendDriverEmail" href="#" target="_blank" class="admin-btn" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); font-size: 0.78rem; text-decoration: none; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-paper-plane"></i> Notificar por Email
-                    </a>
-                    <button id="btnCloseDocReview" style="background: transparent; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </div>
+                <button id="btnCloseDocReview" style="background: transparent; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
 
             <!-- SECCIÓN BANCARIA DESTACADA -->
@@ -745,7 +743,7 @@
     <!-- FIREBASE & SYNC SCRIPTS -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <script src="sync.js?v=60"></script>
+    <script src="sync.js?v=71"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -794,6 +792,8 @@
             const revDriverAvatar = document.getElementById('revDriverAvatar');
             const revDriverName = document.getElementById('revDriverName');
             const revDriverPhone = document.getElementById('revDriverPhone');
+            const revDriverEmail = document.getElementById('revDriverEmail');
+            const revDriverEmailConsentBadge = document.getElementById('revDriverEmailConsentBadge');
             const revDriverVehicle = document.getElementById('revDriverVehicle');
             const revDriverPlate = document.getElementById('revDriverPlate');
             const revBankName = document.getElementById('revBankName');
@@ -1009,6 +1009,8 @@
                             nombre: c.nombre || 'Conductor Registrado',
                             dni: c.dni || 'S/D',
                             telefono: c.telefono || 'Sin teléfono',
+                            email: c.email || '',
+                            aceptaComunicaciones: c.aceptaComunicaciones !== false,
                             autoMarcaModelo: c.autoMarcaModelo || 'Vehículo',
                             patente: c.patente || 'S/P',
                             color: c.color || 'Negro',
@@ -1016,9 +1018,9 @@
                             fotoPerfil: c.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
                             estadoVerificacion: c.estadoVerificacion || 'pendiente',
                             isOnline: !!c.isOnline,
-                            banco: c.banco || 'Mercado Pago / Banco Galicia',
-                            cbu: c.cbu || 'Sin registrar',
-                            titularCuenta: c.titularCuenta || c.nombre || 'Sin registrar',
+                            banco: c.banco || '',
+                            cbu: c.cbu || '',
+                            titularCuenta: c.titularCuenta || c.nombre || '',
                             docsImages: c.docsImages || {},
                             observaciones: c.observaciones || '',
                             updatedAt: c.updatedAt || Date.now()
@@ -1027,29 +1029,39 @@
                 }
 
                 // B. Incorporar el Conductor Local Activo
-                if (activeDocs && (activeDocs.nombre || activeDocs.dni || activeDocs.docsImages)) {
+                if (activeDocs && (activeDocs.nombre || activeDocs.dni || (activeDocs.docsImages && Object.keys(activeDocs.docsImages).length > 0))) {
                     const cleanLocalDni = String(activeDocs.dni || '').replace(/\D/g, '');
+                    const cleanLocalPhone = String(activeDocs.telefono || '').replace(/\D/g, '');
+                    const localStableId = activeDocs.id || (cleanLocalDni ? 'drv_' + cleanLocalDni : (cleanLocalPhone ? 'drv_' + cleanLocalPhone : 'drv_local_active'));
+
                     const existingIdx = drivers.findIndex(d => {
+                        if (d.id && localStableId && d.id === localStableId) return true;
                         const dDni = String(d.dni || '').replace(/\D/g, '');
-                        return (cleanLocalDni && dDni && cleanLocalDni === dDni) || (d.nombre && activeDocs.nombre && d.nombre.trim().toLowerCase() === activeDocs.nombre.trim().toLowerCase());
+                        if (cleanLocalDni && dDni && cleanLocalDni === dDni) return true;
+                        const dPhone = String(d.telefono || '').replace(/\D/g, '');
+                        if (cleanLocalPhone && dPhone && cleanLocalPhone === dPhone) return true;
+                        if (d.nombre && activeDocs.nombre && d.nombre.trim().toLowerCase() === activeDocs.nombre.trim().toLowerCase()) return true;
+                        return false;
                     });
 
                     if (existingIdx >= 0) {
-                        drivers[existingIdx].docsImages = Object.assign({}, drivers[existingIdx].docsImages || {}, activeDocs.docsImages || {});
-                        if (activeDocs.fotoPerfil && !activeDocs.fotoPerfil.includes('unsplash.com')) {
-                            drivers[existingIdx].fotoPerfil = activeDocs.fotoPerfil;
-                        }
-                        if (activeDocs.banco) drivers[existingIdx].banco = activeDocs.banco;
-                        if (activeDocs.cbu) drivers[existingIdx].cbu = activeDocs.cbu;
-                        if (activeDocs.titularCuenta) drivers[existingIdx].titularCuenta = activeDocs.titularCuenta;
-                        if (activeDocs.estadoVerificacion) drivers[existingIdx].estadoVerificacion = activeDocs.estadoVerificacion;
+                        drivers[existingIdx] = {
+                            ...drivers[existingIdx],
+                            ...activeDocs,
+                            id: drivers[existingIdx].id || localStableId,
+                            email: activeDocs.email || drivers[existingIdx].email || '',
+                            aceptaComunicaciones: activeDocs.aceptaComunicaciones !== false,
+                            docsImages: Object.assign({}, drivers[existingIdx].docsImages || {}, activeDocs.docsImages || {}),
+                            isOnline: isOnlineLocal || drivers[existingIdx].isOnline
+                        };
                     } else {
-                        const localStableId = cleanLocalDni ? 'drv_' + cleanLocalDni : 'drv_active_user';
                         drivers.unshift({
                             id: localStableId,
                             nombre: activeDocs.nombre || 'Conductor Registrado',
                             dni: activeDocs.dni || 'S/D',
                             telefono: activeDocs.telefono || 'Sin teléfono',
+                            email: activeDocs.email || '',
+                            aceptaComunicaciones: activeDocs.aceptaComunicaciones !== false,
                             autoMarcaModelo: activeDocs.autoMarcaModelo || 'Vehículo',
                             patente: activeDocs.patente || 'S/P',
                             color: activeDocs.color || 'Negro',
@@ -1057,9 +1069,9 @@
                             fotoPerfil: activeDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
                             estadoVerificacion: activeDocs.estadoVerificacion || 'pendiente',
                             isOnline: isOnlineLocal,
-                            banco: activeDocs.banco || 'Mercado Pago / Banco Galicia',
-                            cbu: activeDocs.cbu || 'Sin registrar',
-                            titularCuenta: activeDocs.titularCuenta || activeDocs.nombre || 'Sin registrar',
+                            banco: activeDocs.banco || '',
+                            cbu: activeDocs.cbu || '',
+                            titularCuenta: activeDocs.titularCuenta || activeDocs.nombre || '',
                             docsImages: activeDocs.docsImages || {},
                             observaciones: activeDocs.observaciones || '',
                             updatedAt: activeDocs.updatedAt || Date.now()
@@ -1067,20 +1079,24 @@
                     }
                 }
 
-                // C. Incorporar otros conductores locales
+                // C. Incorporar otros conductores registrados
                 if (Array.isArray(storedDrivers) && storedDrivers.length > 0) {
                     storedDrivers.forEach(d => {
                         const driverName = d.nombre || d.name;
-                        const existingIdx = drivers.findIndex(ex => (ex.nombre && driverName && ex.nombre === driverName) || (ex.id && d.id && ex.id === d.id));
+                        const existingIdx = drivers.findIndex(ex => (ex.id && d.id && ex.id === d.id) || (ex.dni && d.dni && ex.dni === d.dni) || (ex.nombre && driverName && ex.nombre.trim().toLowerCase() === driverName.trim().toLowerCase()));
                         if (existingIdx >= 0) {
-                            drivers[existingIdx].docsImages = Object.assign({}, drivers[existingIdx].docsImages || {}, d.docsImages || {});
+                            if (d.docsImages && Object.keys(d.docsImages).length > 0) {
+                                drivers[existingIdx].docsImages = Object.assign({}, d.docsImages, drivers[existingIdx].docsImages || {});
+                            }
                         } else if (driverName) {
                             const cleanDni = String(d.dni || '').replace(/\D/g, '');
                             drivers.push({
                                 id: d.id || (cleanDni ? 'drv_' + cleanDni : ('drv_' + driverName.replace(/\s+/g, '_').toLowerCase())),
-                                nombre: driverName || 'Conductor Flota',
+                                nombre: driverName,
                                 dni: d.dni || 'S/D',
                                 telefono: d.telefono || d.phone || 'S/T',
+                                email: d.email || '',
+                                aceptaComunicaciones: d.aceptaComunicaciones !== false,
                                 autoMarcaModelo: d.autoMarcaModelo || d.vehicle || 'Vehículo',
                                 patente: d.patente || d.plate || 'S/P',
                                 color: d.color || 'Negro',
@@ -1088,10 +1104,11 @@
                                 fotoPerfil: d.fotoPerfil || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
                                 estadoVerificacion: d.estadoVerificacion || 'pendiente',
                                 isOnline: !!d.isOnline,
-                                banco: d.banco || 'BBVA Argentina',
-                                cbu: d.cbu || '0170020620000001928374',
-                                titularCuenta: d.titularCuenta || driverName || 'Titular',
+                                banco: d.banco || '',
+                                cbu: d.cbu || '',
+                                titularCuenta: d.titularCuenta || driverName,
                                 docsImages: d.docsImages || {},
+                                observaciones: d.observaciones || '',
                                 updatedAt: d.updatedAt || Date.now()
                             });
                         }
@@ -1129,8 +1146,9 @@
                     const plate = (d.patente || '').toLowerCase();
                     const phone = (d.telefono || '').toLowerCase();
                     const dni = (d.dni || '').toLowerCase();
+                    const email = (d.email || '').toLowerCase();
 
-                    const matchesSearch = !searchTerm || name.includes(searchTerm) || plate.includes(searchTerm) || phone.includes(searchTerm) || dni.includes(searchTerm);
+                    const matchesSearch = !searchTerm || name.includes(searchTerm) || plate.includes(searchTerm) || phone.includes(searchTerm) || dni.includes(searchTerm) || email.includes(searchTerm);
 
                     return matchesFilter && matchesSearch;
                 });
@@ -1152,8 +1170,9 @@
                     const statusLabel = status === 'aprobado' ? '✓ Aprobado' : (status === 'rechazado' ? '✕ Rechazado' : '⏱️ Pendiente');
                     const bankName = d.banco || 'Mercado Pago';
                     const cbuShort = d.cbu ? (d.cbu.substring(0, 10) + '...') : 'Sin CBU';
-                    const holderMatch = (d.titularCuenta || '').toLowerCase().trim() === (d.nombre || '').toLowerCase().trim();
+                    const holderMatch = Boolean(d.titularCuenta && d.nombre && (d.titularCuenta.toLowerCase().trim() === d.nombre.toLowerCase().trim() || d.titularCuenta.toLowerCase().includes(d.nombre.toLowerCase()) || d.nombre.toLowerCase().includes(d.titularCuenta.toLowerCase())));
                     const safeId = String(d.id || d.dni || d.nombre);
+                    const docsCount = d.docsImages ? Object.keys(d.docsImages).filter(k => d.docsImages[k] && d.docsImages[k].length > 20).length : 0;
 
                     return `
                         <tr>
@@ -1162,7 +1181,7 @@
                                     <img src="${d.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}" class="driver-avatar">
                                     <div class="driver-name-box">
                                         <span class="driver-name-bold">${d.nombre || 'Conductor'}</span>
-                                        <span class="driver-phone-sub"><i class="fa-solid fa-phone"></i> ${d.telefono || 'Sin tel.'}</span>
+                                        <span class="driver-phone-sub"><i class="fa-solid fa-phone"></i> ${d.telefono || 'Sin tel.'} ${d.email ? `| <i class="fa-solid fa-envelope"></i> ${d.email}` : ''}</span>
                                     </div>
                                 </div>
                             </td>
@@ -1170,15 +1189,18 @@
                                 <strong style="color: #fff;">${d.autoMarcaModelo || 'Vehículo'} (${d.color || ''})</strong>
                                 <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
                                     <span style="font-family: monospace; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: #fff;">${d.patente || 'S/P'}</span>
-                                    <span>${d.categoria || 'Ejecutivo'}</span>
+                                    <span>${d.categoria || 'Sedán Estándar'}</span>
                                 </div>
                             </td>
                             <td>
                                 <strong style="color: #cbd5e1;">DNI: ${d.dni || 'S/D'}</strong>
+                                <div style="font-size: 0.74rem; color: ${docsCount >= 6 ? '#34d399' : '#fbbf24'}; margin-top: 2px;">
+                                    <i class="fa-solid fa-folder"></i> ${docsCount}/9 Archivos Subidos
+                                </div>
                             </td>
                             <td>
                                 <div style="font-size: 0.82rem;">
-                                    <span style="color: #fbbf24; font-weight: 600;">${bankName}</span>
+                                    <span style="color: #fbbf24; font-weight: 600;">${bankName || 'Sin banco'}</span>
                                     <div style="font-size: 0.75rem; color: #94a3b8; font-family: monospace;">${cbuShort}</div>
                                     <span style="font-size: 0.7rem; color: ${holderMatch ? '#34d399' : '#f59e0b'};">
                                         ${holderMatch ? '✓ Coincide Titular' : '⚠️ Validar Titular'}
@@ -1227,13 +1249,13 @@
                 });
             });
 
-            // 6. MODAL DE REVISIÓN DOCUMENTAL DETALLADA CON BLOQUEO DE SEGURIDAD
+            // 6. MODAL DE REVISIÓN DOCUMENTAL DETALLADA CON AISLAMIENTO ESTRICTO Y BLOQUEO DE SEGURIDAD
             function openDocReviewModal(driverIdentifier) {
                 if (!currentDrivers || currentDrivers.length === 0) {
                     loadDriversData();
                 }
 
-                // Búsqueda inteligente por id, dni o nombre
+                // Búsqueda inteligente y exacta por ID, DNI o Nombre
                 const cleanInput = String(driverIdentifier || '').replace(/\D/g, '');
                 let driver = currentDrivers.find(d => {
                     if (String(d.id) === String(driverIdentifier)) return true;
@@ -1242,45 +1264,40 @@
                     if (cleanInput && cleanDni && cleanInput === cleanDni) return true;
                     if (d.nombre && driverIdentifier && d.nombre.trim().toLowerCase() === String(driverIdentifier).trim().toLowerCase()) return true;
                     return false;
-                }) || currentDrivers[0] || {};
+                });
+
+                if (!driver) {
+                    driver = currentDrivers[0] || {};
+                }
 
                 activeReviewDriver = driver;
 
-                // Datos locales frescos
-                let localFreshDocs = {};
-                try {
-                    const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
-                    if (raw) localFreshDocs = JSON.parse(raw);
-                } catch(e) {}
+                if (revDriverAvatar) revDriverAvatar.src = driver.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+                if (revDriverName) revDriverName.textContent = driver.nombre || 'Conductor';
+                if (revDriverPhone) revDriverPhone.innerHTML = `<i class="fa-solid fa-phone"></i> ${driver.telefono || 'Sin teléfono'}`;
+                if (revDriverEmail) revDriverEmail.innerHTML = `<i class="fa-solid fa-envelope"></i> ${driver.email || 'Sin correo'}`;
+                if (revDriverVehicle) revDriverVehicle.innerHTML = `<i class="fa-solid fa-car"></i> ${driver.autoMarcaModelo || 'Vehículo'} (${driver.color || ''})`;
+                if (revDriverPlate) revDriverPlate.textContent = driver.patente || 'S/P';
 
-                let storedDriversList = [];
-                try {
-                    const raw = localStorage.getItem('rutaprivada_drivers_v1');
-                    if (raw) storedDriversList = JSON.parse(raw);
-                } catch(e) {}
+                if (revDriverEmailConsentBadge) {
+                    if (driver.aceptaComunicaciones !== false) {
+                        revDriverEmailConsentBadge.className = 'badge-status aprobado';
+                        revDriverEmailConsentBadge.textContent = '✓ Notificaciones Email Habilitadas';
+                        revDriverEmailConsentBadge.style.display = 'inline-block';
+                    } else {
+                        revDriverEmailConsentBadge.className = 'badge-status rechazada';
+                        revDriverEmailConsentBadge.textContent = '⚠️ Sin Consentimiento de Correo';
+                        revDriverEmailConsentBadge.style.display = 'inline-block';
+                    }
+                }
 
-                const cleanDriverDni = String(driver.dni || localFreshDocs.dni || '').replace(/\D/g, '');
-                const storedDriverMatch = storedDriversList.find(d => {
-                    if (d.id && driver.id && String(d.id) === String(driver.id)) return true;
-                    const dDni = String(d.dni || '').replace(/\D/g, '');
-                    if (cleanDriverDni && dDni && cleanDriverDni === dDni) return true;
-                    if (d.nombre && driver.nombre && d.nombre.trim().toLowerCase() === driver.nombre.trim().toLowerCase()) return true;
-                    return false;
-                }) || {};
+                if (revBankName) revBankName.textContent = driver.banco || 'Sin registrar';
+                if (revBankCbu) revBankCbu.textContent = driver.cbu || 'Sin registrar';
+                if (revBankHolder) revBankHolder.textContent = driver.titularCuenta || driver.nombre || 'Sin registrar';
 
-                if (revDriverAvatar) revDriverAvatar.src = driver.fotoPerfil || localFreshDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
-                if (revDriverName) revDriverName.textContent = driver.nombre || localFreshDocs.nombre || 'Conductor';
-                if (revDriverPhone) revDriverPhone.innerHTML = `<i class="fa-solid fa-phone"></i> ${driver.telefono || localFreshDocs.telefono || 'Sin teléfono'}`;
-                if (revDriverVehicle) revDriverVehicle.innerHTML = `<i class="fa-solid fa-car"></i> ${driver.autoMarcaModelo || localFreshDocs.autoMarcaModelo || 'Vehículo'} (${driver.color || localFreshDocs.color || ''})`;
-                if (revDriverPlate) revDriverPlate.textContent = driver.patente || localFreshDocs.patente || 'AE927CN';
-
-                if (revBankName) revBankName.textContent = driver.banco || localFreshDocs.banco || 'Mercado Pago / Banco Galicia';
-                if (revBankCbu) revBankCbu.textContent = driver.cbu || localFreshDocs.cbu || '0000003100084592039481';
-                if (revBankHolder) revBankHolder.textContent = driver.titularCuenta || localFreshDocs.titularCuenta || driver.nombre || 'Sin registrar';
-
-                const holderName = (driver.titularCuenta || localFreshDocs.titularCuenta || '').toLowerCase().trim();
-                const dName = (driver.nombre || localFreshDocs.nombre || '').toLowerCase().trim();
-                const isMatch = holderName && dName && (holderName === dName || holderName.includes(dName) || dName.includes(holderName));
+                const holderName = (driver.titularCuenta || '').toLowerCase().trim();
+                const dName = (driver.nombre || '').toLowerCase().trim();
+                const isMatch = Boolean(holderName && dName && (holderName === dName || holderName.includes(dName) || dName.includes(holderName)));
 
                 if (bankMatchStatusBadge) {
                     if (isMatch) {
@@ -1293,21 +1310,16 @@
                 }
 
                 if (revAdminNotes) {
-                    revAdminNotes.value = driver.observaciones || localFreshDocs.observaciones || '';
+                    revAdminNotes.value = driver.observaciones || '';
                 }
 
-                // Extracción consolidada de archivos y documentos de conductor
+                // Extracción estricta y personal de documentos (AISLADO SOLO A ESTE CHOFER)
                 const userImgs = driver.docsImages || {};
-                const localImgs = localFreshDocs.docsImages || {};
-                const storedImgs = storedDriverMatch.docsImages || {};
 
                 function resolveDoc(keys) {
                     for (const k of keys) {
                         if (userImgs[k] && typeof userImgs[k] === 'string' && userImgs[k].length > 20) return userImgs[k];
-                        if (localImgs[k] && typeof localImgs[k] === 'string' && localImgs[k].length > 20) return localImgs[k];
-                        if (storedImgs[k] && typeof storedImgs[k] === 'string' && storedImgs[k].length > 20) return storedImgs[k];
                         if (driver[k] && typeof driver[k] === 'string' && driver[k].length > 20) return driver[k];
-                        if (localFreshDocs[k] && typeof localFreshDocs[k] === 'string' && localFreshDocs[k].length > 20) return localFreshDocs[k];
                     }
                     return '';
                 }
@@ -1321,7 +1333,7 @@
                     { title: '4. Cédula Frente', key: 'cedula_frente', data: resolveDoc(['cedula_frente', 'cedula', 'fileCedulaFrente', 'cedulaFrente']) },
                     { title: '4. Cédula Dorso', key: 'cedula_dorso', data: resolveDoc(['cedula_dorso', 'fileCedulaDorso', 'cedulaDorso']) },
                     { title: '5. Antecedentes Penales', key: 'antecedentes', data: resolveDoc(['antecedentes', 'fileAntecedentes']) },
-                    { title: '6. Foto de Perfil', key: 'foto', data: resolveDoc(['foto', 'fotoPerfil', 'fileFotoPerfil']) || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com') ? driver.fotoPerfil : (localFreshDocs.fotoPerfil && !localFreshDocs.fotoPerfil.includes('unsplash.com') ? localFreshDocs.fotoPerfil : '')) }
+                    { title: '6. Foto de Perfil', key: 'foto', data: resolveDoc(['foto', 'fotoPerfil', 'fileFotoPerfil']) || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com') ? driver.fotoPerfil : '') }
                 ];
 
                 // Estado de validación por cada uno de los 9 documentos
@@ -1339,6 +1351,7 @@
                     const validCount = docValidationState.filter(d => d.hasData && d.isValid && !d.isObserved).length;
                     const missingCount = docValidationState.filter(d => !d.hasData).length;
                     const observedCount = docValidationState.filter(d => d.isObserved).length;
+                    const unverifiedCount = totalDocs - validCount - missingCount - observedCount;
 
                     if (revDocValidCount) {
                         revDocValidCount.textContent = `${validCount}/${totalDocs} Validados`;
@@ -1362,7 +1375,7 @@
                             docApprovalWarningIcon.style.color = '#10b981';
                         }
                         if (docApprovalWarningText) {
-                            docApprovalWarningText.textContent = '✓ Documentación Completa y Verificada: Los 9 archivos están en regla. Puedes habilitar al conductor para operar.';
+                            docApprovalWarningText.textContent = '✓ Documentación Completa y Verificada: Los 9 archivos están en regla y validados. Puedes habilitar al conductor para operar.';
                         }
                     } else {
                         if (btnApproveDriverMaster) {
@@ -1383,11 +1396,10 @@
                         let detailReasons = [];
                         if (missingCount > 0) detailReasons.push(`${missingCount} sin adjuntar`);
                         if (observedCount > 0) detailReasons.push(`${observedCount} observado(s)`);
-                        const unverified = totalDocs - validCount - missingCount - observedCount;
-                        if (unverified > 0) detailReasons.push(`${unverified} sin validar`);
+                        if (unverifiedCount > 0) detailReasons.push(`${unverifiedCount} sin validar`);
 
                         if (docApprovalWarningText) {
-                            docApprovalWarningText.textContent = `Aprobación Bloqueada: ${detailReasons.join(', ')}. Deben estar los 9 documentos subidos y validados para habilitar al chofer.`;
+                            docApprovalWarningText.textContent = `⛔ Aprobación Bloqueada: ${detailReasons.join(', ')}. Deben estar los 9 documentos subidos y validados para habilitar al chofer.`;
                         }
                     }
                 }
@@ -1849,16 +1861,23 @@
                     } catch(e){}
                 }
 
-                // 2. Actualizar en LocalStorage
+                // 2. Actualizar en LocalStorage (Persistencia Blindada)
                 let updatedItem = null;
                 try {
                     let localRecharges = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
-                    const idx = localRecharges.findIndex(r => r.id === rechargeId);
+                    const idx = localRecharges.findIndex(r => r.id === rechargeId || (r.comprobante && r.comprobante === rechargeId));
                     if (idx >= 0) {
                         localRecharges[idx].estado = decision;
+                        localRecharges[idx].timestampAprobacion = Date.now();
                         updatedItem = localRecharges[idx];
-                        localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(localRecharges));
+                    } else {
+                        const cloudItem = cloudRechargesList.find(r => r.id === rechargeId);
+                        if (cloudItem) {
+                            updatedItem = { ...cloudItem, estado: decision, timestampAprobacion: Date.now() };
+                            localRecharges.unshift(updatedItem);
+                        }
                     }
+                    localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(localRecharges));
                 } catch(e){}
 
                 // 3. Emitir evento por bus sync (0ms al chofer)
