@@ -1490,17 +1490,10 @@ class RutaSyncManager {
                     }
                 }
 
-<<<<<<< HEAD
-                // --- REGLA D: AUTO-DESPACHO A RADAR DE VIAJES EN VIVO (10 MIN ANTES SI NO FUE TOMADA) ---
-                // Si la reserva no fue aceptada por ningún chofer y faltan 10 minutos o menos para el horario:
-                // Se envía de forma automática como solicitud de viaje en vivo para que los choferes conectados la tomen
-                if (diffMin <= 10 && diffMin >= -10 && (!res.driverAssigned || res.driverAssigned === '') && (status === 'disponible' || status === 'pendiente') && !res.despachadaComoViajeEnVivo) {
-=======
                 // --- REGLA D: AUTO-DESPACHO A RADAR DE VIAJES EN VIVO (20 MIN ANTES SI NO FUE TOMADA) ---
                 // Si la reserva no fue aceptada por ningún chofer y faltan 20 minutos o menos para el horario:
                 // Se envía de forma automática como solicitud de viaje en vivo para que los choferes conectados la tomen
                 if (diffMin <= 20 && diffMin >= -10 && (!res.driverAssigned || res.driverAssigned === '') && (status === 'disponible' || status === 'pendiente') && !res.despachadaComoViajeEnVivo) {
->>>>>>> 8efdb8e0f55100535b8378e490544d5fbcbdd700
                     res.despachadaComoViajeEnVivo = true;
                     modified = true;
 
@@ -1534,6 +1527,24 @@ class RutaSyncManager {
         } catch(e) {
             console.warn('Error en supervisarReservasProgramadas:', e);
         }
+    }
+
+    // ==========================================
+    // GESTIÓN Y SINCRONIZACIÓN DE DOCUMENTACIÓN
+    // ==========================================
+    guardarDocumentosConductor(driverData) {
+        if (!driverData) return;
+        try {
+            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(driverData));
+        } catch(e){}
+
+        if (this.firestore) {
+            const cleanDni = String(driverData.dni || '').replace(/\D/g, '') || 'chofer_actual';
+            const docId = String(driverData.id || ('drv_' + cleanDni));
+            this.firestore.collection('drivers').doc(docId).set(driverData, { merge: true }).catch(() => {});
+        }
+
+        this.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driverData);
     }
 }
 

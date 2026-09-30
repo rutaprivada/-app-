@@ -507,7 +507,6 @@
                 </div>
             </div>
 
-            <div class="metric-card">
                 <div class="metric-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
                     <i class="fa-solid fa-signal"></i>
                 </div>
@@ -516,41 +515,99 @@
                     <div class="metric-label">Conductores En Línea</div>
                 </div>
             </div>
-        </section>
 
-        <!-- FILTROS Y BÚSQUEDA -->
-        <section class="controls-row">
-            <div class="search-box">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="adminSearchInput" class="search-input" placeholder="Buscar por nombre, patente, DNI o teléfono...">
-            </div>
-
-            <div class="filter-tabs">
-                <button class="filter-tab-btn active" data-status="todos">Todos</button>
-                <button class="filter-tab-btn" data-status="pendiente">⚠️ Pendientes</button>
-                <button class="filter-tab-btn" data-status="aprobado">✓ Aprobados</button>
-                <button class="filter-tab-btn" data-status="rechazado">✕ Rechazados</button>
+            <div class="metric-card" id="cardMetricRecharges" style="cursor: pointer; border-color: rgba(251, 191, 36, 0.3);">
+                <div class="metric-icon" style="background: rgba(251, 191, 36, 0.2); color: #fbbf24;">
+                    <i class="fa-solid fa-money-bill-transfer"></i>
+                </div>
+                <div>
+                    <div class="metric-val" id="metricPendingRecharges" style="color: #fbbf24;">0</div>
+                    <div class="metric-label">Recargas por Conciliar</div>
+                </div>
             </div>
         </section>
 
-        <!-- TABLA DE CONDUCTORES -->
-        <section class="drivers-table-wrapper">
-            <table class="drivers-table">
-                <thead>
-                    <tr>
-                        <th>Conductor</th>
-                        <th>Vehículo & Categoría</th>
-                        <th>DNI / Registro</th>
-                        <th>Cuenta Bancaria Titular</th>
-                        <th>Estado Solicitud</th>
-                        <th style="text-align: right;">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="driversTableBody">
-                    <!-- Filas dinámicas generadas por JS -->
-                </tbody>
-            </table>
-        </section>
+        <!-- SECCIONES / PESTAÑAS PRINCIPALES DEL PANEL -->
+        <div style="display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--admin-border); padding-bottom: 12px;">
+            <button id="tabNavDrivers" class="admin-btn admin-btn-primary" style="padding: 10px 20px;">
+                <i class="fa-solid fa-id-card"></i> Validación de Documentos y Choferes
+            </button>
+            <button id="tabNavRecharges" class="admin-btn" style="padding: 10px 20px; position: relative;">
+                <i class="fa-solid fa-wallet"></i> Conciliación de Recargas y Saldo
+                <span id="badgePendingRechargesCount" style="display:none; margin-left: 6px; background: #ef4444; color: #fff; font-size: 0.7rem; padding: 2px 7px; border-radius: 10px; font-weight: 800;">0</span>
+            </button>
+        </div>
+
+        <!-- SECCIÓN 1: VALIDACIÓN DE CONDUCTORES Y DOCUMENTOS -->
+        <div id="sectionDriversView">
+            <!-- FILTROS Y BÚSQUEDA -->
+            <section class="controls-row">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="adminSearchInput" class="search-input" placeholder="Buscar por nombre, patente, DNI o teléfono...">
+                </div>
+
+                <div class="filter-tabs">
+                    <button class="filter-tab-btn active" data-status="todos">Todos</button>
+                    <button class="filter-tab-btn" data-status="pendiente">⚠️ Pendientes</button>
+                    <button class="filter-tab-btn" data-status="aprobado">✓ Aprobados</button>
+                    <button class="filter-tab-btn" data-status="rechazado">✕ Rechazados</button>
+                </div>
+            </section>
+
+            <!-- TABLA DE CONDUCTORES -->
+            <section class="drivers-table-wrapper">
+                <table class="drivers-table">
+                    <thead>
+                        <tr>
+                            <th>Conductor</th>
+                            <th>Vehículo & Categoría</th>
+                            <th>DNI / Registro</th>
+                            <th>Cuenta Bancaria Titular</th>
+                            <th>Estado Solicitud</th>
+                            <th style="text-align: right;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="driversTableBody">
+                        <!-- Filas dinámicas generadas por JS -->
+                    </tbody>
+                </table>
+            </section>
+        </div>
+
+        <!-- SECCIÓN 2: CONCILIACIÓN DE RECARGAS DE SALDO (TRANSFERENCIAS) -->
+        <div id="sectionRechargesView" style="display: none;">
+            <div class="controls-row" style="margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-building-columns text-gold" style="font-size: 1.4rem;"></i>
+                    <div>
+                        <strong style="color: #fff; font-size: 1rem;">Conciliación Bancaria de Recargas</strong>
+                        <div style="font-size: 0.8rem; color: #94a3b8;">Verifica el ingreso de transferencias en tu cuenta/CBU y aprueba la acreditación del saldo al chofer con un clic.</div>
+                    </div>
+                </div>
+                <button id="btnRefreshRecharges" class="admin-btn">
+                    <i class="fa-solid fa-rotate"></i> Actualizar Recargas
+                </button>
+            </div>
+
+            <section class="drivers-table-wrapper">
+                <table class="drivers-table">
+                    <thead>
+                        <tr>
+                            <th>Conductor</th>
+                            <th>Monto Solicitado</th>
+                            <th>N° Comprobante / Referencia</th>
+                            <th>Fecha y Hora</th>
+                            <th>Estado</th>
+                            <th style="text-align: right;">Acción de Acreditación</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rechargesTableBody">
+                        <!-- Filas de recargas generadas por JS -->
+                    </tbody>
+                </table>
+            </section>
+        </div>
 
     </main>
 
@@ -670,23 +727,47 @@
             const btnLogoutAdmin = document.getElementById('btnLogoutAdmin');
             const btnRefreshAdmin = document.getElementById('btnRefreshAdmin');
 
-            const driversTableBody = document.getElementById('driversTableBody');
-            const adminSearchInput = document.getElementById('adminSearchInput');
-            const filterTabBtns = document.querySelectorAll('.filter-tab-btn');
+            // Elementos DOM de Secciones y Recargas
+            const tabNavDrivers = document.getElementById('tabNavDrivers');
+            const tabNavRecharges = document.getElementById('tabNavRecharges');
+            const sectionDriversView = document.getElementById('sectionDriversView');
+            const sectionRechargesView = document.getElementById('sectionRechargesView');
+            const cardMetricRecharges = document.getElementById('cardMetricRecharges');
+            const metricPendingRecharges = document.getElementById('metricPendingRecharges');
+            const badgePendingRechargesCount = document.getElementById('badgePendingRechargesCount');
+            const rechargesTableBody = document.getElementById('rechargesTableBody');
+            const btnRefreshRecharges = document.getElementById('btnRefreshRecharges');
 
-            const metricTotalDrivers = document.getElementById('metricTotalDrivers');
-            const metricPendingDrivers = document.getElementById('metricPendingDrivers');
-            const metricApprovedDrivers = document.getElementById('metricApprovedDrivers');
-            const metricOnlineDrivers = document.getElementById('metricOnlineDrivers');
+            let cloudRechargesList = [];
 
-            const docReviewModalOverlay = document.getElementById('docReviewModalOverlay');
-            const btnCloseDocReview = document.getElementById('btnCloseDocReview');
+            // Tab Navigation
+            function switchAdminView(view) {
+                if (view === 'recharges') {
+                    sectionDriversView.style.display = 'none';
+                    sectionRechargesView.style.display = 'block';
+                    tabNavDrivers.classList.remove('admin-btn-primary');
+                    tabNavRecharges.classList.add('admin-btn-primary');
+                    renderRechargesTable();
+                } else {
+                    sectionDriversView.style.display = 'block';
+                    sectionRechargesView.style.display = 'none';
+                    tabNavRecharges.classList.remove('admin-btn-primary');
+                    tabNavDrivers.classList.add('admin-btn-primary');
+                    renderDriversTable();
+                }
+            }
+
+            if (tabNavDrivers) tabNavDrivers.addEventListener('click', () => switchAdminView('drivers'));
+            if (tabNavRecharges) tabNavRecharges.addEventListener('click', () => switchAdminView('recharges'));
+            if (cardMetricRecharges) cardMetricRecharges.addEventListener('click', () => switchAdminView('recharges'));
+            if (btnRefreshRecharges) btnRefreshRecharges.addEventListener('click', () => renderRechargesTable());
 
             // 1. AUTENTICACIÓN CON PIN
             function checkAuth() {
                 if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
                     authModalOverlay.classList.remove('active');
                     loadDriversData();
+                    loadRechargesData();
                 } else {
                     authModalOverlay.classList.add('active');
                     setTimeout(() => adminPinInput.focus(), 100);
@@ -702,6 +783,7 @@
                     sessionStorage.setItem('rutaprivada_admin_authed', 'true');
                     authModalOverlay.classList.remove('active');
                     loadDriversData();
+                    loadRechargesData();
                 } else {
                     alert('❌ Clave de administrador incorrecta. Intenta nuevamente.');
                     adminPinInput.value = '';
@@ -716,6 +798,7 @@
 
             btnRefreshAdmin.addEventListener('click', () => {
                 loadDriversData();
+                loadRechargesData();
             });
 
             let cloudDriversList = [];
@@ -739,6 +822,8 @@
                                 firebase.initializeApp(FIREBASE_CONFIG);
                             }
                             const db = firebase.firestore();
+                            
+                            // Listen to Drivers
                             db.collection('drivers').onSnapshot((snapshot) => {
                                 cloudDriversList = [];
                                 snapshot.forEach(doc => {
@@ -748,6 +833,20 @@
                                 });
                                 loadDriversData();
                             }, (err) => console.warn('Firestore admin listener warning:', err));
+
+                            // Listen to Wallet Recharges in Realtime
+                            db.collection('wallet_recharges').onSnapshot((snapshot) => {
+                                cloudRechargesList = [];
+                                snapshot.forEach(doc => {
+                                    if (doc.exists) {
+                                        const data = doc.data();
+                                        data.id = data.id || doc.id;
+                                        cloudRechargesList.push(data);
+                                    }
+                                });
+                                loadRechargesData();
+                            }, (err) => console.warn('Firestore recharges listener warning:', err));
+
                         } catch(e) {
                             console.warn('Error setting up admin firestore sync:', e);
                         }
@@ -761,6 +860,164 @@
             }
 
             initFirestoreRealtimeSync();
+
+            // GESTIÓN DE RECARGAS DE SALDO (CONCILIACIÓN BANCARIA)
+            function loadRechargesData() {
+                let localRecharges = [];
+                try {
+                    const raw = localStorage.getItem('rutaprivada_driver_recharges_v1');
+                    if (raw) localRecharges = JSON.parse(raw);
+                } catch(e) {}
+
+                let combined = [...cloudRechargesList];
+                localRecharges.forEach(loc => {
+                    if (!combined.some(c => c.id === loc.id || (c.comprobante && loc.comprobante && c.comprobante === loc.comprobante))) {
+                        combined.push(loc);
+                    }
+                });
+
+                combined.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+                
+                const pendingCount = combined.filter(r => (r.estado || 'pendiente') === 'pendiente').length;
+                if (metricPendingRecharges) metricPendingRecharges.textContent = pendingCount;
+                if (badgePendingRechargesCount) {
+                    if (pendingCount > 0) {
+                        badgePendingRechargesCount.style.display = 'inline-block';
+                        badgePendingRechargesCount.textContent = pendingCount;
+                    } else {
+                        badgePendingRechargesCount.style.display = 'none';
+                    }
+                }
+
+                renderRechargesTable(combined);
+            }
+
+            function renderRechargesTable(list = null) {
+                if (!list) {
+                    loadRechargesData();
+                    return;
+                }
+
+                if (!rechargesTableBody) return;
+
+                if (list.length === 0) {
+                    rechargesTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px 20px; color: #94a3b8;">
+                                <i class="fa-solid fa-receipt" style="font-size: 2.2rem; margin-bottom: 10px; display: block; color: #64748b;"></i>
+                                No hay solicitudes de recarga por transferencia registradas actualmente.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                rechargesTableBody.innerHTML = list.map(r => {
+                    const status = (r.estado || 'pendiente').toLowerCase();
+                    const statusClass = status === 'aprobado' ? 'aprobado' : (status === 'rechazado' ? 'rechazado' : 'pendiente');
+                    const statusLabel = status === 'aprobado' ? '✓ Acreditado' : (status === 'rechazado' ? '✕ Rechazado' : '⏳ Pendiente de Conciliación');
+                    const amountFormatted = Number(r.monto || 0).toLocaleString('es-AR');
+                    const isPending = status === 'pendiente';
+
+                    return `
+                        <tr>
+                            <td>
+                                <strong style="color: #fff; font-size: 0.95rem; display: block;">${r.driverName || 'Conductor Registrado'}</strong>
+                                <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
+                                    <span><i class="fa-solid fa-id-card"></i> DNI: ${r.driverDni || 'S/D'}</span> | 
+                                    <span><i class="fa-solid fa-car"></i> Patente: ${r.driverPatente || 'S/P'}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 800; color: #34d399;">$${amountFormatted}</span>
+                            </td>
+                            <td>
+                                <div style="background: rgba(255,255,255,0.06); padding: 4px 10px; border-radius: 6px; display: inline-block; font-family: monospace; font-size: 0.85rem; color: #fbbf24; border: 1px solid rgba(251,191,36,0.3);">
+                                    <i class="fa-solid fa-receipt"></i> #${r.comprobante || 'S/N'}
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-size: 0.82rem; color: #cbd5e1;">${r.fecha || 'Hoy'}</div>
+                                <div style="font-size: 0.74rem; color: #94a3b8;">${r.hora || ''}</div>
+                            </td>
+                            <td>
+                                <span class="badge-status ${statusClass}">${statusLabel}</span>
+                            </td>
+                            <td style="text-align: right;">
+                                ${isPending ? `
+                                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                        <button class="admin-btn btn-approve-recharge" data-id="${r.id}" data-amount="${r.monto}" data-dni="${r.driverDni}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; padding: 6px 12px; font-size: 0.78rem;">
+                                            <i class="fa-solid fa-check"></i> Aprobar & Acreditar
+                                        </button>
+                                        <button class="admin-btn btn-reject-recharge" data-id="${r.id}" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4); padding: 6px 12px; font-size: 0.78rem;">
+                                            <i class="fa-solid fa-xmark"></i> Rechazar
+                                        </button>
+                                    </div>
+                                ` : `
+                                    <span style="font-size: 0.78rem; color: #64748b;"><i class="fa-solid fa-circle-check"></i> Procesado</span>
+                                `}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // Wire action buttons
+                document.querySelectorAll('.btn-approve-recharge').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.getAttribute('data-id');
+                        const amount = btn.getAttribute('data-amount');
+                        const dni = btn.getAttribute('data-dni');
+                        processRechargeDecision(id, 'aprobado', amount, dni);
+                    });
+                });
+
+                document.querySelectorAll('.btn-reject-recharge').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.getAttribute('data-id');
+                        processRechargeDecision(id, 'rechazado');
+                    });
+                });
+            }
+
+            function processRechargeDecision(rechargeId, decision, amount = 0, dni = '') {
+                if (!confirm(`¿Confirmas ${decision.toUpperCase()} esta recarga de saldo?`)) return;
+
+                // 1. Actualizar en Firestore
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                    try {
+                        const db = firebase.firestore();
+                        db.collection('wallet_recharges').doc(rechargeId).set({
+                            estado: decision,
+                            aprobadoPor: 'admin',
+                            timestampAprobacion: Date.now()
+                        }, { merge: true }).catch(err => console.warn('Firestore recharge update error:', err));
+                    } catch(e){}
+                }
+
+                // 2. Si es local o en memoria
+                try {
+                    let localRecharges = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
+                    const idx = localRecharges.findIndex(r => r.id === rechargeId);
+                    if (idx >= 0) {
+                        localRecharges[idx].estado = decision;
+                        localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(localRecharges));
+                    }
+                } catch(e){}
+
+                // 3. Emitir evento por bus sync
+                if (window.RutaSync) {
+                    window.RutaSync.emit('RECARGA_SALDO_PROCESADA', {
+                        rechargeId,
+                        estado: decision,
+                        monto: amount,
+                        driverDni: dni,
+                        timestamp: Date.now()
+                    });
+                }
+
+                alert(decision === 'aprobado' ? `✅ ¡Recarga de $${Number(amount).toLocaleString('es-AR')} Aprobada!\nEl saldo se ha acreditado automáticamente en la billetera del chofer.` : `❌ Recarga rechazada.`);
+                loadRechargesData();
+            }
 
             // 2. CARGA DE DATOS REALES DE CONDUCTORES EN TIEMPO REAL
             function loadDriversData() {
@@ -882,12 +1139,14 @@
             setInterval(() => {
                 if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
                     loadDriversData();
+                    loadRechargesData();
                 }
             }, 2000);
 
             window.addEventListener('storage', () => {
                 if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
                     loadDriversData();
+                    loadRechargesData();
                 }
             });
 

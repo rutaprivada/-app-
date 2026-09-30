@@ -1218,12 +1218,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return `📅 ${dayName} ${formattedDate}`;
         }
 
-        function getAdvanceConnectionTime(timeStr, advanceMin = 25) {
-            if (!timeStr || !timeStr.includes(':')) return '25 min antes';
+        function getAdvanceConnectionTime(timeStr, advanceMin = 30) {
+            if (!timeStr || !timeStr.includes(':')) return '30 min antes';
             const parts = timeStr.split(':');
             let h = parseInt(parts[0], 10);
             let m = parseInt(parts[1], 10);
-            if (isNaN(h) || isNaN(m)) return '25 min antes';
+            if (isNaN(h) || isNaN(m)) return '30 min antes';
             let totalMinutes = h * 60 + m - advanceMin;
             if (totalMinutes < 0) totalMinutes += 24 * 60;
             const finalH = Math.floor(totalMinutes / 60) % 24;
@@ -1261,7 +1261,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dayItems.forEach(b => {
                 const status = String(b.status || b.estado || '').toLowerCase();
                 const isTomada = status === 'aceptada' || status === 'en_curso' || b.driverAssigned === driverState.info.nombre;
-                const clientName = b.clientName || b.customerName || b.nombrePasajero || 'Cliente Ejecutivo';
+                const clientName = b.clientName || b.customerName || b.nombrePasajero || b.pasajero || b.name || b.usuario || 'Pasajero VIP';
                 const pickupAddr = b.pickupAddress || b.origin || b.origen || 'Punto de recogida';
                 const dropoffAddr = b.dropoffAddress || b.destination || b.destino || 'Destino';
                 
@@ -1302,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     durMinStr = `${rawDurMin} min`;
                 }
 
-                const connectTimeStr = getAdvanceConnectionTime(timeStr, 25);
+                const connectTimeStr = getAdvanceConnectionTime(timeStr, 30);
                 const estimatedArrivalStr = getEstimatedArrivalTime(timeStr, rawDurMin);
 
                 // Formato de cabecera con fecha y hora
@@ -1323,7 +1323,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 htmlContent += `
                     <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''} ${conflictInfo.conflicto ? 'reserva-conflicto' : ''}" data-id="${b.id}" onclick="if (window.abrirModalDetalleReserva) window.abrirModalDetalleReserva('${b.id}')" style="cursor: pointer;">
                         
-                        <!-- Header con Categoría y Rating estilo VIP -->
+                        <!-- Header con Categoría y Rating VIP -->
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <span class="reserva-badge-rutaprivada" style="margin-bottom: 0;">
@@ -1348,20 +1348,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                     ${dateBadgeFormatted}
                                 </span>
                                 <span style="font-size: 0.72rem; color: #94a3b8;">Tarifa calculada garantizada · Partner VIP</span>
-                            </div>
-                        </div>
-
-                        <!-- Indicador de Hora de Conexión Recomendada (Inspiración Uber / RutaPrivada) -->
-                        <div class="reserva-connection-box" style="display: flex; align-items: center; justify-content: space-between; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 9px 12px; margin-bottom: 14px;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <i class="fa-regular fa-clock text-gold" style="font-size: 1.15rem;"></i>
-                                <div>
-                                    <div style="font-size: 0.78rem; font-weight: 800; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.4px;">Hora de conexión</div>
-                                    <div style="font-size: 0.72rem; color: #cbd5e1;">Preséntate 25 min antes para no afectar tu acceso</div>
-                                </div>
-                            </div>
-                            <div style="font-size: 1rem; font-weight: 900; color: #fef08a; letter-spacing: -0.3px;">
-                                ${connectTimeStr} hs
                             </div>
                         </div>
 
@@ -1390,25 +1376,24 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <!-- Bloque Informativo 'Lo que debes saber' -->
-                        <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.76rem; color: #cbd5e1;">
-                            <div style="font-weight: 800; color: #e2e8f0; margin-bottom: 6px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px;">
-                                <i class="fa-solid fa-shield-halved text-gold"></i> Lo que debes saber
+                        <!-- Bloque de Conexión e Información del Traslado -->
+                        <div class="reserva-itinerary-info-box" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 11px 14px; margin: 10px 0 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 5px;">
+                                <span style="font-weight: 800; color: #fbbf24; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.4px;">
+                                    <i class="fa-solid fa-clock-rotate-left text-gold"></i> Hora de Conexión: <span style="color:#fef08a;">${connectTimeStr} hs</span>
+                                </span>
+                                <span style="font-size: 0.7rem; color: #34d399; font-weight: 700; background: rgba(16,185,129,0.15); padding: 2px 7px; border-radius: 4px;">● Conectar 30 min antes</span>
                             </div>
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <i class="fa-solid fa-check text-emerald" style="font-size: 0.7rem;"></i>
-                                    <span>Pasajero: <strong style="color: #fff;">${clientName}</strong> · Pago: <strong style="color: #34d399;">${pInfo.payMethodLabel}</strong></span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <i class="fa-solid fa-check text-emerald" style="font-size: 0.7rem;"></i>
-                                    <span>Conéctate con antelación para asegurar la asignación del servicio.</span>
+                            <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.76rem; color: #cbd5e1;">
+                                <div><strong style="color: #94a3b8;">Pasajero:</strong> <strong style="color: #fff;">${clientName}</strong> &nbsp;·&nbsp; <strong style="color: #94a3b8;">Cobro:</strong> <span style="color: #fbbf24; font-weight: 700;">${pInfo.payMethodLabel}</span></div>
+                                <div style="color: #94a3b8; font-size: 0.72rem;">
+                                    <i class="fa-solid fa-circle-check text-emerald" style="font-size: 0.68rem;"></i> Conéctate 30 minutos antes del inicio del viaje para confirmar recepción y asegurar la asignación.
                                 </div>
                             </div>
                         </div>
 
-                        <div class="reserva-detail-hint" onclick="if (window.abrirModalDetalleReserva) { event.stopPropagation(); window.abrirModalDetalleReserva('${b.id}'); }" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.76rem; color: #38bdf8; margin: 4px 0 12px; padding: 7px 12px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; cursor: pointer;">
-                            <span style="font-weight: 700;"><i class="fa-solid fa-map-location-dot"></i> Toca para ver ruta completa interactiva y desglose</span>
+                        <div class="reserva-detail-hint" onclick="if (window.abrirModalDetalleReserva) { event.stopPropagation(); window.abrirModalDetalleReserva('${b.id}'); }" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.76rem; color: #38bdf8; margin: 4px 0 12px; padding: 8px 12px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; cursor: pointer;">
+                            <span style="font-weight: 700;"><i class="fa-solid fa-map-location-dot"></i> Ver ruta interactiva completa, paradas y mapa</span>
                             <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem;"></i>
                         </div>
 
@@ -1520,10 +1505,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const mapContainer = document.getElementById('reservaDetailMap');
         if (!mapContainer) return;
 
-        const originCoords = item._originCoords || item.originCoords || resolveAddressCoords(item.pickupAddress || item.origin || item.origen, { lat: -34.5682, lng: -58.4371 });
-        const destCoords = item._destCoords || item.destinationCoords || resolveAddressCoords(item.dropoffAddress || item.destination || item.destino, { lat: -34.5658, lng: -58.4340 });
+        const defaultOrigin = { lat: -34.6037, lng: -58.3816 };
+        const defaultDest = { lat: -34.5822, lng: -58.4200 };
+
+        const originCoords = item._originCoords || item.originCoords || (typeof resolveAddressCoords === 'function' ? resolveAddressCoords(item.pickupAddress || item.origin || item.origen, defaultOrigin) : defaultOrigin);
+        const destCoords = item._destCoords || item.destinationCoords || (typeof resolveAddressCoords === 'function' ? resolveAddressCoords(item.dropoffAddress || item.destination || item.destino, defaultDest) : defaultDest);
         const stopAddr = item.parada || item.stopAddress;
-        const stopCoords = stopAddr ? (item._stopCoords || item.stopCoords || resolveAddressCoords(stopAddr, { lat: -34.5889, lng: -58.4306 })) : null;
+        const stopCoords = stopAddr ? (item._stopCoords || item.stopCoords || (typeof resolveAddressCoords === 'function' ? resolveAddressCoords(stopAddr, { lat: -34.5889, lng: -58.4306 }) : null)) : null;
 
         if (!reservaDetailMapInstance) {
             reservaDetailMapInstance = L.map('reservaDetailMap', {
@@ -1531,7 +1519,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 attributionControl: false
             }).setView([originCoords.lat, originCoords.lng], 13);
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                 maxZoom: 19
             }).addTo(reservaDetailMapInstance);
         } else {
@@ -1544,23 +1532,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const bounds = L.latLngBounds([[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]]);
 
+        const greenIcon = L.divIcon({
+            className: 'custom-map-pin',
+            html: '<div style="background:#10b981; width:20px; height:20px; border-radius:50%; border:3px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;"><div style="background:#fff; width:6px; height:6px; border-radius:50%;"></div></div>',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        const goldIcon = L.divIcon({
+            className: 'custom-map-pin',
+            html: '<div style="background:#f59e0b; width:20px; height:20px; border-radius:4px; border:3px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;"><div style="background:#fff; width:6px; height:6px; border-radius:2px;"></div></div>',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
         // Marcador Origen
-        L.marker([originCoords.lat, originCoords.lng], {
-            icon: createPointPinIcon('origin', 'Partida')
-        }).addTo(reservaDetailMapInstance);
+        L.marker([originCoords.lat, originCoords.lng], { icon: greenIcon }).addTo(reservaDetailMapInstance);
 
         // Marcador Parada si existe
         if (stopCoords) {
             bounds.extend([stopCoords.lat, stopCoords.lng]);
-            L.marker([stopCoords.lat, stopCoords.lng], {
-                icon: createPointPinIcon('stop', 'Parada')
-            }).addTo(reservaDetailMapInstance);
+            const stopIcon = L.divIcon({
+                className: 'custom-map-pin',
+                html: '<div style="background:#38bdf8; width:18px; height:18px; border-radius:50%; border:3px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,0.5);"></div>',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
+            });
+            L.marker([stopCoords.lat, stopCoords.lng], { icon: stopIcon }).addTo(reservaDetailMapInstance);
         }
 
         // Marcador Destino
-        L.marker([destCoords.lat, destCoords.lng], {
-            icon: createPointPinIcon('destination', 'Destino')
-        }).addTo(reservaDetailMapInstance);
+        L.marker([destCoords.lat, destCoords.lng], { icon: goldIcon }).addTo(reservaDetailMapInstance);
 
         // Trazar línea de ruta estimada con OSRM
         const osrmCoordStr = stopCoords
@@ -1576,7 +1578,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Línea negra exterior de contraste
                     L.polyline(coords, {
                         color: '#000000',
-                        weight: 8,
+                        weight: 7,
                         opacity: 0.8
                     }).addTo(reservaDetailMapInstance);
 
@@ -1587,7 +1589,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         opacity: 1.0
                     }).addTo(reservaDetailMapInstance);
 
-                    reservaDetailMapInstance.fitBounds(osrmLine.getBounds(), { padding: [25, 25] });
+                    reservaDetailMapInstance.fitBounds(osrmLine.getBounds(), { padding: [30, 30] });
                 } else {
                     fallbackReservaPolyline();
                 }
@@ -1603,23 +1605,30 @@ document.addEventListener('DOMContentLoaded', () => {
             L.polyline(routePoints, {
                 color: '#fbbf24',
                 weight: 4,
-                opacity: 0.95
+                opacity: 0.95,
+                dashArray: '8, 8'
             }).addTo(reservaDetailMapInstance);
-            reservaDetailMapInstance.fitBounds(bounds, { padding: [25, 25] });
+            reservaDetailMapInstance.fitBounds(bounds, { padding: [30, 30] });
         }
 
         setTimeout(() => {
             if (reservaDetailMapInstance) {
                 reservaDetailMapInstance.invalidateSize();
-                reservaDetailMapInstance.fitBounds(bounds, { padding: [25, 25] });
+                reservaDetailMapInstance.fitBounds(bounds, { padding: [30, 30] });
             }
-        }, 120);
+        }, 80);
 
         setTimeout(() => {
             if (reservaDetailMapInstance) {
                 reservaDetailMapInstance.invalidateSize();
             }
-        }, 350);
+        }, 250);
+
+        setTimeout(() => {
+            if (reservaDetailMapInstance) {
+                reservaDetailMapInstance.invalidateSize();
+            }
+        }, 500);
     }
 
     function abrirModalDetalleReserva(resId) {
@@ -1640,7 +1649,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const driverName = (driverState.info && driverState.info.nombre) || 'Daniel Pabon';
         const isTomada = status === 'aceptada' || status === 'en_curso' || item.driverAssigned === driverName;
 
-        const clientName = item.clientName || item.customerName || item.nombrePasajero || 'Cliente Ejecutivo';
+        const clientName = item.clientName || item.customerName || item.nombrePasajero || item.pasajero || item.name || item.usuario || 'Pasajero VIP';
         const pickupAddr = item.pickupAddress || item.origin || item.origen || 'Punto de recogida';
         const dropoffAddr = item.dropoffAddress || item.destination || item.destino || 'Destino';
         const stopAddr = item.parada || item.stopAddress;
@@ -1668,7 +1677,7 @@ document.addEventListener('DOMContentLoaded', () => {
             rawDurMin = parseInt(durMinStr, 10) || 25;
         }
 
-        const connectTimeStr = getAdvanceConnectionTime(timeStr, 25);
+        const connectTimeStr = getAdvanceConnectionTime(timeStr, 30);
         const estimatedArrivalStr = getEstimatedArrivalTime(timeStr, rawDurMin);
 
         // Llenar campos del modal
@@ -1690,19 +1699,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnStart = document.getElementById('btnResDetailStart');
         const btnChat = document.getElementById('btnResDetailChat');
 
-        // Nuevos elementos híbridos en el modal
-        const elConnectTime = document.getElementById('resDetailConnectTime');
+        // Nuevos elementos en el modal
+        const elConnectTime = document.getElementById('resDetailConnectionTime');
         const elOrigTime = document.getElementById('resDetailOriginTime');
-        const elDestTime = document.getElementById('resDetailDestTime');
-        const elRouteBannerTime = document.getElementById('resDetailRouteBannerTime');
+        const elDestTime = document.getElementById('resDetailDestinationTime');
+        const elMapDurationDist = document.getElementById('resDetailMapDurationDist');
 
         if (elTitle) elTitle.textContent = `Traslado VIP #${String(item.id || '').slice(-6)}`;
         if (elDate) elDate.textContent = `📅 ${dateStr} · ${timeStr} HS`;
         if (elPrice) elPrice.textContent = `$${priceVal.toLocaleString('es-AR')}`;
         if (elConnectTime) elConnectTime.textContent = `${connectTimeStr} hs`;
         if (elOrigTime) elOrigTime.textContent = `${timeStr} hs`;
-        if (elDestTime) elDestTime.textContent = `${estimatedArrivalStr} hs`;
-        if (elRouteBannerTime) elRouteBannerTime.textContent = `Viaje de ${durMinStr} (${distKmStr})`;
+        if (elDestTime) elDestTime.textContent = `~${estimatedArrivalStr} hs`;
+        if (elMapDurationDist) elMapDurationDist.textContent = `${distKmStr} · ~${durMinStr}`;
 
         if (elStatus) {
             elStatus.textContent = isTomada ? '✓ Agendada en tu Hoja' : '⚡ Disponible';
@@ -4543,20 +4552,21 @@ document.addEventListener('DOMContentLoaded', () => {
         function saveDocsData(status = 'pendiente') {
             const current = loadDocsData();
             const photoSrc = (previewFotoPerfil && previewFotoPerfil.src && !previewFotoPerfil.src.includes('unsplash.com')) ? previewFotoPerfil.src : (loadedDocsImages.foto || current.fotoPerfil || '');
+            const mergedDocsImages = Object.assign({}, current.docsImages || {}, loadedDocsImages);
 
             const updatedDocs = {
-                nombre: docInputDriverName ? docInputDriverName.value.trim() : current.nombre,
-                dni: docInputDniNum ? docInputDniNum.value.trim() : current.dni,
-                telefono: docInputPhone ? docInputPhone.value.trim() : current.telefono,
-                autoMarcaModelo: docInputVehicleModel ? docInputVehicleModel.value.trim() : current.autoMarcaModelo,
-                patente: docInputPlate ? docInputPlate.value.trim() : current.patente,
-                color: docInputColor ? docInputColor.value.trim() : current.color,
+                nombre: docInputDriverName ? (docInputDriverName.value.trim() || current.nombre) : current.nombre,
+                dni: docInputDniNum ? (docInputDniNum.value.trim() || current.dni) : current.dni,
+                telefono: docInputPhone ? (docInputPhone.value.trim() || current.telefono) : current.telefono,
+                autoMarcaModelo: docInputVehicleModel ? (docInputVehicleModel.value.trim() || current.autoMarcaModelo) : current.autoMarcaModelo,
+                patente: docInputPlate ? (docInputPlate.value.trim() || current.patente) : current.patente,
+                color: docInputColor ? (docInputColor.value.trim() || current.color) : current.color,
                 categoria: docSelectCategory ? docSelectCategory.value : current.categoria,
                 fotoPerfil: photoSrc,
-                banco: docInputBankName ? docInputBankName.value.trim() : current.banco,
-                cbu: docInputCbu ? docInputCbu.value.trim() : current.cbu,
-                titularCuenta: docInputBankHolder ? docInputBankHolder.value.trim() : current.titularCuenta,
-                docsImages: loadedDocsImages,
+                banco: docInputBankName ? (docInputBankName.value.trim() || current.banco) : current.banco,
+                cbu: docInputCbu ? (docInputCbu.value.trim() || current.cbu) : current.cbu,
+                titularCuenta: docInputBankHolder ? (docInputBankHolder.value.trim() || current.titularCuenta) : current.titularCuenta,
+                docsImages: mergedDocsImages,
                 estadoVerificacion: status,
                 updatedAt: Date.now()
             };
@@ -4570,13 +4580,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // 2. Sincronizar en tiempo real con Firebase Cloud Firestore
+            const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '') || String(Date.now());
+            const docId = 'drv_' + cleanDni;
+            updatedDocs.id = docId;
+
             if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                 try {
                     const db = firebase.firestore();
-                    const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '') || String(Date.now());
-                    const docId = 'drv_' + cleanDni;
                     db.collection('drivers').doc(docId).set({
-                        id: docId,
                         ...updatedDocs,
                         isOnline: driverState.isOnline,
                         timestamp: Date.now()
@@ -4586,7 +4597,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 3. Actualizar lista en memoria
+            // 3. Emitir evento por bus sync para recepción inmediata en Admin
+            if (window.RutaSync) {
+                window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', updatedDocs);
+            }
+
+            // 4. Actualizar lista en memoria
             try {
                 let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
                 const idx = driversList.findIndex(d => (d.dni && updatedDocs.dni && d.dni === updatedDocs.dni) || d.nombre === updatedDocs.nombre);
@@ -5621,6 +5637,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        const rechargeTransferRef = document.getElementById('rechargeTransferRef');
+
         if (btnConfirmRechargeWhatsapp) {
             btnConfirmRechargeWhatsapp.addEventListener('click', () => {
                 const amount = Number(customRechargeAmount ? customRechargeAmount.value : 10000) || 10000;
@@ -5629,16 +5647,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
+                const refCode = (rechargeTransferRef ? rechargeTransferRef.value.trim() : '') || '';
+                if (refCode.length < 3) {
+                    alert('⚠️ Comprobante Requerido:\n\nPor favor, ingresa el Número de Comprobante / Referencia de la transferencia que realizaste desde tu cuenta bancaria o billetera virtual para que el sistema pueda conciliarla.');
+                    if (rechargeTransferRef) rechargeTransferRef.focus();
+                    return;
+                }
+
                 const wallet = loadDriverWallet();
-                wallet.balance += amount;
-                wallet.totalRecargas = (wallet.totalRecargas || 0) + amount;
                 const now = new Date();
+                const rechargeId = 'rec_' + Date.now();
+
                 wallet.movimientos.unshift({
-                    id: 'mov_' + Date.now(),
+                    id: rechargeId,
                     fecha: now.toLocaleDateString('es-AR'),
                     hora: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    tipo: 'recarga',
-                    descripcion: `Recarga de Saldo Billetera (${driverState.info.nombre})`,
+                    tipo: 'recarga_pendiente',
+                    estado: 'en_conciliacion',
+                    comprobante: refCode,
+                    descripcion: `Recarga en Conciliación Bancaria (#${refCode})`,
                     monto: amount,
                     saldoPosterior: wallet.balance
                 });
@@ -5646,27 +5673,74 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateWalletUI();
 
                 if (modalRecargarSaldo) modalRecargarSaldo.classList.remove('active');
-                showDriverToast(`✅ Saldo acreditado por conciliación: +$${amount.toLocaleString('es-AR')}`);
+                if (rechargeTransferRef) rechargeTransferRef.value = '';
 
-                // Sincronizar recarga con Firestore si está disponible
-                if (window.RutaSync && window.RutaSync.firestore) {
+                showDriverToast(`⏳ Transferencia enviada a conciliación: $${amount.toLocaleString('es-AR')}`);
+                alert(`✓ Transferencia Registrada en Conciliación Bancaria.\n\nSe ha recibido tu aviso de recarga por $${amount.toLocaleString('es-AR')} con Comprobante N° ${refCode}.\n\nEl saldo se acreditará en tu cuenta tan pronto como el sistema o la Administración verifiquen el ingreso de los fondos en la cuenta bancaria.`);
+
+                // Sincronizar recarga pendiente con Firestore
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
+                        const db = firebase.firestore();
                         const driverId = driverState.info.telefono || driverState.info.dni || 'chofer_current';
-                        window.RutaSync.firestore.collection('wallet_recharges').add({
+                        db.collection('wallet_recharges').doc(rechargeId).set({
+                            id: rechargeId,
                             driverId: driverId,
                             driverName: driverState.info.nombre,
                             driverPatente: driverState.info.patente,
                             driverDni: driverState.info.dni,
                             monto: amount,
+                            comprobante: refCode,
                             timestamp: Date.now(),
                             fecha: now.toLocaleDateString('es-AR'),
                             hora: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             metodo: 'transferencia_bancaria_cuit',
-                            estado: 'acreditado'
-                        }).catch(() => {});
+                            estado: 'pendiente'
+                        }).catch(err => console.warn('Error syncing recharge to firestore:', err));
                     } catch(e) {}
                 }
             });
+        }
+
+        // Listener en tiempo real para acreditaciones aprobadas por Administración
+        if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+            try {
+                const db = firebase.firestore();
+                const driverDni = (driverState.info.dni || '').replace(/\D/g, '');
+                db.collection('wallet_recharges')
+                    .where('estado', '==', 'aprobado')
+                    .onSnapshot(snapshot => {
+                        snapshot.docChanges().forEach(change => {
+                            if (change.type === 'added' || change.type === 'modified') {
+                                const data = change.doc.data();
+                                const cleanTarget = (data.driverDni || '').replace(/\D/g, '');
+                                if (cleanTarget && driverDni && cleanTarget === driverDni) {
+                                    const processedKey = 'rutaprivada_processed_rec_' + change.doc.id;
+                                    if (!localStorage.getItem(processedKey)) {
+                                        localStorage.setItem(processedKey, 'true');
+                                        const wallet = loadDriverWallet();
+                                        wallet.balance += Number(data.monto || 0);
+                                        wallet.totalRecargas = (wallet.totalRecargas || 0) + Number(data.monto || 0);
+                                        const now = new Date();
+                                        wallet.movimientos.unshift({
+                                            id: 'acred_' + Date.now(),
+                                            fecha: now.toLocaleDateString('es-AR'),
+                                            hora: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                            tipo: 'recarga',
+                                            estado: 'acreditado',
+                                            descripcion: `Recarga Acreditada por Administración (#${data.comprobante || ''})`,
+                                            monto: Number(data.monto || 0),
+                                            saldoPosterior: wallet.balance
+                                        });
+                                        saveDriverWallet(wallet);
+                                        updateWalletUI();
+                                        showDriverToast(`🎉 ¡Saldo Acreditado! +$${Number(data.monto || 0).toLocaleString('es-AR')}`);
+                                    }
+                                }
+                            }
+                        });
+                    }, err => console.warn('Recharge listener warning:', err));
+            } catch(e) {}
         }
 
         updateWalletUI();
