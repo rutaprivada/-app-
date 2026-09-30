@@ -1218,6 +1218,33 @@ document.addEventListener('DOMContentLoaded', () => {
             return `📅 ${dayName} ${formattedDate}`;
         }
 
+        function getAdvanceConnectionTime(timeStr, advanceMin = 25) {
+            if (!timeStr || !timeStr.includes(':')) return '25 min antes';
+            const parts = timeStr.split(':');
+            let h = parseInt(parts[0], 10);
+            let m = parseInt(parts[1], 10);
+            if (isNaN(h) || isNaN(m)) return '25 min antes';
+            let totalMinutes = h * 60 + m - advanceMin;
+            if (totalMinutes < 0) totalMinutes += 24 * 60;
+            const finalH = Math.floor(totalMinutes / 60) % 24;
+            const finalM = totalMinutes % 60;
+            return `${String(finalH).padStart(2, '0')}:${String(finalM).padStart(2, '0')}`;
+        }
+
+        function getEstimatedArrivalTime(timeStr, durMin = 20) {
+            if (!timeStr || !timeStr.includes(':')) return '--:--';
+            const parts = timeStr.split(':');
+            let h = parseInt(parts[0], 10);
+            let m = parseInt(parts[1], 10);
+            if (isNaN(h) || isNaN(m)) return '--:--';
+            let duration = parseInt(durMin, 10);
+            if (isNaN(duration) || duration <= 0) duration = 20;
+            let totalMinutes = h * 60 + m + duration;
+            const finalH = Math.floor(totalMinutes / 60) % 24;
+            const finalM = totalMinutes % 60;
+            return `${String(finalH).padStart(2, '0')}:${String(finalM).padStart(2, '0')}`;
+        }
+
         let htmlContent = '';
         Object.keys(groupedByDay).forEach(dayKey => {
             const dayItems = groupedByDay[dayKey];
@@ -1248,9 +1275,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const timeStr = b.time || b.pickupTime || '00:00';
                 const pInfo = formatDriverTripPriceDisplay(b);
 
-                // Cálculo y visualización destacada de distancia y duración (Estilo Cabify)
+                // Cálculo de distancia y duración
                 let distKmStr = '12.9 km';
                 let durMinStr = '28 min';
+                let rawDurMin = 28;
                 if (b.distanceKm && Number(b.distanceKm) > 0) {
                     distKmStr = `${Number(b.distanceKm).toFixed(1)} km`;
                 } else if (b.distancia) {
@@ -1260,25 +1288,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (b.durationMin && Number(b.durationMin) > 0) {
-                    durMinStr = `${Math.round(Number(b.durationMin))} min`;
+                    rawDurMin = Math.round(Number(b.durationMin));
+                    durMinStr = `${rawDurMin} min`;
                 } else if (b.duracion) {
                     durMinStr = String(b.duracion);
+                    rawDurMin = parseInt(durMinStr, 10) || 25;
                 } else if (b.duration) {
                     durMinStr = String(b.duration);
+                    rawDurMin = parseInt(durMinStr, 10) || 25;
                 } else {
                     const parsedKm = parseFloat(distKmStr.replace(',', '.')) || 12;
-                    durMinStr = `${Math.round(Math.max(15, parsedKm * 2.2))} min`;
+                    rawDurMin = Math.round(Math.max(15, parsedKm * 2.2));
+                    durMinStr = `${rawDurMin} min`;
                 }
 
-                // Formato de cabecera estilo Cabify
-                let dateBadgeCabify = dateStr;
+                const connectTimeStr = getAdvanceConnectionTime(timeStr, 25);
+                const estimatedArrivalStr = getEstimatedArrivalTime(timeStr, rawDurMin);
+
+                // Formato de cabecera con fecha y hora
+                let dateBadgeFormatted = dateStr;
                 if (dateStr && dateStr.includes('-')) {
                     const p = dateStr.split('-');
                     if (p.length === 3) {
                         const dObj = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
                         const mNames = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
                         const dNames = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
-                        dateBadgeCabify = `${dNames[dObj.getDay()]} ${p[2]}, ${timeStr}`;
+                        dateBadgeFormatted = `${dNames[dObj.getDay()]} ${p[2]} ${mNames[dObj.getMonth()]}, ${timeStr} hs`;
                     }
                 }
 
@@ -1286,64 +1321,95 @@ document.addEventListener('DOMContentLoaded', () => {
                 const conflictInfo = !isTomada ? tieneConflictoHorario45Min(b, tomadas) : { conflicto: false };
 
                 htmlContent += `
-                    <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''} ${conflictInfo.conflicto ? 'reserva-conflicto' : ''}" data-id="${b.id}" style="cursor: pointer;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span class="reserva-badge-rutaprivada">
-                                <i class="fa-solid fa-crown"></i> RESERVA RUTA PRIVADA
-                            </span>
+                    <div class="reserva-card ${isTomada ? 'reserva-tomada' : ''} ${conflictInfo.conflicto ? 'reserva-conflicto' : ''}" data-id="${b.id}" onclick="if (window.abrirModalDetalleReserva) window.abrirModalDetalleReserva('${b.id}')" style="cursor: pointer;">
+                        
+                        <!-- Header con Categoría y Rating estilo VIP -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="reserva-badge-rutaprivada" style="margin-bottom: 0;">
+                                    <i class="fa-solid fa-crown"></i> ${b.categoria || 'RESERVA VIP'}
+                                </span>
+                                <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fbbf24; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-star" style="font-size: 0.65rem;"></i> 4.95
+                                </span>
+                            </div>
                             <span class="reserva-status-tag ${isTomada ? 'tomada' : (conflictInfo.conflicto ? 'conflicto' : 'disponible')}">
                                 ${isTomada ? '✓ Agendada en tu Hoja' : (conflictInfo.conflicto ? '🔒 Conflicto Horario' : '⚡ Disponible')}
                             </span>
                         </div>
 
-                        <div class="reserva-header-row">
+                        <!-- Precio Principal y Horario Prominente -->
+                        <div class="reserva-header-row" style="margin-bottom: 12px; padding-bottom: 10px;">
                             <div class="reserva-datetime">
-                                <span class="reserva-date-pill">📅 ${dateBadgeCabify}</span>
-                                <div class="reserva-price-rp">
-                                    $ ${priceVal.toLocaleString('es-AR')} <small>en app · partner</small>
+                                <div class="reserva-price-rp" style="font-size: 1.6rem; color: #fbbf24;">
+                                    $ ${priceVal.toLocaleString('es-AR')}
                                 </div>
+                                <span style="font-size: 0.88rem; font-weight: 800; color: #f8fafc; margin-top: 2px;">
+                                    ${dateBadgeFormatted}
+                                </span>
+                                <span style="font-size: 0.72rem; color: #94a3b8;">Tarifa calculada garantizada · Partner VIP</span>
                             </div>
                         </div>
 
-                        <!-- Itinerario Visual Exclusivo RutaPrivada con Distancia y Duración -->
+                        <!-- Indicador de Hora de Conexión Recomendada (Inspiración Uber / RutaPrivada) -->
+                        <div class="reserva-connection-box" style="display: flex; align-items: center; justify-content: space-between; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 9px 12px; margin-bottom: 14px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fa-regular fa-clock text-gold" style="font-size: 1.15rem;"></i>
+                                <div>
+                                    <div style="font-size: 0.78rem; font-weight: 800; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.4px;">Hora de conexión</div>
+                                    <div style="font-size: 0.72rem; color: #cbd5e1;">Preséntate 25 min antes para no afectar tu acceso</div>
+                                </div>
+                            </div>
+                            <div style="font-size: 1rem; font-weight: 900; color: #fef08a; letter-spacing: -0.3px;">
+                                ${connectTimeStr} hs
+                            </div>
+                        </div>
+
+                        <!-- Itinerario Visual de Ruta con Tiempos Estimados -->
                         <div class="reserva-route-timeline">
                             <div class="reserva-timeline-step">
                                 <div class="reserva-timeline-dot"></div>
-                                <strong>${timeStr} h</strong>
-                                <span>${pickupAddr}</span>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                    <strong>${pickupAddr}</strong>
+                                    <span style="color: #10b981; font-weight: 800; font-size: 0.82rem; margin-left: 8px;">${timeStr} hs</span>
+                                </div>
+                                <span>Punto de partida programado</span>
                             </div>
 
-                            <div class="reserva-distance-duration-bar">
-                                <i class="fa-solid fa-bolt text-gold"></i> ${durMinStr} &nbsp;·&nbsp; <i class="fa-solid fa-road text-gold"></i> ${distKmStr}
+                            <div class="reserva-distance-duration-bar" style="margin: 6px 0;">
+                                <i class="fa-solid fa-bolt text-gold"></i> Viaje de ${durMinStr} (${distKmStr})
                             </div>
 
                             <div class="reserva-timeline-step">
                                 <div class="reserva-timeline-dot dest"></div>
-                                <strong>Destino</strong>
-                                <span>${dropoffAddr}</span>
+                                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                    <strong>${dropoffAddr}</strong>
+                                    <span style="color: #fbbf24; font-weight: 800; font-size: 0.82rem; margin-left: 8px;">${estimatedArrivalStr} hs</span>
+                                </div>
+                                <span>Destino final estimado</span>
                             </div>
                         </div>
 
-                        <div class="reserva-meta-grid">
-                            <div class="reserva-meta-item">
-                                <span class="m-title">Pasajero</span>
-                                <span class="m-val" style="display: flex; align-items: center; gap: 4px;">
-                                    <i class="fa-solid fa-user-shield text-sky" style="font-size: 0.75rem;"></i> ${clientName}
-                                </span>
+                        <!-- Bloque Informativo 'Lo que debes saber' -->
+                        <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.76rem; color: #cbd5e1;">
+                            <div style="font-weight: 800; color: #e2e8f0; margin-bottom: 6px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px;">
+                                <i class="fa-solid fa-shield-halved text-gold"></i> Lo que debes saber
                             </div>
-                            <div class="reserva-meta-item">
-                                <span class="m-title">${pInfo.isCard ? 'Ganancia (Tarjeta)' : 'Total a Cobrar'}</span>
-                                <span class="m-val text-gold">${pInfo.displayHeroFormatted}</span>
-                            </div>
-                            <div class="reserva-meta-item">
-                                <span class="m-title">Pago</span>
-                                <span class="m-val">${pInfo.payMethodLabel}</span>
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-check text-emerald" style="font-size: 0.7rem;"></i>
+                                    <span>Pasajero: <strong style="color: #fff;">${clientName}</strong> · Pago: <strong style="color: #34d399;">${pInfo.payMethodLabel}</strong></span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-check text-emerald" style="font-size: 0.7rem;"></i>
+                                    <span>Conéctate con antelación para asegurar la asignación del servicio.</span>
+                                </div>
                             </div>
                         </div>
 
-                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: #38bdf8; margin: 4px 0 10px; padding: 4px 8px; background: rgba(56, 189, 248, 0.08); border-radius: 6px;">
-                            <span><i class="fa-solid fa-map-location-dot"></i> Toca la tarjeta para ver mapa de ruta y desglose</span>
-                            <i class="fa-solid fa-chevron-right" style="font-size: 0.65rem;"></i>
+                        <div class="reserva-detail-hint" onclick="if (window.abrirModalDetalleReserva) { event.stopPropagation(); window.abrirModalDetalleReserva('${b.id}'); }" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.76rem; color: #38bdf8; margin: 4px 0 12px; padding: 7px 12px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 8px; cursor: pointer;">
+                            <span style="font-weight: 700;"><i class="fa-solid fa-map-location-dot"></i> Toca para ver ruta completa interactiva y desglose</span>
+                            <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem;"></i>
                         </div>
 
                         ${b.notes ? `
@@ -1381,8 +1447,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <i class="fa-solid fa-ban"></i> Solapamiento (&lt; 45 min de ${conflictInfo.horaTomada} hs)
                                 </button>
                             ` : `
-                                <button type="button" class="btn-tomar-reserva btn-aceptar-reserva-action" data-id="${b.id}">
-                                    <i class="fa-solid fa-check"></i> Aceptar reserva
+                                <button type="button" class="btn-tomar-reserva btn-aceptar-reserva-action" data-id="${b.id}" style="font-size: 0.95rem; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <i class="fa-solid fa-check"></i> Aceptar · $ ${priceVal.toLocaleString('es-AR')}
                                 </button>
                             `)}
                         </div>
@@ -1547,13 +1613,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 reservaDetailMapInstance.invalidateSize();
                 reservaDetailMapInstance.fitBounds(bounds, { padding: [25, 25] });
             }
-        }, 180);
+        }, 120);
+
+        setTimeout(() => {
+            if (reservaDetailMapInstance) {
+                reservaDetailMapInstance.invalidateSize();
+            }
+        }, 350);
     }
 
     function abrirModalDetalleReserva(resId) {
         const bookings = getStoredBookings();
-        const item = bookings.find(b => b.id === resId);
-        if (!item) return;
+        const item = bookings.find(b => String(b.id) === String(resId) || String(b.reservaId) === String(resId)) || {
+            id: resId,
+            pickupAddress: 'Punto de recogida',
+            dropoffAddress: 'Destino',
+            price: 35000,
+            date: 'Hoy',
+            time: '00:00'
+        };
 
         const modal = document.getElementById('modalDetalleReserva');
         if (!modal) return;
@@ -1578,11 +1656,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let distKmStr = '12.9 km';
         let durMinStr = '28 min';
+        let rawDurMin = 28;
         if (item.distanceKm && Number(item.distanceKm) > 0) distKmStr = `${Number(item.distanceKm).toFixed(1)} km`;
         else if (item.distancia) distKmStr = String(item.distancia);
 
-        if (item.durationMin && Number(item.durationMin) > 0) durMinStr = `${Math.round(Number(item.durationMin))} min`;
-        else if (item.duracion) durMinStr = String(item.duracion);
+        if (item.durationMin && Number(item.durationMin) > 0) {
+            rawDurMin = Math.round(Number(item.durationMin));
+            durMinStr = `${rawDurMin} min`;
+        } else if (item.duracion) {
+            durMinStr = String(item.duracion);
+            rawDurMin = parseInt(durMinStr, 10) || 25;
+        }
+
+        const connectTimeStr = getAdvanceConnectionTime(timeStr, 25);
+        const estimatedArrivalStr = getEstimatedArrivalTime(timeStr, rawDurMin);
 
         // Llenar campos del modal
         const elTitle = document.getElementById('resDetailHeaderTitle');
@@ -1603,9 +1690,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnStart = document.getElementById('btnResDetailStart');
         const btnChat = document.getElementById('btnResDetailChat');
 
+        // Nuevos elementos híbridos en el modal
+        const elConnectTime = document.getElementById('resDetailConnectTime');
+        const elOrigTime = document.getElementById('resDetailOriginTime');
+        const elDestTime = document.getElementById('resDetailDestTime');
+        const elRouteBannerTime = document.getElementById('resDetailRouteBannerTime');
+
         if (elTitle) elTitle.textContent = `Traslado VIP #${String(item.id || '').slice(-6)}`;
         if (elDate) elDate.textContent = `📅 ${dateStr} · ${timeStr} HS`;
         if (elPrice) elPrice.textContent = `$${priceVal.toLocaleString('es-AR')}`;
+        if (elConnectTime) elConnectTime.textContent = `${connectTimeStr} hs`;
+        if (elOrigTime) elOrigTime.textContent = `${timeStr} hs`;
+        if (elDestTime) elDestTime.textContent = `${estimatedArrivalStr} hs`;
+        if (elRouteBannerTime) elRouteBannerTime.textContent = `Viaje de ${durMinStr} (${distKmStr})`;
+
         if (elStatus) {
             elStatus.textContent = isTomada ? '✓ Agendada en tu Hoja' : '⚡ Disponible';
             elStatus.style.background = isTomada ? 'rgba(16, 185, 129, 0.2)' : 'rgba(56, 189, 248, 0.2)';
@@ -1649,6 +1747,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 btnAccept.classList.remove('hidden');
                 btnStart.classList.add('hidden');
+                btnAccept.innerHTML = `<i class="fa-solid fa-check"></i> Aceptar · $${priceVal.toLocaleString('es-AR')}`;
                 btnAccept.onclick = () => {
                     cerrarModalDetalleReserva();
                     aceptarReservaProgramada(item.id);
@@ -1664,14 +1763,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         modal.classList.add('active');
+        modal.style.display = 'flex';
         renderReservaDetailMap(item);
         playAlertSound('incoming');
     }
+    window.abrirModalDetalleReserva = abrirModalDetalleReserva;
 
     function cerrarModalDetalleReserva() {
         const modal = document.getElementById('modalDetalleReserva');
-        if (modal) modal.classList.remove('active');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+        }
     }
+    window.cerrarModalDetalleReserva = cerrarModalDetalleReserva;
 
     const btnCloseDetalleReserva = document.getElementById('btnCloseDetalleReserva');
     if (btnCloseDetalleReserva) {
@@ -4197,7 +4302,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const canvas = document.createElement('canvas');
                             let width = img.width;
                             let height = img.height;
-                            const maxDim = 1200; // Resolución nítida para documentos
+                            const maxDim = 900; // Resolución óptima y nítida para lectura de documentos
 
                             if (width > maxDim || height > maxDim) {
                                 if (width > height) {
@@ -4214,7 +4319,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(img, 0, 0, width, height);
 
-                            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+                            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
                             resolve({ type: 'image', name: file.name, data: compressedBase64 });
                         } catch(err) {
                             resolve({ type: 'image', name: file.name, data: e.target.result });

@@ -809,33 +809,48 @@
                 }
 
                 // B. Incorporar el Conductor Real Activo Local si ya ha registrado datos
-                if (activeDocs && activeDocs.nombre && !drivers.some(d => d.nombre === activeDocs.nombre || (d.dni && activeDocs.dni && d.dni === activeDocs.dni))) {
-                    drivers.unshift({
-                        id: 'drv_active_user',
-                        nombre: activeDocs.nombre || 'Conductor Registrado',
-                        dni: activeDocs.dni || 'S/D',
-                        telefono: activeDocs.telefono || 'Sin teléfono',
-                        autoMarcaModelo: activeDocs.autoMarcaModelo || 'Vehículo',
-                        patente: activeDocs.patente || 'S/P',
-                        color: activeDocs.color || 'Negro',
-                        categoria: activeDocs.categoria || 'Sedán Estándar',
-                        fotoPerfil: activeDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                        estadoVerificacion: activeDocs.estadoVerificacion || 'pendiente',
-                        isOnline: isOnlineLocal,
-                        banco: activeDocs.banco || 'Mercado Pago / Banco Galicia',
-                        cbu: activeDocs.cbu || 'Sin registrar',
-                        titularCuenta: activeDocs.titularCuenta || activeDocs.nombre || 'Sin registrar',
-                        docsImages: activeDocs.docsImages || {},
-                        observaciones: activeDocs.observaciones || '',
-                        updatedAt: activeDocs.updatedAt || Date.now()
-                    });
+                if (activeDocs && (activeDocs.nombre || activeDocs.dni || activeDocs.docsImages)) {
+                    const existingIdx = drivers.findIndex(d => (d.dni && activeDocs.dni && d.dni === activeDocs.dni) || (d.nombre && activeDocs.nombre && d.nombre === activeDocs.nombre));
+                    if (existingIdx >= 0) {
+                        drivers[existingIdx].docsImages = Object.assign({}, drivers[existingIdx].docsImages || {}, activeDocs.docsImages || {});
+                        if (activeDocs.fotoPerfil && !activeDocs.fotoPerfil.includes('unsplash.com')) {
+                            drivers[existingIdx].fotoPerfil = activeDocs.fotoPerfil;
+                        }
+                        if (activeDocs.banco) drivers[existingIdx].banco = activeDocs.banco;
+                        if (activeDocs.cbu) drivers[existingIdx].cbu = activeDocs.cbu;
+                        if (activeDocs.titularCuenta) drivers[existingIdx].titularCuenta = activeDocs.titularCuenta;
+                        if (activeDocs.estadoVerificacion) drivers[existingIdx].estadoVerificacion = activeDocs.estadoVerificacion;
+                    } else {
+                        drivers.unshift({
+                            id: 'drv_active_user',
+                            nombre: activeDocs.nombre || 'Conductor Registrado',
+                            dni: activeDocs.dni || 'S/D',
+                            telefono: activeDocs.telefono || 'Sin teléfono',
+                            autoMarcaModelo: activeDocs.autoMarcaModelo || 'Vehículo',
+                            patente: activeDocs.patente || 'S/P',
+                            color: activeDocs.color || 'Negro',
+                            categoria: activeDocs.categoria || 'Sedán Estándar',
+                            fotoPerfil: activeDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                            estadoVerificacion: activeDocs.estadoVerificacion || 'pendiente',
+                            isOnline: isOnlineLocal,
+                            banco: activeDocs.banco || 'Mercado Pago / Banco Galicia',
+                            cbu: activeDocs.cbu || 'Sin registrar',
+                            titularCuenta: activeDocs.titularCuenta || activeDocs.nombre || 'Sin registrar',
+                            docsImages: activeDocs.docsImages || {},
+                            observaciones: activeDocs.observaciones || '',
+                            updatedAt: activeDocs.updatedAt || Date.now()
+                        });
+                    }
                 }
 
                 // C. Agregar otros conductores almacenados localmente
                 if (Array.isArray(storedDrivers) && storedDrivers.length > 0) {
                     storedDrivers.forEach(d => {
                         const driverName = d.nombre || d.name;
-                        if (driverName && !drivers.some(ex => ex.nombre === driverName || ex.id === d.id)) {
+                        const existingIdx = drivers.findIndex(ex => (ex.nombre && driverName && ex.nombre === driverName) || (ex.id && d.id && ex.id === d.id));
+                        if (existingIdx >= 0) {
+                            drivers[existingIdx].docsImages = Object.assign({}, drivers[existingIdx].docsImages || {}, d.docsImages || {});
+                        } else if (driverName) {
                             drivers.push({
                                 id: d.id || ('drv_' + Math.random().toString(36).substr(2, 6)),
                                 nombre: driverName || 'Conductor Flota',
@@ -1010,20 +1025,30 @@
             const btnRejectDriverMaster = document.getElementById('btnRejectDriverMaster');
 
             function openDocReviewModal(driverId) {
-                const driver = currentDrivers.find(d => d.id === driverId) || currentDrivers[0];
+                const driver = currentDrivers.find(d => d.id === driverId) || currentDrivers[0] || {};
                 activeReviewDriver = driver;
 
-                revDriverAvatar.src = driver.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
-                revDriverName.textContent = driver.nombre || 'Conductor';
-                revDriverPhone.innerHTML = `<i class="fa-solid fa-phone"></i> ${driver.telefono || 'Sin teléfono'}`;
-                revDriverVehicle.innerHTML = `<i class="fa-solid fa-car"></i> ${driver.autoMarcaModelo || 'Vehículo'} (${driver.color || ''})`;
-                revDriverPlate.textContent = driver.patente || 'AE927CN';
+                // Cargar también datos locales frescos por si se acaban de guardar
+                let localFreshDocs = {};
+                try {
+                    const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
+                    if (raw) localFreshDocs = JSON.parse(raw);
+                } catch(e) {}
 
-                revBankName.textContent = driver.banco || 'Mercado Pago / Banco Galicia';
-                revBankCbu.textContent = driver.cbu || '0000003100084592039481';
-                revBankHolder.textContent = driver.titularCuenta || driver.nombre || 'Sin registrar';
+                revDriverAvatar.src = driver.fotoPerfil || localFreshDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+                revDriverName.textContent = driver.nombre || localFreshDocs.nombre || 'Conductor';
+                revDriverPhone.innerHTML = `<i class="fa-solid fa-phone"></i> ${driver.telefono || localFreshDocs.telefono || 'Sin teléfono'}`;
+                revDriverVehicle.innerHTML = `<i class="fa-solid fa-car"></i> ${driver.autoMarcaModelo || localFreshDocs.autoMarcaModelo || 'Vehículo'} (${driver.color || localFreshDocs.color || ''})`;
+                revDriverPlate.textContent = driver.patente || localFreshDocs.patente || 'AE927CN';
 
-                const isMatch = (driver.titularCuenta || '').toLowerCase().trim() === (driver.nombre || '').toLowerCase().trim();
+                revBankName.textContent = driver.banco || localFreshDocs.banco || 'Mercado Pago / Banco Galicia';
+                revBankCbu.textContent = driver.cbu || localFreshDocs.cbu || '0000003100084592039481';
+                revBankHolder.textContent = driver.titularCuenta || localFreshDocs.titularCuenta || driver.nombre || 'Sin registrar';
+
+                const holderName = (driver.titularCuenta || localFreshDocs.titularCuenta || '').toLowerCase().trim();
+                const dName = (driver.nombre || localFreshDocs.nombre || '').toLowerCase().trim();
+                const isMatch = holderName && dName && (holderName === dName || holderName.includes(dName) || dName.includes(holderName));
+
                 if (isMatch) {
                     bankMatchStatusBadge.className = 'badge-status aprobado';
                     bankMatchStatusBadge.textContent = '✓ Titular Coincide Exactamente';
@@ -1032,22 +1057,33 @@
                     bankMatchStatusBadge.textContent = '⚠️ Verificar Nombre del Titular';
                 }
 
-                revAdminNotes.value = driver.observaciones || '';
+                revAdminNotes.value = driver.observaciones || localFreshDocs.observaciones || '';
 
-                // Extraer imágenes y documentos reales cargados por el conductor
+                // Extraer imágenes y documentos buscando en todos los orígenes posibles
                 const userImgs = driver.docsImages || {};
+                const localImgs = localFreshDocs.docsImages || {};
+
+                function resolveDoc(keys) {
+                    for (const k of keys) {
+                        if (userImgs[k] && typeof userImgs[k] === 'string' && userImgs[k].length > 20) return userImgs[k];
+                        if (localImgs[k] && typeof localImgs[k] === 'string' && localImgs[k].length > 20) return localImgs[k];
+                        if (driver[k] && typeof driver[k] === 'string' && driver[k].length > 20) return driver[k];
+                        if (localFreshDocs[k] && typeof localFreshDocs[k] === 'string' && localFreshDocs[k].length > 20) return localFreshDocs[k];
+                    }
+                    return '';
+                }
 
                 // Generar los documentos de revisión con soporte para Frente/Dorso y PDFs
                 const docItems = [
-                    { title: '1. DNI Frente', key: 'dni_frente', altKey: 'dni', data: userImgs.dni_frente || userImgs.dni || '' },
-                    { title: '1. DNI Dorso', key: 'dni_dorso', data: userImgs.dni_dorso || '' },
-                    { title: '2. Licencia Frente', key: 'licencia_frente', altKey: 'licencia', data: userImgs.licencia_frente || userImgs.licencia || '' },
-                    { title: '2. Licencia Dorso', key: 'licencia_dorso', data: userImgs.licencia_dorso || '' },
-                    { title: '3. Seguro del Auto (Póliza)', key: 'seguro', data: userImgs.seguro || '' },
-                    { title: '4. Cédula Frente', key: 'cedula_frente', altKey: 'cedula', data: userImgs.cedula_frente || userImgs.cedula || '' },
-                    { title: '4. Cédula Dorso', key: 'cedula_dorso', data: userImgs.cedula_dorso || '' },
-                    { title: '5. Antecedentes Penales', key: 'antecedentes', data: userImgs.antecedentes || '' },
-                    { title: '6. Foto de Perfil', key: 'foto', data: userImgs.foto || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com') ? driver.fotoPerfil : '') }
+                    { title: '1. DNI Frente', key: 'dni_frente', data: resolveDoc(['dni_frente', 'dni', 'fileDniFrente', 'dniFrente']) },
+                    { title: '1. DNI Dorso', key: 'dni_dorso', data: resolveDoc(['dni_dorso', 'fileDniDorso', 'dniDorso']) },
+                    { title: '2. Licencia Frente', key: 'licencia_frente', data: resolveDoc(['licencia_frente', 'licencia', 'fileLicenciaFrente', 'licenciaFrente']) },
+                    { title: '2. Licencia Dorso', key: 'licencia_dorso', data: resolveDoc(['licencia_dorso', 'fileLicenciaDorso', 'licenciaDorso']) },
+                    { title: '3. Seguro del Auto (Póliza)', key: 'seguro', data: resolveDoc(['seguro', 'fileSeguro', 'poliza']) },
+                    { title: '4. Cédula Frente', key: 'cedula_frente', data: resolveDoc(['cedula_frente', 'cedula', 'fileCedulaFrente', 'cedulaFrente']) },
+                    { title: '4. Cédula Dorso', key: 'cedula_dorso', data: resolveDoc(['cedula_dorso', 'fileCedulaDorso', 'cedulaDorso']) },
+                    { title: '5. Antecedentes Penales', key: 'antecedentes', data: resolveDoc(['antecedentes', 'fileAntecedentes']) },
+                    { title: '6. Foto de Perfil', key: 'foto', data: resolveDoc(['foto', 'fotoPerfil', 'fileFotoPerfil']) || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com') ? driver.fotoPerfil : '') }
                 ];
 
                 docsReviewGrid.innerHTML = docItems.map((item, idx) => {

@@ -1096,24 +1096,9 @@ let stopMarker = null;
 let routePolyline = null;
 
 // ==========================================
-function initializePassengerApp() {
-  try { initDateTimeControls(); } catch (e) { console.error('Error initDateTimeControls:', e); }
-  try { initMap(); } catch (e) { console.error('Error initMap:', e); }
-  try { initEventListeners(); } catch (e) { console.error('Error initEventListeners:', e); }
-  try { initRatingSystem(); } catch (e) { console.error('Error initRatingSystem:', e); }
-  try { setupModalDismissals(); } catch (e) { console.error('Error setupModalDismissals:', e); }
-  try { loadConfigToModal(); } catch (e) { console.error('Error loadConfigToModal:', e); }
-  try { fetchRealtimeWeather(); } catch (e) { console.error('Error fetchRealtimeWeather:', e); }
-  try { updateCalculation(); } catch (e) { console.error('Error updateCalculation:', e); }
-  try { initPwa(); } catch (e) { console.error('Error initPwa:', e); }
-  try { goToWizardStep(1); } catch (e) { console.error('Error goToWizardStep(1):', e); }
-}
+// 3. INICIALIZACIÓN PRINCIPAL (SE EJECUTA AL FINAL DEL ARCHIVO TRAS DEFINIR TODAS LAS FUNCIONES)
+// ==========================================
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializePassengerApp);
-} else {
-  initializePassengerApp();
-}
 
 function loadConfig() {
   try {
@@ -7953,6 +7938,8 @@ if (btnRecenterPassengerMap) {
             <span style="color: #94a3b8; font-size: 0.75rem;">${res.categoria || 'Sedán Ejecutivo'}</span>
           </div>
 
+          ${(!isCancelled && !isCompleted) ? `
+          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
             <button type="button" class="btn-passenger-support-res" data-id="${res.id}" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
               <i class="fa-solid fa-headset"></i> Soporte Central
             </button>
@@ -8239,20 +8226,34 @@ if (btnRecenterPassengerMap) {
     };
   }
 
-  // Inicializar al cargar
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      initPassengerProfileModule();
-      initPassengerSosModule();
-      setupAndroidBackButtonHandler();
-      checkAndRestoreActiveTripOnStartup();
-    });
-  } else {
-    initPassengerProfileModule();
-    initPassengerSosModule();
-    setupAndroidBackButtonHandler();
-    checkAndRestoreActiveTripOnStartup();
+  // ==========================================
+  // INICIALIZACIÓN GENERAL COMPLETA DE LA APP DEL PASAJERO
+  // ==========================================
+  function startPassengerApplication() {
+    try { initDateTimeControls(); } catch (e) { console.warn('DateTime controls:', e); }
+    try { initCustomCalendar(); } catch (e) { console.warn('Custom calendar:', e); }
+    try { initMap(); } catch (e) { console.warn('Map init:', e); }
+    try { initEventListeners(); } catch (e) { console.warn('Event listeners:', e); }
+    try { initRatingSystem(); } catch (e) { console.warn('Rating system:', e); }
+    try { setupModalDismissals(); } catch (e) { console.warn('Modal dismissals:', e); }
+    try { loadConfigToModal(); } catch (e) { console.warn('Config modal:', e); }
+    try { initPassengerProfileModule(); } catch (e) { console.warn('Passenger profile:', e); }
+    try { initPassengerSosModule(); } catch (e) { console.warn('Passenger SOS:', e); }
+    try { setupAndroidBackButtonHandler(); } catch (e) { console.warn('Back button:', e); }
+    try { checkAndRestoreActiveTripOnStartup(); } catch (e) { console.warn('Restore active trip:', e); }
+    try { fetchRealtimeWeather(); } catch (e) { console.warn('Weather fetch:', e); }
+    try { updateCalculation(); } catch (e) { console.warn('Calculation:', e); }
+    try { initPwa(); } catch (e) { console.warn('PWA init:', e); }
+    try { goToWizardStep(1); } catch (e) { console.warn('Wizard step 1:', e); }
   }
+
+  // Inicializar al cargar el DOM o inmediatamente si ya cargó
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startPassengerApplication);
+  } else {
+    startPassengerApplication();
+  }
+
 
 
 
