@@ -866,10 +866,42 @@
 
                 let combined = [...cloudRechargesList];
                 localRecharges.forEach(loc => {
-                    if (!combined.some(c => c.id === loc.id || (c.comprobante && loc.comprobante && c.comprobante === loc.comprobante))) {
+                    if (!combined.some(c => c.id === loc.id || (c.comprobante && loc.comprobante && String(c.comprobante) === String(loc.comprobante)))) {
                         combined.push(loc);
                     }
                 });
+
+                // Extraer también recargas registradas en la billetera local (ej: prueba de chofer en vivo)
+                try {
+                    const rawWallet = localStorage.getItem('rutaprivada_driver_wallet_v1');
+                    if (rawWallet) {
+                        const wallet = JSON.parse(rawWallet);
+                        if (Array.isArray(wallet.movimientos)) {
+                            let activeDriverDocs = {};
+                            try { activeDriverDocs = JSON.parse(localStorage.getItem('rutaprivada_driver_docs_v1') || '{}'); } catch(e){}
+                            
+                            wallet.movimientos.forEach(m => {
+                                if (m.tipo === 'recarga_pendiente' || m.estado === 'en_conciliacion' || (m.comprobante && Number(m.monto || 0) > 0)) {
+                                    const refNum = String(m.comprobante || '').replace(/\D/g, '') || m.comprobante;
+                                    if (!combined.some(c => (c.comprobante && refNum && String(c.comprobante).includes(refNum)) || (c.id && m.id && c.id === m.id))) {
+                                        combined.unshift({
+                                            id: m.id || ('rec_' + Date.now()),
+                                            driverName: activeDriverDocs.nombre || 'Daniel Pabon',
+                                            driverDni: activeDriverDocs.dni || '96180823',
+                                            driverPatente: activeDriverDocs.patente || 'AE927CN',
+                                            monto: Number(m.monto || 1000),
+                                            comprobante: m.comprobante || '3170274687',
+                                            fecha: m.fecha || 'Hoy',
+                                            hora: m.hora || '',
+                                            estado: (m.estado === 'acreditado' || m.estado === 'aprobado') ? 'aprobado' : 'pendiente',
+                                            timestamp: Date.now()
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                    }
+                } catch(e) {}
 
                 combined.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
                 
@@ -941,10 +973,10 @@
                             <td style="text-align: right;">
                                 ${isPending ? `
                                     <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                        <button class="admin-btn btn-approve-recharge" data-id="${r.id}" data-amount="${r.monto}" data-dni="${r.driverDni}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; padding: 6px 12px; font-size: 0.78rem;">
+                                        <button class="admin-btn btn-approve-recharge" data-id="${r.id}" data-amount="${r.monto}" data-dni="${r.driverDni}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; padding: 6px 12px; font-size: 0.78rem; cursor: pointer;">
                                             <i class="fa-solid fa-check"></i> Aprobar & Acreditar
                                         </button>
-                                        <button class="admin-btn btn-reject-recharge" data-id="${r.id}" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4); padding: 6px 12px; font-size: 0.78rem;">
+                                        <button class="admin-btn btn-reject-recharge" data-id="${r.id}" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4); padding: 6px 12px; font-size: 0.78rem; cursor: pointer;">
                                             <i class="fa-solid fa-xmark"></i> Rechazar
                                         </button>
                                     </div>
@@ -958,7 +990,8 @@
 
                 // Wire action buttons
                 document.querySelectorAll('.btn-approve-recharge').forEach(btn => {
-                    btn.addEventListener('click', () => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
                         const id = btn.getAttribute('data-id');
                         const amount = btn.getAttribute('data-amount');
                         const dni = btn.getAttribute('data-dni');
@@ -967,7 +1000,8 @@
                 });
 
                 document.querySelectorAll('.btn-reject-recharge').forEach(btn => {
-                    btn.addEventListener('click', () => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
                         const id = btn.getAttribute('data-id');
                         processRechargeDecision(id, 'rechazado');
                     });
@@ -999,7 +1033,27 @@
                     }
                 } catch(e){}
 
-                // 3. Emitir evento por bus sync
+                // 3. Actualizar también la billetera local del conductor
+                try {
+                    const rawWallet = localStorage.getItem('rutaprivada_driver_wallet_v1');
+                    if (rawWallet) {
+                        const wallet = JSON.parse(rawWallet);
+                        if (decision === 'aprobado') {
+                            wallet.balance += Number(amount || 0);
+                            wallet.totalRecargas = (wallet.totalRecargas || 0) + Number(amount || 0);
+                        }
+                        if (Array.isArray(wallet.movimientos)) {
+                            const mIdx = wallet.movimientos.findIndex(m => m.id === rechargeId || (m.tipo === 'recarga_pendiente' && m.estado === 'en_conciliacion'));
+                            if (mIdx >= 0) {
+                                wallet.movimientos[mIdx].estado = decision === 'aprobado' ? 'acreditado' : 'rechazado';
+                                wallet.movimientos[mIdx].tipo = 'recarga';
+                            }
+                        }
+                        localStorage.setItem('rutaprivada_driver_wallet_v1', JSON.stringify(wallet));
+                    }
+                } catch(e){}
+
+                // 4. Emitir evento por bus sync
                 if (window.RutaSync) {
                     window.RutaSync.emit('RECARGA_SALDO_PROCESADA', {
                         rechargeId,
@@ -1010,6 +1064,7 @@
                     });
                 }
 
+                window.dispatchEvent(new Event('storage'));
                 alert(decision === 'aprobado' ? `✅ ¡Recarga de $${Number(amount).toLocaleString('es-AR')} Aprobada!\nEl saldo se ha acreditado automáticamente en la billetera del chofer.` : `❌ Recarga rechazada.`);
                 loadRechargesData();
             }
@@ -1062,7 +1117,7 @@
 
                 // B. Incorporar el Conductor Real Activo Local si ya ha registrado datos
                 if (activeDocs && (activeDocs.nombre || activeDocs.dni || activeDocs.docsImages)) {
-                    const existingIdx = drivers.findIndex(d => (d.dni && activeDocs.dni && d.dni === activeDocs.dni) || (d.nombre && activeDocs.nombre && d.nombre === activeDocs.nombre));
+                    const existingIdx = drivers.findIndex(d => (d.dni && activeDocs.dni && String(d.dni) === String(activeDocs.dni)) || (d.nombre && activeDocs.nombre && d.nombre.toLowerCase().trim() === activeDocs.nombre.toLowerCase().trim()));
                     if (existingIdx >= 0) {
                         drivers[existingIdx].docsImages = Object.assign({}, drivers[existingIdx].docsImages || {}, activeDocs.docsImages || {});
                         if (activeDocs.fotoPerfil && !activeDocs.fotoPerfil.includes('unsplash.com')) {
@@ -1198,7 +1253,7 @@
                     const holderMatch = (d.titularCuenta || '').toLowerCase() === (d.nombre || '').toLowerCase();
 
                     return `
-                        <tr>
+                        <tr style="cursor: pointer;" onclick="window.openDocReviewModal('${d.id}')">
                             <td>
                                 <div class="driver-user-cell">
                                     <img src="${d.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}" class="driver-avatar">
@@ -1233,7 +1288,7 @@
                                 </span>
                             </td>
                             <td style="text-align: right;">
-                                <button class="admin-btn btn-review-driver" onclick="window.openDocReviewModal('${d.id}')" data-id="${d.id}" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); cursor: pointer;">
+                                <button type="button" class="admin-btn btn-review-driver" onclick="event.stopPropagation(); window.openDocReviewModal('${d.id}');" data-id="${d.id}" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); cursor: pointer;">
                                     <i class="fa-solid fa-clipboard-check"></i> Revisar Documentación
                                 </button>
                             </td>
@@ -1280,7 +1335,13 @@
             const btnRejectDriverMaster = document.getElementById('btnRejectDriverMaster');
 
             function openDocReviewModal(driverId) {
-                const driver = currentDrivers.find(d => d.id === driverId) || currentDrivers[0] || {};
+                // Localizar el conductor buscando por ID, DNI o Nombre
+                const driver = currentDrivers.find(d => 
+                    String(d.id) === String(driverId) || 
+                    (d.dni && driverId && String(d.dni) === String(driverId)) ||
+                    (d.nombre && driverId && d.nombre.toLowerCase().trim() === String(driverId).toLowerCase().trim())
+                ) || currentDrivers[0] || {};
+                
                 activeReviewDriver = driver;
 
                 // Cargar también datos locales frescos por si se acaban de guardar
@@ -1290,29 +1351,31 @@
                     if (raw) localFreshDocs = JSON.parse(raw);
                 } catch(e) {}
 
-                revDriverAvatar.src = driver.fotoPerfil || localFreshDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
-                revDriverName.textContent = driver.nombre || localFreshDocs.nombre || 'Conductor';
-                revDriverPhone.innerHTML = `<i class="fa-solid fa-phone"></i> ${driver.telefono || localFreshDocs.telefono || 'Sin teléfono'}`;
-                revDriverVehicle.innerHTML = `<i class="fa-solid fa-car"></i> ${driver.autoMarcaModelo || localFreshDocs.autoMarcaModelo || 'Vehículo'} (${driver.color || localFreshDocs.color || ''})`;
-                revDriverPlate.textContent = driver.patente || localFreshDocs.patente || 'AE927CN';
+                if (revDriverAvatar) revDriverAvatar.src = driver.fotoPerfil || localFreshDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+                if (revDriverName) revDriverName.textContent = driver.nombre || localFreshDocs.nombre || 'Conductor';
+                if (revDriverPhone) revDriverPhone.innerHTML = `<i class="fa-solid fa-phone"></i> ${driver.telefono || localFreshDocs.telefono || 'Sin teléfono'}`;
+                if (revDriverVehicle) revDriverVehicle.innerHTML = `<i class="fa-solid fa-car"></i> ${driver.autoMarcaModelo || localFreshDocs.autoMarcaModelo || 'Vehículo'} (${driver.color || localFreshDocs.color || ''})`;
+                if (revDriverPlate) revDriverPlate.textContent = driver.patente || localFreshDocs.patente || 'AE927CN';
 
-                revBankName.textContent = driver.banco || localFreshDocs.banco || 'Mercado Pago / Banco Galicia';
-                revBankCbu.textContent = driver.cbu || localFreshDocs.cbu || '0000003100084592039481';
-                revBankHolder.textContent = driver.titularCuenta || localFreshDocs.titularCuenta || driver.nombre || 'Sin registrar';
+                if (revBankName) revBankName.textContent = driver.banco || localFreshDocs.banco || 'Mercado Pago / Banco Galicia';
+                if (revBankCbu) revBankCbu.textContent = driver.cbu || localFreshDocs.cbu || '0000003100084592039481';
+                if (revBankHolder) revBankHolder.textContent = driver.titularCuenta || localFreshDocs.titularCuenta || driver.nombre || 'Sin registrar';
 
                 const holderName = (driver.titularCuenta || localFreshDocs.titularCuenta || '').toLowerCase().trim();
                 const dName = (driver.nombre || localFreshDocs.nombre || '').toLowerCase().trim();
                 const isMatch = holderName && dName && (holderName === dName || holderName.includes(dName) || dName.includes(holderName));
 
-                if (isMatch) {
-                    bankMatchStatusBadge.className = 'badge-status aprobado';
-                    bankMatchStatusBadge.textContent = '✓ Titular Coincide Exactamente';
-                } else {
-                    bankMatchStatusBadge.className = 'badge-status pendiente';
-                    bankMatchStatusBadge.textContent = '⚠️ Verificar Nombre del Titular';
+                if (bankMatchStatusBadge) {
+                    if (isMatch) {
+                        bankMatchStatusBadge.className = 'badge-status aprobado';
+                        bankMatchStatusBadge.textContent = '✓ Titular Coincide Exactamente';
+                    } else {
+                        bankMatchStatusBadge.className = 'badge-status pendiente';
+                        bankMatchStatusBadge.textContent = '⚠️ Verificar Nombre del Titular';
+                    }
                 }
 
-                revAdminNotes.value = driver.observaciones || localFreshDocs.observaciones || '';
+                if (revAdminNotes) revAdminNotes.value = driver.observaciones || localFreshDocs.observaciones || '';
 
                 // Extraer imágenes y documentos buscando en todos los orígenes posibles
                 const userImgs = driver.docsImages || {};
@@ -1341,111 +1404,135 @@
                     { title: '6. Foto de Perfil', key: 'foto', data: resolveDoc(['foto', 'fotoPerfil', 'fileFotoPerfil']) || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com') ? driver.fotoPerfil : '') }
                 ];
 
-                docsReviewGrid.innerHTML = docItems.map((item, idx) => {
-                    const hasData = Boolean(item.data && item.data.length > 20);
-                    const isPdf = hasData && (item.data.startsWith('data:application/pdf') || item.data.includes('application/pdf') || item.data.includes('.pdf'));
+                if (docsReviewGrid) {
+                    docsReviewGrid.innerHTML = docItems.map((item, idx) => {
+                        const hasData = Boolean(item.data && item.data.length > 20);
+                        const isPdf = hasData && (item.data.startsWith('data:application/pdf') || item.data.includes('application/pdf') || item.data.includes('.pdf'));
 
-                    let contentHtml = '';
-                    if (isPdf) {
-                        contentHtml = `
-                            <div style="height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(2,132,199,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:8px; margin:10px 0; padding:10px; text-align:center;">
-                                <i class="fa-solid fa-file-pdf" style="font-size:2rem; color:#ef4444; margin-bottom:6px;"></i>
-                                <span style="font-size:0.75rem; color:#fff; font-weight:700;">Documento en PDF</span>
-                                <a href="${item.data}" target="_blank" download="${item.key}.pdf" style="margin-top:6px; background:#0284c7; color:#fff; padding:4px 10px; border-radius:6px; font-size:0.72rem; text-decoration:none; font-weight:700;">
-                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir / Ver PDF
-                                </a>
-                            </div>
-                        `;
-                    } else if (hasData) {
-                        contentHtml = `
-                            <img src="${item.data}" class="doc-preview-img zoomable-doc-img" data-src="${item.data}" title="Clic para ampliar imagen">
-                        `;
-                    } else {
-                        contentHtml = `
-                            <div style="height:120px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); border:1px dashed rgba(255,255,255,0.15); border-radius:8px; margin:10px 0; color:#94a3b8; font-size:0.8rem;">
-                                <i class="fa-solid fa-file-circle-xmark" style="margin-right:6px;"></i> No adjuntado aún
-                            </div>
-                        `;
-                    }
-
-                    return `
-                        <div class="doc-review-card" id="docCard_${idx}">
-                            <div>
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <strong style="font-size: 0.8rem; color: #e2e8f0;">${item.title}</strong>
-                                    ${hasData ? '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(16,185,129,0.2); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✓ Adjuntado</span>' : '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(239,68,68,0.2); color: #fca5a5; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✕ Sin Archivo</span>'}
+                        let contentHtml = '';
+                        if (isPdf) {
+                            contentHtml = `
+                                <div style="height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(2,132,199,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:8px; margin:10px 0; padding:10px; text-align:center;">
+                                    <i class="fa-solid fa-file-pdf" style="font-size:2rem; color:#ef4444; margin-bottom:6px;"></i>
+                                    <span style="font-size:0.75rem; color:#fff; font-weight:700;">Documento en PDF</span>
+                                    <a href="${item.data}" target="_blank" download="${item.key}.pdf" style="margin-top:6px; background:#0284c7; color:#fff; padding:4px 10px; border-radius:6px; font-size:0.72rem; text-decoration:none; font-weight:700;">
+                                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir / Ver PDF
+                                    </a>
                                 </div>
-                                ${contentHtml}
+                            `;
+                        } else if (hasData) {
+                            contentHtml = `
+                                <img src="${item.data}" class="doc-preview-img zoomable-doc-img" data-src="${item.data}" title="Clic para ampliar imagen">
+                            `;
+                        } else {
+                            contentHtml = `
+                                <div style="height:120px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); border:1px dashed rgba(255,255,255,0.15); border-radius:8px; margin:10px 0; color:#94a3b8; font-size:0.8rem;">
+                                    <i class="fa-solid fa-file-circle-xmark" style="margin-right:6px;"></i> No adjuntado aún
+                                </div>
+                            `;
+                        }
+
+                        return `
+                            <div class="doc-review-card" id="docCard_${idx}">
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <strong style="font-size: 0.8rem; color: #e2e8f0;">${item.title}</strong>
+                                        ${hasData ? '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(16,185,129,0.2); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✓ Adjuntado</span>' : '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(239,68,68,0.2); color: #fca5a5; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✕ Sin Archivo</span>'}
+                                    </div>
+                                    ${contentHtml}
+                                </div>
+                                <div style="display: flex; gap: 8px; margin-top: 6px;">
+                                    <button type="button" class="admin-btn btn-doc-approve" data-index="${idx}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">
+                                        <i class="fa-solid fa-check"></i> Válido
+                                    </button>
+                                    <button type="button" class="admin-btn btn-doc-reject" data-index="${idx}" data-title="${item.title}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(239,68,68,0.2); color:#f87171; border-color:rgba(239,68,68,0.4);">
+                                        <i class="fa-solid fa-xmark"></i> Observar
+                                    </button>
+                                </div>
                             </div>
-                            <div style="display: flex; gap: 8px; margin-top: 6px;">
-                                <button type="button" class="admin-btn btn-doc-approve" data-index="${idx}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">
-                                    <i class="fa-solid fa-check"></i> Válido
-                                </button>
-                                <button type="button" class="admin-btn btn-doc-reject" data-index="${idx}" data-title="${item.title}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(239,68,68,0.2); color:#f87171; border-color:rgba(239,68,68,0.4);">
-                                    <i class="fa-solid fa-xmark"></i> Observar
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
+                        `;
+                    }).join('');
 
-                // Asignar listeners individuales de validación y observación
-                document.querySelectorAll('.btn-doc-approve').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const idx = btn.getAttribute('data-index');
-                        const card = document.getElementById(`docCard_${idx}`);
-                        if (card) {
-                            card.style.borderColor = '#10b981';
-                            card.style.background = 'rgba(16, 185, 129, 0.08)';
-                            const badge = card.querySelector('.doc-item-badge');
-                            if (badge) {
-                                badge.textContent = '✓ Verificado';
-                                badge.style.background = 'rgba(16, 185, 129, 0.3)';
-                                badge.style.color = '#34d399';
+                    // Asignar listeners individuales de validación y observación
+                    document.querySelectorAll('.btn-doc-approve').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const idx = btn.getAttribute('data-index');
+                            const card = document.getElementById(`docCard_${idx}`);
+                            if (card) {
+                                card.style.borderColor = '#10b981';
+                                card.style.background = 'rgba(16, 185, 129, 0.08)';
+                                const badge = card.querySelector('.doc-item-badge');
+                                if (badge) {
+                                    badge.textContent = '✓ Verificado';
+                                    badge.style.background = 'rgba(16, 185, 129, 0.3)';
+                                    badge.style.color = '#34d399';
+                                }
                             }
-                        }
+                        });
                     });
-                });
 
-                document.querySelectorAll('.btn-doc-reject').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const idx = btn.getAttribute('data-index');
-                        const docTitle = btn.getAttribute('data-title') || 'Documento';
-                        const card = document.getElementById(`docCard_${idx}`);
-                        if (card) {
-                            card.style.borderColor = '#ef4444';
-                            card.style.background = 'rgba(239, 68, 68, 0.08)';
-                            const badge = card.querySelector('.doc-item-badge');
-                            if (badge) {
-                                badge.textContent = '⚠️ Observado';
-                                badge.style.background = 'rgba(239, 68, 68, 0.3)';
-                                badge.style.color = '#f87171';
+                    document.querySelectorAll('.btn-doc-reject').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const idx = btn.getAttribute('data-index');
+                            const docTitle = btn.getAttribute('data-title') || 'Documento';
+                            const card = document.getElementById(`docCard_${idx}`);
+                            if (card) {
+                                card.style.borderColor = '#ef4444';
+                                card.style.background = 'rgba(239, 68, 68, 0.08)';
+                                const badge = card.querySelector('.doc-item-badge');
+                                if (badge) {
+                                    badge.textContent = '⚠️ Observado';
+                                    badge.style.background = 'rgba(239, 68, 68, 0.3)';
+                                    badge.style.color = '#f87171';
+                                }
                             }
-                        }
-                        const noteToAdd = `• Observación en ${docTitle}: `;
-                        if (!revAdminNotes.value.includes(noteToAdd)) {
-                            revAdminNotes.value += (revAdminNotes.value.trim() ? '\n' : '') + noteToAdd;
-                            revAdminNotes.focus();
-                        }
+                            const noteToAdd = `• Observación en ${docTitle}: `;
+                            if (!revAdminNotes.value.includes(noteToAdd)) {
+                                revAdminNotes.value += (revAdminNotes.value.trim() ? '\n' : '') + noteToAdd;
+                                revAdminNotes.focus();
+                            }
+                        });
                     });
-                });
 
-                // Listener para zoom de imágenes
-                document.querySelectorAll('.zoomable-doc-img').forEach(img => {
-                    img.addEventListener('click', () => {
-                        const src = img.getAttribute('data-src') || img.src;
-                        openImgZoomModal(src);
+                    // Listener para zoom de imágenes
+                    document.querySelectorAll('.zoomable-doc-img').forEach(img => {
+                        img.addEventListener('click', () => {
+                            const src = img.getAttribute('data-src') || img.src;
+                            openImgZoomModal(src);
+                        });
                     });
-                });
+                }
 
-                docReviewModalOverlay.classList.add('active');
+                if (docReviewModalOverlay) {
+                    docReviewModalOverlay.style.display = 'flex';
+                    docReviewModalOverlay.style.opacity = '1';
+                    docReviewModalOverlay.style.pointerEvents = 'auto';
+                    docReviewModalOverlay.style.zIndex = '99999';
+                    docReviewModalOverlay.classList.add('active');
+                }
             }
 
             window.openDocReviewModal = openDocReviewModal;
 
-            btnCloseDocReview.addEventListener('click', () => {
-                docReviewModalOverlay.classList.remove('active');
-            });
+            if (btnCloseDocReview) {
+                btnCloseDocReview.addEventListener('click', () => {
+                    if (docReviewModalOverlay) {
+                        docReviewModalOverlay.classList.remove('active');
+                        docReviewModalOverlay.style.display = 'none';
+                        docReviewModalOverlay.style.pointerEvents = 'none';
+                    }
+                });
+            }
+
+            if (docReviewModalOverlay) {
+                docReviewModalOverlay.addEventListener('click', (e) => {
+                    if (e.target === docReviewModalOverlay) {
+                        docReviewModalOverlay.classList.remove('active');
+                        docReviewModalOverlay.style.display = 'none';
+                        docReviewModalOverlay.style.pointerEvents = 'none';
+                    }
+                });
+            }
 
             // Zoom modal
             const imgZoomModalOverlay = document.getElementById('imgZoomModalOverlay');
@@ -1453,17 +1540,35 @@
             const btnCloseZoom = document.getElementById('btnCloseZoom');
 
             function openImgZoomModal(src) {
-                imgZoomElement.src = src;
-                imgZoomModalOverlay.classList.add('active');
+                if (imgZoomElement) imgZoomElement.src = src;
+                if (imgZoomModalOverlay) {
+                    imgZoomModalOverlay.style.display = 'flex';
+                    imgZoomModalOverlay.style.opacity = '1';
+                    imgZoomModalOverlay.style.pointerEvents = 'auto';
+                    imgZoomModalOverlay.style.zIndex = '999999';
+                    imgZoomModalOverlay.classList.add('active');
+                }
             }
 
-            btnCloseZoom.addEventListener('click', () => {
-                imgZoomModalOverlay.classList.remove('active');
-            });
+            if (btnCloseZoom) {
+                btnCloseZoom.addEventListener('click', () => {
+                    if (imgZoomModalOverlay) {
+                        imgZoomModalOverlay.classList.remove('active');
+                        imgZoomModalOverlay.style.display = 'none';
+                        imgZoomModalOverlay.style.pointerEvents = 'none';
+                    }
+                });
+            }
 
-            imgZoomModalOverlay.addEventListener('click', (e) => {
-                if (e.target === imgZoomModalOverlay) imgZoomModalOverlay.classList.remove('active');
-            });
+            if (imgZoomModalOverlay) {
+                imgZoomModalOverlay.addEventListener('click', (e) => {
+                    if (e.target === imgZoomModalOverlay) {
+                        imgZoomModalOverlay.classList.remove('active');
+                        imgZoomModalOverlay.style.display = 'none';
+                        imgZoomModalOverlay.style.pointerEvents = 'none';
+                    }
+                });
+            }
 
             // 6. ACCIONES MAESTRAS DE APROBACIÓN O RECHAZO
             function updateDriverStatus(newStatus) {
