@@ -583,6 +583,10 @@
                                 <input type="tel" id="docInputPhone" class="driver-form-input" placeholder="Ej. +54 9 11 2255-8226" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
                             </div>
                         </div>
+                        <div>
+                            <label style="font-size: 0.75rem; color: #94a3b8;"><i class="fa-solid fa-envelope"></i> Correo Electrónico (Para avisos, fechas de cobro y habilitación) *</label>
+                            <input type="email" id="docInputEmail" class="driver-form-input" placeholder="ejemplo@gmail.com" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                        </div>
                     </div>
                 </div>
 
@@ -1429,8 +1433,11 @@
     <!-- Leaflet JS for Maps -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+    <!-- PDF.js for ultra-compact document rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
     <!-- SCRIPTS -->
-    <script src="sync.js?v=70"></script>
-    <script src="conductor.js?v=70"></script>
+    <script src="sync.js?v=75"></script>
+    <script src="conductor.js?v=75"></script>
 </body>
 </html>

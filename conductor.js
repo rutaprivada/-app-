@@ -4248,6 +4248,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const docInputDriverName = document.getElementById('docInputDriverName');
         const docInputDniNum = document.getElementById('docInputDniNum');
         const docInputPhone = document.getElementById('docInputPhone');
+        const docInputEmail = document.getElementById('docInputEmail');
         const docInputVehicleModel = document.getElementById('docInputVehicleModel');
         const docInputPlate = document.getElementById('docInputPlate');
         const docInputColor = document.getElementById('docInputColor');
@@ -4274,6 +4275,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nombre: '',
                 dni: '',
                 telefono: '',
+                email: '',
                 autoMarcaModelo: '',
                 patente: '',
                 color: 'Negro',
@@ -4288,21 +4290,49 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
 
-        // Helper para comprimir imágenes de documentos antes de guardar en localStorage / Firestore (garantiza < 30KB por foto, 100% nítido)
+        // Helper para comprimir imágenes y PDFs de documentos antes de guardar en Firestore (garantiza < 30KB por archivo, 100% nítido)
         function readFileOrCompressImage(file) {
-            return new Promise((resolve, reject) => {
+            return new Promise(async (resolve, reject) => {
                 if (!file) return resolve(null);
                 
-                // Si es un archivo PDF, leer como DataURL
+                // 1. Si es un archivo PDF, convertir la 1ra página a imagen nítida de ~25KB usando PDF.js o Canvas
                 if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    try {
+                        if (typeof pdfjsLib !== 'undefined') {
+                            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                            const arrayBuffer = await file.arrayBuffer();
+                            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                            const page = await pdf.getPage(1);
+                            const viewport = page.getViewport({ scale: 1.0 });
+                            
+                            const maxDim = 640;
+                            const scale = maxDim / Math.max(viewport.width, viewport.height);
+                            const scaledViewport = page.getViewport({ scale: Math.min(scale, 1.5) });
+
+                            const canvas = document.createElement('canvas');
+                            canvas.width = scaledViewport.width;
+                            canvas.height = scaledViewport.height;
+                            const ctx = canvas.getContext('2d');
+
+                            await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.60);
+                            return resolve({ type: 'pdf', name: file.name, data: dataUrl });
+                        }
+                    } catch(pdfErr) {
+                        console.warn('PDF.js render fallback:', pdfErr);
+                    }
+
+                    // Fallback si no está PDF.js
                     const reader = new FileReader();
-                    reader.onload = (e) => resolve({ type: 'pdf', name: file.name, data: e.target.result });
+                    reader.onload = (e) => {
+                        resolve({ type: 'pdf', name: file.name, data: e.target.result });
+                    };
                     reader.onerror = (err) => reject(err);
                     reader.readAsDataURL(file);
                     return;
                 }
 
-                // Si es imagen, redimensionar usando Canvas para que pese ~25KB-35KB y quepa perfecto en Firestore y LocalStorage
+                // 2. Si es imagen, redimensionar usando Canvas para que pese ~25KB-35KB y quepa perfecto en Firestore y LocalStorage
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
@@ -4364,6 +4394,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (docInputDriverName) docInputDriverName.value = data.nombre || '';
             if (docInputDniNum) docInputDniNum.value = data.dni || '';
             if (docInputPhone) docInputPhone.value = data.telefono || '';
+            if (docInputEmail) docInputEmail.value = data.email || '';
             if (docInputVehicleModel) docInputVehicleModel.value = data.autoMarcaModelo || '';
             if (docInputPlate) docInputPlate.value = data.patente || '';
             if (docInputColor) docInputColor.value = data.color || 'Negro';
@@ -4516,7 +4547,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 badge.style.background = 'rgba(16, 185, 129, 0.2)';
                                 badge.style.color = '#34d399';
                             }
-                            // Guardado y sincronización automática inmediata
                             saveDocsData(loadDocsData().estadoVerificacion || 'pendiente');
                         }
                     } catch(err) {
@@ -4542,7 +4572,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                     badge.style.background = 'rgba(16, 185, 129, 0.2)';
                                     badge.style.color = '#34d399';
                                 }
-                                // Guardado y sincronización automática inmediata
                                 saveDocsData(loadDocsData().estadoVerificacion || 'pendiente');
                             }
                         } catch(err) {
@@ -4562,6 +4591,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nombre: docInputDriverName ? (docInputDriverName.value.trim() || current.nombre) : current.nombre,
                 dni: docInputDniNum ? (docInputDniNum.value.trim() || current.dni) : current.dni,
                 telefono: docInputPhone ? (docInputPhone.value.trim() || current.telefono) : current.telefono,
+                email: docInputEmail ? (docInputEmail.value.trim() || current.email || '') : (current.email || ''),
                 autoMarcaModelo: docInputVehicleModel ? (docInputVehicleModel.value.trim() || current.autoMarcaModelo) : current.autoMarcaModelo,
                 patente: docInputPlate ? (docInputPlate.value.trim() || current.patente) : current.patente,
                 color: docInputColor ? (docInputColor.value.trim() || current.color) : current.color,
@@ -4575,6 +4605,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatedAt: Date.now()
             };
 
+            const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '') || String(Date.now());
+            const docId = 'drv_' + cleanDni;
+            updatedDocs.id = docId;
+
             // 1. Guardar localmente
             try {
                 localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(updatedDocs));
@@ -4584,16 +4618,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // 2. Sincronizar en tiempo real con Firebase Cloud Firestore
-            const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '') || String(Date.now());
-            const docId = 'drv_' + cleanDni;
-            updatedDocs.id = docId;
-
             if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                 try {
                     const db = firebase.firestore();
                     db.collection('drivers').doc(docId).set({
                         ...updatedDocs,
-                        isOnline: driverState.isOnline,
+                        isOnline: !!driverState.isOnline,
+                        actualizadoEn: Date.now(),
                         timestamp: Date.now()
                     }, { merge: true }).catch(err => console.warn('Firestore driver sync warn:', err));
                 } catch(e) {
@@ -4601,15 +4632,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 3. Emitir evento por bus sync para recepción inmediata en Admin
+            // 3. Sincronizar vía RutaSync Multi-canal
             if (window.RutaSync) {
+                if (typeof window.RutaSync.guardarDocumentosConductor === 'function') {
+                    window.RutaSync.guardarDocumentosConductor(updatedDocs);
+                }
                 window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', updatedDocs);
             }
 
-            // 4. Actualizar lista en memoria
+            // 4. Actualizar lista de choferes local
             try {
                 let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
-                const idx = driversList.findIndex(d => (d.dni && updatedDocs.dni && d.dni === updatedDocs.dni) || d.nombre === updatedDocs.nombre);
+                const idx = driversList.findIndex(d => (d.dni && updatedDocs.dni && d.dni === updatedDocs.dni) || d.nombre === updatedDocs.nombre || d.id === docId);
                 if (idx >= 0) {
                     driversList[idx] = { ...driversList[idx], ...updatedDocs };
                 } else {
@@ -4793,38 +4827,51 @@ document.addEventListener('DOMContentLoaded', () => {
             window.RutaSync.on('ESTADO_CONDUCTOR_ACTUALIZADO', (data) => {
                 if (!data) return;
                 const localDocs = loadDocsData();
-                const cleanDniLocal = (localDocs.dni || '').replace(/\D/g, '');
-                const cleanDniIncoming = (data.dni || data.id || '').replace(/\D/g, '');
+                const cleanDniLocal = String(localDocs.dni || '').replace(/\D/g, '');
+                const cleanDniIncoming = String(data.dni || data.id || '').replace(/\D/g, '');
+                const nameLocal = (localDocs.nombre || '').trim().toLowerCase();
+                const nameIncoming = (data.nombre || '').trim().toLowerCase();
                 
-                // Si la actualización corresponde a este chofer o es global
-                if (!cleanDniIncoming || !cleanDniLocal || cleanDniIncoming === cleanDniLocal || data.id === 'driver_local' || data.id === ('drv_' + cleanDniLocal)) {
-                    const newStatus = data.estadoVerificacion || data.estado || 'aprobado';
-                    const prevStatus = localDocs.estadoVerificacion;
-                    localDocs.estadoVerificacion = newStatus;
-                    if (data.observaciones !== undefined) localDocs.observaciones = data.observaciones;
-                    
-                    try {
-                        localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
-                        window.dispatchEvent(new Event('storage'));
-                    } catch(e){}
-                    
-                    updateDocsStatusBanner(newStatus);
-                    renderDriverProfileInfo();
-                    
-                    if (newStatus === 'aprobado') {
-                        showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el Administrador!');
-                        try { playAlertSound('success'); } catch(e){}
-                        if (prevStatus !== 'aprobado') {
-                            alert('🎉 ¡ENHORABUENA!\n\nTu cuenta y documentación han sido APROBADAS por el Administrador de RutaPrivada.\n\nYa puedes presionar "ESTÁS EN LÍNEA" para conectarte y empezar a recibir viajes en tiempo real.');
-                        }
-                    } else if (newStatus === 'rechazado') {
-                        showDriverToast('⚠️ Tu documentación fue observada o rechazada.');
-                        if (driverState.isOnline) {
-                            setOnlineStatus(false);
-                        }
-                        if (prevStatus !== 'rechazado') {
-                            alert(`❌ DOCUMENTACIÓN OBSERVADA O RECHAZADA:\n\nEl Administrador ha indicado lo siguiente:\n\n"${data.observaciones || 'Documentación incompleta o ilegible'}"\n\nPor favor ingresa a tu perfil para corregir o subir nuevamente los documentos requeridos.`);
-                        }
+                // Verificación estricta de identidad: SOLO procesar si el mensaje va dirigido a este chofer específico
+                const isMatch = (cleanDniLocal && cleanDniIncoming && cleanDniLocal === cleanDniIncoming) ||
+                                (data.id && localDocs.id && data.id === localDocs.id) ||
+                                (data.id && cleanDniLocal && data.id === ('drv_' + cleanDniLocal)) ||
+                                (nameLocal && nameIncoming && nameLocal === nameIncoming && nameLocal.length > 3);
+                
+                if (!isMatch) {
+                    // Este evento es de otro chofer; no alterar el estado local ni emitir alertas
+                    return;
+                }
+
+                const newStatus = data.estadoVerificacion || data.estado || 'pendiente';
+                const prevStatus = localDocs.estadoVerificacion;
+                localDocs.estadoVerificacion = newStatus;
+                if (data.observaciones !== undefined) {
+                    localDocs.observaciones = data.observaciones;
+                }
+                
+                try {
+                    localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
+                    window.dispatchEvent(new Event('storage'));
+                } catch(e){}
+                
+                updateDocsStatusBanner(newStatus);
+                renderDriverProfileInfo();
+                
+                if (newStatus === 'aprobado') {
+                    showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el Administrador!');
+                    try { playAlertSound('success'); } catch(e){}
+                    if (prevStatus !== 'aprobado') {
+                        alert('🎉 ¡ENHORABUENA!\n\nTu cuenta y documentación han sido APROBADAS por el Administrador de RutaPrivada.\n\nYa puedes presionar "ESTÁS EN LÍNEA" para conectarte y empezar a recibir viajes en tiempo real.');
+                    }
+                } else if (newStatus === 'rechazado') {
+                    showDriverToast('⚠️ Tu documentación fue observada o rechazada.');
+                    if (driverState.isOnline) {
+                        setOnlineStatus(false);
+                    }
+                    if (prevStatus !== 'rechazado') {
+                        const obsText = data.observaciones ? `\n\nMotivo / Observaciones:\n${data.observaciones}` : '';
+                        alert(`❌ DOCUMENTACIÓN OBSERVADA O RECHAZADA:\n\nEl Administrador ha indicado lo siguiente:${obsText}\n\nPor favor ingresa a "Documentación", corrige o sube nuevamente los archivos observados y vuelve a enviarlos.`);
                     }
                 }
             });

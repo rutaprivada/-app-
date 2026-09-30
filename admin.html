@@ -647,21 +647,27 @@
     <div class="admin-modal-overlay" id="docReviewModalOverlay">
         <div class="admin-modal-card">
             <!-- Header Modal -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--admin-border); padding-bottom: 16px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--admin-border); padding-bottom: 16px; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
                 <div style="display: flex; gap: 14px; align-items: center;">
                     <img id="revDriverAvatar" src="" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover; border: 2px solid #fbbf24;">
                     <div>
                         <h2 id="revDriverName" style="font-family: 'Outfit', sans-serif; margin: 0; color: #fff; font-size: 1.4rem;">Nombre Conductor</h2>
-                        <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px; font-size: 0.82rem; color: #94a3b8;">
+                        <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px; font-size: 0.82rem; color: #94a3b8; flex-wrap: wrap;">
                             <span id="revDriverPhone"><i class="fa-solid fa-phone"></i> +54 9 11 ...</span>
+                            <span id="revDriverEmail" style="color: #38bdf8;"><i class="fa-solid fa-envelope"></i> email@ejemplo.com</span>
                             <span id="revDriverVehicle"><i class="fa-solid fa-car"></i> Fiat Cronos</span>
                             <span id="revDriverPlate" style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; font-family: monospace; color: #fff;">AE927CN</span>
                         </div>
                     </div>
                 </div>
-                <button id="btnCloseDocReview" style="background: transparent; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <a id="btnSendDriverEmail" href="#" target="_blank" class="admin-btn" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); font-size: 0.78rem; text-decoration: none; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-paper-plane"></i> Notificar por Email
+                    </a>
+                    <button id="btnCloseDocReview" style="background: transparent; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
             </div>
 
             <!-- SECCIÓN BANCARIA DESTACADA -->
