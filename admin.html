@@ -588,12 +588,20 @@
                     <i class="fa-solid fa-building-columns text-gold" style="font-size: 1.4rem;"></i>
                     <div>
                         <strong style="color: #fff; font-size: 1rem;">Conciliación Bancaria de Recargas</strong>
-                        <div style="font-size: 0.8rem; color: #94a3b8;">Verifica el ingreso de transferencias en tu cuenta/CBU y aprueba la acreditación del saldo al chofer con un clic.</div>
+                        <div style="font-size: 0.8rem; color: #94a3b8;">Historial completo de transferencias y aprobación de recargas de saldo a choferes.</div>
                     </div>
                 </div>
-                <button id="btnRefreshRecharges" class="admin-btn">
-                    <i class="fa-solid fa-rotate"></i> Actualizar Recargas
-                </button>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div class="filter-tabs" id="rechargeFilterTabs">
+                        <button class="filter-tab-btn recharge-tab-btn active" data-status="todos">Todos</button>
+                        <button class="filter-tab-btn recharge-tab-btn" data-status="pendiente">⏳ Pendientes</button>
+                        <button class="filter-tab-btn recharge-tab-btn" data-status="aprobado">✓ Aprobadas</button>
+                        <button class="filter-tab-btn recharge-tab-btn" data-status="rechazado">✕ Rechazadas</button>
+                    </div>
+                    <button id="btnRefreshRecharges" class="admin-btn">
+                        <i class="fa-solid fa-rotate"></i> Actualizar
+                    </button>
+                </div>
             </div>
 
             <section class="drivers-table-wrapper">
@@ -681,11 +689,18 @@
                 </p>
             </div>
 
-            <!-- GRID DE 7 DOCUMENTOS REQUERIDOS -->
-            <h4 style="color: #e2e8f0; margin-bottom: 12px; font-size: 0.95rem;"><i class="fa-solid fa-folder-open"></i> Documentación Adjunta de la Solicitud</h4>
+            <!-- GRID DE 9 DOCUMENTOS REQUERIDOS CON TRACKER -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <h4 style="color: #e2e8f0; margin: 0; font-size: 0.95rem;">
+                    <i class="fa-solid fa-folder-open"></i> Documentación Adjunta de la Solicitud (<span id="revDocValidCount" style="color:#fbbf24; font-weight:700;">0/9 Validados</span>)
+                </h4>
+                <button type="button" id="btnValidateAllDocs" class="admin-btn" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4); font-size: 0.78rem; padding: 5px 12px;">
+                    <i class="fa-solid fa-check-double"></i> Validar Todos los Archivos
+                </button>
+            </div>
             
             <div class="doc-review-grid" id="docsReviewGrid">
-                <!-- Generado por JS: DNI, Licencia, Seguro, Cédula, Antecedentes, Foto y Comprobante Bancario -->
+                <!-- Generado por JS: DNI, Licencia, Seguro, Cédula, Antecedentes y Foto -->
             </div>
 
             <!-- OBSERVACIONES Y ACCIONES DE APROBACIÓN -->
@@ -693,8 +708,14 @@
                 <label style="font-size: 0.8rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 6px;">Observaciones o Motivo de Rechazo (Opcional):</label>
                 <textarea id="revAdminNotes" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 10px; font-size: 0.85rem; resize: vertical; min-height: 60px;" placeholder="Ej: Licencia vencida o falta comprobante de CBU..."></textarea>
                 
+                <!-- BANNER DE BLOQUEO / VALIDACIÓN REQUERIDA -->
+                <div id="docApprovalWarningBanner" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; padding: 10px 14px; border-radius: 8px; font-size: 0.8rem; margin-top: 14px; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-lock" id="docApprovalWarningIcon" style="font-size: 1.1rem; color: #ef4444;"></i>
+                    <span id="docApprovalWarningText">Botón de Aprobación Bloqueado: Se requiere que los 9 documentos estén subidos y marcados como válidos para habilitar al chofer.</span>
+                </div>
+
                 <div style="display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap;">
-                    <button id="btnApproveDriverMaster" class="admin-btn admin-btn-primary" style="flex: 2; padding: 12px; justify-content: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;">
+                    <button id="btnApproveDriverMaster" class="admin-btn admin-btn-primary" disabled style="flex: 2; padding: 12px; justify-content: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; opacity: 0.4; cursor: not-allowed;">
                         <i class="fa-solid fa-user-check"></i> APROBAR CONDUCTOR & HABILITAR PARA OPERAR
                     </button>
                     <button id="btnRejectDriverMaster" class="admin-btn" style="flex: 1; padding: 12px; justify-content: center; background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4);">
@@ -728,6 +749,8 @@
             let cloudRechargesList = [];
             let cloudDriversList = [];
             let activeFilter = 'todos';
+            let activeRechargeFilter = 'todos';
+            let docValidationState = [];
 
             // Elementos DOM Principales
             const authModalOverlay = document.getElementById('authModalOverlay');
@@ -746,6 +769,7 @@
             const badgePendingRechargesCount = document.getElementById('badgePendingRechargesCount');
             const rechargesTableBody = document.getElementById('rechargesTableBody');
             const btnRefreshRecharges = document.getElementById('btnRefreshRecharges');
+            const rechargeFilterTabs = document.querySelectorAll('.recharge-tab-btn');
 
             // Elementos de Métricas Conductores
             const metricTotalDrivers = document.getElementById('metricTotalDrivers');
@@ -770,8 +794,13 @@
             const revBankCbu = document.getElementById('revBankCbu');
             const revBankHolder = document.getElementById('revBankHolder');
             const bankMatchStatusBadge = document.getElementById('bankMatchStatusBadge');
+            const revDocValidCount = document.getElementById('revDocValidCount');
+            const btnValidateAllDocs = document.getElementById('btnValidateAllDocs');
             const docsReviewGrid = document.getElementById('docsReviewGrid');
             const revAdminNotes = document.getElementById('revAdminNotes');
+            const docApprovalWarningBanner = document.getElementById('docApprovalWarningBanner');
+            const docApprovalWarningIcon = document.getElementById('docApprovalWarningIcon');
+            const docApprovalWarningText = document.getElementById('docApprovalWarningText');
             const btnApproveDriverMaster = document.getElementById('btnApproveDriverMaster');
             const btnRejectDriverMaster = document.getElementById('btnRejectDriverMaster');
 
@@ -787,7 +816,7 @@
                     if (sectionRechargesView) sectionRechargesView.style.display = 'block';
                     if (tabNavDrivers) tabNavDrivers.classList.remove('admin-btn-primary');
                     if (tabNavRecharges) tabNavRecharges.classList.add('admin-btn-primary');
-                    renderRechargesTable();
+                    loadRechargesData();
                 } else {
                     if (sectionDriversView) sectionDriversView.style.display = 'block';
                     if (sectionRechargesView) sectionRechargesView.style.display = 'none';
@@ -800,7 +829,17 @@
             if (tabNavDrivers) tabNavDrivers.addEventListener('click', () => switchAdminView('drivers'));
             if (tabNavRecharges) tabNavRecharges.addEventListener('click', () => switchAdminView('recharges'));
             if (cardMetricRecharges) cardMetricRecharges.addEventListener('click', () => switchAdminView('recharges'));
-            if (btnRefreshRecharges) btnRefreshRecharges.addEventListener('click', () => renderRechargesTable());
+            if (btnRefreshRecharges) btnRefreshRecharges.addEventListener('click', () => loadRechargesData());
+
+            // Filtros de Recargas
+            rechargeFilterTabs.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    rechargeFilterTabs.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    activeRechargeFilter = btn.getAttribute('data-status') || 'todos';
+                    loadRechargesData();
+                });
+            });
 
             // 1. AUTENTICACIÓN
             function checkAuth() {
@@ -869,6 +908,9 @@
                                     }
                                 });
                                 loadDriversData();
+                                if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
+                                    openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
+                                }
                             }, (err) => console.warn('Firestore admin listener warning:', err));
 
                             // Escuchar Recargas de Saldo en tiempo real
@@ -916,8 +958,15 @@
                     }
                 });
 
-                window.RutaSync.on('ESTADO_CONDUCTOR_ACTUALIZADO', () => {
+                window.RutaSync.on('ESTADO_CONDUCTOR_ACTUALIZADO', (updatedDriver) => {
                     loadDriversData();
+                    if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
+                        const activeDni = String(activeReviewDriver.dni || '').replace(/\D/g, '');
+                        const updatedDni = updatedDriver ? String(updatedDriver.dni || '').replace(/\D/g, '') : '';
+                        if (!updatedDriver || !updatedDni || activeDni === updatedDni || activeReviewDriver.id === updatedDriver.id || activeReviewDriver.nombre === updatedDriver.nombre) {
+                            openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
+                        }
+                    }
                 });
             }
 
@@ -1172,7 +1221,7 @@
                 });
             });
 
-            // 6. MODAL DE REVISIÓN DOCUMENTAL DETALLADA
+            // 6. MODAL DE REVISIÓN DOCUMENTAL DETALLADA CON BLOQUEO DE SEGURIDAD
             function openDocReviewModal(driverIdentifier) {
                 if (!currentDrivers || currentDrivers.length === 0) {
                     loadDriversData();
@@ -1197,6 +1246,21 @@
                     const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
                     if (raw) localFreshDocs = JSON.parse(raw);
                 } catch(e) {}
+
+                let storedDriversList = [];
+                try {
+                    const raw = localStorage.getItem('rutaprivada_drivers_v1');
+                    if (raw) storedDriversList = JSON.parse(raw);
+                } catch(e) {}
+
+                const cleanDriverDni = String(driver.dni || localFreshDocs.dni || '').replace(/\D/g, '');
+                const storedDriverMatch = storedDriversList.find(d => {
+                    if (d.id && driver.id && String(d.id) === String(driver.id)) return true;
+                    const dDni = String(d.dni || '').replace(/\D/g, '');
+                    if (cleanDriverDni && dDni && cleanDriverDni === dDni) return true;
+                    if (d.nombre && driver.nombre && d.nombre.trim().toLowerCase() === driver.nombre.trim().toLowerCase()) return true;
+                    return false;
+                }) || {};
 
                 if (revDriverAvatar) revDriverAvatar.src = driver.fotoPerfil || localFreshDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
                 if (revDriverName) revDriverName.textContent = driver.nombre || localFreshDocs.nombre || 'Conductor';
@@ -1226,14 +1290,16 @@
                     revAdminNotes.value = driver.observaciones || localFreshDocs.observaciones || '';
                 }
 
-                // Extracción de archivos y documentos de conductor
+                // Extracción consolidada de archivos y documentos de conductor
                 const userImgs = driver.docsImages || {};
                 const localImgs = localFreshDocs.docsImages || {};
+                const storedImgs = storedDriverMatch.docsImages || {};
 
                 function resolveDoc(keys) {
                     for (const k of keys) {
                         if (userImgs[k] && typeof userImgs[k] === 'string' && userImgs[k].length > 20) return userImgs[k];
                         if (localImgs[k] && typeof localImgs[k] === 'string' && localImgs[k].length > 20) return localImgs[k];
+                        if (storedImgs[k] && typeof storedImgs[k] === 'string' && storedImgs[k].length > 20) return storedImgs[k];
                         if (driver[k] && typeof driver[k] === 'string' && driver[k].length > 20) return driver[k];
                         if (localFreshDocs[k] && typeof localFreshDocs[k] === 'string' && localFreshDocs[k].length > 20) return localFreshDocs[k];
                     }
@@ -1249,13 +1315,82 @@
                     { title: '4. Cédula Frente', key: 'cedula_frente', data: resolveDoc(['cedula_frente', 'cedula', 'fileCedulaFrente', 'cedulaFrente']) },
                     { title: '4. Cédula Dorso', key: 'cedula_dorso', data: resolveDoc(['cedula_dorso', 'fileCedulaDorso', 'cedulaDorso']) },
                     { title: '5. Antecedentes Penales', key: 'antecedentes', data: resolveDoc(['antecedentes', 'fileAntecedentes']) },
-                    { title: '6. Foto de Perfil', key: 'foto', data: resolveDoc(['foto', 'fotoPerfil', 'fileFotoPerfil']) || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com') ? driver.fotoPerfil : '') }
+                    { title: '6. Foto de Perfil', key: 'foto', data: resolveDoc(['foto', 'fotoPerfil', 'fileFotoPerfil']) || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com') ? driver.fotoPerfil : (localFreshDocs.fotoPerfil && !localFreshDocs.fotoPerfil.includes('unsplash.com') ? localFreshDocs.fotoPerfil : '')) }
                 ];
+
+                // Estado de validación por cada uno de los 9 documentos
+                const isAlreadyApproved = (driver.estadoVerificacion === 'aprobado');
+                docValidationState = docItems.map(item => ({
+                    key: item.key,
+                    title: item.title,
+                    hasData: Boolean(item.data && item.data.length > 20),
+                    isValid: isAlreadyApproved && Boolean(item.data && item.data.length > 20),
+                    isObserved: false
+                }));
+
+                function updateMasterApprovalEligibility() {
+                    const totalDocs = docValidationState.length; // 9
+                    const validCount = docValidationState.filter(d => d.hasData && d.isValid && !d.isObserved).length;
+                    const missingCount = docValidationState.filter(d => !d.hasData).length;
+                    const observedCount = docValidationState.filter(d => d.isObserved).length;
+
+                    if (revDocValidCount) {
+                        revDocValidCount.textContent = `${validCount}/${totalDocs} Validados`;
+                        revDocValidCount.style.color = validCount === totalDocs ? '#34d399' : '#fbbf24';
+                    }
+
+                    if (validCount === totalDocs && missingCount === 0 && observedCount === 0) {
+                        if (btnApproveDriverMaster) {
+                            btnApproveDriverMaster.disabled = false;
+                            btnApproveDriverMaster.style.opacity = '1';
+                            btnApproveDriverMaster.style.cursor = 'pointer';
+                            btnApproveDriverMaster.style.filter = 'none';
+                        }
+                        if (docApprovalWarningBanner) {
+                            docApprovalWarningBanner.style.background = 'rgba(16, 185, 129, 0.15)';
+                            docApprovalWarningBanner.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                            docApprovalWarningBanner.style.color = '#34d399';
+                        }
+                        if (docApprovalWarningIcon) {
+                            docApprovalWarningIcon.className = 'fa-solid fa-circle-check';
+                            docApprovalWarningIcon.style.color = '#10b981';
+                        }
+                        if (docApprovalWarningText) {
+                            docApprovalWarningText.textContent = '✓ Documentación Completa y Verificada: Los 9 archivos están en regla. Puedes habilitar al conductor para operar.';
+                        }
+                    } else {
+                        if (btnApproveDriverMaster) {
+                            btnApproveDriverMaster.disabled = true;
+                            btnApproveDriverMaster.style.opacity = '0.4';
+                            btnApproveDriverMaster.style.cursor = 'not-allowed';
+                            btnApproveDriverMaster.style.filter = 'grayscale(0.6)';
+                        }
+                        if (docApprovalWarningBanner) {
+                            docApprovalWarningBanner.style.background = 'rgba(239, 68, 68, 0.15)';
+                            docApprovalWarningBanner.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                            docApprovalWarningBanner.style.color = '#fca5a5';
+                        }
+                        if (docApprovalWarningIcon) {
+                            docApprovalWarningIcon.className = 'fa-solid fa-lock';
+                            docApprovalWarningIcon.style.color = '#ef4444';
+                        }
+                        let detailReasons = [];
+                        if (missingCount > 0) detailReasons.push(`${missingCount} sin adjuntar`);
+                        if (observedCount > 0) detailReasons.push(`${observedCount} observado(s)`);
+                        const unverified = totalDocs - validCount - missingCount - observedCount;
+                        if (unverified > 0) detailReasons.push(`${unverified} sin validar`);
+
+                        if (docApprovalWarningText) {
+                            docApprovalWarningText.textContent = `Aprobación Bloqueada: ${detailReasons.join(', ')}. Deben estar los 9 documentos subidos y validados para habilitar al chofer.`;
+                        }
+                    }
+                }
 
                 if (docsReviewGrid) {
                     docsReviewGrid.innerHTML = docItems.map((item, idx) => {
                         const hasData = Boolean(item.data && item.data.length > 20);
                         const isPdf = hasData && (item.data.startsWith('data:application/pdf') || item.data.includes('application/pdf') || item.data.includes('.pdf'));
+                        const isInitiallyValid = docValidationState[idx] && docValidationState[idx].isValid;
 
                         let contentHtml = '';
                         if (isPdf) {
@@ -1280,12 +1415,21 @@
                             `;
                         }
 
+                        let badgeHtml = '';
+                        if (isInitiallyValid) {
+                            badgeHtml = '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(16,185,129,0.25); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✓ Verificado</span>';
+                        } else if (hasData) {
+                            badgeHtml = '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(59,130,246,0.2); color: #60a5fa; padding: 2px 6px; border-radius: 4px; font-weight: 700;">📎 Adjuntado (Revisar)</span>';
+                        } else {
+                            badgeHtml = '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(239,68,68,0.2); color: #fca5a5; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✕ Sin Archivo</span>';
+                        }
+
                         return `
-                            <div class="doc-review-card" id="docCard_${idx}">
+                            <div class="doc-review-card" id="docCard_${idx}" style="${isInitiallyValid ? 'border-color:#10b981; background:rgba(16,185,129,0.08);' : ''}">
                                 <div>
                                     <div style="display: flex; justify-content: space-between; align-items: center;">
                                         <strong style="font-size: 0.8rem; color: #e2e8f0;">${item.title}</strong>
-                                        ${hasData ? '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(16,185,129,0.2); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✓ Adjuntado</span>' : '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(239,68,68,0.2); color: #fca5a5; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✕ Sin Archivo</span>'}
+                                        ${badgeHtml}
                                     </div>
                                     ${contentHtml}
                                 </div>
@@ -1301,48 +1445,93 @@
                         `;
                     }).join('');
 
-                    // Listeners individuales
+                    // Listeners individuales para marcar Válido
                     document.querySelectorAll('.btn-doc-approve').forEach(btn => {
                         btn.addEventListener('click', () => {
-                            const idx = btn.getAttribute('data-index');
-                            const card = document.getElementById(`docCard_${idx}`);
-                            if (card) {
-                                card.style.borderColor = '#10b981';
-                                card.style.background = 'rgba(16, 185, 129, 0.08)';
-                                const badge = card.querySelector('.doc-item-badge');
-                                if (badge) {
-                                    badge.textContent = '✓ Verificado';
-                                    badge.style.background = 'rgba(16, 185, 129, 0.3)';
-                                    badge.style.color = '#34d399';
+                            const idx = parseInt(btn.getAttribute('data-index'), 10);
+                            if (docValidationState[idx]) {
+                                if (!docValidationState[idx].hasData) {
+                                    alert('⚠️ No puedes validar un documento que no ha sido adjuntado aún.');
+                                    return;
                                 }
+                                docValidationState[idx].isValid = true;
+                                docValidationState[idx].isObserved = false;
+                                const card = document.getElementById(`docCard_${idx}`);
+                                if (card) {
+                                    card.style.borderColor = '#10b981';
+                                    card.style.background = 'rgba(16, 185, 129, 0.08)';
+                                    const badge = card.querySelector('.doc-item-badge');
+                                    if (badge) {
+                                        badge.textContent = '✓ Verificado';
+                                        badge.style.background = 'rgba(16, 185, 129, 0.3)';
+                                        badge.style.color = '#34d399';
+                                    }
+                                }
+                                updateMasterApprovalEligibility();
                             }
                         });
                     });
 
+                    // Listeners individuales para Observar
                     document.querySelectorAll('.btn-doc-reject').forEach(btn => {
                         btn.addEventListener('click', () => {
-                            const idx = btn.getAttribute('data-index');
+                            const idx = parseInt(btn.getAttribute('data-index'), 10);
                             const docTitle = btn.getAttribute('data-title') || 'Documento';
-                            const card = document.getElementById(`docCard_${idx}`);
-                            if (card) {
-                                card.style.borderColor = '#ef4444';
-                                card.style.background = 'rgba(239, 68, 68, 0.08)';
-                                const badge = card.querySelector('.doc-item-badge');
-                                if (badge) {
-                                    badge.textContent = '⚠️ Observado';
-                                    badge.style.background = 'rgba(239, 68, 68, 0.3)';
-                                    badge.style.color = '#f87171';
+                            if (docValidationState[idx]) {
+                                docValidationState[idx].isValid = false;
+                                docValidationState[idx].isObserved = true;
+                                const card = document.getElementById(`docCard_${idx}`);
+                                if (card) {
+                                    card.style.borderColor = '#ef4444';
+                                    card.style.background = 'rgba(239, 68, 68, 0.08)';
+                                    const badge = card.querySelector('.doc-item-badge');
+                                    if (badge) {
+                                        badge.textContent = '⚠️ Observado';
+                                        badge.style.background = 'rgba(239, 68, 68, 0.3)';
+                                        badge.style.color = '#f87171';
+                                    }
                                 }
-                            }
-                            if (revAdminNotes) {
-                                const noteToAdd = `• Observación en ${docTitle}: `;
-                                if (!revAdminNotes.value.includes(noteToAdd)) {
-                                    revAdminNotes.value += (revAdminNotes.value.trim() ? '\n' : '') + noteToAdd;
-                                    revAdminNotes.focus();
+                                if (revAdminNotes) {
+                                    const noteToAdd = `• Observación en ${docTitle}: `;
+                                    if (!revAdminNotes.value.includes(noteToAdd)) {
+                                        revAdminNotes.value += (revAdminNotes.value.trim() ? '\n' : '') + noteToAdd;
+                                        revAdminNotes.focus();
+                                    }
                                 }
+                                updateMasterApprovalEligibility();
                             }
                         });
                     });
+
+                    // Botón para validar todos los archivos presentes con un clic
+                    if (btnValidateAllDocs) {
+                        btnValidateAllDocs.onclick = () => {
+                            let anyMissing = false;
+                            docValidationState.forEach((item, idx) => {
+                                if (item.hasData) {
+                                    item.isValid = true;
+                                    item.isObserved = false;
+                                    const card = document.getElementById(`docCard_${idx}`);
+                                    if (card) {
+                                        card.style.borderColor = '#10b981';
+                                        card.style.background = 'rgba(16, 185, 129, 0.08)';
+                                        const badge = card.querySelector('.doc-item-badge');
+                                        if (badge) {
+                                            badge.textContent = '✓ Verificado';
+                                            badge.style.background = 'rgba(16, 185, 129, 0.3)';
+                                            badge.style.color = '#34d399';
+                                        }
+                                    }
+                                } else {
+                                    anyMissing = true;
+                                }
+                            });
+                            updateMasterApprovalEligibility();
+                            if (anyMissing) {
+                                alert('⚠️ Se validaron los documentos adjuntos. Ten presente que aún faltan archivos por subir para poder habilitar al chofer.');
+                            }
+                        };
+                    }
 
                     // Zoom de imagen
                     document.querySelectorAll('.zoomable-doc-img').forEach(img => {
@@ -1352,6 +1541,8 @@
                         });
                     });
                 }
+
+                updateMasterApprovalEligibility();
 
                 if (docReviewModalOverlay) {
                     docReviewModalOverlay.style.display = 'flex';
@@ -1421,6 +1612,14 @@
             function updateDriverStatus(newStatus) {
                 if (!activeReviewDriver) return;
 
+                if (newStatus === 'aprobado') {
+                    const validCount = docValidationState.filter(d => d.hasData && d.isValid && !d.isObserved).length;
+                    if (validCount < 9) {
+                        alert('⛔ BLOQUEO DE SEGURIDAD:\nNo se puede habilitar al conductor hasta que los 9 documentos estén debidamente cargados y validados.');
+                        return;
+                    }
+                }
+
                 const notesVal = revAdminNotes ? revAdminNotes.value.trim() : '';
                 activeReviewDriver.estadoVerificacion = newStatus;
                 activeReviewDriver.observaciones = notesVal;
@@ -1475,7 +1674,7 @@
                 renderDriversTable();
 
                 const msg = newStatus === 'aprobado' ? 
-                    '✅ ¡CONDUCTOR APROBADO EXITOSAMENTE!\nEl chofer ha sido habilitado para operar y ha recibido la notificación en vivo en su aplicación.' :
+                    '✅ ¡CONDUCTOR APROBADO EXITOSAMENTE!\nEl chofer ha sido habilitado para operar y ha recibido la confirmación en vivo en su aplicación.' :
                     '❌ Solicitud rechazada u observada.\nSe han enviado las observaciones al chofer para que corrija sus documentos.';
                 alert(msg);
             }
@@ -1488,7 +1687,7 @@
                 btnRejectDriverMaster.addEventListener('click', () => updateDriverStatus('rechazado'));
             }
 
-            // 9. GESTIÓN DE RECARGAS DE SALDO
+            // 9. GESTIÓN DE RECARGAS DE SALDO (HISTORIAL CONSERVADO)
             function loadRechargesData() {
                 let localRecharges = [];
                 try {
@@ -1496,14 +1695,26 @@
                     if (raw) localRecharges = JSON.parse(raw);
                 } catch(e) {}
 
+                // Fusión inteligente: nunca eliminar o retroceder registros aprobados
                 let combined = [...cloudRechargesList];
                 localRecharges.forEach(loc => {
-                    if (!combined.some(c => c.id === loc.id || (c.comprobante && loc.comprobante && c.comprobante === loc.comprobante))) {
+                    const matchIdx = combined.findIndex(c => c.id === loc.id || (c.comprobante && loc.comprobante && c.comprobante === loc.comprobante));
+                    if (matchIdx >= 0) {
+                        combined[matchIdx] = { ...combined[matchIdx], ...loc };
+                        if (loc.estado === 'aprobado' || combined[matchIdx].estado === 'aprobado') {
+                            combined[matchIdx].estado = 'aprobado';
+                        }
+                    } else {
                         combined.push(loc);
                     }
                 });
 
                 combined.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+                // Preservar en storage local consolidado
+                try {
+                    localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(combined));
+                } catch(e) {}
                 
                 const pendingCount = combined.filter(r => (r.estado || 'pendiente') === 'pendiente').length;
                 if (metricPendingRecharges) metricPendingRecharges.textContent = pendingCount;
@@ -1527,19 +1738,24 @@
 
                 if (!rechargesTableBody) return;
 
-                if (list.length === 0) {
+                let displayList = list;
+                if (activeRechargeFilter !== 'todos') {
+                    displayList = displayList.filter(r => (r.estado || 'pendiente').toLowerCase() === activeRechargeFilter);
+                }
+
+                if (displayList.length === 0) {
                     rechargesTableBody.innerHTML = `
                         <tr>
                             <td colspan="6" style="text-align: center; padding: 40px 20px; color: #94a3b8;">
                                 <i class="fa-solid fa-receipt" style="font-size: 2.2rem; margin-bottom: 10px; display: block; color: #64748b;"></i>
-                                No hay solicitudes de recarga por transferencia registradas actualmente.
+                                No hay transferencias con el estado seleccionado (${activeRechargeFilter.toUpperCase()}).
                             </td>
                         </tr>
                     `;
                     return;
                 }
 
-                rechargesTableBody.innerHTML = list.map(r => {
+                rechargesTableBody.innerHTML = displayList.map(r => {
                     const status = (r.estado || 'pendiente').toLowerCase();
                     const statusClass = status === 'aprobado' ? 'aprobado' : (status === 'rechazado' ? 'rechazado' : 'pendiente');
                     const statusLabel = status === 'aprobado' ? '✓ Acreditado' : (status === 'rechazado' ? '✕ Rechazado' : '⏳ Pendiente de Conciliación');
@@ -1582,7 +1798,7 @@
                                         </button>
                                     </div>
                                 ` : `
-                                    <span style="font-size: 0.78rem; color: #64748b;"><i class="fa-solid fa-circle-check"></i> Procesado</span>
+                                    <span style="font-size: 0.78rem; color: #34d399; font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Procesado</span>
                                 `}
                             </td>
                         </tr>
@@ -1657,10 +1873,15 @@
             }
 
             // Evento de storage para sincronización entre pestañas
-            window.addEventListener('storage', () => {
+            window.addEventListener('storage', (e) => {
                 if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
                     loadDriversData();
                     loadRechargesData();
+                    if (e && (e.key === 'rutaprivada_driver_docs_v1' || e.key === 'rutaprivada_drivers_v1')) {
+                        if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
+                            openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
+                        }
+                    }
                 }
             });
 
