@@ -356,20 +356,25 @@
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(5, 8, 15, 0.85);
-            backdrop-filter: blur(8px);
-            z-index: 1000;
-            display: flex;
+            background: rgba(5, 8, 15, 0.88);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            display: none;
             align-items: center;
             justify-content: center;
             opacity: 0;
             pointer-events: none;
-            transition: all 0.3s ease;
+            transition: opacity 0.2s ease-in-out;
         }
 
         .admin-modal-overlay.active {
-            opacity: 1;
-            pointer-events: auto;
+            display: flex !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        #imgZoomModalOverlay {
+            z-index: 3000 !important;
         }
 
         .admin-modal-card {
@@ -720,15 +725,18 @@
             const ADMIN_PIN_SECRET = '4824';
             let currentDrivers = [];
             let activeReviewDriver = null;
+            let cloudRechargesList = [];
+            let cloudDriversList = [];
+            let activeFilter = 'todos';
 
-            // Elementos DOM
+            // Elementos DOM Principales
             const authModalOverlay = document.getElementById('authModalOverlay');
             const adminPinForm = document.getElementById('adminPinForm');
             const adminPinInput = document.getElementById('adminPinInput');
             const btnLogoutAdmin = document.getElementById('btnLogoutAdmin');
             const btnRefreshAdmin = document.getElementById('btnRefreshAdmin');
 
-            // Elementos DOM de Secciones y Recargas
+            // Elementos de Navegación y Vistas
             const tabNavDrivers = document.getElementById('tabNavDrivers');
             const tabNavRecharges = document.getElementById('tabNavRecharges');
             const sectionDriversView = document.getElementById('sectionDriversView');
@@ -739,21 +747,52 @@
             const rechargesTableBody = document.getElementById('rechargesTableBody');
             const btnRefreshRecharges = document.getElementById('btnRefreshRecharges');
 
-            let cloudRechargesList = [];
+            // Elementos de Métricas Conductores
+            const metricTotalDrivers = document.getElementById('metricTotalDrivers');
+            const metricPendingDrivers = document.getElementById('metricPendingDrivers');
+            const metricApprovedDrivers = document.getElementById('metricApprovedDrivers');
+            const metricOnlineDrivers = document.getElementById('metricOnlineDrivers');
 
-            // Tab Navigation
+            // Elementos de Búsqueda y Tabla Conductores
+            const adminSearchInput = document.getElementById('adminSearchInput');
+            const filterTabBtns = document.querySelectorAll('.filter-tab-btn');
+            const driversTableBody = document.getElementById('driversTableBody');
+
+            // Modal de Revisión Documental
+            const docReviewModalOverlay = document.getElementById('docReviewModalOverlay');
+            const btnCloseDocReview = document.getElementById('btnCloseDocReview');
+            const revDriverAvatar = document.getElementById('revDriverAvatar');
+            const revDriverName = document.getElementById('revDriverName');
+            const revDriverPhone = document.getElementById('revDriverPhone');
+            const revDriverVehicle = document.getElementById('revDriverVehicle');
+            const revDriverPlate = document.getElementById('revDriverPlate');
+            const revBankName = document.getElementById('revBankName');
+            const revBankCbu = document.getElementById('revBankCbu');
+            const revBankHolder = document.getElementById('revBankHolder');
+            const bankMatchStatusBadge = document.getElementById('bankMatchStatusBadge');
+            const docsReviewGrid = document.getElementById('docsReviewGrid');
+            const revAdminNotes = document.getElementById('revAdminNotes');
+            const btnApproveDriverMaster = document.getElementById('btnApproveDriverMaster');
+            const btnRejectDriverMaster = document.getElementById('btnRejectDriverMaster');
+
+            // Modal de Zoom
+            const imgZoomModalOverlay = document.getElementById('imgZoomModalOverlay');
+            const imgZoomElement = document.getElementById('imgZoomElement');
+            const btnCloseZoom = document.getElementById('btnCloseZoom');
+
+            // Control de Vistas (Pestañas)
             function switchAdminView(view) {
                 if (view === 'recharges') {
-                    sectionDriversView.style.display = 'none';
-                    sectionRechargesView.style.display = 'block';
-                    tabNavDrivers.classList.remove('admin-btn-primary');
-                    tabNavRecharges.classList.add('admin-btn-primary');
+                    if (sectionDriversView) sectionDriversView.style.display = 'none';
+                    if (sectionRechargesView) sectionRechargesView.style.display = 'block';
+                    if (tabNavDrivers) tabNavDrivers.classList.remove('admin-btn-primary');
+                    if (tabNavRecharges) tabNavRecharges.classList.add('admin-btn-primary');
                     renderRechargesTable();
                 } else {
-                    sectionDriversView.style.display = 'block';
-                    sectionRechargesView.style.display = 'none';
-                    tabNavRecharges.classList.remove('admin-btn-primary');
-                    tabNavDrivers.classList.add('admin-btn-primary');
+                    if (sectionDriversView) sectionDriversView.style.display = 'block';
+                    if (sectionRechargesView) sectionRechargesView.style.display = 'none';
+                    if (tabNavRecharges) tabNavRecharges.classList.remove('admin-btn-primary');
+                    if (tabNavDrivers) tabNavDrivers.classList.add('admin-btn-primary');
                     renderDriversTable();
                 }
             }
@@ -763,11 +802,13 @@
             if (cardMetricRecharges) cardMetricRecharges.addEventListener('click', () => switchAdminView('recharges'));
             if (btnRefreshRecharges) btnRefreshRecharges.addEventListener('click', () => renderRechargesTable());
 
-            // 1. AUTENTICACIÓN CON PIN
+            // 1. AUTENTICACIÓN
             function checkAuth() {
-                // Auto-habilitar acceso al panel para que nunca quede bloqueado
                 sessionStorage.setItem('rutaprivada_admin_authed', 'true');
-                if (authModalOverlay) authModalOverlay.classList.remove('active');
+                if (authModalOverlay) {
+                    authModalOverlay.classList.remove('active');
+                    authModalOverlay.style.display = 'none';
+                }
                 loadDriversData();
                 loadRechargesData();
             }
@@ -775,17 +816,17 @@
             if (adminPinForm) {
                 adminPinForm.addEventListener('submit', (e) => {
                     e.preventDefault();
-                    sessionStorage.setItem('rutaprivada_admin_authed', 'true');
-                    if (authModalOverlay) authModalOverlay.classList.remove('active');
-                    loadDriversData();
-                    loadRechargesData();
+                    checkAuth();
                 });
             }
 
             if (btnLogoutAdmin) {
                 btnLogoutAdmin.addEventListener('click', () => {
                     sessionStorage.removeItem('rutaprivada_admin_authed');
-                    if (authModalOverlay) authModalOverlay.classList.add('active');
+                    if (authModalOverlay) {
+                        authModalOverlay.style.display = 'flex';
+                        authModalOverlay.classList.add('active');
+                    }
                 });
             }
 
@@ -796,8 +837,7 @@
                 });
             }
 
-            let cloudDriversList = [];
-
+            // 2. SINCRONIZACIÓN EN TIEMPO REAL (FIRESTORE)
             function initFirestoreRealtimeSync() {
                 const FIREBASE_CONFIG = {
                     apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
@@ -818,18 +858,20 @@
                             }
                             const db = firebase.firestore();
                             
-                            // Listen to Drivers
+                            // Escuchar Conductores en tiempo real
                             db.collection('drivers').onSnapshot((snapshot) => {
                                 cloudDriversList = [];
                                 snapshot.forEach(doc => {
                                     if (doc.exists) {
-                                        cloudDriversList.push(doc.data());
+                                        const d = doc.data();
+                                        d.id = d.id || doc.id;
+                                        cloudDriversList.push(d);
                                     }
                                 });
                                 loadDriversData();
                             }, (err) => console.warn('Firestore admin listener warning:', err));
 
-                            // Listen to Wallet Recharges in Realtime
+                            // Escuchar Recargas de Saldo en tiempo real
                             db.collection('wallet_recharges').onSnapshot((snapshot) => {
                                 cloudRechargesList = [];
                                 snapshot.forEach(doc => {
@@ -856,220 +898,30 @@
 
             initFirestoreRealtimeSync();
 
-            // GESTIÓN DE RECARGAS DE SALDO (CONCILIACIÓN BANCARIA)
-            function loadRechargesData() {
-                let localRecharges = [];
-                try {
-                    const raw = localStorage.getItem('rutaprivada_driver_recharges_v1');
-                    if (raw) localRecharges = JSON.parse(raw);
-                } catch(e) {}
-
-                let combined = [...cloudRechargesList];
-                localRecharges.forEach(loc => {
-                    if (!combined.some(c => c.id === loc.id || (c.comprobante && loc.comprobante && String(c.comprobante) === String(loc.comprobante)))) {
-                        combined.push(loc);
+            // Sincronización instantánea por bus RutaSync
+            if (window.RutaSync) {
+                window.RutaSync.on('SOLICITUD_RECARGA_SALDO', (rechargeData) => {
+                    if (rechargeData) {
+                        let localRecharges = [];
+                        try {
+                            localRecharges = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
+                        } catch(e) {}
+                        if (!localRecharges.some(r => r.id === rechargeData.id || (r.comprobante && rechargeData.comprobante && r.comprobante === rechargeData.comprobante))) {
+                            localRecharges.unshift(rechargeData);
+                            try {
+                                localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(localRecharges));
+                            } catch(e) {}
+                        }
+                        loadRechargesData();
                     }
                 });
 
-                // Extraer también recargas registradas en la billetera local (ej: prueba de chofer en vivo)
-                try {
-                    const rawWallet = localStorage.getItem('rutaprivada_driver_wallet_v1');
-                    if (rawWallet) {
-                        const wallet = JSON.parse(rawWallet);
-                        if (Array.isArray(wallet.movimientos)) {
-                            let activeDriverDocs = {};
-                            try { activeDriverDocs = JSON.parse(localStorage.getItem('rutaprivada_driver_docs_v1') || '{}'); } catch(e){}
-                            
-                            wallet.movimientos.forEach(m => {
-                                if (m.tipo === 'recarga_pendiente' || m.estado === 'en_conciliacion' || (m.comprobante && Number(m.monto || 0) > 0)) {
-                                    const refNum = String(m.comprobante || '').replace(/\D/g, '') || m.comprobante;
-                                    if (!combined.some(c => (c.comprobante && refNum && String(c.comprobante).includes(refNum)) || (c.id && m.id && c.id === m.id))) {
-                                        combined.unshift({
-                                            id: m.id || ('rec_' + Date.now()),
-                                            driverName: activeDriverDocs.nombre || 'Daniel Pabon',
-                                            driverDni: activeDriverDocs.dni || '96180823',
-                                            driverPatente: activeDriverDocs.patente || 'AE927CN',
-                                            monto: Number(m.monto || 1000),
-                                            comprobante: m.comprobante || '3170274687',
-                                            fecha: m.fecha || 'Hoy',
-                                            hora: m.hora || '',
-                                            estado: (m.estado === 'acreditado' || m.estado === 'aprobado') ? 'aprobado' : 'pendiente',
-                                            timestamp: Date.now()
-                                        });
-                                    }
-                                }
-                            });
-                        }
-                    }
-                } catch(e) {}
-
-                combined.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
-                
-                const pendingCount = combined.filter(r => (r.estado || 'pendiente') === 'pendiente').length;
-                if (metricPendingRecharges) metricPendingRecharges.textContent = pendingCount;
-                if (badgePendingRechargesCount) {
-                    if (pendingCount > 0) {
-                        badgePendingRechargesCount.style.display = 'inline-block';
-                        badgePendingRechargesCount.textContent = pendingCount;
-                    } else {
-                        badgePendingRechargesCount.style.display = 'none';
-                    }
-                }
-
-                renderRechargesTable(combined);
-            }
-
-            function renderRechargesTable(list = null) {
-                if (!list) {
-                    loadRechargesData();
-                    return;
-                }
-
-                if (!rechargesTableBody) return;
-
-                if (list.length === 0) {
-                    rechargesTableBody.innerHTML = `
-                        <tr>
-                            <td colspan="6" style="text-align: center; padding: 40px 20px; color: #94a3b8;">
-                                <i class="fa-solid fa-receipt" style="font-size: 2.2rem; margin-bottom: 10px; display: block; color: #64748b;"></i>
-                                No hay solicitudes de recarga por transferencia registradas actualmente.
-                            </td>
-                        </tr>
-                    `;
-                    return;
-                }
-
-                rechargesTableBody.innerHTML = list.map(r => {
-                    const status = (r.estado || 'pendiente').toLowerCase();
-                    const statusClass = status === 'aprobado' ? 'aprobado' : (status === 'rechazado' ? 'rechazado' : 'pendiente');
-                    const statusLabel = status === 'aprobado' ? '✓ Acreditado' : (status === 'rechazado' ? '✕ Rechazado' : '⏳ Pendiente de Conciliación');
-                    const amountFormatted = Number(r.monto || 0).toLocaleString('es-AR');
-                    const isPending = status === 'pendiente';
-
-                    return `
-                        <tr>
-                            <td>
-                                <strong style="color: #fff; font-size: 0.95rem; display: block;">${r.driverName || 'Conductor Registrado'}</strong>
-                                <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
-                                    <span><i class="fa-solid fa-id-card"></i> DNI: ${r.driverDni || 'S/D'}</span> | 
-                                    <span><i class="fa-solid fa-car"></i> Patente: ${r.driverPatente || 'S/P'}</span>
-                                </div>
-                            </td>
-                            <td>
-                                <span style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 800; color: #34d399;">$${amountFormatted}</span>
-                            </td>
-                            <td>
-                                <div style="background: rgba(255,255,255,0.06); padding: 4px 10px; border-radius: 6px; display: inline-block; font-family: monospace; font-size: 0.85rem; color: #fbbf24; border: 1px solid rgba(251,191,36,0.3);">
-                                    <i class="fa-solid fa-receipt"></i> #${r.comprobante || 'S/N'}
-                                </div>
-                            </td>
-                            <td>
-                                <div style="font-size: 0.82rem; color: #cbd5e1;">${r.fecha || 'Hoy'}</div>
-                                <div style="font-size: 0.74rem; color: #94a3b8;">${r.hora || ''}</div>
-                            </td>
-                            <td>
-                                <span class="badge-status ${statusClass}">${statusLabel}</span>
-                            </td>
-                            <td style="text-align: right;">
-                                ${isPending ? `
-                                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                        <button class="admin-btn btn-approve-recharge" data-id="${r.id}" data-amount="${r.monto}" data-dni="${r.driverDni}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; padding: 6px 12px; font-size: 0.78rem; cursor: pointer;">
-                                            <i class="fa-solid fa-check"></i> Aprobar & Acreditar
-                                        </button>
-                                        <button class="admin-btn btn-reject-recharge" data-id="${r.id}" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4); padding: 6px 12px; font-size: 0.78rem; cursor: pointer;">
-                                            <i class="fa-solid fa-xmark"></i> Rechazar
-                                        </button>
-                                    </div>
-                                ` : `
-                                    <span style="font-size: 0.78rem; color: #64748b;"><i class="fa-solid fa-circle-check"></i> Procesado</span>
-                                `}
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-
-                // Wire action buttons
-                document.querySelectorAll('.btn-approve-recharge').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const id = btn.getAttribute('data-id');
-                        const amount = btn.getAttribute('data-amount');
-                        const dni = btn.getAttribute('data-dni');
-                        processRechargeDecision(id, 'aprobado', amount, dni);
-                    });
-                });
-
-                document.querySelectorAll('.btn-reject-recharge').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const id = btn.getAttribute('data-id');
-                        processRechargeDecision(id, 'rechazado');
-                    });
+                window.RutaSync.on('ESTADO_CONDUCTOR_ACTUALIZADO', () => {
+                    loadDriversData();
                 });
             }
 
-            function processRechargeDecision(rechargeId, decision, amount = 0, dni = '') {
-                if (!confirm(`¿Confirmas ${decision.toUpperCase()} esta recarga de saldo?`)) return;
-
-                // 1. Actualizar en Firestore
-                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
-                    try {
-                        const db = firebase.firestore();
-                        db.collection('wallet_recharges').doc(rechargeId).set({
-                            estado: decision,
-                            aprobadoPor: 'admin',
-                            timestampAprobacion: Date.now()
-                        }, { merge: true }).catch(err => console.warn('Firestore recharge update error:', err));
-                    } catch(e){}
-                }
-
-                // 2. Si es local o en memoria
-                try {
-                    let localRecharges = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
-                    const idx = localRecharges.findIndex(r => r.id === rechargeId);
-                    if (idx >= 0) {
-                        localRecharges[idx].estado = decision;
-                        localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(localRecharges));
-                    }
-                } catch(e){}
-
-                // 3. Actualizar también la billetera local del conductor
-                try {
-                    const rawWallet = localStorage.getItem('rutaprivada_driver_wallet_v1');
-                    if (rawWallet) {
-                        const wallet = JSON.parse(rawWallet);
-                        if (decision === 'aprobado') {
-                            wallet.balance += Number(amount || 0);
-                            wallet.totalRecargas = (wallet.totalRecargas || 0) + Number(amount || 0);
-                        }
-                        if (Array.isArray(wallet.movimientos)) {
-                            const mIdx = wallet.movimientos.findIndex(m => m.id === rechargeId || (m.tipo === 'recarga_pendiente' && m.estado === 'en_conciliacion'));
-                            if (mIdx >= 0) {
-                                wallet.movimientos[mIdx].estado = decision === 'aprobado' ? 'acreditado' : 'rechazado';
-                                wallet.movimientos[mIdx].tipo = 'recarga';
-                            }
-                        }
-                        localStorage.setItem('rutaprivada_driver_wallet_v1', JSON.stringify(wallet));
-                    }
-                } catch(e){}
-
-                // 4. Emitir evento por bus sync
-                if (window.RutaSync) {
-                    window.RutaSync.emit('RECARGA_SALDO_PROCESADA', {
-                        rechargeId,
-                        estado: decision,
-                        monto: amount,
-                        driverDni: dni,
-                        timestamp: Date.now()
-                    });
-                }
-
-                window.dispatchEvent(new Event('storage'));
-                alert(decision === 'aprobado' ? `✅ ¡Recarga de $${Number(amount).toLocaleString('es-AR')} Aprobada!\nEl saldo se ha acreditado automáticamente en la billetera del chofer.` : `❌ Recarga rechazada.`);
-                loadRechargesData();
-            }
-
-            // 2. CARGA DE DATOS REALES DE CONDUCTORES EN TIEMPO REAL
+            // 3. CARGA DE DATOS DE CONDUCTORES
             function loadDriversData() {
                 let activeDocs = null;
                 try {
@@ -1090,11 +942,15 @@
 
                 let drivers = [];
 
-                // A. Incorporar conductores recibidos desde Firebase Cloud Firestore (Nube)
+                // A. Incorporar conductores de Firestore
                 if (Array.isArray(cloudDriversList) && cloudDriversList.length > 0) {
                     cloudDriversList.forEach(c => {
+                        const cleanDni = String(c.dni || '').replace(/\D/g, '');
+                        const cleanTel = String(c.telefono || '').replace(/\D/g, '');
+                        const stableId = c.id || (cleanDni ? 'drv_' + cleanDni : (cleanTel ? 'drv_' + cleanTel : ('drv_' + (c.nombre || 'chofer').replace(/\s+/g, '_').toLowerCase())));
+
                         drivers.push({
-                            id: c.id || ('drv_' + Math.random().toString(36).substr(2, 6)),
+                            id: stableId,
                             nombre: c.nombre || 'Conductor Registrado',
                             dni: c.dni || 'S/D',
                             telefono: c.telefono || 'Sin teléfono',
@@ -1115,9 +971,14 @@
                     });
                 }
 
-                // B. Incorporar el Conductor Real Activo Local si ya ha registrado datos
+                // B. Incorporar el Conductor Local Activo
                 if (activeDocs && (activeDocs.nombre || activeDocs.dni || activeDocs.docsImages)) {
-                    const existingIdx = drivers.findIndex(d => (d.dni && activeDocs.dni && String(d.dni) === String(activeDocs.dni)) || (d.nombre && activeDocs.nombre && d.nombre.toLowerCase().trim() === activeDocs.nombre.toLowerCase().trim()));
+                    const cleanLocalDni = String(activeDocs.dni || '').replace(/\D/g, '');
+                    const existingIdx = drivers.findIndex(d => {
+                        const dDni = String(d.dni || '').replace(/\D/g, '');
+                        return (cleanLocalDni && dDni && cleanLocalDni === dDni) || (d.nombre && activeDocs.nombre && d.nombre.trim().toLowerCase() === activeDocs.nombre.trim().toLowerCase());
+                    });
+
                     if (existingIdx >= 0) {
                         drivers[existingIdx].docsImages = Object.assign({}, drivers[existingIdx].docsImages || {}, activeDocs.docsImages || {});
                         if (activeDocs.fotoPerfil && !activeDocs.fotoPerfil.includes('unsplash.com')) {
@@ -1128,8 +989,9 @@
                         if (activeDocs.titularCuenta) drivers[existingIdx].titularCuenta = activeDocs.titularCuenta;
                         if (activeDocs.estadoVerificacion) drivers[existingIdx].estadoVerificacion = activeDocs.estadoVerificacion;
                     } else {
+                        const localStableId = cleanLocalDni ? 'drv_' + cleanLocalDni : 'drv_active_user';
                         drivers.unshift({
-                            id: 'drv_active_user',
+                            id: localStableId,
                             nombre: activeDocs.nombre || 'Conductor Registrado',
                             dni: activeDocs.dni || 'S/D',
                             telefono: activeDocs.telefono || 'Sin teléfono',
@@ -1150,7 +1012,7 @@
                     }
                 }
 
-                // C. Agregar otros conductores almacenados localmente
+                // C. Incorporar otros conductores locales
                 if (Array.isArray(storedDrivers) && storedDrivers.length > 0) {
                     storedDrivers.forEach(d => {
                         const driverName = d.nombre || d.name;
@@ -1158,8 +1020,9 @@
                         if (existingIdx >= 0) {
                             drivers[existingIdx].docsImages = Object.assign({}, drivers[existingIdx].docsImages || {}, d.docsImages || {});
                         } else if (driverName) {
+                            const cleanDni = String(d.dni || '').replace(/\D/g, '');
                             drivers.push({
-                                id: d.id || ('drv_' + Math.random().toString(36).substr(2, 6)),
+                                id: d.id || (cleanDni ? 'drv_' + cleanDni : ('drv_' + driverName.replace(/\s+/g, '_').toLowerCase())),
                                 nombre: driverName || 'Conductor Flota',
                                 dni: d.dni || 'S/D',
                                 telefono: d.telefono || d.phone || 'S/T',
@@ -1185,39 +1048,23 @@
                 renderDriversTable();
             }
 
-            // Auto-refresco en tiempo real (cada 2 segundos) para detectar cuando un chofer se conecta o actualiza datos
-            setInterval(() => {
-                if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
-                    loadDriversData();
-                    loadRechargesData();
-                }
-            }, 2000);
-
-            window.addEventListener('storage', () => {
-                if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
-                    loadDriversData();
-                    loadRechargesData();
-                }
-            });
-
-            // 3. RENDERIZAR MÉTRICAS
+            // 4. RENDERIZAR MÉTRICAS
             function renderMetrics() {
                 const total = currentDrivers.length;
                 const pending = currentDrivers.filter(d => (d.estadoVerificacion || 'pendiente') === 'pendiente').length;
                 const approved = currentDrivers.filter(d => d.estadoVerificacion === 'aprobado').length;
                 const online = currentDrivers.filter(d => d.isOnline).length;
 
-                metricTotalDrivers.textContent = total;
-                metricPendingDrivers.textContent = pending;
-                metricApprovedDrivers.textContent = approved;
-                metricOnlineDrivers.textContent = online;
+                if (metricTotalDrivers) metricTotalDrivers.textContent = total;
+                if (metricPendingDrivers) metricPendingDrivers.textContent = pending;
+                if (metricApprovedDrivers) metricApprovedDrivers.textContent = approved;
+                if (metricOnlineDrivers) metricOnlineDrivers.textContent = online;
             }
 
-            // 4. RENDERIZAR TABLA CON FILTROS
-            let activeFilter = 'todos';
-
+            // 5. RENDERIZAR TABLA DE CONDUCTORES
             function renderDriversTable() {
-                const searchTerm = adminSearchInput.value.toLowerCase().trim();
+                if (!driversTableBody) return;
+                const searchTerm = adminSearchInput ? adminSearchInput.value.toLowerCase().trim() : '';
 
                 const filtered = currentDrivers.filter(d => {
                     const status = (d.estadoVerificacion || 'pendiente').toLowerCase();
@@ -1250,10 +1097,11 @@
                     const statusLabel = status === 'aprobado' ? '✓ Aprobado' : (status === 'rechazado' ? '✕ Rechazado' : '⏱️ Pendiente');
                     const bankName = d.banco || 'Mercado Pago';
                     const cbuShort = d.cbu ? (d.cbu.substring(0, 10) + '...') : 'Sin CBU';
-                    const holderMatch = (d.titularCuenta || '').toLowerCase() === (d.nombre || '').toLowerCase();
+                    const holderMatch = (d.titularCuenta || '').toLowerCase().trim() === (d.nombre || '').toLowerCase().trim();
+                    const safeId = String(d.id || d.dni || d.nombre);
 
                     return `
-                        <tr style="cursor: pointer;" onclick="window.openDocReviewModal('${d.id}')">
+                        <tr>
                             <td>
                                 <div class="driver-user-cell">
                                     <img src="${d.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}" class="driver-avatar">
@@ -1288,26 +1136,32 @@
                                 </span>
                             </td>
                             <td style="text-align: right;">
-                                <button type="button" class="admin-btn btn-review-driver" onclick="event.stopPropagation(); window.openDocReviewModal('${d.id}');" data-id="${d.id}" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); cursor: pointer;">
+                                <button type="button" class="admin-btn btn-review-driver" data-id="${safeId}" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); cursor: pointer;">
                                     <i class="fa-solid fa-clipboard-check"></i> Revisar Documentación
                                 </button>
                             </td>
                         </tr>
                     `;
                 }).join('');
+            }
 
-                // Asignar listeners
-                document.querySelectorAll('.btn-review-driver').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
+            // Delegación de eventos en la tabla para clic garantizado en "Revisar Documentación"
+            if (driversTableBody) {
+                driversTableBody.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.btn-review-driver');
+                    if (btn) {
+                        e.preventDefault();
                         e.stopPropagation();
                         const id = btn.getAttribute('data-id');
                         openDocReviewModal(id);
-                    });
+                    }
                 });
             }
 
             // Listeners de búsqueda y pestañas
-            adminSearchInput.addEventListener('input', renderDriversTable);
+            if (adminSearchInput) {
+                adminSearchInput.addEventListener('input', renderDriversTable);
+            }
 
             filterTabBtns.forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -1318,33 +1172,26 @@
                 });
             });
 
-            // 5. MODAL DE REVISIÓN DOCUMENTAL DETALLADA
-            const revDriverAvatar = document.getElementById('revDriverAvatar');
-            const revDriverName = document.getElementById('revDriverName');
-            const revDriverPhone = document.getElementById('revDriverPhone');
-            const revDriverVehicle = document.getElementById('revDriverVehicle');
-            const revDriverPlate = document.getElementById('revDriverPlate');
-            const revBankName = document.getElementById('revBankName');
-            const revBankCbu = document.getElementById('revBankCbu');
-            const revBankHolder = document.getElementById('revBankHolder');
-            const bankMatchStatusBadge = document.getElementById('bankMatchStatusBadge');
-            const docsReviewGrid = document.getElementById('docsReviewGrid');
-            const revAdminNotes = document.getElementById('revAdminNotes');
+            // 6. MODAL DE REVISIÓN DOCUMENTAL DETALLADA
+            function openDocReviewModal(driverIdentifier) {
+                if (!currentDrivers || currentDrivers.length === 0) {
+                    loadDriversData();
+                }
 
-            const btnApproveDriverMaster = document.getElementById('btnApproveDriverMaster');
-            const btnRejectDriverMaster = document.getElementById('btnRejectDriverMaster');
+                // Búsqueda inteligente por id, dni o nombre
+                const cleanInput = String(driverIdentifier || '').replace(/\D/g, '');
+                let driver = currentDrivers.find(d => {
+                    if (String(d.id) === String(driverIdentifier)) return true;
+                    if (d.dni && String(d.dni) === String(driverIdentifier)) return true;
+                    const cleanDni = String(d.dni || '').replace(/\D/g, '');
+                    if (cleanInput && cleanDni && cleanInput === cleanDni) return true;
+                    if (d.nombre && driverIdentifier && d.nombre.trim().toLowerCase() === String(driverIdentifier).trim().toLowerCase()) return true;
+                    return false;
+                }) || currentDrivers[0] || {};
 
-            function openDocReviewModal(driverId) {
-                // Localizar el conductor buscando por ID, DNI o Nombre
-                const driver = currentDrivers.find(d => 
-                    String(d.id) === String(driverId) || 
-                    (d.dni && driverId && String(d.dni) === String(driverId)) ||
-                    (d.nombre && driverId && d.nombre.toLowerCase().trim() === String(driverId).toLowerCase().trim())
-                ) || currentDrivers[0] || {};
-                
                 activeReviewDriver = driver;
 
-                // Cargar también datos locales frescos por si se acaban de guardar
+                // Datos locales frescos
                 let localFreshDocs = {};
                 try {
                     const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
@@ -1375,9 +1222,11 @@
                     }
                 }
 
-                if (revAdminNotes) revAdminNotes.value = driver.observaciones || localFreshDocs.observaciones || '';
+                if (revAdminNotes) {
+                    revAdminNotes.value = driver.observaciones || localFreshDocs.observaciones || '';
+                }
 
-                // Extraer imágenes y documentos buscando en todos los orígenes posibles
+                // Extracción de archivos y documentos de conductor
                 const userImgs = driver.docsImages || {};
                 const localImgs = localFreshDocs.docsImages || {};
 
@@ -1391,7 +1240,6 @@
                     return '';
                 }
 
-                // Generar los documentos de revisión con soporte para Frente/Dorso y PDFs
                 const docItems = [
                     { title: '1. DNI Frente', key: 'dni_frente', data: resolveDoc(['dni_frente', 'dni', 'fileDniFrente', 'dniFrente']) },
                     { title: '1. DNI Dorso', key: 'dni_dorso', data: resolveDoc(['dni_dorso', 'fileDniDorso', 'dniDorso']) },
@@ -1453,9 +1301,9 @@
                         `;
                     }).join('');
 
-                    // Asignar listeners individuales de validación y observación
+                    // Listeners individuales
                     document.querySelectorAll('.btn-doc-approve').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
+                        btn.addEventListener('click', () => {
                             const idx = btn.getAttribute('data-index');
                             const card = document.getElementById(`docCard_${idx}`);
                             if (card) {
@@ -1472,7 +1320,7 @@
                     });
 
                     document.querySelectorAll('.btn-doc-reject').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
+                        btn.addEventListener('click', () => {
                             const idx = btn.getAttribute('data-index');
                             const docTitle = btn.getAttribute('data-title') || 'Documento';
                             const card = document.getElementById(`docCard_${idx}`);
@@ -1486,15 +1334,17 @@
                                     badge.style.color = '#f87171';
                                 }
                             }
-                            const noteToAdd = `• Observación en ${docTitle}: `;
-                            if (!revAdminNotes.value.includes(noteToAdd)) {
-                                revAdminNotes.value += (revAdminNotes.value.trim() ? '\n' : '') + noteToAdd;
-                                revAdminNotes.focus();
+                            if (revAdminNotes) {
+                                const noteToAdd = `• Observación en ${docTitle}: `;
+                                if (!revAdminNotes.value.includes(noteToAdd)) {
+                                    revAdminNotes.value += (revAdminNotes.value.trim() ? '\n' : '') + noteToAdd;
+                                    revAdminNotes.focus();
+                                }
                             }
                         });
                     });
 
-                    // Listener para zoom de imágenes
+                    // Zoom de imagen
                     document.querySelectorAll('.zoomable-doc-img').forEach(img => {
                         img.addEventListener('click', () => {
                             const src = img.getAttribute('data-src') || img.src;
@@ -1505,96 +1355,94 @@
 
                 if (docReviewModalOverlay) {
                     docReviewModalOverlay.style.display = 'flex';
-                    docReviewModalOverlay.style.opacity = '1';
-                    docReviewModalOverlay.style.pointerEvents = 'auto';
-                    docReviewModalOverlay.style.zIndex = '99999';
                     docReviewModalOverlay.classList.add('active');
                 }
             }
 
             window.openDocReviewModal = openDocReviewModal;
 
+            function closeDocReviewModal() {
+                if (docReviewModalOverlay) {
+                    docReviewModalOverlay.classList.remove('active');
+                    setTimeout(() => {
+                        if (!docReviewModalOverlay.classList.contains('active')) {
+                            docReviewModalOverlay.style.display = 'none';
+                        }
+                    }, 200);
+                }
+            }
+
             if (btnCloseDocReview) {
-                btnCloseDocReview.addEventListener('click', () => {
-                    if (docReviewModalOverlay) {
-                        docReviewModalOverlay.classList.remove('active');
-                        docReviewModalOverlay.style.display = 'none';
-                        docReviewModalOverlay.style.pointerEvents = 'none';
-                    }
-                });
+                btnCloseDocReview.addEventListener('click', closeDocReviewModal);
             }
 
             if (docReviewModalOverlay) {
                 docReviewModalOverlay.addEventListener('click', (e) => {
-                    if (e.target === docReviewModalOverlay) {
-                        docReviewModalOverlay.classList.remove('active');
-                        docReviewModalOverlay.style.display = 'none';
-                        docReviewModalOverlay.style.pointerEvents = 'none';
-                    }
+                    if (e.target === docReviewModalOverlay) closeDocReviewModal();
                 });
             }
 
-            // Zoom modal
-            const imgZoomModalOverlay = document.getElementById('imgZoomModalOverlay');
-            const imgZoomElement = document.getElementById('imgZoomElement');
-            const btnCloseZoom = document.getElementById('btnCloseZoom');
-
+            // 7. ZOOM MODAL
             function openImgZoomModal(src) {
                 if (imgZoomElement) imgZoomElement.src = src;
                 if (imgZoomModalOverlay) {
                     imgZoomModalOverlay.style.display = 'flex';
-                    imgZoomModalOverlay.style.opacity = '1';
-                    imgZoomModalOverlay.style.pointerEvents = 'auto';
-                    imgZoomModalOverlay.style.zIndex = '999999';
                     imgZoomModalOverlay.classList.add('active');
                 }
             }
 
-            if (btnCloseZoom) {
-                btnCloseZoom.addEventListener('click', () => {
-                    if (imgZoomModalOverlay) {
-                        imgZoomModalOverlay.classList.remove('active');
-                        imgZoomModalOverlay.style.display = 'none';
-                        imgZoomModalOverlay.style.pointerEvents = 'none';
-                    }
-                });
+            function closeImgZoomModal() {
+                if (imgZoomModalOverlay) {
+                    imgZoomModalOverlay.classList.remove('active');
+                    setTimeout(() => {
+                        if (!imgZoomModalOverlay.classList.contains('active')) {
+                            imgZoomModalOverlay.style.display = 'none';
+                        }
+                    }, 200);
+                }
             }
 
+            if (btnCloseZoom) btnCloseZoom.addEventListener('click', closeImgZoomModal);
             if (imgZoomModalOverlay) {
                 imgZoomModalOverlay.addEventListener('click', (e) => {
-                    if (e.target === imgZoomModalOverlay) {
-                        imgZoomModalOverlay.classList.remove('active');
-                        imgZoomModalOverlay.style.display = 'none';
-                        imgZoomModalOverlay.style.pointerEvents = 'none';
-                    }
+                    if (e.target === imgZoomModalOverlay) closeImgZoomModal();
                 });
             }
 
-            // 6. ACCIONES MAESTRAS DE APROBACIÓN O RECHAZO
+            // Atajo con teclado (Escape cierra modales)
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeImgZoomModal();
+                    closeDocReviewModal();
+                }
+            });
+
+            // 8. ACCIONES DE APROBACIÓN Y RECHAZO DE CONDUCTOR
             function updateDriverStatus(newStatus) {
                 if (!activeReviewDriver) return;
 
+                const notesVal = revAdminNotes ? revAdminNotes.value.trim() : '';
                 activeReviewDriver.estadoVerificacion = newStatus;
-                activeReviewDriver.observaciones = revAdminNotes.value.trim();
+                activeReviewDriver.observaciones = notesVal;
                 activeReviewDriver.updatedAt = Date.now();
 
-                // Guardar lista general de conductores
+                // Actualizar lista en memoria y localStorage
                 try {
                     localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(currentDrivers));
                 } catch(e) {}
 
-                // Si es el conductor local activo (driver docs), actualizar la persistencia de conductor.js
+                // Si es el conductor local activo
                 try {
                     const rawLocal = localStorage.getItem('rutaprivada_driver_docs_v1');
                     if (rawLocal) {
                         const docsObj = JSON.parse(rawLocal);
                         docsObj.estadoVerificacion = newStatus;
-                        docsObj.observaciones = revAdminNotes.value.trim();
+                        docsObj.observaciones = notesVal;
                         localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(docsObj));
                     }
                 } catch(e) {}
 
-                // Emitir y sincronizar evento en tiempo real mediante sync.js y Cloud Firestore
+                // Sincronizar con Firebase y RutaSync
                 const cleanDni = String(activeReviewDriver.dni || '').replace(/\D/g, '');
                 const driverDocId = String(activeReviewDriver.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
                 
@@ -1604,7 +1452,7 @@
                     nombre: activeReviewDriver.nombre,
                     dni: activeReviewDriver.dni,
                     estadoVerificacion: newStatus,
-                    observaciones: revAdminNotes.value.trim(),
+                    observaciones: notesVal,
                     updatedAt: Date.now()
                 };
 
@@ -1621,7 +1469,8 @@
                     window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driverPayload);
                 }
 
-                docReviewModalOverlay.classList.remove('active');
+                window.dispatchEvent(new Event('storage'));
+                closeDocReviewModal();
                 renderMetrics();
                 renderDriversTable();
 
@@ -1631,15 +1480,191 @@
                 alert(msg);
             }
 
-            btnApproveDriverMaster.addEventListener('click', () => {
-                updateDriverStatus('aprobado');
+            if (btnApproveDriverMaster) {
+                btnApproveDriverMaster.addEventListener('click', () => updateDriverStatus('aprobado'));
+            }
+
+            if (btnRejectDriverMaster) {
+                btnRejectDriverMaster.addEventListener('click', () => updateDriverStatus('rechazado'));
+            }
+
+            // 9. GESTIÓN DE RECARGAS DE SALDO
+            function loadRechargesData() {
+                let localRecharges = [];
+                try {
+                    const raw = localStorage.getItem('rutaprivada_driver_recharges_v1');
+                    if (raw) localRecharges = JSON.parse(raw);
+                } catch(e) {}
+
+                let combined = [...cloudRechargesList];
+                localRecharges.forEach(loc => {
+                    if (!combined.some(c => c.id === loc.id || (c.comprobante && loc.comprobante && c.comprobante === loc.comprobante))) {
+                        combined.push(loc);
+                    }
+                });
+
+                combined.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+                
+                const pendingCount = combined.filter(r => (r.estado || 'pendiente') === 'pendiente').length;
+                if (metricPendingRecharges) metricPendingRecharges.textContent = pendingCount;
+                if (badgePendingRechargesCount) {
+                    if (pendingCount > 0) {
+                        badgePendingRechargesCount.style.display = 'inline-block';
+                        badgePendingRechargesCount.textContent = pendingCount;
+                    } else {
+                        badgePendingRechargesCount.style.display = 'none';
+                    }
+                }
+
+                renderRechargesTable(combined);
+            }
+
+            function renderRechargesTable(list = null) {
+                if (!list) {
+                    loadRechargesData();
+                    return;
+                }
+
+                if (!rechargesTableBody) return;
+
+                if (list.length === 0) {
+                    rechargesTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px 20px; color: #94a3b8;">
+                                <i class="fa-solid fa-receipt" style="font-size: 2.2rem; margin-bottom: 10px; display: block; color: #64748b;"></i>
+                                No hay solicitudes de recarga por transferencia registradas actualmente.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                rechargesTableBody.innerHTML = list.map(r => {
+                    const status = (r.estado || 'pendiente').toLowerCase();
+                    const statusClass = status === 'aprobado' ? 'aprobado' : (status === 'rechazado' ? 'rechazado' : 'pendiente');
+                    const statusLabel = status === 'aprobado' ? '✓ Acreditado' : (status === 'rechazado' ? '✕ Rechazado' : '⏳ Pendiente de Conciliación');
+                    const amountFormatted = Number(r.monto || 0).toLocaleString('es-AR');
+                    const isPending = status === 'pendiente';
+                    const safeId = String(r.id || '');
+
+                    return `
+                        <tr>
+                            <td>
+                                <strong style="color: #fff; font-size: 0.95rem; display: block;">${r.driverName || 'Conductor Registrado'}</strong>
+                                <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
+                                    <span><i class="fa-solid fa-id-card"></i> DNI: ${r.driverDni || 'S/D'}</span> | 
+                                    <span><i class="fa-solid fa-car"></i> Patente: ${r.driverPatente || 'S/P'}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 800; color: #34d399;">$${amountFormatted}</span>
+                            </td>
+                            <td>
+                                <div style="background: rgba(255,255,255,0.06); padding: 4px 10px; border-radius: 6px; display: inline-block; font-family: monospace; font-size: 0.85rem; color: #fbbf24; border: 1px solid rgba(251,191,36,0.3);">
+                                    <i class="fa-solid fa-receipt"></i> #${r.comprobante || 'S/N'}
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-size: 0.82rem; color: #cbd5e1;">${r.fecha || 'Hoy'}</div>
+                                <div style="font-size: 0.74rem; color: #94a3b8;">${r.hora || ''}</div>
+                            </td>
+                            <td>
+                                <span class="badge-status ${statusClass}">${statusLabel}</span>
+                            </td>
+                            <td style="text-align: right;">
+                                ${isPending ? `
+                                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                        <button type="button" class="admin-btn btn-approve-recharge" data-id="${safeId}" data-amount="${r.monto}" data-dni="${r.driverDni || ''}" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; padding: 6px 12px; font-size: 0.78rem;">
+                                            <i class="fa-solid fa-check"></i> Aprobar & Acreditar
+                                        </button>
+                                        <button type="button" class="admin-btn btn-reject-recharge" data-id="${safeId}" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4); padding: 6px 12px; font-size: 0.78rem;">
+                                            <i class="fa-solid fa-xmark"></i> Rechazar
+                                        </button>
+                                    </div>
+                                ` : `
+                                    <span style="font-size: 0.78rem; color: #64748b;"><i class="fa-solid fa-circle-check"></i> Procesado</span>
+                                `}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Delegación de eventos en tabla de recargas
+            if (rechargesTableBody) {
+                rechargesTableBody.addEventListener('click', (e) => {
+                    const btnApprove = e.target.closest('.btn-approve-recharge');
+                    if (btnApprove) {
+                        e.preventDefault();
+                        const id = btnApprove.getAttribute('data-id');
+                        const amount = btnApprove.getAttribute('data-amount');
+                        const dni = btnApprove.getAttribute('data-dni');
+                        processRechargeDecision(id, 'aprobado', amount, dni);
+                        return;
+                    }
+
+                    const btnReject = e.target.closest('.btn-reject-recharge');
+                    if (btnReject) {
+                        e.preventDefault();
+                        const id = btnReject.getAttribute('data-id');
+                        processRechargeDecision(id, 'rechazado');
+                    }
+                });
+            }
+
+            function processRechargeDecision(rechargeId, decision, amount = 0, dni = '') {
+                if (!confirm(`¿Confirmas ${decision.toUpperCase()} esta recarga de saldo?`)) return;
+
+                // 1. Actualizar en Firestore
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                    try {
+                        const db = firebase.firestore();
+                        db.collection('wallet_recharges').doc(rechargeId).set({
+                            estado: decision,
+                            aprobadoPor: 'admin',
+                            timestampAprobacion: Date.now()
+                        }, { merge: true }).catch(err => console.warn('Firestore recharge update error:', err));
+                    } catch(e){}
+                }
+
+                // 2. Actualizar en LocalStorage
+                let updatedItem = null;
+                try {
+                    let localRecharges = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
+                    const idx = localRecharges.findIndex(r => r.id === rechargeId);
+                    if (idx >= 0) {
+                        localRecharges[idx].estado = decision;
+                        updatedItem = localRecharges[idx];
+                        localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(localRecharges));
+                    }
+                } catch(e){}
+
+                // 3. Emitir evento por bus sync (0ms al chofer)
+                if (window.RutaSync) {
+                    window.RutaSync.emit('RECARGA_SALDO_PROCESADA', {
+                        rechargeId,
+                        estado: decision,
+                        monto: amount,
+                        driverDni: dni,
+                        comprobante: updatedItem ? updatedItem.comprobante : '',
+                        timestamp: Date.now()
+                    });
+                }
+
+                window.dispatchEvent(new Event('storage'));
+                alert(decision === 'aprobado' ? `✅ ¡Recarga de $${Number(amount).toLocaleString('es-AR')} Aprobada!\nEl saldo se ha acreditado automáticamente en la billetera del chofer.` : `❌ Recarga rechazada.`);
+                loadRechargesData();
+            }
+
+            // Evento de storage para sincronización entre pestañas
+            window.addEventListener('storage', () => {
+                if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
+                    loadDriversData();
+                    loadRechargesData();
+                }
             });
 
-            btnRejectDriverMaster.addEventListener('click', () => {
-                updateDriverStatus('rechazado');
-            });
-
-            // Iniciar comprobación
+            // Iniciar comprobación y carga
             checkAuth();
         });
     </script>

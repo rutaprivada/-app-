@@ -5658,31 +5658,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const now = new Date();
                 const rechargeId = 'rec_' + Date.now();
 
-                const rechargeObj = {
-                    id: rechargeId,
-                    driverId: driverState.info.telefono || driverState.info.dni || 'chofer_current',
-                    driverName: driverState.info.nombre || 'Conductor Registrado',
-                    driverPatente: driverState.info.patente || 'S/P',
-                    driverDni: driverState.info.dni || 'S/D',
-                    driverPhone: driverState.info.telefono || '',
-                    monto: amount,
-                    comprobante: refCode,
-                    timestamp: Date.now(),
-                    fecha: now.toLocaleDateString('es-AR'),
-                    hora: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    metodo: 'transferencia_bancaria_cuit',
-                    estado: 'pendiente'
-                };
-
-                // 1. Guardar en lista de recargas para el panel de administración
-                try {
-                    let storedRecs = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
-                    storedRecs.unshift(rechargeObj);
-                    localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(storedRecs));
-                    window.dispatchEvent(new Event('storage'));
-                } catch(e) {}
-
-                // 2. Guardar en billetera del chofer como movimiento pendiente
                 wallet.movimientos.unshift({
                     id: rechargeId,
                     fecha: now.toLocaleDateString('es-AR'),
@@ -5697,27 +5672,89 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveDriverWallet(wallet);
                 updateWalletUI();
 
+                const rechargePayload = {
+                    id: rechargeId,
+                    driverId: driverState.info.telefono || driverState.info.dni || 'chofer_current',
+                    driverName: driverState.info.nombre || 'Conductor Registrado',
+                    driverPatente: driverState.info.patente || 'S/P',
+                    driverDni: driverState.info.dni || 'S/D',
+                    monto: amount,
+                    comprobante: refCode,
+                    timestamp: Date.now(),
+                    fecha: now.toLocaleDateString('es-AR'),
+                    hora: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    metodo: 'transferencia_bancaria_cuit',
+                    estado: 'pendiente'
+                };
+
+                // 1. Guardar localmente para disponibilidad inmediata
+                try {
+                    let localRecharges = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
+                    localRecharges.unshift(rechargePayload);
+                    localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(localRecharges));
+                    window.dispatchEvent(new Event('storage'));
+                } catch(e) {}
+
+                // 2. Emitir evento por bus sync para recepción inmediata en el Panel Admin
+                if (window.RutaSync) {
+                    window.RutaSync.emit('SOLICITUD_RECARGA_SALDO', rechargePayload);
+                }
+
                 if (modalRecargarSaldo) modalRecargarSaldo.classList.remove('active');
                 if (rechargeTransferRef) rechargeTransferRef.value = '';
 
                 showDriverToast(`⏳ Transferencia enviada a conciliación: $${amount.toLocaleString('es-AR')}`);
                 alert(`✓ Transferencia Registrada en Conciliación Bancaria.\n\nSe ha recibido tu aviso de recarga por $${amount.toLocaleString('es-AR')} con Comprobante N° ${refCode}.\n\nEl saldo se acreditará en tu cuenta tan pronto como el sistema o la Administración verifiquen el ingreso de los fondos en la cuenta bancaria.`);
 
-                // 3. Sincronizar recarga pendiente con Firestore y Bus Sync
+                // 3. Sincronizar recarga pendiente con Firestore
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
                         const db = firebase.firestore();
-                        db.collection('wallet_recharges').doc(rechargeId).set(rechargeObj).catch(err => console.warn('Error syncing recharge to firestore:', err));
+                        db.collection('wallet_recharges').doc(rechargeId).set(rechargePayload).catch(err => console.warn('Error syncing recharge to firestore:', err));
                     } catch(e) {}
-                }
-
-                if (window.RutaSync) {
-                    window.RutaSync.emit('NUEVA_RECARGA_SOLICITADA', rechargeObj);
                 }
             });
         }
 
-        // Listener en tiempo real para acreditaciones aprobadas por Administración
+        // Listener en tiempo real vía RutaSync (0ms de latencia) para acreditaciones aprobadas por Administración
+        if (window.RutaSync) {
+            window.RutaSync.on('RECARGA_SALDO_PROCESADA', (data) => {
+                if (!data) return;
+                const driverDni = (driverState.info.dni || '').replace(/\D/g, '');
+                const cleanTarget = (data.driverDni || '').replace(/\D/g, '');
+                if (!cleanTarget || !driverDni || cleanTarget === driverDni || data.driverDni === driverState.info.dni) {
+                    const processedKey = 'rutaprivada_processed_rec_' + (data.rechargeId || data.id || Date.now());
+                    if (!localStorage.getItem(processedKey)) {
+                        localStorage.setItem(processedKey, 'true');
+                        if (data.estado === 'aprobado') {
+                            const wallet = loadDriverWallet();
+                            const amount = Number(data.monto || 0);
+                            wallet.balance += amount;
+                            wallet.totalRecargas = (wallet.totalRecargas || 0) + amount;
+                            const now = new Date();
+                            wallet.movimientos.unshift({
+                                id: 'acred_' + Date.now(),
+                                fecha: now.toLocaleDateString('es-AR'),
+                                hora: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                tipo: 'recarga',
+                                estado: 'acreditado',
+                                descripcion: `Recarga Acreditada por Administración (#${data.comprobante || ''})`,
+                                monto: amount,
+                                saldoPosterior: wallet.balance
+                            });
+                            saveDriverWallet(wallet);
+                            updateWalletUI();
+                            showDriverToast(`🎉 ¡Saldo Acreditado! +$${amount.toLocaleString('es-AR')}`);
+                            try { playAlertSound('success'); } catch(e){}
+                        } else if (data.estado === 'rechazado') {
+                            showDriverToast(`❌ Tu solicitud de recarga fue rechazada por la administración.`);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Listener en tiempo real vía Firestore para acreditaciones aprobadas por Administración
         if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
             try {
                 const db = firebase.firestore();
