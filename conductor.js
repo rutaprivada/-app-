@@ -4560,7 +4560,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        function saveDocsData(status = 'pendiente') {
+        const FIREBASE_CONFIG_CONDUCTOR = {
+            apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
+            authDomain: "rutaprivada-app.firebaseapp.com",
+            projectId: "rutaprivada-app",
+            storageBucket: "rutaprivada-app.firebasestorage.app",
+            messagingSenderId: "349256222860",
+            appId: "1:349256222860:web:6bdac96975582de57093a9",
+            measurementId: "G-EXXS3VHD14"
+        };
+
+        async function saveDocsData(status = 'pendiente') {
             const current = loadDocsData();
             const photoSrc = (previewFotoPerfil && previewFotoPerfil.src && !previewFotoPerfil.src.includes('unsplash.com')) ? previewFotoPerfil.src : (loadedDocsImages.foto || current.fotoPerfil || '');
             const mergedDocsImages = Object.assign({}, current.docsImages || {}, loadedDocsImages);
@@ -4598,14 +4608,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const docId = 'drv_' + cleanDni;
             updatedDocs.id = docId;
 
-            if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+            if (typeof firebase !== 'undefined') {
                 try {
+                    if (!firebase.apps || !firebase.apps.length) {
+                        firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
+                    }
                     const db = firebase.firestore();
-                    db.collection('drivers').doc(docId).set({
+                    await db.collection('drivers').doc(docId).set({
                         ...updatedDocs,
                         isOnline: driverState.isOnline,
                         timestamp: Date.now()
-                    }, { merge: true }).catch(err => console.warn('Firestore driver sync warn:', err));
+                    }, { merge: true });
+                    console.log('✓ Conductor y documentación subidos a Firestore:', docId);
                 } catch(e) {
                     console.warn('Firestore sync error:', e);
                 }
