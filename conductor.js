@@ -4570,6 +4570,32 @@ document.addEventListener('DOMContentLoaded', () => {
             measurementId: "G-EXXS3VHD14"
         };
 
+        async function uploadToFirebaseStorageIfPossible(docId, docKey, fileOrDataUrl, isPdf = false) {
+            if (typeof firebase === 'undefined' || !firebase.storage) return null;
+            try {
+                if (!firebase.apps || !firebase.apps.length) {
+                    firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
+                }
+                const storage = firebase.storage();
+                const ext = isPdf ? 'pdf' : 'jpg';
+                const fileRef = storage.ref().child(`drivers/${docId}/${docKey}.${ext}`);
+                
+                let uploadTask;
+                if (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:')) {
+                    uploadTask = await fileRef.putString(fileOrDataUrl, 'data_url');
+                } else if (fileOrDataUrl instanceof Blob || fileOrDataUrl instanceof File) {
+                    uploadTask = await fileRef.put(fileOrDataUrl);
+                }
+                if (uploadTask) {
+                    const url = await uploadTask.ref.getDownloadURL();
+                    return url;
+                }
+            } catch(err) {
+                console.warn(`Storage upload info for ${docKey} (using Firestore atomic subcollection):`, err);
+            }
+            return null;
+        }
+
         async function saveDocsData(status = 'pendiente') {
             const current = loadDocsData();
             const photoSrc = (previewFotoPerfil && previewFotoPerfil.src && !previewFotoPerfil.src.includes('unsplash.com')) ? previewFotoPerfil.src : (loadedDocsImages.foto || current.fotoPerfil || '');
@@ -4603,7 +4629,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn('LocalStorage save warning:', e);
             }
 
-            // 2. Sincronizar en tiempo real con Firebase Cloud Firestore
+            // 2. Sincronizar en tiempo real con Firebase Cloud Firestore y Firebase Storage
             const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '') || (updatedDocs.telefono || '').replace(/\D/g, '') || String(Date.now());
             const docId = 'drv_' + cleanDni;
             updatedDocs.id = docId;
@@ -4614,12 +4640,61 @@ document.addEventListener('DOMContentLoaded', () => {
                         firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
                     }
                     const db = firebase.firestore();
-                    await db.collection('drivers').doc(docId).set({
+
+                    // A. Guardar cada archivo individualmente en Storage o Subcolección
+                    const docPromises = [];
+                    for (const [docKey, docData] of Object.entries(mergedDocsImages)) {
+                        if (docData && typeof docData === 'string' && docData.length > 20) {
+                            const isPdf = docData.startsWith('data:application/pdf') || docData.includes('application/pdf');
+                            const p = (async () => {
+                                let remoteUrl = null;
+                                try {
+                                    remoteUrl = await uploadToFirebaseStorageIfPossible(docId, docKey, docData, isPdf);
+                                    if (remoteUrl) {
+                                        mergedDocsImages[docKey] = remoteUrl;
+                                        if (docKey === 'foto') {
+                                            updatedDocs.fotoPerfil = remoteUrl;
+                                            if (previewFotoPerfil) previewFotoPerfil.src = remoteUrl;
+                                        }
+                                    }
+                                } catch(stErr){}
+
+                                await db.collection('drivers').doc(docId).collection('documents').doc(docKey).set({
+                                    key: docKey,
+                                    data: remoteUrl || docData,
+                                    updatedAt: Date.now()
+                                }, { merge: true }).catch(err => console.warn(`Error guardando subdoc ${docKey}:`, err));
+                            })();
+                            docPromises.push(p);
+                        }
+                    }
+                    await Promise.all(docPromises);
+
+                    // B. Guardar documento principal con metadatos y enlaces / fotos
+                    const mainDriverDoc = {
                         ...updatedDocs,
+                        docsImages: mergedDocsImages,
                         isOnline: driverState.isOnline,
                         timestamp: Date.now()
-                    }, { merge: true });
-                    console.log('✓ Conductor y documentación subidos a Firestore:', docId);
+                    };
+
+                    try {
+                        await db.collection('drivers').doc(docId).set(mainDriverDoc, { merge: true });
+                    } catch(sizeErr) {
+                        console.warn('Doc principal grande, usando referencias a subcolección:', sizeErr);
+                        const lightMap = {};
+                        for (const [k, v] of Object.entries(mergedDocsImages)) {
+                            if (v && v.startsWith('http')) {
+                                lightMap[k] = v;
+                            } else {
+                                lightMap[k] = 'saved_in_subcollection';
+                            }
+                        }
+                        mainDriverDoc.docsImages = lightMap;
+                        await db.collection('drivers').doc(docId).set(mainDriverDoc, { merge: true });
+                    }
+
+                    console.log('✓ Conductor y todos sus documentos subidos a Firestore / Storage:', docId);
                 } catch(e) {
                     console.warn('Firestore sync error:', e);
                 }

@@ -834,7 +834,8 @@
     <!-- FIREBASE & SYNC SCRIPTS -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <script src="sync.js?v=71"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+    <script src="sync.js?v=72"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -1516,7 +1517,7 @@
                 });
             });
 
-            // 6. MODAL DE REVISIÓN DOCUMENTAL DETALLADA CON AISLAMIENTO ESTRICTO Y BLOQUEO DE SEGURIDAD
+            // 6. MODAL DE REVISIÓN DOCUMENTAL DETALLADA CON AISLAMIENTO ESTRICTO Y CARGA EN TIEMPO REAL
             function openDocReviewModal(driverIdentifier) {
                 if (!currentDrivers || currentDrivers.length === 0) {
                     loadDriversData();
@@ -1580,173 +1581,237 @@
                     revAdminNotes.value = driver.observaciones || '';
                 }
 
-                // Extracción estricta y personal de documentos (AISLADO SOLO A ESTE CHOFER)
-                const userImgs = driver.docsImages || {};
+                // Subfunción para renderizar las tarjetas de los 9 documentos
+                function renderGrid() {
+                    const userImgs = driver.docsImages || {};
 
-                function resolveDoc(keys) {
-                    for (const k of keys) {
-                        if (userImgs[k] && typeof userImgs[k] === 'string' && userImgs[k].length > 20) return userImgs[k];
-                        if (driver[k] && typeof driver[k] === 'string' && driver[k].length > 20) return driver[k];
-                    }
-                    return '';
-                }
-
-                const docItems = [
-                    { title: '1. DNI Frente', key: 'dni_frente', data: resolveDoc(['dni_frente', 'dni', 'fileDniFrente', 'dniFrente']) },
-                    { title: '1. DNI Dorso', key: 'dni_dorso', data: resolveDoc(['dni_dorso', 'fileDniDorso', 'dniDorso']) },
-                    { title: '2. Licencia Frente', key: 'licencia_frente', data: resolveDoc(['licencia_frente', 'licencia', 'fileLicenciaFrente', 'licenciaFrente']) },
-                    { title: '2. Licencia Dorso', key: 'licencia_dorso', data: resolveDoc(['licencia_dorso', 'fileLicenciaDorso', 'licenciaDorso']) },
-                    { title: '3. Seguro del Auto (Póliza)', key: 'seguro', data: resolveDoc(['seguro', 'fileSeguro', 'poliza']) },
-                    { title: '4. Cédula Frente', key: 'cedula_frente', data: resolveDoc(['cedula_frente', 'cedula', 'fileCedulaFrente', 'cedulaFrente']) },
-                    { title: '4. Cédula Dorso', key: 'cedula_dorso', data: resolveDoc(['cedula_dorso', 'fileCedulaDorso', 'cedulaDorso']) },
-                    { title: '5. Antecedentes Penales', key: 'antecedentes', data: resolveDoc(['antecedentes', 'fileAntecedentes']) },
-                    { title: '6. Foto de Perfil', key: 'foto', data: resolveDoc(['foto', 'fotoPerfil', 'fileFotoPerfil']) || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com') ? driver.fotoPerfil : '') }
-                ];
-
-                // Estado de validación por cada uno de los 9 documentos
-                const isAlreadyApproved = (driver.estadoVerificacion === 'aprobado');
-                docValidationState = docItems.map(item => ({
-                    key: item.key,
-                    title: item.title,
-                    hasData: Boolean(item.data && item.data.length > 20),
-                    isValid: isAlreadyApproved && Boolean(item.data && item.data.length > 20),
-                    isObserved: false
-                }));
-
-                function updateMasterApprovalEligibility() {
-                    const totalDocs = docValidationState.length; // 9
-                    const validCount = docValidationState.filter(d => d.hasData && d.isValid && !d.isObserved).length;
-                    const missingCount = docValidationState.filter(d => !d.hasData).length;
-                    const observedCount = docValidationState.filter(d => d.isObserved).length;
-                    const unverifiedCount = totalDocs - validCount - missingCount - observedCount;
-
-                    if (revDocValidCount) {
-                        revDocValidCount.textContent = `${validCount}/${totalDocs} Validados`;
-                        revDocValidCount.style.color = validCount === totalDocs ? '#34d399' : '#fbbf24';
+                    function resolveDoc(keys) {
+                        for (const k of keys) {
+                            if (userImgs[k] && typeof userImgs[k] === 'string' && userImgs[k].length > 20 && !userImgs[k].endsWith('...[subcollection]')) {
+                                return userImgs[k];
+                            }
+                            if (driver[k] && typeof driver[k] === 'string' && driver[k].length > 20 && !driver[k].endsWith('...[subcollection]')) {
+                                return driver[k];
+                            }
+                        }
+                        return '';
                     }
 
-                    if (validCount === totalDocs && missingCount === 0 && observedCount === 0) {
-                        if (btnApproveDriverMaster) {
-                            btnApproveDriverMaster.disabled = false;
-                            btnApproveDriverMaster.style.opacity = '1';
-                            btnApproveDriverMaster.style.cursor = 'pointer';
-                            btnApproveDriverMaster.style.filter = 'none';
-                        }
-                        if (docApprovalWarningBanner) {
-                            docApprovalWarningBanner.style.background = 'rgba(16, 185, 129, 0.15)';
-                            docApprovalWarningBanner.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-                            docApprovalWarningBanner.style.color = '#34d399';
-                        }
-                        if (docApprovalWarningIcon) {
-                            docApprovalWarningIcon.className = 'fa-solid fa-circle-check';
-                            docApprovalWarningIcon.style.color = '#10b981';
-                        }
-                        if (docApprovalWarningText) {
-                            docApprovalWarningText.textContent = '✓ Documentación Completa y Verificada: Los 9 archivos están en regla y validados. Puedes habilitar al conductor para operar.';
-                        }
-                    } else {
-                        if (btnApproveDriverMaster) {
-                            btnApproveDriverMaster.disabled = true;
-                            btnApproveDriverMaster.style.opacity = '0.4';
-                            btnApproveDriverMaster.style.cursor = 'not-allowed';
-                            btnApproveDriverMaster.style.filter = 'grayscale(0.6)';
-                        }
-                        if (docApprovalWarningBanner) {
-                            docApprovalWarningBanner.style.background = 'rgba(239, 68, 68, 0.15)';
-                            docApprovalWarningBanner.style.borderColor = 'rgba(239, 68, 68, 0.35)';
-                            docApprovalWarningBanner.style.color = '#fca5a5';
-                        }
-                        if (docApprovalWarningIcon) {
-                            docApprovalWarningIcon.className = 'fa-solid fa-lock';
-                            docApprovalWarningIcon.style.color = '#ef4444';
-                        }
-                        let detailReasons = [];
-                        if (missingCount > 0) detailReasons.push(`${missingCount} sin adjuntar`);
-                        if (observedCount > 0) detailReasons.push(`${observedCount} observado(s)`);
-                        if (unverifiedCount > 0) detailReasons.push(`${unverifiedCount} sin validar`);
+                    const docItems = [
+                        { title: '1. DNI Frente', key: 'dni_frente', data: resolveDoc(['dni_frente', 'dni', 'fileDniFrente', 'dniFrente']) },
+                        { title: '1. DNI Dorso', key: 'dni_dorso', data: resolveDoc(['dni_dorso', 'fileDniDorso', 'dniDorso']) },
+                        { title: '2. Licencia Frente', key: 'licencia_frente', data: resolveDoc(['licencia_frente', 'licencia', 'fileLicenciaFrente', 'licenciaFrente']) },
+                        { title: '2. Licencia Dorso', key: 'licencia_dorso', data: resolveDoc(['licencia_dorso', 'fileLicenciaDorso', 'licenciaDorso']) },
+                        { title: '3. Seguro del Auto (Póliza)', key: 'seguro', data: resolveDoc(['seguro', 'fileSeguro', 'poliza']) },
+                        { title: '4. Cédula Frente', key: 'cedula_frente', data: resolveDoc(['cedula_frente', 'cedula', 'fileCedulaFrente', 'cedulaFrente']) },
+                        { title: '4. Cédula Dorso', key: 'cedula_dorso', data: resolveDoc(['cedula_dorso', 'fileCedulaDorso', 'cedulaDorso']) },
+                        { title: '5. Antecedentes Penales', key: 'antecedentes', data: resolveDoc(['antecedentes', 'fileAntecedentes']) },
+                        { title: '6. Foto de Perfil', key: 'foto', data: resolveDoc(['foto', 'fotoPerfil', 'fileFotoPerfil']) || (driver.fotoPerfil && !driver.fotoPerfil.includes('unsplash.com') ? driver.fotoPerfil : '') }
+                    ];
 
-                        if (docApprovalWarningText) {
-                            docApprovalWarningText.textContent = `⛔ Aprobación Bloqueada: ${detailReasons.join(', ')}. Deben estar los 9 documentos subidos y validados para habilitar al chofer.`;
-                        }
-                    }
-                }
+                    const isAlreadyApproved = (driver.estadoVerificacion === 'aprobado');
+                    docValidationState = docItems.map(item => ({
+                        key: item.key,
+                        title: item.title,
+                        hasData: Boolean(item.data && item.data.length > 20),
+                        isValid: isAlreadyApproved && Boolean(item.data && item.data.length > 20),
+                        isObserved: false
+                    }));
 
-                if (docsReviewGrid) {
-                    docsReviewGrid.innerHTML = docItems.map((item, idx) => {
-                        const hasData = Boolean(item.data && item.data.length > 20);
-                        const isPdf = hasData && (item.data.startsWith('data:application/pdf') || item.data.includes('application/pdf') || item.data.includes('.pdf'));
-                        const isInitiallyValid = docValidationState[idx] && docValidationState[idx].isValid;
+                    updateMasterApprovalEligibility();
 
-                        let contentHtml = '';
-                        if (isPdf) {
-                            contentHtml = `
-                                <div style="height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(2,132,199,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:8px; margin:10px 0; padding:10px; text-align:center;">
-                                    <i class="fa-solid fa-file-pdf" style="font-size:2rem; color:#ef4444; margin-bottom:6px;"></i>
-                                    <span style="font-size:0.75rem; color:#fff; font-weight:700;">Documento en PDF</span>
-                                    <a href="${item.data}" target="_blank" download="${item.key}.pdf" style="margin-top:6px; background:#0284c7; color:#fff; padding:4px 10px; border-radius:6px; font-size:0.72rem; text-decoration:none; font-weight:700;">
-                                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir / Ver PDF
-                                    </a>
-                                </div>
-                            `;
-                        } else if (hasData) {
-                            contentHtml = `
-                                <img src="${item.data}" class="doc-preview-img zoomable-doc-img" data-src="${item.data}" title="Clic para ampliar imagen">
-                            `;
-                        } else {
-                            contentHtml = `
-                                <div style="height:120px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); border:1px dashed rgba(255,255,255,0.15); border-radius:8px; margin:10px 0; color:#94a3b8; font-size:0.8rem;">
-                                    <i class="fa-solid fa-file-circle-xmark" style="margin-right:6px;"></i> No adjuntado aún
-                                </div>
-                            `;
-                        }
+                    if (docsReviewGrid) {
+                        docsReviewGrid.innerHTML = docItems.map((item, idx) => {
+                            const hasData = Boolean(item.data && item.data.length > 20);
+                            const isPdf = hasData && (item.data.startsWith('data:application/pdf') || item.data.includes('application/pdf') || item.data.includes('.pdf'));
+                            const isInitiallyValid = docValidationState[idx] && docValidationState[idx].isValid;
 
-                        let badgeHtml = '';
-                        if (isInitiallyValid) {
-                            badgeHtml = '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(16,185,129,0.25); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✓ Verificado</span>';
-                        } else if (hasData) {
-                            badgeHtml = '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(59,130,246,0.2); color: #60a5fa; padding: 2px 6px; border-radius: 4px; font-weight: 700;">📎 Adjuntado (Revisar)</span>';
-                        } else {
-                            badgeHtml = '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(239,68,68,0.2); color: #fca5a5; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✕ Sin Archivo</span>';
-                        }
-
-                        return `
-                            <div class="doc-review-card" id="docCard_${idx}" style="${isInitiallyValid ? 'border-color:#10b981; background:rgba(16,185,129,0.08);' : ''}">
-                                <div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                                        <strong style="font-size: 0.8rem; color: #e2e8f0;">${item.title}</strong>
-                                        ${badgeHtml}
+                            let contentHtml = '';
+                            if (isPdf) {
+                                contentHtml = `
+                                    <div style="height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(2,132,199,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:8px; margin:10px 0; padding:10px; text-align:center;">
+                                        <i class="fa-solid fa-file-pdf" style="font-size:2rem; color:#ef4444; margin-bottom:6px;"></i>
+                                        <span style="font-size:0.75rem; color:#fff; font-weight:700;">Documento en PDF</span>
+                                        <a href="${item.data}" target="_blank" download="${item.key}.pdf" style="margin-top:6px; background:#0284c7; color:#fff; padding:4px 10px; border-radius:6px; font-size:0.72rem; text-decoration:none; font-weight:700;">
+                                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir / Ver PDF
+                                        </a>
                                     </div>
-                                    ${contentHtml}
-                                </div>
-                                <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
-                                    <label class="admin-btn" style="width: 100%; justify-content: center; font-size: 0.74rem; padding: 6px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.35); cursor: pointer; text-align: center;">
-                                        <input type="file" class="admin-doc-file-input" data-key="${item.key}" data-index="${idx}" accept="image/*,application/pdf" style="display: none;">
-                                        <i class="fa-solid fa-cloud-arrow-up"></i> ${hasData ? 'Reemplazar Archivo' : 'Subir Archivo desde PC'}
-                                    </label>
-                                    <div style="display: flex; gap: 6px;">
-                                        <button type="button" class="admin-btn btn-doc-approve" data-index="${idx}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">
-                                            <i class="fa-solid fa-check"></i> Válido
-                                        </button>
-                                        <button type="button" class="admin-btn btn-doc-reject" data-index="${idx}" data-title="${item.title}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(239,68,68,0.2); color:#f87171; border-color:rgba(239,68,68,0.4);">
-                                            <i class="fa-solid fa-xmark"></i> Observar
-                                        </button>
+                                `;
+                            } else if (hasData) {
+                                contentHtml = `
+                                    <img src="${item.data}" class="doc-preview-img zoomable-doc-img" data-src="${item.data}" title="Clic para ampliar imagen">
+                                `;
+                            } else {
+                                contentHtml = `
+                                    <div style="height:120px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); border:1px dashed rgba(255,255,255,0.15); border-radius:8px; margin:10px 0; color:#94a3b8; font-size:0.8rem;">
+                                        <i class="fa-solid fa-file-circle-xmark" style="margin-right:6px;"></i> No adjuntado aún
+                                    </div>
+                                `;
+                            }
+
+                            let badgeHtml = '';
+                            if (isInitiallyValid) {
+                                badgeHtml = '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(16,185,129,0.25); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✓ Verificado</span>';
+                            } else if (hasData) {
+                                badgeHtml = '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(59,130,246,0.2); color: #60a5fa; padding: 2px 6px; border-radius: 4px; font-weight: 700;">📎 Adjuntado (Revisar)</span>';
+                            } else {
+                                badgeHtml = '<span class="doc-item-badge" style="font-size: 0.65rem; background: rgba(239,68,68,0.2); color: #fca5a5; padding: 2px 6px; border-radius: 4px; font-weight: 700;">✕ Sin Archivo</span>';
+                            }
+
+                            return `
+                                <div class="doc-review-card" id="docCard_${idx}" style="${isInitiallyValid ? 'border-color:#10b981; background:rgba(16,185,129,0.08);' : ''}">
+                                    <div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <strong style="font-size: 0.8rem; color: #e2e8f0;">${item.title}</strong>
+                                            ${badgeHtml}
+                                        </div>
+                                        ${contentHtml}
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+                                        <label class="admin-btn" style="width: 100%; justify-content: center; font-size: 0.74rem; padding: 6px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.35); cursor: pointer; text-align: center;">
+                                            <input type="file" class="admin-doc-file-input" data-key="${item.key}" data-index="${idx}" accept="image/*,application/pdf" style="display: none;">
+                                            <i class="fa-solid fa-cloud-arrow-up"></i> ${hasData ? 'Reemplazar Archivo' : 'Subir Archivo desde PC'}
+                                        </label>
+                                        <div style="display: flex; gap: 6px;">
+                                            <button type="button" class="admin-btn btn-doc-approve" data-index="${idx}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">
+                                                <i class="fa-solid fa-check"></i> Válido
+                                            </button>
+                                            <button type="button" class="admin-btn btn-doc-reject" data-index="${idx}" data-title="${item.title}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(239,68,68,0.2); color:#f87171; border-color:rgba(239,68,68,0.4);">
+                                                <i class="fa-solid fa-xmark"></i> Observar
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        `;
-                    }).join('');
+                            `;
+                        }).join('');
 
-                    // Listeners para subir archivos directos desde PC por el Administrador
-                    document.querySelectorAll('.admin-doc-file-input').forEach(input => {
-                        input.addEventListener('change', async (e) => {
-                            const file = e.target.files[0];
-                            if (!file || !activeReviewDriver) return;
-                            const key = input.getAttribute('data-key');
-                            const idx = parseInt(input.getAttribute('data-index'), 10);
-                            try {
-                                const res = await compressImageFile(file);
-                                if (res && res.data) {
-                                    if (!activeReviewDriver.docsImages) activeReviewDriver.docsImages = {};
+                        // Clic para Zoom de imágenes
+                        document.querySelectorAll('.zoomable-doc-img').forEach(img => {
+                            img.addEventListener('click', () => {
+                                const src = img.getAttribute('data-src') || img.src;
+                                if (imgZoomElement && src) {
+                                    imgZoomElement.src = src;
+                                    if (imgZoomModalOverlay) {
+                                        imgZoomModalOverlay.style.display = 'flex';
+                                        imgZoomModalOverlay.classList.add('active');
+                                    }
+                                }
+                            });
+                        });
+
+                        // Reasignar listeners
+                        document.querySelectorAll('.admin-doc-file-input').forEach(input => {
+                            input.addEventListener('change', async (e) => {
+                                const file = e.target.files[0];
+                                if (!file || !activeReviewDriver) return;
+                                const key = input.getAttribute('data-key');
+                                const idx = parseInt(input.getAttribute('data-index'), 10);
+                                try {
+                                    const res = await compressImageFile(file);
+                                    if (res && res.data) {
+                                        if (!activeReviewDriver.docsImages) activeReviewDriver.docsImages = {};
+                                        activeReviewDriver.docsImages[key] = res.data;
+                                        if (key === 'foto') {
+                                            activeReviewDriver.fotoPerfil = res.data;
+                                            if (revDriverAvatar) revDriverAvatar.src = res.data;
+                                        }
+                                        if (docValidationState[idx]) {
+                                            docValidationState[idx].hasData = true;
+                                            docValidationState[idx].isValid = true;
+                                            docValidationState[idx].isObserved = false;
+                                        }
+                                        saveUpdatedDriverToStorage(activeReviewDriver);
+                                        renderGrid();
+                                    }
+                                } catch(err) {
+                                    console.error('Error cargando documento desde admin:', err);
+                                    alert('Error al procesar el archivo seleccionado.');
+                                }
+                            });
+                        });
+
+                        document.querySelectorAll('.btn-doc-approve').forEach(btn => {
+                            btn.addEventListener('click', () => {
+                                const idx = parseInt(btn.getAttribute('data-index'), 10);
+                                if (docValidationState[idx]) {
+                                    if (!docValidationState[idx].hasData) {
+                                        alert('⚠️ No puedes validar un documento que no ha sido adjuntado aún.');
+                                        return;
+                                    }
+                                    docValidationState[idx].isValid = true;
+                                    docValidationState[idx].isObserved = false;
+                                    const card = document.getElementById(`docCard_${idx}`);
+                                    if (card) {
+                                        card.style.borderColor = '#10b981';
+                                        card.style.background = 'rgba(16, 185, 129, 0.08)';
+                                        const badge = card.querySelector('.doc-item-badge');
+                                        if (badge) {
+                                            badge.textContent = '✓ Verificado';
+                                            badge.style.background = 'rgba(16, 185, 129, 0.3)';
+                                            badge.style.color = '#34d399';
+                                        }
+                                    }
+                                    updateMasterApprovalEligibility();
+                                }
+                            });
+                        });
+
+                        document.querySelectorAll('.btn-doc-reject').forEach(btn => {
+                            btn.addEventListener('click', () => {
+                                const idx = parseInt(btn.getAttribute('data-index'), 10);
+                                const docTitle = btn.getAttribute('data-title') || 'Documento';
+                                if (docValidationState[idx]) {
+                                    docValidationState[idx].isValid = false;
+                                    docValidationState[idx].isObserved = true;
+                                    const card = document.getElementById(`docCard_${idx}`);
+                                    if (card) {
+                                        card.style.borderColor = '#ef4444';
+                                        card.style.background = 'rgba(239, 68, 68, 0.08)';
+                                        const badge = card.querySelector('.doc-item-badge');
+                                        if (badge) {
+                                            badge.textContent = '⚠️ Observado';
+                                            badge.style.background = 'rgba(239, 68, 68, 0.3)';
+                                            badge.style.color = '#f87171';
+                                        }
+                                    }
+                                    if (revAdminNotes) {
+                                        const noteToAdd = `• Observación en ${docTitle}: `;
+                                        if (!revAdminNotes.value.includes(noteToAdd)) {
+                                            revAdminNotes.value += (revAdminNotes.value.trim() ? '\n' : '') + noteToAdd;
+                                            revAdminNotes.focus();
+                                        }
+                                    }
+                                    updateMasterApprovalEligibility();
+                                }
+                            });
+                        });
+                    }
+                }
+
+                renderGrid();
+
+                // Carga en segundo plano de los documentos desde Firestore subcolección 'documents'
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length && driver.id) {
+                    try {
+                        const db = firebase.firestore();
+                        db.collection('drivers').doc(driver.id).collection('documents').get().then(subSnap => {
+                            if (subSnap && !subSnap.empty) {
+                                if (!driver.docsImages) driver.docsImages = {};
+                                let hasNewData = false;
+                                subSnap.forEach(subDoc => {
+                                    const sData = subDoc.data();
+                                    if (sData && sData.data && sData.data.length > 20) {
+                                        driver.docsImages[subDoc.id] = sData.data;
+                                        hasNewData = true;
+                                    }
+                                });
+                                if (hasNewData && activeReviewDriver && activeReviewDriver.id === driver.id) {
+                                    renderGrid();
+                                }
+                            }
+                        }).catch(err => console.warn('Firestore subcollection load warning:', err));
+                    } catch(e){}
+                }
                                     activeReviewDriver.docsImages[key] = res.data;
                                     if (key === 'foto') {
                                         activeReviewDriver.fotoPerfil = res.data;
