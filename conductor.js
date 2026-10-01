@@ -4629,7 +4629,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn('LocalStorage save warning:', e);
             }
 
-            // 2. Sincronizar en tiempo real con Firebase Cloud Firestore y Firebase Storage
+            // 2. Sincronizar en tiempo real con Firebase Cloud Firestore
             const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '') || (updatedDocs.telefono || '').replace(/\D/g, '') || String(Date.now());
             const docId = 'drv_' + cleanDni;
             updatedDocs.id = docId;
@@ -4641,60 +4641,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     const db = firebase.firestore();
 
-                    // A. Guardar cada archivo individualmente en Storage o Subcolección
-                    const docPromises = [];
-                    for (const [docKey, docData] of Object.entries(mergedDocsImages)) {
-                        if (docData && typeof docData === 'string' && docData.length > 20) {
-                            const isPdf = docData.startsWith('data:application/pdf') || docData.includes('application/pdf');
-                            const p = (async () => {
-                                let remoteUrl = null;
-                                try {
-                                    remoteUrl = await uploadToFirebaseStorageIfPossible(docId, docKey, docData, isPdf);
-                                    if (remoteUrl) {
-                                        mergedDocsImages[docKey] = remoteUrl;
-                                        if (docKey === 'foto') {
-                                            updatedDocs.fotoPerfil = remoteUrl;
-                                            if (previewFotoPerfil) previewFotoPerfil.src = remoteUrl;
-                                        }
-                                    }
-                                } catch(stErr){}
-
-                                await db.collection('drivers').doc(docId).collection('documents').doc(docKey).set({
-                                    key: docKey,
-                                    data: remoteUrl || docData,
-                                    updatedAt: Date.now()
-                                }, { merge: true }).catch(err => console.warn(`Error guardando subdoc ${docKey}:`, err));
-                            })();
-                            docPromises.push(p);
-                        }
-                    }
-                    await Promise.all(docPromises);
-
-                    // B. Guardar documento principal con metadatos y enlaces / fotos
+                    // A. Guardar de inmediato datos del chofer en la colección principal
                     const mainDriverDoc = {
                         ...updatedDocs,
-                        docsImages: mergedDocsImages,
                         isOnline: driverState.isOnline,
                         timestamp: Date.now()
                     };
 
-                    try {
-                        await db.collection('drivers').doc(docId).set(mainDriverDoc, { merge: true });
-                    } catch(sizeErr) {
-                        console.warn('Doc principal grande, usando referencias a subcolección:', sizeErr);
-                        const lightMap = {};
-                        for (const [k, v] of Object.entries(mergedDocsImages)) {
-                            if (v && v.startsWith('http')) {
-                                lightMap[k] = v;
-                            } else {
-                                lightMap[k] = 'saved_in_subcollection';
-                            }
-                        }
-                        mainDriverDoc.docsImages = lightMap;
-                        await db.collection('drivers').doc(docId).set(mainDriverDoc, { merge: true });
-                    }
+                    db.collection('drivers').doc(docId).set(mainDriverDoc, { merge: true }).then(() => {
+                        console.log('✓ Perfil de conductor sincronizado con Firestore:', docId);
+                    }).catch(err => console.warn('Error guardando chofer en Firestore:', err));
 
-                    console.log('✓ Conductor y todos sus documentos subidos a Firestore / Storage:', docId);
+                    // B. Guardar cada archivo individualmente en subcolección 'documents'
+                    for (const [docKey, docData] of Object.entries(mergedDocsImages)) {
+                        if (docData && typeof docData === 'string' && docData.length > 20) {
+                            db.collection('drivers').doc(docId).collection('documents').doc(docKey).set({
+                                key: docKey,
+                                data: docData,
+                                updatedAt: Date.now()
+                            }, { merge: true }).catch(err => console.warn(`Error guardando subdoc ${docKey}:`, err));
+                        }
+                    }
                 } catch(e) {
                     console.warn('Firestore sync error:', e);
                 }
