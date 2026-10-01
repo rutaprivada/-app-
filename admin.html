@@ -1162,6 +1162,38 @@
                     measurementId: "G-EXXS3VHD14"
                 };
 
+                const fetchDriversFromFirestore = (db) => {
+                    db.collection('drivers').get().then((snapshot) => {
+                        if (snapshot && !snapshot.empty) {
+                            cloudDriversList = [];
+                            snapshot.forEach(doc => {
+                                if (doc.exists) {
+                                    const d = doc.data();
+                                    d.id = d.id || doc.id;
+                                    cloudDriversList.push(d);
+                                }
+                            });
+                            loadDriversData();
+                        }
+                    }).catch(err => console.warn('Firestore initial drivers fetch warning:', err));
+                };
+
+                const fetchRechargesFromFirestore = (db) => {
+                    db.collection('wallet_recharges').get().then((snapshot) => {
+                        if (snapshot && !snapshot.empty) {
+                            cloudRechargesList = [];
+                            snapshot.forEach(doc => {
+                                if (doc.exists) {
+                                    const data = doc.data();
+                                    data.id = data.id || doc.id;
+                                    cloudRechargesList.push(data);
+                                }
+                            });
+                            loadRechargesData();
+                        }
+                    }).catch(err => console.warn('Firestore initial recharges fetch warning:', err));
+                };
+
                 let retries = 0;
                 const attachListener = () => {
                     if (typeof firebase !== 'undefined') {
@@ -1171,7 +1203,11 @@
                             }
                             const db = firebase.firestore();
                             
-                            // Escuchar Conductores en tiempo real
+                            // 1. Carga inmediata directa
+                            fetchDriversFromFirestore(db);
+                            fetchRechargesFromFirestore(db);
+
+                            // 2. Escuchar Conductores en tiempo real
                             db.collection('drivers').onSnapshot((snapshot) => {
                                 cloudDriversList = [];
                                 snapshot.forEach(doc => {
@@ -1187,7 +1223,7 @@
                                 }
                             }, (err) => console.warn('Firestore admin listener warning:', err));
 
-                            // Escuchar Recargas de Saldo en tiempo real
+                            // 3. Escuchar Recargas de Saldo en tiempo real
                             db.collection('wallet_recharges').onSnapshot((snapshot) => {
                                 cloudRechargesList = [];
                                 snapshot.forEach(doc => {
@@ -1200,10 +1236,16 @@
                                 loadRechargesData();
                             }, (err) => console.warn('Firestore recharges listener warning:', err));
 
+                            // 4. Polling de respaldo cada 3.5 segundos para garantizar datos en vivo siempre
+                            setInterval(() => {
+                                fetchDriversFromFirestore(db);
+                                fetchRechargesFromFirestore(db);
+                            }, 3500);
+
                         } catch(e) {
                             console.warn('Error setting up admin firestore sync:', e);
                         }
-                    } else if (retries < 10) {
+                    } else if (retries < 15) {
                         retries++;
                         setTimeout(attachListener, 300);
                     }
@@ -1811,122 +1853,6 @@
                             }
                         }).catch(err => console.warn('Firestore subcollection load warning:', err));
                     } catch(e){}
-                }
-                                    activeReviewDriver.docsImages[key] = res.data;
-                                    if (key === 'foto') {
-                                        activeReviewDriver.fotoPerfil = res.data;
-                                        if (revDriverAvatar) revDriverAvatar.src = res.data;
-                                    }
-                                    if (docValidationState[idx]) {
-                                        docValidationState[idx].hasData = true;
-                                        docValidationState[idx].isValid = true;
-                                        docValidationState[idx].isObserved = false;
-                                    }
-                                    saveUpdatedDriverToStorage(activeReviewDriver);
-                                    openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
-                                }
-                            } catch(err) {
-                                console.error('Error cargando documento desde admin:', err);
-                                alert('Error al procesar el archivo seleccionado.');
-                            }
-                        });
-                    });
-
-                    // Listeners individuales para marcar Válido
-                    document.querySelectorAll('.btn-doc-approve').forEach(btn => {
-                        btn.addEventListener('click', () => {
-                            const idx = parseInt(btn.getAttribute('data-index'), 10);
-                            if (docValidationState[idx]) {
-                                if (!docValidationState[idx].hasData) {
-                                    alert('⚠️ No puedes validar un documento que no ha sido adjuntado aún.');
-                                    return;
-                                }
-                                docValidationState[idx].isValid = true;
-                                docValidationState[idx].isObserved = false;
-                                const card = document.getElementById(`docCard_${idx}`);
-                                if (card) {
-                                    card.style.borderColor = '#10b981';
-                                    card.style.background = 'rgba(16, 185, 129, 0.08)';
-                                    const badge = card.querySelector('.doc-item-badge');
-                                    if (badge) {
-                                        badge.textContent = '✓ Verificado';
-                                        badge.style.background = 'rgba(16, 185, 129, 0.3)';
-                                        badge.style.color = '#34d399';
-                                    }
-                                }
-                                updateMasterApprovalEligibility();
-                            }
-                        });
-                    });
-
-                    // Listeners individuales para Observar
-                    document.querySelectorAll('.btn-doc-reject').forEach(btn => {
-                        btn.addEventListener('click', () => {
-                            const idx = parseInt(btn.getAttribute('data-index'), 10);
-                            const docTitle = btn.getAttribute('data-title') || 'Documento';
-                            if (docValidationState[idx]) {
-                                docValidationState[idx].isValid = false;
-                                docValidationState[idx].isObserved = true;
-                                const card = document.getElementById(`docCard_${idx}`);
-                                if (card) {
-                                    card.style.borderColor = '#ef4444';
-                                    card.style.background = 'rgba(239, 68, 68, 0.08)';
-                                    const badge = card.querySelector('.doc-item-badge');
-                                    if (badge) {
-                                        badge.textContent = '⚠️ Observado';
-                                        badge.style.background = 'rgba(239, 68, 68, 0.3)';
-                                        badge.style.color = '#f87171';
-                                    }
-                                }
-                                if (revAdminNotes) {
-                                    const noteToAdd = `• Observación en ${docTitle}: `;
-                                    if (!revAdminNotes.value.includes(noteToAdd)) {
-                                        revAdminNotes.value += (revAdminNotes.value.trim() ? '\n' : '') + noteToAdd;
-                                        revAdminNotes.focus();
-                                    }
-                                }
-                                updateMasterApprovalEligibility();
-                            }
-                        });
-                    });
-
-                    // Botón para validar todos los archivos presentes con un clic
-                    if (btnValidateAllDocs) {
-                        btnValidateAllDocs.onclick = () => {
-                            let anyMissing = false;
-                            docValidationState.forEach((item, idx) => {
-                                if (item.hasData) {
-                                    item.isValid = true;
-                                    item.isObserved = false;
-                                    const card = document.getElementById(`docCard_${idx}`);
-                                    if (card) {
-                                        card.style.borderColor = '#10b981';
-                                        card.style.background = 'rgba(16, 185, 129, 0.08)';
-                                        const badge = card.querySelector('.doc-item-badge');
-                                        if (badge) {
-                                            badge.textContent = '✓ Verificado';
-                                            badge.style.background = 'rgba(16, 185, 129, 0.3)';
-                                            badge.style.color = '#34d399';
-                                        }
-                                    }
-                                } else {
-                                    anyMissing = true;
-                                }
-                            });
-                            updateMasterApprovalEligibility();
-                            if (anyMissing) {
-                                alert('⚠️ Se validaron los documentos adjuntos. Ten presente que aún faltan archivos por subir para poder habilitar al chofer.');
-                            }
-                        };
-                    }
-
-                    // Zoom de imagen
-                    document.querySelectorAll('.zoomable-doc-img').forEach(img => {
-                        img.addEventListener('click', () => {
-                            const src = img.getAttribute('data-src') || img.src;
-                            openImgZoomModal(src);
-                        });
-                    });
                 }
 
                 updateMasterApprovalEligibility();
