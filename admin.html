@@ -465,6 +465,9 @@
         </a>
 
         <div class="admin-nav-actions">
+            <button id="btnOpenManualDriverModal" class="admin-btn admin-btn-primary">
+                <i class="fa-solid fa-user-plus"></i> + Alta Manual Chofer
+            </button>
             <button id="btnRefreshAdmin" class="admin-btn">
                 <i class="fa-solid fa-rotate"></i> Actualizar
             </button>
@@ -624,6 +627,94 @@
         </div>
 
     </main>
+
+    <!-- MODAL DE ALTA MANUAL DE CONDUCTOR -->
+    <div class="admin-modal-overlay" id="manualDriverModalOverlay" style="display: none;">
+        <div class="admin-modal-card" style="max-width: 650px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--admin-border); padding-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(251, 191, 36, 0.2); color: #fbbf24; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                        <i class="fa-solid fa-user-plus"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; color: #fff; font-size: 1.15rem; font-family: 'Outfit', sans-serif;">Alta Manual de Conductor</h3>
+                        <span style="font-size: 0.78rem; color: #94a3b8;">Registra un nuevo chofer y adjunta sus documentos directamente desde PC</span>
+                    </div>
+                </div>
+                <button type="button" id="btnCloseManualDriver" style="background: transparent; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="formManualDriver">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div>
+                        <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px;">Nombre y Apellido *</label>
+                        <input type="text" id="manDriverName" required placeholder="Ej: Carlos Gómez" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 0.85rem;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px;">DNI / Pasaporte *</label>
+                        <input type="text" id="manDriverDni" required placeholder="Ej: 38472910" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 0.85rem;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div>
+                        <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px;">Teléfono WhatsApp *</label>
+                        <input type="tel" id="manDriverPhone" required placeholder="Ej: +54 9 11 2345-6789" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 0.85rem;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px;">Correo Electrónico *</label>
+                        <input type="email" id="manDriverEmail" required placeholder="Ej: chofer@gmail.com" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 0.85rem;">
+                    </div>
+                </div>
+
+                <div style="background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.25); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="manDriverConsent" checked style="width: 16px; height: 16px; accent-color: #fbbf24; cursor: pointer;">
+                    <label for="manDriverConsent" style="font-size: 0.75rem; color: #fbbf24; font-weight: 600; cursor: pointer;">
+                        El conductor acepta recibir notificaciones y correos oficiales de Ruta Privada.
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div>
+                        <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px;">Vehículo (Marca / Modelo) *</label>
+                        <input type="text" id="manDriverVehicle" required placeholder="Ej: Toyota Corolla" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 0.85rem;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px;">Patente *</label>
+                        <input type="text" id="manDriverPlate" required placeholder="Ej: AF 123 CD" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 0.85rem; text-transform: uppercase;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px;">Color</label>
+                        <input type="text" id="manDriverColor" placeholder="Ej: Gris Plata" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 0.85rem;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div>
+                        <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px;">Banco / Billetera</label>
+                        <input type="text" id="manDriverBank" placeholder="Ej: Mercado Pago" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 0.85rem;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px;">CBU / CVU / Alias</label>
+                        <input type="text" id="manDriverCbu" placeholder="Ej: 00000031000..." style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 0.85rem;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 4px;">Titular Cuenta</label>
+                        <input type="text" id="manDriverHolder" placeholder="Ej: Carlos Gómez" style="width: 100%; background: #0b0f19; border: 1px solid var(--admin-border); color: #fff; border-radius: 8px; padding: 9px 12px; font-size: 0.85rem;">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" id="btnCancelManualDriver" class="admin-btn" style="padding: 10px 18px;">Cancelar</button>
+                    <button type="submit" class="admin-btn admin-btn-primary" style="padding: 10px 20px;">
+                        <i class="fa-solid fa-folder-open"></i> Crear Conductor y Subir Documentos
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- MODAL DE AUTENTICACIÓN ADMIN (PIN) -->
     <div class="admin-modal-overlay" id="authModalOverlay">
@@ -814,6 +905,182 @@
             const imgZoomModalOverlay = document.getElementById('imgZoomModalOverlay');
             const imgZoomElement = document.getElementById('imgZoomElement');
             const btnCloseZoom = document.getElementById('btnCloseZoom');
+
+            // Modal de Alta Manual de Conductor
+            const btnOpenManualDriverModal = document.getElementById('btnOpenManualDriverModal');
+            const manualDriverModalOverlay = document.getElementById('manualDriverModalOverlay');
+            const btnCloseManualDriver = document.getElementById('btnCloseManualDriver');
+            const btnCancelManualDriver = document.getElementById('btnCancelManualDriver');
+            const formManualDriver = document.getElementById('formManualDriver');
+
+            function openManualDriverModal() {
+                if (manualDriverModalOverlay) {
+                    manualDriverModalOverlay.style.display = 'flex';
+                    manualDriverModalOverlay.classList.add('active');
+                }
+            }
+
+            function closeManualDriverModal() {
+                if (manualDriverModalOverlay) {
+                    manualDriverModalOverlay.classList.remove('active');
+                    setTimeout(() => {
+                        if (!manualDriverModalOverlay.classList.contains('active')) {
+                            manualDriverModalOverlay.style.display = 'none';
+                        }
+                    }, 200);
+                }
+            }
+
+            if (btnOpenManualDriverModal) btnOpenManualDriverModal.addEventListener('click', openManualDriverModal);
+            if (btnCloseManualDriver) btnCloseManualDriver.addEventListener('click', closeManualDriverModal);
+            if (btnCancelManualDriver) btnCancelManualDriver.addEventListener('click', closeManualDriverModal);
+            if (manualDriverModalOverlay) {
+                manualDriverModalOverlay.addEventListener('click', (e) => {
+                    if (e.target === manualDriverModalOverlay) closeManualDriverModal();
+                });
+            }
+
+            // Utilidad de compresión ultra liviana para imágenes y soporte PDF
+            function compressImageFile(file) {
+                return new Promise((resolve, reject) => {
+                    const fileName = (file.name || '').toLowerCase();
+                    if (file.type === 'application/pdf' || fileName.endsWith('.pdf')) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve({ type: 'pdf', data: e.target.result });
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            try {
+                                const canvas = document.createElement('canvas');
+                                let width = img.width || 800;
+                                let height = img.height || 600;
+                                const maxDim = 800;
+                                if (width > maxDim || height > maxDim) {
+                                    if (width > height) {
+                                        height = Math.round((height * maxDim) / width);
+                                        width = maxDim;
+                                    } else {
+                                        width = Math.round((width * maxDim) / height);
+                                        height = maxDim;
+                                    }
+                                }
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, width, height);
+                                resolve({ type: 'image', data: canvas.toDataURL('image/jpeg', 0.65) });
+                            } catch(err) {
+                                resolve({ type: 'image', data: e.target.result });
+                            }
+                        };
+                        img.onerror = () => resolve({ type: 'image', data: e.target.result });
+                        img.src = e.target.result;
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            function saveUpdatedDriverToStorage(driver) {
+                if (!driver) return;
+                const cleanDni = String(driver.dni || '').replace(/\D/g, '');
+                const driverDocId = String(driver.id || (cleanDni ? 'drv_' + cleanDni : ('drv_' + (driver.nombre || 'chofer').replace(/\s+/g, '_').toLowerCase())));
+                driver.id = driverDocId;
+                driver.updatedAt = Date.now();
+
+                const idx = currentDrivers.findIndex(d => (d.id && d.id === driverDocId) || (d.dni && driver.dni && String(d.dni).replace(/\D/g, '') === cleanDni) || (d.nombre && d.nombre.trim().toLowerCase() === String(driver.nombre).trim().toLowerCase()));
+                if (idx >= 0) {
+                    currentDrivers[idx] = { ...currentDrivers[idx], ...driver };
+                } else {
+                    currentDrivers.unshift(driver);
+                }
+
+                try {
+                    localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(currentDrivers));
+                } catch(e) {}
+
+                try {
+                    const rawLocal = localStorage.getItem('rutaprivada_driver_docs_v1');
+                    if (rawLocal) {
+                        const docsObj = JSON.parse(rawLocal);
+                        const localDni = String(docsObj.dni || '').replace(/\D/g, '');
+                        if (!cleanDni || localDni === cleanDni || docsObj.nombre === driver.nombre) {
+                            const merged = { ...docsObj, ...driver };
+                            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(merged));
+                        }
+                    }
+                } catch(e) {}
+
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                    try {
+                        firebase.firestore().collection('drivers').doc(driverDocId).set(driver, { merge: true }).catch(err => console.warn('Firestore sync warning:', err));
+                    } catch(e){}
+                }
+
+                if (window.RutaSync) {
+                    if (typeof window.RutaSync.guardarDocumentosConductor === 'function') {
+                        window.RutaSync.guardarDocumentosConductor(driver);
+                    }
+                    window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driver);
+                }
+
+                window.dispatchEvent(new Event('storage'));
+                renderMetrics();
+                renderDriversTable();
+            }
+
+            if (formManualDriver) {
+                formManualDriver.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const name = document.getElementById('manDriverName').value.trim();
+                    const dni = document.getElementById('manDriverDni').value.trim();
+                    const phone = document.getElementById('manDriverPhone').value.trim();
+                    const email = document.getElementById('manDriverEmail').value.trim();
+                    const consent = document.getElementById('manDriverConsent').checked;
+                    const vehicle = document.getElementById('manDriverVehicle').value.trim();
+                    const plate = document.getElementById('manDriverPlate').value.trim().toUpperCase();
+                    const color = document.getElementById('manDriverColor').value.trim() || 'Gris';
+                    const bank = document.getElementById('manDriverBank').value.trim() || 'Mercado Pago';
+                    const cbu = document.getElementById('manDriverCbu').value.trim();
+                    const holder = document.getElementById('manDriverHolder').value.trim() || name;
+
+                    const cleanDni = dni.replace(/\D/g, '');
+                    const newDriverId = 'drv_' + (cleanDni || Date.now());
+
+                    const newDriver = {
+                        id: newDriverId,
+                        nombre: name,
+                        dni: dni,
+                        telefono: phone,
+                        email: email,
+                        aceptaComunicaciones: consent,
+                        autoMarcaModelo: vehicle,
+                        patente: plate,
+                        color: color,
+                        categoria: 'Sedán Estándar',
+                        fotoPerfil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                        estadoVerificacion: 'pendiente',
+                        isOnline: false,
+                        banco: bank,
+                        cbu: cbu,
+                        titularCuenta: holder,
+                        docsImages: {},
+                        observaciones: '',
+                        updatedAt: Date.now()
+                    };
+
+                    saveUpdatedDriverToStorage(newDriver);
+                    closeManualDriverModal();
+                    formManualDriver.reset();
+                    alert(`✓ Conductor ${name} registrado correctamente en el sistema.\n\nSe abrirá a continuación el panel de revisión documental para que puedas cargar o validar sus archivos desde tu PC.`);
+                    openDocReviewModal(newDriver.id);
+                });
+            }
 
             // Control de Vistas (Pestañas)
             function switchAdminView(view) {
@@ -1451,17 +1718,54 @@
                                     </div>
                                     ${contentHtml}
                                 </div>
-                                <div style="display: flex; gap: 8px; margin-top: 6px;">
-                                    <button type="button" class="admin-btn btn-doc-approve" data-index="${idx}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">
-                                        <i class="fa-solid fa-check"></i> Válido
-                                    </button>
-                                    <button type="button" class="admin-btn btn-doc-reject" data-index="${idx}" data-title="${item.title}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(239,68,68,0.2); color:#f87171; border-color:rgba(239,68,68,0.4);">
-                                        <i class="fa-solid fa-xmark"></i> Observar
-                                    </button>
+                                <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+                                    <label class="admin-btn" style="width: 100%; justify-content: center; font-size: 0.74rem; padding: 6px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.35); cursor: pointer; text-align: center;">
+                                        <input type="file" class="admin-doc-file-input" data-key="${item.key}" data-index="${idx}" accept="image/*,application/pdf" style="display: none;">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i> ${hasData ? 'Reemplazar Archivo' : 'Subir Archivo desde PC'}
+                                    </label>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button type="button" class="admin-btn btn-doc-approve" data-index="${idx}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">
+                                            <i class="fa-solid fa-check"></i> Válido
+                                        </button>
+                                        <button type="button" class="admin-btn btn-doc-reject" data-index="${idx}" data-title="${item.title}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(239,68,68,0.2); color:#f87171; border-color:rgba(239,68,68,0.4);">
+                                            <i class="fa-solid fa-xmark"></i> Observar
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         `;
                     }).join('');
+
+                    // Listeners para subir archivos directos desde PC por el Administrador
+                    document.querySelectorAll('.admin-doc-file-input').forEach(input => {
+                        input.addEventListener('change', async (e) => {
+                            const file = e.target.files[0];
+                            if (!file || !activeReviewDriver) return;
+                            const key = input.getAttribute('data-key');
+                            const idx = parseInt(input.getAttribute('data-index'), 10);
+                            try {
+                                const res = await compressImageFile(file);
+                                if (res && res.data) {
+                                    if (!activeReviewDriver.docsImages) activeReviewDriver.docsImages = {};
+                                    activeReviewDriver.docsImages[key] = res.data;
+                                    if (key === 'foto') {
+                                        activeReviewDriver.fotoPerfil = res.data;
+                                        if (revDriverAvatar) revDriverAvatar.src = res.data;
+                                    }
+                                    if (docValidationState[idx]) {
+                                        docValidationState[idx].hasData = true;
+                                        docValidationState[idx].isValid = true;
+                                        docValidationState[idx].isObserved = false;
+                                    }
+                                    saveUpdatedDriverToStorage(activeReviewDriver);
+                                    openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
+                                }
+                            } catch(err) {
+                                console.error('Error cargando documento desde admin:', err);
+                                alert('Error al procesar el archivo seleccionado.');
+                            }
+                        });
+                    });
 
                     // Listeners individuales para marcar Válido
                     document.querySelectorAll('.btn-doc-approve').forEach(btn => {
