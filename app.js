@@ -5790,7 +5790,7 @@ function startPassengerRealtimePoll(tripId) {
         const doc = await firebase.firestore().collection('live_trips').doc('current_active_trip').get();
         if (doc.exists) {
           const fsData = doc.data();
-          if (fsData && fsData.estado && fsData.estado !== 'buscando_conductor' && fsData.estado !== 'solicitado') {
+          if (fsData && fsData.estado) {
             activeTrip = fsData;
           }
         }
@@ -5798,25 +5798,36 @@ function startPassengerRealtimePoll(tripId) {
     }
 
     // 2. Check Firestore REST API directly (100% fiable entre redes y dispositivos móviles)
-    if (!activeTrip || activeTrip.estado === 'buscando_conductor' || activeTrip.estado === 'solicitado') {
-      try {
-        const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
-        if (resp.ok) {
-          const json = await resp.json();
-          if (json && json.fields) {
-            const tripObj = (typeof window.firestoreDocToObject === 'function')
-              ? window.firestoreDocToObject(json)
-              : (typeof firestoreDocToObject === 'function' ? firestoreDocToObject(json) : null);
-            if (tripObj && tripObj.estado && tripObj.estado !== 'buscando_conductor' && tripObj.estado !== 'solicitado') {
-              activeTrip = tripObj;
-            }
+    try {
+      const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json && json.fields) {
+          const tripObj = (typeof window.firestoreDocToObject === 'function')
+            ? window.firestoreDocToObject(json)
+            : (typeof firestoreDocToObject === 'function' ? firestoreDocToObject(json) : null);
+          if (tripObj && tripObj.estado) {
+            activeTrip = tripObj;
           }
         }
-      } catch(e){}
-    }
+      }
+    } catch(e){}
 
-    if (activeTrip && activeTrip.estado && activeTrip.estado !== 'buscando_conductor' && activeTrip.estado !== 'solicitado') {
-      handlePassengerDriverAssigned(activeTrip, true);
+    if (activeTrip) {
+      if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(activeTrip.estado)) {
+        if (pStateDriverAssigned && pStateDriverAssigned.classList.contains('hidden')) {
+          handlePassengerDriverAssigned(activeTrip, true);
+        }
+      } else if (activeTrip.estado === 'buscando_conductor' || activeTrip.estado === 'cancelado_por_conductor') {
+        if (pStateDriverAssigned && !pStateDriverAssigned.classList.contains('hidden')) {
+          pStateDriverAssigned.classList.add('hidden');
+          if (pStateSearching) pStateSearching.classList.remove('hidden');
+          if (passengerTripModalTitle) passengerTripModalTitle.textContent = 'Buscando Chofer Ejecutivo...';
+          startPassengerSearchTimeout(activeTrip);
+          showToast('⚠️ Tu conductor asignado no pudo continuar. Reanudando búsqueda de chofer...');
+          try { playPassengerTone('arrived'); } catch(e){}
+        }
+      }
     }
   }, 1000); // Polling ultra-rápido de 1 segundo
 }
@@ -6278,13 +6289,18 @@ if (btnPassengerCancelTrip) {
       }
     }
 
+    const cancelPayload = {
+      id: activeTrip ? activeTrip.id : ('trip_' + Date.now()),
+      estado: 'cancelado_por_pasajero',
+      motivo: 'cancelado_por_pasajero',
+      penalizacion: tienePenalizacion,
+      montoPenalizacion: montoPenalizacion,
+      canceladoEn: Date.now(),
+      ultimoEstadoEn: Date.now()
+    };
+
     if (window.RutaSync) {
-      window.RutaSync.actualizarEstadoViaje('cancelado_por_pasajero', {
-        motivo: 'cancelado_por_pasajero',
-        penalizacion: tienePenalizacion,
-        montoPenalizacion: montoPenalizacion,
-        canceladoEn: Date.now()
-      });
+      window.RutaSync.actualizarEstadoViaje('cancelado_por_pasajero', cancelPayload);
       setTimeout(() => {
         if (window.RutaSync) {
           window.RutaSync.limpiarViajeActivo();
@@ -6292,6 +6308,18 @@ if (btnPassengerCancelTrip) {
         }
       }, 1500);
     }
+
+    // Sincronizar inmediatamente en Firestore REST para que todas las apps de choferes lo detecten al instante
+    try {
+      if (typeof window.objectToFirestoreFields === 'function') {
+        fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: window.objectToFirestoreFields(cancelPayload) })
+        }).catch(() => {});
+      }
+    } catch(e) {}
+
     closeInAppTripModal();
     closePassengerChatModal();
     showToast(tienePenalizacion ? '❌ Viaje cancelado con cobro del 10% de compensación.' : '❌ Solicitud de viaje cancelada.');

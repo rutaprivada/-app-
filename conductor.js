@@ -3880,6 +3880,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Re-solicitar para que todos los demás choferes reciban la solicitud en su radar
                 window.RutaSync.solicitarViaje(reBroadcastTrip);
+
+                // Forzar actualización inmediata en la nube vía REST para la app del pasajero
+                try {
+                    if (typeof window.objectToFirestoreFields === 'function') {
+                        fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ fields: window.objectToFirestoreFields(reBroadcastTrip) })
+                        }).catch(() => {});
+                    }
+                } catch(e) {}
             }
 
             driverState.activeTrip = null;
@@ -4059,6 +4070,74 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (isNew) {
                                 window.RutaSync.guardarMensajeChatLocal(chatObj.ultimoMensaje);
                                 window.RutaSync.emit('CHAT_MENSAJE_ENVIADO', chatObj.ultimoMensaje);
+                            }
+                        }
+                    }
+                }
+            } catch(e) {}
+        }, 1500);
+
+        // Polling en tiempo real de viajes activos y solicitudes en la nube para Conductor
+        setInterval(async () => {
+            if (!driverState.isOnline) return;
+            try {
+                const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+                if (resp.ok) {
+                    const json = await resp.json();
+                    if (json && json.fields) {
+                        const tripObj = (typeof window.firestoreDocToObject === 'function') ? window.firestoreDocToObject(json) : null;
+                        if (tripObj && tripObj.id) {
+                            const cloudStatus = tripObj.estado;
+                            
+                            // 1. Si el viaje fue cancelado por el pasajero
+                            if (cloudStatus === 'cancelado_por_pasajero' || cloudStatus === 'cancelado') {
+                                // A. Si el conductor tenía este viaje activo
+                                if (driverState.activeTrip && (driverState.activeTrip.id === tripObj.id || !tripObj.id)) {
+                                    if (window.RutaSync) {
+                                        window.RutaSync.emit('ESTADO_VIAJE_CAMBIADO', tripObj);
+                                    }
+                                }
+                                // B. Si el conductor tenía este viaje en la alerta entrante (radar modal)
+                                if (driverState.incomingTrip && driverState.incomingTrip.id === tripObj.id) {
+                                    closeIncomingModal();
+                                    showDriverToast('ℹ️ El pasajero canceló la solicitud del viaje.');
+                                    processNextQueuedTrip();
+                                }
+                                // C. Si estaba en lista de espera / disponibles
+                                if (driverState.availableTrips && driverState.availableTrips.some(t => t.id === tripObj.id)) {
+                                    driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== tripObj.id);
+                                    renderAvailableTripsList();
+                                }
+                                if (driverRejectRecycleTimers[tripObj.id]) {
+                                    clearTimeout(driverRejectRecycleTimers[tripObj.id]);
+                                    delete driverRejectRecycleTimers[tripObj.id];
+                                }
+                            }
+                            // 2. Si hay un viaje nuevo buscando conductor en la nube
+                            else if (cloudStatus === 'buscando_conductor' || cloudStatus === 'solicitado') {
+                                if (!driverState.activeTrip) {
+                                    const tripCreatedAt = tripObj.creadoEn || tripObj.timestamp || Date.now();
+                                    const isRecent = (Date.now() - tripCreatedAt) < (6 * 60 * 1000);
+                                    if (isRecent && !driverState.availableTrips.some(t => t.id === tripObj.id)) {
+                                        enqueueIncomingTrip(tripObj);
+                                    }
+                                }
+                            }
+                            // 3. Si el viaje fue tomado por otro chofer
+                            else if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(cloudStatus)) {
+                                const myDriverName = (driverState.info && driverState.info.nombre) || 'Daniel Pabon';
+                                const assignedDriverName = tripObj.conductor ? tripObj.conductor.nombre : '';
+                                if (assignedDriverName && assignedDriverName !== myDriverName) {
+                                    if (driverState.incomingTrip && driverState.incomingTrip.id === tripObj.id) {
+                                        closeIncomingModal();
+                                        showDriverToast('ℹ️ El viaje fue tomado por otro chofer.');
+                                        processNextQueuedTrip();
+                                    }
+                                    if (driverState.availableTrips.some(t => t.id === tripObj.id)) {
+                                        driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== tripObj.id);
+                                        renderAvailableTripsList();
+                                    }
+                                }
                             }
                         }
                     }
