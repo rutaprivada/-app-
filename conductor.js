@@ -2459,6 +2459,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function acceptSelectedTrip(trip) {
+        // Regla 0: Guard estricto de aprobación de chofer
+        const docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+        const statusVerif = (docs && docs.estadoVerificacion) ? docs.estadoVerificacion : 'pendiente';
+        if (statusVerif !== 'aprobado') {
+            alert('⏳ CUENTA PENDIENTE DE APROBACIÓN:\n\nTu cuenta y documentación aún no han sido aprobadas por el Administrador de RutaPrivada.\n\nNo puedes realizar ni aceptar viajes hasta ser validado.');
+            return;
+        }
+
         // Regla 1: No se puede aceptar ningún viaje si se tiene un viaje en curso
         if (driverState.activeTrip) {
             alert('⚠️ TIENES UN VIAJE EN CURSO\n\nDebes completar el viaje actual antes de aceptar un nuevo traslado.');
@@ -5606,8 +5614,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (password.length < 6) {
-                showDriverToast('⚠️ La contraseña debe tener al menos 6 caracteres.');
+            if (password.length < 8 || !/\d/.test(password)) {
+                showDriverToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener al menos un número.');
                 return;
             }
 
@@ -5639,6 +5647,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 email: email,
                 passwordHash: passwordHash,
                 estadoVerificacion: 'sin_subir',
+                aprobado: false,
                 calificacion: 5.0,
                 fechaRegistro: new Date().toISOString(),
                 verifyCode: verifyCode,
@@ -5651,7 +5660,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (inputDriverVerifyCode) inputDriverVerifyCode.value = '';
             if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'flex';
 
-            showDriverToast(`📩 Código de activación enviado a ${email}: [ ${verifyCode} ]`);
+            showDriverToast(`📩 Código de activación generado para ${email}: [ ${verifyCode} ]`);
         });
     }
 

@@ -8469,8 +8469,8 @@ if (btnRecenterPassengerMap) {
           return;
         }
 
-        if (password.length < 6) {
-          if (typeof showToast === 'function') showToast('⚠️ La contraseña debe tener al menos 6 caracteres.');
+        if (password.length < 8 || !/\d/.test(password)) {
+          if (typeof showToast === 'function') showToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener al menos un número.');
           return;
         }
 
@@ -8518,7 +8518,7 @@ if (btnRecenterPassengerMap) {
         if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.remove('hidden');
 
         if (typeof showToast === 'function') {
-          showToast(`📩 Código de activación enviado a ${email}: [ ${verifyCode} ]`);
+          showToast(`📩 Código de activación generado para ${email}: [ ${verifyCode} ]`);
         }
       });
     }
@@ -8571,29 +8571,6 @@ if (btnRecenterPassengerMap) {
       btnCancelPassengerVerify.addEventListener('click', () => {
         if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.add('hidden');
         openPassengerAuthModal('register');
-      });
-    }
-
-    // Acceso Rápido como Pasajero Invitado (crea perfil persistente con identificador)
-    if (btnPassengerGuestAccess) {
-      btnPassengerGuestAccess.addEventListener('click', async () => {
-        const guestPass = 'guest_' + Date.now();
-        const guestUser = {
-          id: 'pass_guest_' + Date.now(),
-          nombre: 'Pasajero Ejecutivo',
-          telefono: '+54 9 11 2255-8226',
-          email: 'pasajero.vip@rutaprivada.com',
-          passwordHash: await hashPassword(guestPass),
-          rating: '5.00',
-          ratingCount: 1,
-          medioPago: 'efectivo',
-          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-          fechaRegistro: new Date().toISOString(),
-          emailVerificado: true
-        };
-        savePassengerSession(guestUser);
-        closePassengerAuthModal();
-        if (typeof showToast === 'function') showToast('✨ Has ingresado con Perfil Rápido de Pasajero.');
       });
     }
 

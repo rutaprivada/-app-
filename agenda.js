@@ -1690,13 +1690,87 @@ function renderClientsTab() {
 
 function loadDrivers() {
   try {
-    const raw = localStorage.getItem(DRIVERS_STORAGE_KEY);
-    if (raw) {
-      state.drivers = JSON.parse(raw);
-    } else {
-      state.drivers = JSON.parse(JSON.stringify(DEFAULT_DRIVERS));
-      saveDrivers();
+    const driversMap = new Map();
+
+    // 1. Cargar choferes registrados desde la app de conductor
+    const rawRegistered = localStorage.getItem('rutaprivada_registered_drivers_v1');
+    if (rawRegistered) {
+      const parsedReg = JSON.parse(rawRegistered);
+      if (Array.isArray(parsedReg)) {
+        parsedReg.forEach(d => {
+          if (d && (d.id || d.dni || d.email)) {
+            const key = d.id || ('drv_' + (d.dni ? d.dni.replace(/\D/g, '') : d.email));
+            driversMap.set(key, {
+              id: key,
+              name: d.nombre || 'Chofer Registrado',
+              dni: d.dni || '',
+              phone: d.telefono || '',
+              email: d.email || '',
+              vehicle: d.autoMarcaModelo || d.vehicle || 'Vehículo Sin Cargar',
+              plate: d.patente || d.plate || 'S/P',
+              color: d.color || '',
+              category: d.categoria || 'Sedán Estándar',
+              cbu: d.cbu || '',
+              banco: d.banco || '',
+              estadoVerificacion: d.estadoVerificacion || 'pendiente',
+              observaciones: d.observaciones || '',
+              emailVerificado: !!d.emailVerificado,
+              rating: d.calificacion || 5.0
+            });
+          }
+        });
+      }
     }
+
+    // 2. Cargar chofer activo local si existe
+    const rawDocs = localStorage.getItem('rutaprivada_driver_docs_v1');
+    if (rawDocs) {
+      const d = JSON.parse(rawDocs);
+      if (d && (d.nombre || d.dni)) {
+        const key = d.id || ('drv_' + (d.dni ? d.dni.replace(/\D/g, '') : 'local'));
+        const existing = driversMap.get(key) || {};
+        driversMap.set(key, {
+          ...existing,
+          id: key,
+          name: d.nombre || existing.name || 'Chofer Partner',
+          dni: d.dni || existing.dni || '',
+          phone: d.telefono || existing.phone || '',
+          email: d.email || existing.email || '',
+          vehicle: d.autoMarcaModelo || existing.vehicle || 'Vehículo Sin Cargar',
+          plate: d.patente || existing.plate || 'S/P',
+          color: d.color || existing.color || '',
+          category: d.categoria || existing.category || 'Sedán Estándar',
+          cbu: d.cbu || existing.cbu || '',
+          banco: d.banco || existing.banco || '',
+          estadoVerificacion: d.estadoVerificacion || existing.estadoVerificacion || 'pendiente',
+          observaciones: d.observaciones || existing.observaciones || '',
+          emailVerificado: d.emailVerificado !== undefined ? d.emailVerificado : true,
+          rating: 5.0
+        });
+      }
+    }
+
+    // 3. Choferes de flota predeterminados
+    const rawDrivers = localStorage.getItem(DRIVERS_STORAGE_KEY);
+    if (rawDrivers) {
+      const parsedDrivers = JSON.parse(rawDrivers);
+      if (Array.isArray(parsedDrivers)) {
+        parsedDrivers.forEach(d => {
+          if (d && d.id && !driversMap.has(d.id)) {
+            driversMap.set(d.id, {
+              ...d,
+              estadoVerificacion: d.estadoVerificacion || 'aprobado'
+            });
+          }
+        });
+      }
+    } else if (driversMap.size === 0) {
+      DEFAULT_DRIVERS.forEach(d => {
+        driversMap.set(d.id, { ...d, estadoVerificacion: 'aprobado' });
+      });
+    }
+
+    state.drivers = Array.from(driversMap.values());
   } catch (err) {
     console.error('Error al cargar choferes:', err);
     state.drivers = JSON.parse(JSON.stringify(DEFAULT_DRIVERS));
@@ -1711,13 +1785,93 @@ function saveDrivers() {
   }
 }
 
+function setDriverApprovalStatus(driverId, newStatus, observaciones = '') {
+  loadDrivers();
+  const driver = state.drivers.find(d => d.id === driverId);
+  if (!driver) return;
+
+  driver.estadoVerificacion = newStatus;
+  driver.observaciones = observaciones;
+  driver.aprobado = (newStatus === 'aprobado');
+
+  // 1. Guardar en almacenamiento de choferes registrados
+  try {
+    const rawRegistered = localStorage.getItem('rutaprivada_registered_drivers_v1');
+    let regList = rawRegistered ? JSON.parse(rawRegistered) : [];
+    const idx = regList.findIndex(d => d.id === driverId || (d.dni && driver.dni && d.dni === driver.dni) || (d.email && driver.email && d.email === driver.email));
+    if (idx >= 0) {
+      regList[idx].estadoVerificacion = newStatus;
+      regList[idx].observaciones = observaciones;
+      regList[idx].aprobado = (newStatus === 'aprobado');
+    } else {
+      regList.push(driver);
+    }
+    localStorage.setItem('rutaprivada_registered_drivers_v1', JSON.stringify(regList));
+  } catch(e) {}
+
+  // 2. Si coincide con el chofer local en este navegador, actualizarlo
+  try {
+    const rawDocs = localStorage.getItem('rutaprivada_driver_docs_v1');
+    if (rawDocs) {
+      const localDocs = JSON.parse(rawDocs);
+      if (!localDocs.dni || localDocs.dni === driver.dni || localDocs.id === driverId) {
+        localDocs.estadoVerificacion = newStatus;
+        localDocs.observaciones = observaciones;
+        localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
+      }
+    }
+  } catch(e) {}
+
+  saveDrivers();
+
+  // 3. Emitir evento en tiempo real vía RutaSync para notificación inmediata al chofer
+  if (window.RutaSync) {
+    window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', {
+      id: driverId,
+      dni: driver.dni,
+      estadoVerificacion: newStatus,
+      estado: newStatus,
+      observaciones: observaciones
+    });
+  }
+
+  // 4. Sincronizar con Firestore (colección 'drivers' y 'conductores')
+  if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+    try {
+      const db = firebase.firestore();
+      const docId = driver.id || ('drv_' + (driver.dni ? driver.dni.replace(/\D/g, '') : Date.now()));
+      const payload = {
+        id: docId,
+        nombre: driver.name || driver.nombre || '',
+        dni: driver.dni || '',
+        telefono: driver.phone || driver.telefono || '',
+        email: driver.email || '',
+        autoMarcaModelo: driver.vehicle || '',
+        patente: driver.plate || '',
+        estadoVerificacion: newStatus,
+        estado: newStatus,
+        aprobado: (newStatus === 'aprobado'),
+        observaciones: observaciones,
+        actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      db.collection('drivers').doc(docId).set(payload, { merge: true }).catch(() => {});
+      db.collection('conductores').doc(docId).set(payload, { merge: true }).catch(() => {});
+    } catch(e) {}
+  }
+
+  renderDriversTab();
+  showToast(newStatus === 'aprobado' ? `✅ Chofer ${driver.name} APROBADO y Habilitado para realizar viajes.` : `⚠️ Chofer ${driver.name} marcado como RECHAZADO.`);
+}
+
 function renderDriversTab() {
   loadDrivers();
   const container = document.getElementById('drivers-container');
   const countBadge = document.getElementById('drivers-count-badge');
 
+  const pendingCount = state.drivers.filter(d => d.estadoVerificacion !== 'aprobado').length;
+
   if (countBadge) {
-    countBadge.textContent = `${state.drivers.length} ${state.drivers.length === 1 ? 'chofer activo' : 'choferes activos'}`;
+    countBadge.textContent = `${state.drivers.length} choferes (${pendingCount} pendientes)`;
   }
 
   if (!container) return;
@@ -1727,7 +1881,7 @@ function renderDriversTab() {
       <div class="agenda-empty-state">
         <div class="empty-icon">🚗</div>
         <h3>No hay choferes registrados</h3>
-        <p>Agrega los choferes y vehículos de tu flota para seleccionarlos rápidamente al confirmar reservas por WhatsApp.</p>
+        <p>Los nuevos choferes que se registren en la App de Chofer aparecerán aquí para su validación y habilitación.</p>
       </div>
     `;
     return;
@@ -1735,25 +1889,66 @@ function renderDriversTab() {
 
   container.innerHTML = state.drivers.map(d => {
     const initials = d.name ? d.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : 'CH';
+    const status = d.estadoVerificacion || 'pendiente';
+    const isApproved = status === 'aprobado';
+    const isRejected = status === 'rechazado';
+
+    let statusBadgeHtml = '';
+    if (isApproved) {
+      statusBadgeHtml = `<span style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">🟢 Aprobado & Habilitado</span>`;
+    } else if (isRejected) {
+      statusBadgeHtml = `<span style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">🔴 Rechazado / Observado</span>`;
+    } else {
+      statusBadgeHtml = `<span style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">🟡 Pendiente de Aprobación</span>`;
+    }
 
     return `
-      <div class="client-card driver-card" data-id="${d.id}">
-        <div class="client-header">
-          <div class="client-avatar" style="background: linear-gradient(135deg, #10b981, #059669); color: #fff;">${initials}</div>
-          <div>
-            <div class="client-name">${escapeHTML(d.name)}</div>
-            <div class="client-phone">${d.phone ? '📱 ' + escapeHTML(d.phone) : 'Sin teléfono'}</div>
+      <div class="client-card driver-card" data-id="${d.id}" style="border: 1px solid ${isApproved ? 'rgba(16,185,129,0.3)' : (isRejected ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.4)')};">
+        <div class="client-header" style="justify-content: space-between; align-items: flex-start;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="client-avatar" style="background: ${isApproved ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #f59e0b, #d97706)'}; color: #fff;">${initials}</div>
+            <div>
+              <div class="client-name">${escapeHTML(d.name)}</div>
+              <div class="client-phone">${d.phone ? '📱 ' + escapeHTML(d.phone) : 'Sin teléfono'}</div>
+              ${d.dni ? `<div style="font-size: 0.72rem; color: #94a3b8;">🪪 DNI: <strong>${escapeHTML(d.dni)}</strong></div>` : ''}
+              ${d.email ? `<div style="font-size: 0.72rem; color: #38bdf8;">✉️ ${escapeHTML(d.email)}</div>` : ''}
+            </div>
           </div>
+          <div>${statusBadgeHtml}</div>
         </div>
 
-        <div class="client-stats" style="grid-template-columns: 1fr 1fr; gap: 8px;">
-          <div>Auto: <strong style="color: #ffffff;">${escapeHTML(d.vehicle)}</strong></div>
-          <div>Patente: <strong style="color: #38bdf8; text-transform: uppercase;">${escapeHTML(d.plate)}</strong></div>
+        <div class="client-stats" style="grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 8px;">
+          <div>Auto: <strong style="color: #ffffff;">${escapeHTML(d.vehicle || 'Sin cargar')}</strong></div>
+          <div>Patente: <strong style="color: #38bdf8; text-transform: uppercase;">${escapeHTML(d.plate || 'S/P')}</strong></div>
+          ${d.cbu ? `<div style="grid-column: span 2; font-size: 0.75rem;">🏦 CBU: <strong style="color:#fbbf24;">${escapeHTML(d.cbu)}</strong></div>` : ''}
         </div>
 
-        <div style="display:flex; gap:8px; margin-top:12px;">
-          <button type="button" class="btn btn-secondary btn-sm btn-edit-driver" data-id="${d.id}" style="flex:1; justify-content:center;">
-            ✏️ Editar
+        ${d.observaciones ? `
+          <div style="margin-top: 8px; padding: 6px 10px; background: rgba(239,68,68,0.1); border-left: 3px solid #ef4444; border-radius: 6px; font-size: 0.74rem; color: #fca5a5;">
+            <strong>Motivo observación:</strong> ${escapeHTML(d.observaciones)}
+          </div>
+        ` : ''}
+
+        <!-- Botones de Acción de Administración -->
+        <div style="display:flex; flex-wrap: wrap; gap:6px; margin-top:12px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+          ${!isApproved ? `
+            <button type="button" class="btn btn-primary btn-sm btn-approve-driver" data-id="${d.id}" style="flex:1; justify-content:center; background: #10b981; border: none; font-size: 0.78rem;">
+              ✅ Aprobar Chofer
+            </button>
+          ` : `
+            <button type="button" class="btn btn-outline btn-sm btn-reject-driver" data-id="${d.id}" style="flex:1; justify-content:center; color: #f87171; border-color: rgba(239,68,68,0.4); font-size: 0.78rem;">
+              🚫 Deshabilitar
+            </button>
+          `}
+          
+          ${!isRejected && !isApproved ? `
+            <button type="button" class="btn btn-danger-subtle btn-sm btn-reject-driver" data-id="${d.id}" style="justify-content:center; font-size: 0.78rem;">
+              ❌ Rechazar
+            </button>
+          ` : ''}
+
+          <button type="button" class="btn btn-secondary btn-sm btn-edit-driver" data-id="${d.id}" style="justify-content:center;" title="Editar datos">
+            ✏️
           </button>
           <button type="button" class="btn btn-danger-subtle btn-sm btn-delete-driver" data-id="${d.id}" style="justify-content:center;" title="Eliminar chofer">
             🗑️
@@ -1763,7 +1958,28 @@ function renderDriversTab() {
     `;
   }).join('');
 
-  // Listeners para editar y eliminar chofer
+  // Listeners para acciones de administración
+  container.querySelectorAll('.btn-approve-driver').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      const driver = state.drivers.find(d => d.id === id);
+      if (confirm(`¿Aprobar y Habilitar a ${driver ? driver.name : 'este chofer'} para que pueda recibir viajes en tiempo real?`)) {
+        setDriverApprovalStatus(id, 'aprobado');
+      }
+    });
+  });
+
+  container.querySelectorAll('.btn-reject-driver').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      const driver = state.drivers.find(d => d.id === id);
+      const reason = prompt(`Indica el motivo de rechazo/observación para ${driver ? driver.name : 'este chofer'}:`, 'Documentación ilegible o faltan datos del seguro');
+      if (reason !== null) {
+        setDriverApprovalStatus(id, 'rechazado', reason);
+      }
+    });
+  });
+
   container.querySelectorAll('.btn-edit-driver').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-id');

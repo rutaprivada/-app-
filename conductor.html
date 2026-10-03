@@ -956,15 +956,15 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label for="regDriverDni" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
-                            🪪 DNI / CUIT *
+                            🪪 DNI *
                         </label>
-                        <input type="text" id="regDriverDni" placeholder="Ej: 38.452.910" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
+                        <input type="text" id="regDriverDni" placeholder="Ej: 38450123" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                     </div>
                     <div>
                         <label for="regDriverPhone" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
                             📱 Número de Teléfono *
                         </label>
-                        <input type="tel" id="regDriverPhone" placeholder="Ej: +54 9 11 2255-8226" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
+                        <input type="tel" id="regDriverPhone" placeholder="Ej: 11 2255-8226" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                     </div>
                 </div>
 
@@ -978,24 +978,24 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label for="regDriverPassword" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
-                            🔒 Contraseña *
+                            🔒 Contraseña * <span style="font-size:0.7rem; color:#fbbf24;">(Mín. 8 car. y 1 número)</span>
                         </label>
-                        <input type="password" id="regDriverPassword" placeholder="Mínimo 6 caracteres" required minlength="6" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
+                        <input type="password" id="regDriverPassword" placeholder="Mínimo 8 caracteres (1 número)" required minlength="8" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                     </div>
                     <div>
                         <label for="regDriverPasswordConfirm" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
-                            🔒 Confirmar *
+                            🔒 Confirmar Contraseña *
                         </label>
-                        <input type="password" id="regDriverPasswordConfirm" placeholder="Repite la contraseña" required minlength="6" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
+                        <input type="password" id="regDriverPasswordConfirm" placeholder="Repite la contraseña" required minlength="8" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                     </div>
                 </div>
 
                 <div style="background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 10px; font-size: 0.75rem; color: #cbd5e1; margin-top: 2px;">
-                    ℹ️ Los datos de tu vehículo y cuenta bancaria se configurarán al ingresar en la sección de verificación y habilitación.
+                    ℹ️ Los datos de tu auto, documentación y CBU bancario se cargarán a continuación para la revisión y aprobación por parte de Administración.
                 </div>
 
                 <button type="submit" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; padding: 13px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); margin-top: 4px;">
-                    <i class="fa-solid fa-id-card"></i> Registrar Cuenta de Chofer
+                    <i class="fa-solid fa-id-card"></i> Registrar Cuenta y Validar Correo
                 </button>
             </form>
         </div>
