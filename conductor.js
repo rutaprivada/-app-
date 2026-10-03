@@ -3792,19 +3792,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 fecha: new Date().toISOString()
             };
 
+            // Calcular nuevo promedio de calificación del pasajero
             try {
                 let ratings = [];
                 const raw = localStorage.getItem('rutaprivada_passenger_ratings');
                 if (raw) ratings = JSON.parse(raw);
                 ratings.push(passengerRatingRecord);
                 localStorage.setItem('rutaprivada_passenger_ratings', JSON.stringify(ratings));
+
+                const passengerNameClean = passengerRatingRecord.passenger.trim().toLowerCase();
+                const passengerSpecificRatings = ratings.filter(r => (r.passenger || '').trim().toLowerCase() === passengerNameClean);
+                const avgPassengerRating = (passengerSpecificRatings.reduce((acc, r) => acc + (Number(r.stars) || 5), 0) / passengerSpecificRatings.length).toFixed(2);
+                passengerRatingRecord.calificacionPromedio = Number(avgPassengerRating);
             } catch (e) {}
+
+            // Registrar calificación en el historial del viaje del conductor
+            if (driverState.stats.historial && driverState.stats.historial.length > 0) {
+                driverState.stats.historial[0].calificacionPasajero = {
+                    estrellas: driverSelectedPassengerRating,
+                    tags: selectedTags,
+                    fecha: new Date().toISOString()
+                };
+                saveStats();
+            }
 
             if (window.RutaSync) {
                 window.RutaSync.emit('CALIFICACION_PASAJERO_GUARDADA', passengerRatingRecord);
                 window.RutaSync.limpiarViajeActivo();
                 window.RutaSync.limpiarChat();
             }
+
+            // Sincronizar en Firestore REST
+            try {
+                if (typeof window.objectToFirestoreFields === 'function') {
+                    fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/passenger_ratings/' + passengerRatingRecord.id + '?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fields: window.objectToFirestoreFields(passengerRatingRecord) })
+                    }).catch(() => {});
+                }
+            } catch(e) {}
 
             if (modalDriverRatePassenger) {
                 modalDriverRatePassenger.classList.remove('active');
@@ -3814,6 +3841,7 @@ document.addEventListener('DOMContentLoaded', () => {
             stateActiveTrip.classList.remove('active');
             stateSearching.classList.add('active');
             playAlertSound('success');
+            showDriverToast('⭐ Calificación del pasajero guardada en el historial.');
         });
     }
 
@@ -4001,14 +4029,42 @@ document.addEventListener('DOMContentLoaded', () => {
             if (driverState.incomingTrip && driverState.incomingTrip.id === viaje.id) {
                 closeIncomingModal();
                 showDriverToast('ℹ️ El viaje fue tomado por otro chofer de la flota.');
+                processNextQueuedTrip();
             }
             if (driverRejectRecycleTimers[viaje.id]) {
                 clearTimeout(driverRejectRecycleTimers[viaje.id]);
                 delete driverRejectRecycleTimers[viaje.id];
             }
+            if (typeof driverPendingTripQueue !== 'undefined') {
+                const idx = driverPendingTripQueue.findIndex(t => t.id === viaje.id);
+                if (idx !== -1) driverPendingTripQueue.splice(idx, 1);
+            }
             driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== viaje.id);
             renderAvailableTripsList();
         });
+
+        // Polling en tiempo real de chat para Conductor
+        setInterval(async () => {
+            if (!driverState.activeTrip && (!modalDriverChat || !modalDriverChat.classList.contains('active'))) return;
+            try {
+                const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/chat_active?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+                if (resp.ok) {
+                    const json = await resp.json();
+                    if (json && json.fields) {
+                        const chatObj = (typeof window.firestoreDocToObject === 'function') ? window.firestoreDocToObject(json) : null;
+                        if (chatObj && chatObj.ultimoMensaje && window.RutaSync) {
+                            const tripId = chatObj.tripId || (driverState.activeTrip ? driverState.activeTrip.id : 'active_trip');
+                            const prevMsgs = window.RutaSync.obtenerMensajesChat(tripId);
+                            const isNew = !prevMsgs.some(m => m.id === chatObj.ultimoMensaje.id || (m.timestamp === chatObj.ultimoMensaje.timestamp && m.texto === chatObj.ultimoMensaje.texto));
+                            if (isNew) {
+                                window.RutaSync.guardarMensajeChatLocal(chatObj.ultimoMensaje);
+                                window.RutaSync.emit('CHAT_MENSAJE_ENVIADO', chatObj.ultimoMensaje);
+                            }
+                        }
+                    }
+                }
+            } catch(e) {}
+        }, 1500);
 
         window.RutaSync.on('RESERVA_CREADA', (reserva) => {
             if (reserva && reserva.id && !isTestBooking(reserva)) {

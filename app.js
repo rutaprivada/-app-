@@ -6407,6 +6407,32 @@ document.querySelectorAll('.chat-quick-replies .quick-chip-btn').forEach(btn => 
   });
 });
 
+// Polling en tiempo real de chat para Pasajero
+setInterval(async () => {
+  const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+  const isModalOpen = passengerChatModal && !passengerChatModal.classList.contains('hidden');
+  if (!activeTrip && !isModalOpen) return;
+
+  try {
+    const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/chat_active?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+    if (resp.ok) {
+      const json = await resp.json();
+      if (json && json.fields) {
+        const chatObj = (typeof window.firestoreDocToObject === 'function') ? window.firestoreDocToObject(json) : null;
+        if (chatObj && chatObj.ultimoMensaje && window.RutaSync) {
+          const tripId = chatObj.tripId || (activeTrip ? activeTrip.id : 'active_trip');
+          const prevMsgs = window.RutaSync.obtenerMensajesChat(tripId);
+          const isNew = !prevMsgs.some(m => m.id === chatObj.ultimoMensaje.id || (m.timestamp === chatObj.ultimoMensaje.timestamp && m.texto === chatObj.ultimoMensaje.texto));
+          if (isNew) {
+            window.RutaSync.guardarMensajeChatLocal(chatObj.ultimoMensaje);
+            window.RutaSync.emit('CHAT_MENSAJE_ENVIADO', chatObj.ultimoMensaje);
+          }
+        }
+      }
+    }
+  } catch(e) {}
+}, 1500);
+
 // Sincronización en tiempo real de eventos
 if (window.RutaSync) {
   window.RutaSync.on('VIAJE_ACEPTADO', (viaje) => {
@@ -6994,15 +7020,21 @@ if (btnRecenterPassengerMap) {
         fecha: new Date().toISOString()
       };
 
+      // Calcular promedio acumulado del chofer
       try {
         let ratings = [];
         const raw = localStorage.getItem('rutaprivada_driver_ratings');
         if (raw) ratings = JSON.parse(raw);
         ratings.push(ratingRecord);
         localStorage.setItem('rutaprivada_driver_ratings', JSON.stringify(ratings));
+
+        const driverNameClean = ratingRecord.driver.trim().toLowerCase();
+        const driverSpecificRatings = ratings.filter(r => (r.driver || '').trim().toLowerCase() === driverNameClean);
+        const avgDriverRating = (driverSpecificRatings.reduce((acc, r) => acc + (Number(r.stars) || 5), 0) / driverSpecificRatings.length).toFixed(1);
+        ratingRecord.calificacionPromedio = Number(avgDriverRating);
       } catch (e) {}
 
-      // Guardar en el historial de viajes del pasajero (Cabify style)
+      // Guardar en el historial de viajes del pasajero con la calificación registrada
       try {
         const activeTrip = pActiveTripData || (window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null) || {};
         const now = new Date();
@@ -7024,7 +7056,13 @@ if (btnRecenterPassengerMap) {
           procesamientoServicio: Math.round((Number(state.totalPrice) || 0) * 0.08),
           altaDemanda: state.breakdown ? state.breakdown.tollCost : 0,
           metodoPago: activeTrip.metodoPago || 'Efectivo',
-          valoracionTexto: '⭐'.repeat(passengerSelectedRating) + ` (${passengerSelectedRating}/5)`
+          valoracionTexto: '⭐'.repeat(passengerSelectedRating) + ` (${passengerSelectedRating}/5)`,
+          calificacionChofer: {
+            estrellas: passengerSelectedRating,
+            tags: selectedTags,
+            comentario: comment,
+            fecha: new Date().toISOString()
+          }
         };
         addTripToPassengerHistory(tripHistoryItem);
       } catch(e) {}
@@ -7033,6 +7071,17 @@ if (btnRecenterPassengerMap) {
         window.RutaSync.emit('CALIFICACION_GUARDADA', ratingRecord);
         window.RutaSync.limpiarViajeActivo();
       }
+
+      // Sincronizar calificación en Firestore REST
+      try {
+        if (typeof window.objectToFirestoreFields === 'function') {
+          fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/driver_ratings/' + ratingRecord.id + '?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: window.objectToFirestoreFields(ratingRecord) })
+          }).catch(() => {});
+        }
+      } catch(e) {}
 
       if (modalPassengerTripCompleted) {
         modalPassengerTripCompleted.classList.add('hidden');

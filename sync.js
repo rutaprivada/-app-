@@ -180,6 +180,21 @@ class RutaSyncManager {
                             console.warn('Firestore active trip listener warning:', err);
                         });
 
+                    // Escuchar chat en tiempo real
+                    this.firestore.collection('live_trips').doc('chat_active')
+                        .onSnapshot((doc) => {
+                            if (doc.exists) {
+                                const data = doc.data();
+                                if (data && data.ultimoMensaje && data.ultimoMensaje.id) {
+                                    if (!this.processedEvents.has(data.ultimoMensaje.id)) {
+                                        this.processedEvents.add(data.ultimoMensaje.id);
+                                        this.guardarMensajeChatLocal(data.ultimoMensaje);
+                                        this.emit('CHAT_MENSAJE_ENVIADO', data.ultimoMensaje);
+                                    }
+                                }
+                            }
+                        }, (err) => {});
+
                     // Escuchar eventos globales emitidos
                     this.firestore.collection('live_trips').doc('latest_event')
                         .onSnapshot((doc) => {
@@ -1278,6 +1293,17 @@ class RutaSyncManager {
 
         this.guardarMensajeChatLocal(msg);
         this.emit('CHAT_MENSAJE_ENVIADO', msg);
+
+        // Guardar lista completa en Firestore REST para sincronización multi-dispositivo inmediata
+        try {
+            const allMsgs = this.obtenerMensajesChat(tripId);
+            this.postFirestoreDocREST('live_trips', 'chat_active', {
+                tripId: tripId,
+                ultimoMensaje: msg,
+                mensajes: allMsgs,
+                timestamp: Date.now()
+            });
+        } catch(e) {}
         return msg;
     }
 
