@@ -58,15 +58,38 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const currentFleetDriver = getFleetDriverInfo();
-
-    const initialDocs = (() => {
+    function loadDocsData() {
         try {
             const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
-            return raw ? JSON.parse(raw) : null;
-        } catch(e) { return null; }
-    })();
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && (parsed.nombre || parsed.dni || parsed.estadoVerificacion || parsed.email)) {
+                    return parsed;
+                }
+            }
+        } catch(e) {}
+        return {
+            nombre: '',
+            dni: '',
+            telefono: '',
+            email: '',
+            aceptaComunicaciones: true,
+            autoMarcaModelo: '',
+            patente: '',
+            color: 'Negro',
+            categoria: 'Sedán Estándar',
+            fotoPerfil: '',
+            banco: '',
+            cbu: '',
+            titularCuenta: '',
+            estadoVerificacion: 'sin_subir',
+            observaciones: '',
+            docsImages: {}
+        };
+    }
 
+    const currentFleetDriver = getFleetDriverInfo();
+    const initialDocs = loadDocsData();
     const isInitiallyApproved = Boolean(initialDocs && initialDocs.estadoVerificacion === 'aprobado');
 
     // ESTADO DEL CONDUCTOR (Offline por defecto si no está aprobado)
@@ -5202,20 +5225,57 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const localDocs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
                 if (!localDocs) return;
-                const cleanDni = (localDocs.dni || '').replace(/\D/g, '') || (localDocs.telefono || '').replace(/\D/g, '');
-                if (!cleanDni) return;
+                const cleanDni = (localDocs.dni || '').replace(/\D/g, '');
+                const cleanTel = (localDocs.telefono || '').replace(/\D/g, '');
+                const docId = localDocs.id || (cleanDni ? 'drv_' + cleanDni : (cleanTel ? 'drv_' + cleanTel : ''));
 
-                const resp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/drv_${cleanDni}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
-                if (resp.ok) {
-                    const json = await resp.json();
-                    if (json && json.fields) {
-                        const getStr = (f, def = '') => (json.fields[f] && json.fields[f].stringValue !== undefined) ? json.fields[f].stringValue : def;
-                        const status = getStr('estadoVerificacion', '');
-                        const obs = getStr('observaciones', '');
-                        if (status) {
-                            processDriverUpdate(status, obs);
+                let matched = false;
+
+                // A. Consulta directa por ID de documento
+                if (docId) {
+                    try {
+                        const resp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
+                        if (resp.ok) {
+                            const json = await resp.json();
+                            if (json && json.fields) {
+                                const getStr = (f, def = '') => (json.fields[f] && json.fields[f].stringValue !== undefined) ? json.fields[f].stringValue : def;
+                                const status = getStr('estadoVerificacion', '');
+                                const obs = getStr('observaciones', '');
+                                if (status) {
+                                    processDriverUpdate(status, obs);
+                                    matched = true;
+                                }
+                            }
                         }
-                    }
+                    } catch(e) {}
+                }
+
+                // B. Búsqueda por colección drivers si aún no coincide
+                if (!matched) {
+                    try {
+                        const allResp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
+                        if (allResp.ok) {
+                            const allJson = await allResp.json();
+                            if (allJson && allJson.documents && allJson.documents.length > 0) {
+                                allJson.documents.forEach(doc => {
+                                    const f = doc.fields || {};
+                                    const getStr = (key, def = '') => (f[key] && f[key].stringValue !== undefined) ? f[key].stringValue : def;
+                                    const dDni = (getStr('dni', '')).replace(/\D/g, '');
+                                    const dTel = (getStr('telefono', '')).replace(/\D/g, '');
+                                    const dName = (getStr('nombre', '')).trim().toLowerCase();
+                                    const localName = (localDocs.nombre || '').trim().toLowerCase();
+
+                                    if ((cleanDni && dDni && cleanDni === dDni) || (cleanTel && dTel && cleanTel === dTel) || (localName && dName && localName === dName)) {
+                                        const status = getStr('estadoVerificacion', '');
+                                        const obs = getStr('observaciones', '');
+                                        if (status) {
+                                            processDriverUpdate(status, obs);
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    } catch(e) {}
                 }
             } catch(e) {}
         };
@@ -5941,6 +6001,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 const refCode = (rechargeTransferRef ? rechargeTransferRef.value.trim() : '') || '';
                 if (refCode.length < 3) {
                     showDriverToast('⚠️ Por favor ingresa el Número de Comprobante / Trámite.');
+                    if (rechargeTransferRef) rechargeTransferRef.focus();
+                    return;
+                }
+
+                // Verificar si ya envió una solicitud con este mismo número de comprobante/trámite
+                let existingLocalRecharges = [];
+                try {
+                    existingLocalRecharges = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
+                } catch(e) {}
+
+                const cleanRef = refCode.trim().toLowerCase();
+                const isDuplicate = existingLocalRecharges.some(r => r.comprobante && r.comprobante.trim().toLowerCase() === cleanRef);
+                if (isDuplicate) {
+                    alert(`⚠️ NÚMERO DE TRÁMITE YA ENVIADO:\n\nEl comprobante #${refCode} ya ha sido registrado y enviado a conciliación anteriormente.\n\nPor favor verifica tu número de trámite o ingresa el número correspondiente a una nueva transferencia.`);
                     if (rechargeTransferRef) rechargeTransferRef.focus();
                     return;
                 }

@@ -1461,6 +1461,7 @@
                         if (resp.ok) {
                             const data = await resp.json();
                             if (data && data.documents && data.documents.length > 0) {
+                                const freshList = [];
                                 data.documents.forEach(doc => {
                                     const fields = doc.fields || {};
                                     const getStr = (f, def = '') => (fields[f] && fields[f].stringValue !== undefined) ? fields[f].stringValue : def;
@@ -1484,13 +1485,9 @@
                                         timestamp: getNum('timestamp', Date.now())
                                     };
 
-                                    const matchIdx = cloudRechargesList.findIndex(cr => cr.id === rec.id || (cr.comprobante && rec.comprobante && cr.comprobante === rec.comprobante));
-                                    if (matchIdx >= 0) {
-                                        cloudRechargesList[matchIdx] = { ...cloudRechargesList[matchIdx], ...rec };
-                                    } else {
-                                        cloudRechargesList.unshift(rec);
-                                    }
+                                    freshList.push(rec);
                                 });
+                                cloudRechargesList = freshList;
                                 loadRechargesData();
                             }
                         }
@@ -2449,20 +2446,22 @@
                     if (raw) localRecharges = JSON.parse(raw);
                 } catch(e) {}
 
-                // Fusión inteligente: nunca eliminar o retroceder registros aprobados
-                let combined = [...cloudRechargesList];
+                // Fusión por ID único: la nube Firestore siempre tiene prioridad de estado
+                const combinedMap = new Map();
+                
+                // 1. Agregar locales existentes
                 localRecharges.forEach(loc => {
-                    const matchIdx = combined.findIndex(c => c.id === loc.id || (c.comprobante && loc.comprobante && c.comprobante === loc.comprobante));
-                    if (matchIdx >= 0) {
-                        combined[matchIdx] = { ...combined[matchIdx], ...loc };
-                        if (loc.estado === 'aprobado' || combined[matchIdx].estado === 'aprobado') {
-                            combined[matchIdx].estado = 'aprobado';
-                        }
-                    } else {
-                        combined.push(loc);
+                    if (loc && loc.id) combinedMap.set(loc.id, loc);
+                });
+
+                // 2. Incorporar y actualizar con datos en vivo de la nube Firestore
+                cloudRechargesList.forEach(cloudItem => {
+                    if (cloudItem && cloudItem.id) {
+                        combinedMap.set(cloudItem.id, cloudItem);
                     }
                 });
 
+                const combined = Array.from(combinedMap.values());
                 combined.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
 
                 // Preservar en storage local consolidado
@@ -2470,7 +2469,7 @@
                     localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(combined));
                 } catch(e) {}
                 
-                const pendingCount = combined.filter(r => (r.estado || 'pendiente') === 'pendiente').length;
+                const pendingCount = combined.filter(r => (r.estado || 'pendiente').toLowerCase() === 'pendiente').length;
                 if (metricPendingRecharges) metricPendingRecharges.textContent = pendingCount;
                 if (badgePendingRechargesCount) {
                     if (pendingCount > 0) {
