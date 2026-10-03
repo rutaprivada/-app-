@@ -545,6 +545,60 @@ class RutaSyncManager {
                     localStorage.setItem('rutaprivada_driver_location', JSON.stringify(message.payload));
                 } catch (e) {}
             }
+        } else if (message.type === 'ESTADO_CONDUCTOR_ACTUALIZADO' || message.type === 'DOCUMENTOS_CONDUCTOR_ACTUALIZADOS') {
+            if (message.payload) {
+                try {
+                    let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+                    const cleanDni = String(message.payload.dni || '').replace(/\D/g, '');
+                    const docId = String(message.payload.id || (cleanDni ? 'drv_' + cleanDni : ''));
+                    const idx = driversList.findIndex(d => (d.id && docId && d.id === docId) || (d.dni && cleanDni && String(d.dni).replace(/\D/g, '') === cleanDni) || (d.nombre && message.payload.nombre && d.nombre.trim().toLowerCase() === message.payload.nombre.trim().toLowerCase()));
+                    if (idx >= 0) {
+                        driversList[idx] = { ...driversList[idx], ...message.payload, docsImages: Object.assign({}, driversList[idx].docsImages || {}, message.payload.docsImages || {}) };
+                    } else {
+                        driversList.unshift(message.payload);
+                    }
+                    localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
+                    window.dispatchEvent(new Event('storage'));
+                } catch(e) {}
+            }
+        } else if (message.type === 'DOCUMENTO_CONDUCTOR_SUBIDO') {
+            if (message.payload && message.payload.driverId && message.payload.key && message.payload.data) {
+                try {
+                    let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+                    const dId = String(message.payload.driverId);
+                    const cleanDni = String(message.payload.dni || '').replace(/\D/g, '');
+                    let target = driversList.find(d => d.id === dId || (cleanDni && d.dni && String(d.dni).replace(/\D/g, '') === cleanDni));
+                    if (target) {
+                        if (!target.docsImages) target.docsImages = {};
+                        target.docsImages[message.payload.key] = message.payload.data;
+                        localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
+                        window.dispatchEvent(new Event('storage'));
+                    }
+                } catch(e) {}
+            }
+        } else if (message.type === 'SOLICITUD_RECARGA_SALDO') {
+            if (message.payload) {
+                try {
+                    let recharges = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
+                    if (!recharges.some(r => r.id === message.payload.id || (r.comprobante && message.payload.comprobante && r.comprobante === message.payload.comprobante))) {
+                        recharges.unshift(message.payload);
+                        localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(recharges));
+                        window.dispatchEvent(new Event('storage'));
+                    }
+                } catch(e) {}
+            }
+        } else if (message.type === 'RECARGA_SALDO_PROCESADA') {
+            if (message.payload && message.payload.rechargeId) {
+                try {
+                    let recharges = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
+                    const idx = recharges.findIndex(r => r.id === message.payload.rechargeId);
+                    if (idx >= 0) {
+                        recharges[idx].estado = message.payload.estado || 'aprobado';
+                        localStorage.setItem('rutaprivada_driver_recharges_v1', JSON.stringify(recharges));
+                        window.dispatchEvent(new Event('storage'));
+                    }
+                } catch(e) {}
+            }
         }
 
         // Notificaciones nativas inteligentes para eventos clave de viaje

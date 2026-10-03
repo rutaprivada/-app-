@@ -4699,6 +4699,19 @@ document.addEventListener('DOMContentLoaded', () => {
             // 3. Emitir evento por bus sync para recepción inmediata en Admin
             if (window.RutaSync) {
                 window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', mainDriverDoc);
+
+                // Transmitir cada documento subido por el canal de sincronización en tiempo real
+                for (const [docKey, docData] of Object.entries(mergedDocsImages)) {
+                    if (docData && typeof docData === 'string' && docData.length > 20) {
+                        window.RutaSync.emit('DOCUMENTO_CONDUCTOR_SUBIDO', {
+                            driverId: docId,
+                            dni: cleanDni,
+                            key: docKey,
+                            data: docData,
+                            timestamp: Date.now()
+                        });
+                    }
+                }
             }
 
             // 4. Actualizar lista en memoria
@@ -4706,9 +4719,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
                 const idx = driversList.findIndex(d => (d.dni && updatedDocs.dni && d.dni === updatedDocs.dni) || (d.id && d.id === updatedDocs.id) || d.nombre === updatedDocs.nombre);
                 if (idx >= 0) {
-                    driversList[idx] = { ...driversList[idx], ...updatedDocs };
+                    driversList[idx] = { ...driversList[idx], ...updatedDocs, docsImages: Object.assign({}, driversList[idx].docsImages || {}, mergedDocsImages) };
                 } else {
-                    driversList.unshift(updatedDocs);
+                    driversList.unshift({ ...updatedDocs, docsImages: mergedDocsImages });
                 }
                 localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
             } catch(e) {}

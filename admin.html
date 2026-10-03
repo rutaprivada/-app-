@@ -1370,12 +1370,76 @@
                 });
 
                 window.RutaSync.on('ESTADO_CONDUCTOR_ACTUALIZADO', (updatedDriver) => {
+                    if (updatedDriver) {
+                        try {
+                            let localList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+                            const cleanDni = String(updatedDriver.dni || '').replace(/\D/g, '');
+                            const docId = String(updatedDriver.id || (cleanDni ? 'drv_' + cleanDni : ''));
+                            const idx = localList.findIndex(d => (d.id && docId && d.id === docId) || (d.dni && cleanDni && String(d.dni).replace(/\D/g, '') === cleanDni) || (d.nombre && updatedDriver.nombre && d.nombre.trim().toLowerCase() === updatedDriver.nombre.trim().toLowerCase()));
+                            if (idx >= 0) {
+                                localList[idx] = { ...localList[idx], ...updatedDriver, docsImages: Object.assign({}, localList[idx].docsImages || {}, updatedDriver.docsImages || {}) };
+                            } else {
+                                localList.unshift(updatedDriver);
+                            }
+                            localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(localList));
+                        } catch(e) {}
+
+                        if (Array.isArray(cloudDriversList)) {
+                            const cleanDni = String(updatedDriver.dni || '').replace(/\D/g, '');
+                            const cIdx = cloudDriversList.findIndex(c => (c.id && updatedDriver.id && c.id === updatedDriver.id) || (c.dni && cleanDni && String(c.dni).replace(/\D/g, '') === cleanDni) || (c.nombre && updatedDriver.nombre && c.nombre.trim().toLowerCase() === updatedDriver.nombre.trim().toLowerCase()));
+                            if (cIdx >= 0) {
+                                cloudDriversList[cIdx] = { ...cloudDriversList[cIdx], ...updatedDriver };
+                            } else {
+                                cloudDriversList.unshift(updatedDriver);
+                            }
+                        }
+                    }
+
                     loadDriversData();
                     if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
                         const activeDni = String(activeReviewDriver.dni || '').replace(/\D/g, '');
                         const updatedDni = updatedDriver ? String(updatedDriver.dni || '').replace(/\D/g, '') : '';
                         if (!updatedDriver || !updatedDni || activeDni === updatedDni || activeReviewDriver.id === updatedDriver.id || activeReviewDriver.nombre === updatedDriver.nombre) {
                             openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
+                        }
+                    }
+                });
+
+                window.RutaSync.on('DOCUMENTO_CONDUCTOR_SUBIDO', (docPayload) => {
+                    if (docPayload && docPayload.key && docPayload.data) {
+                        const cleanDni = String(docPayload.dni || '').replace(/\D/g, '');
+                        const driverId = String(docPayload.driverId || (cleanDni ? 'drv_' + cleanDni : ''));
+
+                        let target = currentDrivers.find(d => (d.id && driverId && d.id === driverId) || (d.dni && cleanDni && String(d.dni).replace(/\D/g, '') === cleanDni));
+                        if (target) {
+                            if (!target.docsImages) target.docsImages = {};
+                            target.docsImages[docPayload.key] = docPayload.data;
+                            if (docPayload.key === 'foto' || docPayload.key === 'fotoPerfil') {
+                                target.fotoPerfil = docPayload.data;
+                            }
+                            if (!target.docsSummary) target.docsSummary = {};
+                            target.docsSummary[docPayload.key] = true;
+                            target.docsCount = Object.values(target.docsSummary).filter(Boolean).length;
+
+                            try {
+                                let localList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+                                const idx = localList.findIndex(d => (d.id && target.id && d.id === target.id) || (d.dni && cleanDni && String(d.dni).replace(/\D/g, '') === cleanDni));
+                                if (idx >= 0) {
+                                    localList[idx].docsImages = Object.assign({}, localList[idx].docsImages || {}, target.docsImages);
+                                    localList[idx].docsSummary = Object.assign({}, localList[idx].docsSummary || {}, target.docsSummary);
+                                    localList[idx].docsCount = target.docsCount;
+                                    if (target.fotoPerfil) localList[idx].fotoPerfil = target.fotoPerfil;
+                                    localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(localList));
+                                }
+                            } catch(e) {}
+
+                            renderDriversTable();
+                            if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
+                                const activeDni = String(activeReviewDriver.dni || '').replace(/\D/g, '');
+                                if (activeReviewDriver.id === target.id || (activeDni && cleanDni && activeDni === cleanDni) || activeReviewDriver.nombre === target.nombre) {
+                                    openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
+                                }
+                            }
                         }
                     }
                 });
@@ -1427,6 +1491,8 @@
                             cbu: c.cbu || '',
                             titularCuenta: c.titularCuenta || c.nombre || '',
                             docsImages: c.docsImages || {},
+                            docsSummary: c.docsSummary || {},
+                            docsCount: c.docsCount || (c.docsSummary ? Object.values(c.docsSummary).filter(Boolean).length : 0),
                             observaciones: c.observaciones || '',
                             updatedAt: c.updatedAt || Date.now()
                         });
@@ -1457,6 +1523,7 @@
                             email: activeDocs.email || drivers[existingIdx].email || '',
                             aceptaComunicaciones: activeDocs.aceptaComunicaciones !== false,
                             docsImages: Object.assign({}, drivers[existingIdx].docsImages || {}, activeDocs.docsImages || {}),
+                            docsSummary: Object.assign({}, drivers[existingIdx].docsSummary || {}, activeDocs.docsSummary || {}),
                             isOnline: isOnlineLocal || drivers[existingIdx].isOnline
                         };
                     } else {
@@ -1478,26 +1545,44 @@
                             cbu: activeDocs.cbu || '',
                             titularCuenta: activeDocs.titularCuenta || activeDocs.nombre || '',
                             docsImages: activeDocs.docsImages || {},
+                            docsSummary: activeDocs.docsSummary || {},
+                            docsCount: activeDocs.docsCount || (activeDocs.docsSummary ? Object.values(activeDocs.docsSummary).filter(Boolean).length : 0),
                             observaciones: activeDocs.observaciones || '',
                             updatedAt: activeDocs.updatedAt || Date.now()
                         });
                     }
                 }
 
-                // C. Incorporar otros conductores registrados
+                // C. Incorporar otros conductores registrados (y sincronizados desde móvil)
                 if (Array.isArray(storedDrivers) && storedDrivers.length > 0) {
                     storedDrivers.forEach(d => {
                         const driverName = d.nombre || d.name;
-                        const existingIdx = drivers.findIndex(ex => (ex.id && d.id && ex.id === d.id) || (ex.dni && d.dni && ex.dni === d.dni) || (ex.nombre && driverName && ex.nombre.trim().toLowerCase() === driverName.trim().toLowerCase()));
+                        const cleanDni = String(d.dni || '').replace(/\D/g, '');
+                        const cleanPhone = String(d.telefono || d.phone || '').replace(/\D/g, '');
+                        const targetId = d.id || (cleanDni ? 'drv_' + cleanDni : (cleanPhone ? 'drv_' + cleanPhone : ''));
+
+                        const existingIdx = drivers.findIndex(ex => {
+                            if (ex.id && targetId && ex.id === targetId) return true;
+                            if (ex.dni && cleanDni && String(ex.dni).replace(/\D/g, '') === cleanDni) return true;
+                            if (ex.telefono && cleanPhone && String(ex.telefono).replace(/\D/g, '') === cleanPhone) return true;
+                            if (ex.nombre && driverName && ex.nombre.trim().toLowerCase() === driverName.trim().toLowerCase()) return true;
+                            return false;
+                        });
+
                         if (existingIdx >= 0) {
-                            if (d.docsImages && Object.keys(d.docsImages).length > 0) {
-                                drivers[existingIdx].docsImages = Object.assign({}, d.docsImages, drivers[existingIdx].docsImages || {});
-                            }
-                        } else if (driverName) {
-                            const cleanDni = String(d.dni || '').replace(/\D/g, '');
+                            // Fusión completa de datos actualizados
+                            drivers[existingIdx] = {
+                                ...drivers[existingIdx],
+                                ...d,
+                                id: drivers[existingIdx].id || targetId,
+                                docsImages: Object.assign({}, drivers[existingIdx].docsImages || {}, d.docsImages || {}),
+                                docsSummary: Object.assign({}, drivers[existingIdx].docsSummary || {}, d.docsSummary || {}),
+                                docsCount: d.docsCount || drivers[existingIdx].docsCount || (d.docsSummary ? Object.values(d.docsSummary).filter(Boolean).length : 0)
+                            };
+                        } else if (driverName || cleanDni) {
                             drivers.push({
-                                id: d.id || (cleanDni ? 'drv_' + cleanDni : ('drv_' + driverName.replace(/\s+/g, '_').toLowerCase())),
-                                nombre: driverName,
+                                id: targetId || ('drv_' + (driverName || 'chofer').replace(/\s+/g, '_').toLowerCase()),
+                                nombre: driverName || 'Conductor',
                                 dni: d.dni || 'S/D',
                                 telefono: d.telefono || d.phone || 'S/T',
                                 email: d.email || '',
@@ -1513,6 +1598,8 @@
                                 cbu: d.cbu || '',
                                 titularCuenta: d.titularCuenta || driverName,
                                 docsImages: d.docsImages || {},
+                                docsSummary: d.docsSummary || {},
+                                docsCount: d.docsCount || (d.docsSummary ? Object.values(d.docsSummary).filter(Boolean).length : 0),
                                 observaciones: d.observaciones || '',
                                 updatedAt: d.updatedAt || Date.now()
                             });
