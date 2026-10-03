@@ -4668,10 +4668,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: Date.now()
             };
 
-            // Documento completo para almacenamiento Cloud Firestore (incluye imágenes comprimidas de los 8 documentos)
+            // Documento completo para almacenamiento Cloud Firestore
             const fullCloudDriverDoc = {
-                ...mainDriverDoc,
-                docsImages: mergedDocsImages
+                ...mainDriverDoc
             };
 
             // A. Sincronización mediante Firebase Firestore SDK
@@ -4682,12 +4681,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     const db = firebase.firestore();
 
-                    // Guardar de inmediato todos los datos y fotos del chofer en Firestore
-                    db.collection('drivers').doc(docId).set(fullCloudDriverDoc, { merge: true }).then(() => {
-                        console.log('✓ Perfil completo de conductor sincronizado con Firestore:', docId);
+                    // 1. Guardar de inmediato datos principales del chofer en Firestore (super ligero, siempre exitoso)
+                    db.collection('drivers').doc(docId).set(mainDriverDoc, { merge: true }).then(() => {
+                        console.log('✓ Perfil de conductor sincronizado con Firestore:', docId);
                     }).catch(err => console.warn('Error guardando chofer en Firestore SDK:', err));
 
-                    // También guardar subdocumentos individuales por redundancia
+                    // 2. Guardar cada documento individualmente en subcolección (cada uno con su propio límite de 1MB)
                     for (const [docKey, docData] of Object.entries(mergedDocsImages)) {
                         if (docData && typeof docData === 'string' && docData.length > 20) {
                             db.collection('drivers').doc(docId).collection('documents').doc(docKey).set({
@@ -4695,7 +4694,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                 key: docKey,
                                 data: docData,
                                 updatedAt: Date.now()
-                            }, { merge: true }).catch(() => {});
+                            }, { merge: true }).then(() => {
+                                console.log(`✓ Documento ${docKey} sincronizado en subcolección Firestore.`);
+                            }).catch(err => console.warn(`Error subiendo documento ${docKey}:`, err));
                         }
                     }
                 } catch(e) {
@@ -4730,6 +4731,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ fields: restFields })
                 }).catch(() => {});
+
+                // Subir documentos por REST API en paralelo
+                for (const [docKey, docData] of Object.entries(mergedDocsImages)) {
+                    if (docData && typeof docData === 'string' && docData.length > 20) {
+                        fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}/documents/${docKey}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                fields: {
+                                    id: { stringValue: docKey },
+                                    key: { stringValue: docKey },
+                                    data: { stringValue: docData },
+                                    updatedAt: { integerValue: String(Date.now()) }
+                                }
+                            })
+                        }).catch(() => {});
+                    }
+                }
             } catch(e) {}
 
             // 3. Emitir evento por bus sync para recepción inmediata en Admin

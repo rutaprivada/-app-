@@ -2116,14 +2116,38 @@
 
                 renderGrid();
 
+                const cleanDni = String(driver.dni || '').replace(/\D/g, '');
+                const cleanPhone = String(driver.telefono || '').replace(/\D/g, '');
+                const targetId = driver.id || (cleanDni ? 'drv_' + cleanDni : (cleanPhone ? 'drv_' + cleanPhone : ''));
+
+                // Carga directa mediante Firestore REST API de la subcolección
+                if (targetId) {
+                    fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${targetId}/documents?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' })
+                        .then(r => r.json())
+                        .then(res => {
+                            if (res && res.documents && res.documents.length > 0) {
+                                if (!driver.docsImages) driver.docsImages = {};
+                                let hasRestNew = false;
+                                res.documents.forEach(docItem => {
+                                    const dKey = docItem.name.split('/').pop();
+                                    const fields = docItem.fields || {};
+                                    const b64 = (fields.data && fields.data.stringValue) ? fields.data.stringValue : '';
+                                    if (b64 && b64.length > 20) {
+                                        driver.docsImages[dKey] = b64;
+                                        hasRestNew = true;
+                                    }
+                                });
+                                if (hasRestNew && activeReviewDriver) {
+                                    renderGrid();
+                                }
+                            }
+                        }).catch(() => {});
+                }
+
                 // Carga y escucha en tiempo real de los documentos desde Firestore subcolección 'documents'
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
                         const db = firebase.firestore();
-                        const cleanDni = String(driver.dni || '').replace(/\D/g, '');
-                        const cleanPhone = String(driver.telefono || '').replace(/\D/g, '');
-                        const targetId = driver.id || (cleanDni ? 'drv_' + cleanDni : (cleanPhone ? 'drv_' + cleanPhone : ''));
-
                         if (targetId) {
                             db.collection('drivers').doc(targetId).collection('documents').onSnapshot(subSnap => {
                                 if (subSnap && !subSnap.empty) {

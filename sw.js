@@ -3,7 +3,7 @@
  * Soporta instalación en Android, iOS y PC con carga instantánea y caché local
  */
 
-const CACHE_NAME = 'rutaprivada-pwa-v26';
+const CACHE_NAME = 'rutaprivada-pwa-v75';
 
 const STATIC_ASSETS = [
   './',
@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
   './conductor.css',
   './conductor.js',
   './sync.js',
+  './admin.html',
   './favicon.svg',
   './icon-192.png',
   './icon-512.png',
@@ -36,7 +37,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activación: Limpiar cachés anteriores
+// Activación: Limpiar todos los cachés anteriores de inmediato
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -51,13 +52,11 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Intercepción de peticiones:
-// - Peticiones a APIs externas (OSRM, USIG, Photon, Open-Meteo, Carto Tiles): Network First con bypass de caché para datos en vivo.
-// - Recursos locales de la app: Stale-While-Revalidate para máxima velocidad de arranque.
+// Intercepción de peticiones con estrategia Network-First (siempre datos frescos)
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // APIs dinámicas y mapas en tiempo real (siempre en vivo)
+  // APIs dinámicas, sync y Firestore en tiempo real (siempre en vivo sin caché)
   if (
     url.hostname.includes('project-osrm.org') ||
     url.hostname.includes('openstreetmap.org') ||
@@ -66,7 +65,10 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('open-meteo.com') ||
     url.hostname.includes('cartocdn.com') ||
     url.hostname.includes('mapbox.com') ||
-    url.hostname.includes('wa.me') ||
+    url.hostname.includes('ntfy.sh') ||
+    url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('firebaseio.com') ||
+    url.pathname.includes('/api/sync') ||
     event.request.method !== 'GET'
   ) {
     event.respondWith(
@@ -79,10 +81,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Recursos estáticos locales
+  // Recursos estáticos locales: Network First (Red primero, respaldo en caché si no hay conexión)
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
+    fetch(event.request)
+      .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -90,10 +92,10 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      }).catch(() => cachedResponse);
-
-      return cachedResponse || fetchPromise;
-    })
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      })
   );
 });
 
