@@ -4721,6 +4721,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     titularCuenta: { stringValue: updatedDocs.titularCuenta || '' },
                     estadoVerificacion: { stringValue: status },
                     observaciones: { stringValue: updatedDocs.observaciones || '' },
+                    docsCount: { integerValue: String(Object.values(docsUploadedSummary).filter(Boolean).length) },
                     updatedAt: { integerValue: String(Date.now()) }
                 };
                 if (safeProfilePhoto) {
@@ -4849,6 +4850,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (docInputEmail && !docInputEmail.value.trim()) {
                     alert('⚠️ Por favor ingresa el correo electrónico del chofer.');
                     docInputEmail.focus();
+                    return;
+                }
+                const cbuVal = docInputCbu ? docInputCbu.value.trim().replace(/\s+/g, '') : '';
+                const cbuOnlyDigits = cbuVal.replace(/\D/g, '');
+                if (!cbuOnlyDigits || cbuOnlyDigits.length !== 22) {
+                    alert('⚠️ CBU BANCARIO OBLIGATORIO:\n\nDebes ingresar obligatoriamente un número de CBU Bancario de 22 dígitos numéricos.\nNo se permiten alias ya que cambian constantemente.');
+                    if (docInputCbu) docInputCbu.focus();
                     return;
                 }
                 saveDocsData('pendiente');
@@ -5938,7 +5946,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showDriverToast(`⏳ Transferencia enviada a conciliación: $${amount.toLocaleString('es-AR')}`);
                 alert(`✓ Transferencia Registrada en Conciliación Bancaria.\n\nSe ha recibido tu aviso de recarga por $${amount.toLocaleString('es-AR')} con Comprobante N° ${refCode}.\n\nEl saldo se acreditará en tu cuenta tan pronto como el sistema o la Administración verifiquen el ingreso de los fondos en la cuenta bancaria.`);
 
-                // 3. Sincronizar recarga pendiente con Firestore
+                // 3. Sincronizar recarga pendiente con Firestore (SDK y REST)
                 if (typeof firebase !== 'undefined') {
                     try {
                         if (!firebase.apps || !firebase.apps.length) {
@@ -5950,6 +5958,31 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.warn('Firebase error in recharge:', e);
                     }
                 }
+
+                // Sincronización REST directa en paralelo garantizada
+                try {
+                    fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/wallet_recharges/${rechargeId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            fields: {
+                                id: { stringValue: rechargeId },
+                                driverId: { stringValue: String(rechargePayload.driverId || '') },
+                                driverName: { stringValue: String(rechargePayload.driverName || '') },
+                                driverDni: { stringValue: String(rechargePayload.driverDni || '') },
+                                driverPatente: { stringValue: String(rechargePayload.driverPatente || '') },
+                                driverPhone: { stringValue: String(rechargePayload.driverPhone || '') },
+                                monto: { integerValue: String(amount) },
+                                comprobante: { stringValue: String(refCode) },
+                                estado: { stringValue: 'pendiente' },
+                                fecha: { stringValue: rechargePayload.fecha || '' },
+                                hora: { stringValue: rechargePayload.hora || '' },
+                                metodo: { stringValue: 'transferencia_bancaria_cuit' },
+                                timestamp: { integerValue: String(Date.now()) }
+                            }
+                        })
+                    }).catch(() => {});
+                } catch(e) {}
             });
         }
 

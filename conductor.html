@@ -756,8 +756,8 @@
                                 </div>
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                                     <div>
-                                        <label style="font-size: 0.72rem; color: #94a3b8;">CBU / CVU / Alias *</label>
-                                        <input type="text" id="docInputCbu" class="driver-form-input" placeholder="Ej. 00000031000845..." required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:6px; font-size:0.82rem; font-family: monospace;">
+                                        <label style="font-size: 0.72rem; color: #fbbf24; font-weight: 700;">CBU Bancario Obligatorio (22 dígitos) *</label>
+                                        <input type="text" id="docInputCbu" class="driver-form-input" placeholder="Ej. 0720123488000012345678 (22 números)" maxlength="22" inputmode="numeric" pattern="[0-9]{22}" required style="width:100%; background:#0f172a; border:1px solid rgba(251,191,36,0.3); color:#fff; padding:8px 10px; border-radius:6px; font-size:0.82rem; font-family: monospace;">
                                     </div>
                                     <div>
                                         <label style="font-size: 0.72rem; color: #94a3b8;">Nombre y Apellido Titular *</label>

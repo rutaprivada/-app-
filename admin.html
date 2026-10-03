@@ -1238,14 +1238,54 @@
                 });
             }
 
+            // Helper global para refresco interactivo de datos
+            function triggerGlobalAdminRefresh(buttonEl = null) {
+                let icon = null;
+                if (buttonEl) {
+                    icon = buttonEl.querySelector('i.fa-rotate') || buttonEl.querySelector('i');
+                    if (icon) icon.classList.add('fa-spin');
+                }
+                
+                // 1. Invocar lecturas activas por REST y por SDK
+                if (typeof fetchDriversFromFirestoreRest === 'function') fetchDriversFromFirestoreRest();
+                if (typeof fetchRechargesFromFirestoreRest === 'function') fetchRechargesFromFirestoreRest();
+
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                    try {
+                        const db = firebase.firestore();
+                        if (typeof fetchDriversFromFirestore === 'function') fetchDriversFromFirestore(db);
+                        if (typeof fetchRechargesFromFirestore === 'function') fetchRechargesFromFirestore(db);
+                    } catch(e) {}
+                }
+
+                loadDriversData();
+                loadRechargesData();
+
+                setTimeout(() => {
+                    if (icon) icon.classList.remove('fa-spin');
+                }, 700);
+            }
+
             if (btnRefreshAdmin) {
-                btnRefreshAdmin.addEventListener('click', () => {
-                    loadDriversData();
-                    loadRechargesData();
+                btnRefreshAdmin.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    triggerGlobalAdminRefresh(btnRefreshAdmin);
+                });
+            }
+
+            if (btnRefreshRecharges) {
+                btnRefreshRecharges.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    triggerGlobalAdminRefresh(btnRefreshRecharges);
                 });
             }
 
             // 2. SINCRONIZACIÓN EN TIEMPO REAL (FIRESTORE)
+            let fetchDriversFromFirestoreRest = null;
+            let fetchRechargesFromFirestoreRest = null;
+            let fetchDriversFromFirestore = null;
+            let fetchRechargesFromFirestore = null;
+
             function initFirestoreRealtimeSync() {
                 const FIREBASE_CONFIG = {
                     apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
@@ -1257,7 +1297,32 @@
                     measurementId: "G-EXXS3VHD14"
                 };
 
-                const fetchDriversFromFirestore = (db) => {
+                const checkSubcollectionsForDrivers = (db) => {
+                    if (!db || !Array.isArray(cloudDriversList) || cloudDriversList.length === 0) return;
+                    cloudDriversList.forEach(drv => {
+                        const drvId = drv.id;
+                        if (!drvId) return;
+                        db.collection('drivers').doc(drvId).collection('documents').get().then(subSnap => {
+                            if (subSnap && !subSnap.empty) {
+                                let subDocsCount = 0;
+                                if (!drv.docsImages) drv.docsImages = {};
+                                subSnap.forEach(sDoc => {
+                                    const sData = sDoc.data();
+                                    if (sData && sData.data && sData.data.length > 20) {
+                                        drv.docsImages[sDoc.id] = sData.data;
+                                        subDocsCount++;
+                                    }
+                                });
+                                if (subDocsCount > (drv.docsCount || 0)) {
+                                    drv.docsCount = subDocsCount;
+                                    loadDriversData();
+                                }
+                            }
+                        }).catch(() => {});
+                    });
+                };
+
+                fetchDriversFromFirestore = (db) => {
                     db.collection('drivers').get().then((snapshot) => {
                         if (snapshot && !snapshot.empty) {
                             cloudDriversList = [];
@@ -1265,16 +1330,20 @@
                                 if (doc.exists) {
                                     const d = doc.data();
                                     d.id = d.id || doc.id;
+                                    if (!d.docsCount && d.docsSummary) {
+                                        d.docsCount = Object.values(d.docsSummary).filter(Boolean).length;
+                                    }
                                     cloudDriversList.push(d);
                                 }
                             });
                             loadDriversData();
+                            checkSubcollectionsForDrivers(db);
                         }
                     }).catch(err => console.warn('Firestore initial drivers fetch warning:', err));
                     fetchDriversFromFirestoreRest();
                 };
 
-                const fetchDriversFromFirestoreRest = async () => {
+                fetchDriversFromFirestoreRest = async () => {
                     try {
                         const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
                         if (resp.ok) {
@@ -1283,7 +1352,7 @@
                                 data.documents.forEach(doc => {
                                     const fields = doc.fields || {};
                                     const getStr = (f, def = '') => (fields[f] && fields[f].stringValue !== undefined) ? fields[f].stringValue : def;
-                                    const getNum = (f, def = 0) => (fields[f] && fields[f].integerValue !== undefined) ? Number(fields[f].integerValue) : def;
+                                    const getNum = (f, def = 0) => (fields[f] && fields[f].integerValue !== undefined) ? Number(fields[f].integerValue) : ((fields[f] && fields[f].doubleValue !== undefined) ? Number(fields[f].doubleValue) : def);
 
                                     const idFromPath = doc.name ? doc.name.split('/').pop() : '';
                                     const dId = getStr('id', idFromPath);
@@ -1294,6 +1363,15 @@
                                             if (v && v.stringValue) docsImgs[k] = v.stringValue;
                                         }
                                     }
+
+                                    let docsSumm = {};
+                                    if (fields.docsSummary && fields.docsSummary.mapValue && fields.docsSummary.mapValue.fields) {
+                                        for (const [k, v] of Object.entries(fields.docsSummary.mapValue.fields)) {
+                                            if (v && v.booleanValue !== undefined) docsSumm[k] = v.booleanValue;
+                                        }
+                                    }
+
+                                    const parsedDocsCount = getNum('docsCount', 0) || Object.values(docsSumm).filter(Boolean).length || Object.keys(docsImgs).length;
 
                                     const rd = {
                                         id: dId,
@@ -1312,14 +1390,44 @@
                                         estadoVerificacion: getStr('estadoVerificacion', 'pendiente'),
                                         observaciones: getStr('observaciones', ''),
                                         docsImages: docsImgs,
+                                        docsSummary: docsSumm,
+                                        docsCount: parsedDocsCount,
                                         updatedAt: getNum('updatedAt', Date.now())
                                     };
 
                                     const matchIdx = cloudDriversList.findIndex(cd => cd.id === rd.id || (cd.dni && rd.dni && cd.dni === rd.dni));
                                     if (matchIdx >= 0) {
-                                        cloudDriversList[matchIdx] = { ...cloudDriversList[matchIdx], ...rd, docsImages: Object.assign({}, cloudDriversList[matchIdx].docsImages || {}, rd.docsImages) };
+                                        cloudDriversList[matchIdx] = { 
+                                            ...cloudDriversList[matchIdx], 
+                                            ...rd, 
+                                            docsCount: Math.max(cloudDriversList[matchIdx].docsCount || 0, rd.docsCount || 0),
+                                            docsImages: Object.assign({}, cloudDriversList[matchIdx].docsImages || {}, rd.docsImages) 
+                                        };
                                     } else {
                                         cloudDriversList.unshift(rd);
+                                    }
+
+                                    // Si no tiene conteo de documentos, consultar subcolección REST
+                                    if (rd.docsCount === 0 && dId) {
+                                        fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${dId}/documents?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' })
+                                            .then(r => r.json())
+                                            .then(subRes => {
+                                                if (subRes && subRes.documents && subRes.documents.length > 0) {
+                                                    const target = cloudDriversList.find(c => c.id === dId);
+                                                    if (target) {
+                                                        target.docsCount = subRes.documents.length;
+                                                        if (!target.docsImages) target.docsImages = {};
+                                                        subRes.documents.forEach(sDoc => {
+                                                            const sKey = sDoc.name.split('/').pop();
+                                                            const sFields = sDoc.fields || {};
+                                                            if (sFields.data && sFields.data.stringValue) {
+                                                                target.docsImages[sKey] = sFields.data.stringValue;
+                                                            }
+                                                        });
+                                                        loadDriversData();
+                                                    }
+                                                }
+                                            }).catch(() => {});
                                     }
                                 });
                                 loadDriversData();
@@ -1330,7 +1438,7 @@
                     }
                 };
 
-                const fetchRechargesFromFirestore = (db) => {
+                fetchRechargesFromFirestore = (db) => {
                     db.collection('wallet_recharges').get().then((snapshot) => {
                         if (snapshot && !snapshot.empty) {
                             cloudRechargesList = [];
@@ -1347,7 +1455,7 @@
                     fetchRechargesFromFirestoreRest();
                 };
 
-                const fetchRechargesFromFirestoreRest = async () => {
+                fetchRechargesFromFirestoreRest = async () => {
                     try {
                         const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/wallet_recharges?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
                         if (resp.ok) {
@@ -1367,8 +1475,12 @@
                                         estado: getStr('estado', 'pendiente'),
                                         driverName: getStr('driverName', 'Chofer Partner'),
                                         driverDni: getStr('driverDni', ''),
-                                        driverPlate: getStr('driverPlate', ''),
+                                        driverPatente: getStr('driverPatente', getStr('driverPlate', '')),
+                                        driverPhone: getStr('driverPhone', ''),
                                         comprobante: getStr('comprobante', ''),
+                                        fecha: getStr('fecha', 'Hoy'),
+                                        hora: getStr('hora', ''),
+                                        metodo: getStr('metodo', 'transferencia_bancaria_cuit'),
                                         timestamp: getNum('timestamp', Date.now())
                                     };
 
@@ -1411,10 +1523,14 @@
                                     if (doc.exists) {
                                         const d = doc.data();
                                         d.id = d.id || doc.id;
+                                        if (!d.docsCount && d.docsSummary) {
+                                            d.docsCount = Object.values(d.docsSummary).filter(Boolean).length;
+                                        }
                                         cloudDriversList.push(d);
                                     }
                                 });
                                 loadDriversData();
+                                checkSubcollectionsForDrivers(db);
                                 if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
                                     openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
                                 }
@@ -2460,7 +2576,7 @@
             function processRechargeDecision(rechargeId, decision, amount = 0, dni = '') {
                 if (!confirm(`¿Confirmas ${decision.toUpperCase()} esta recarga de saldo?`)) return;
 
-                // 1. Actualizar en Firestore
+                // 1. Actualizar en Firestore (SDK y REST)
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
                         const db = firebase.firestore();
@@ -2471,6 +2587,21 @@
                         }, { merge: true }).catch(err => console.warn('Firestore recharge update error:', err));
                     } catch(e){}
                 }
+
+                // Sincronización REST inmediata garantizada
+                try {
+                    fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/wallet_recharges/${rechargeId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4&updateMask.fieldPaths=estado&updateMask.fieldPaths=aprobadoPor&updateMask.fieldPaths=timestampAprobacion`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            fields: {
+                                estado: { stringValue: decision },
+                                aprobadoPor: { stringValue: 'admin' },
+                                timestampAprobacion: { integerValue: String(Date.now()) }
+                            }
+                        })
+                    }).catch(() => {});
+                } catch(e) {}
 
                 // 2. Actualizar en LocalStorage (Persistencia Blindada)
                 let updatedItem = null;
