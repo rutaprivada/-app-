@@ -1271,6 +1271,63 @@
                             loadDriversData();
                         }
                     }).catch(err => console.warn('Firestore initial drivers fetch warning:', err));
+                    fetchDriversFromFirestoreRest();
+                };
+
+                const fetchDriversFromFirestoreRest = async () => {
+                    try {
+                        const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            if (data && data.documents && data.documents.length > 0) {
+                                data.documents.forEach(doc => {
+                                    const fields = doc.fields || {};
+                                    const getStr = (f, def = '') => (fields[f] && fields[f].stringValue !== undefined) ? fields[f].stringValue : def;
+                                    const getNum = (f, def = 0) => (fields[f] && fields[f].integerValue !== undefined) ? Number(fields[f].integerValue) : def;
+
+                                    const idFromPath = doc.name ? doc.name.split('/').pop() : '';
+                                    const dId = getStr('id', idFromPath);
+
+                                    let docsImgs = {};
+                                    if (fields.docsImages && fields.docsImages.mapValue && fields.docsImages.mapValue.fields) {
+                                        for (const [k, v] of Object.entries(fields.docsImages.mapValue.fields)) {
+                                            if (v && v.stringValue) docsImgs[k] = v.stringValue;
+                                        }
+                                    }
+
+                                    const rd = {
+                                        id: dId,
+                                        nombre: getStr('nombre', 'Conductor'),
+                                        dni: getStr('dni', ''),
+                                        telefono: getStr('telefono', ''),
+                                        email: getStr('email', ''),
+                                        autoMarcaModelo: getStr('autoMarcaModelo', ''),
+                                        patente: getStr('patente', ''),
+                                        color: getStr('color', 'Negro'),
+                                        categoria: getStr('categoria', 'Sedán Estándar'),
+                                        fotoPerfil: getStr('fotoPerfil', ''),
+                                        banco: getStr('banco', ''),
+                                        cbu: getStr('cbu', ''),
+                                        titularCuenta: getStr('titularCuenta', ''),
+                                        estadoVerificacion: getStr('estadoVerificacion', 'pendiente'),
+                                        observaciones: getStr('observaciones', ''),
+                                        docsImages: docsImgs,
+                                        updatedAt: getNum('updatedAt', Date.now())
+                                    };
+
+                                    const matchIdx = cloudDriversList.findIndex(cd => cd.id === rd.id || (cd.dni && rd.dni && cd.dni === rd.dni));
+                                    if (matchIdx >= 0) {
+                                        cloudDriversList[matchIdx] = { ...cloudDriversList[matchIdx], ...rd, docsImages: Object.assign({}, cloudDriversList[matchIdx].docsImages || {}, rd.docsImages) };
+                                    } else {
+                                        cloudDriversList.unshift(rd);
+                                    }
+                                });
+                                loadDriversData();
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('Firestore REST drivers fetch warning:', e);
+                    }
                 };
 
                 const fetchRechargesFromFirestore = (db) => {
@@ -1287,10 +1344,55 @@
                             loadRechargesData();
                         }
                     }).catch(err => console.warn('Firestore initial recharges fetch warning:', err));
+                    fetchRechargesFromFirestoreRest();
+                };
+
+                const fetchRechargesFromFirestoreRest = async () => {
+                    try {
+                        const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/wallet_recharges?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            if (data && data.documents && data.documents.length > 0) {
+                                data.documents.forEach(doc => {
+                                    const fields = doc.fields || {};
+                                    const getStr = (f, def = '') => (fields[f] && fields[f].stringValue !== undefined) ? fields[f].stringValue : def;
+                                    const getNum = (f, def = 0) => (fields[f] && fields[f].integerValue !== undefined) ? Number(fields[f].integerValue) : ((fields[f] && fields[f].doubleValue !== undefined) ? Number(fields[f].doubleValue) : def);
+
+                                    const idFromPath = doc.name ? doc.name.split('/').pop() : '';
+                                    const rId = getStr('id', idFromPath);
+
+                                    const rec = {
+                                        id: rId,
+                                        monto: getNum('monto', 0),
+                                        estado: getStr('estado', 'pendiente'),
+                                        driverName: getStr('driverName', 'Chofer Partner'),
+                                        driverDni: getStr('driverDni', ''),
+                                        driverPlate: getStr('driverPlate', ''),
+                                        comprobante: getStr('comprobante', ''),
+                                        timestamp: getNum('timestamp', Date.now())
+                                    };
+
+                                    const matchIdx = cloudRechargesList.findIndex(cr => cr.id === rec.id || (cr.comprobante && rec.comprobante && cr.comprobante === rec.comprobante));
+                                    if (matchIdx >= 0) {
+                                        cloudRechargesList[matchIdx] = { ...cloudRechargesList[matchIdx], ...rec };
+                                    } else {
+                                        cloudRechargesList.unshift(rec);
+                                    }
+                                });
+                                loadRechargesData();
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('Firestore REST recharges fetch warning:', e);
+                    }
                 };
 
                 let retries = 0;
                 const attachListener = () => {
+                    // Iniciar REST fetch de inmediato siempre
+                    fetchDriversFromFirestoreRest();
+                    fetchRechargesFromFirestoreRest();
+
                     if (typeof firebase !== 'undefined') {
                         try {
                             if (!firebase.apps || !firebase.apps.length) {
@@ -1331,11 +1433,11 @@
                                 loadRechargesData();
                             }, (err) => console.warn('Firestore recharges listener warning:', err));
 
-                            // 4. Polling de respaldo cada 3.5 segundos para garantizar datos en vivo siempre
+                            // 4. Polling de respaldo cada 3 segundos para garantizar datos en vivo siempre
                             setInterval(() => {
                                 fetchDriversFromFirestore(db);
                                 fetchRechargesFromFirestore(db);
-                            }, 3500);
+                            }, 3000);
 
                         } catch(e) {
                             console.warn('Error setting up admin firestore sync:', e);

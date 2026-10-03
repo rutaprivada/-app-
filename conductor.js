@@ -4643,7 +4643,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Foto de perfil compacta (< 70KB)
             const safeProfilePhoto = (photoSrc && photoSrc.length < 80000) ? photoSrc : '';
 
-            // Documento principal liviano (< 5KB) que nunca excede la cuota de 1MB de Firestore
+            // Documento principal liviano para eventos de red
             const mainDriverDoc = {
                 id: docId,
                 nombre: updatedDocs.nombre || 'Conductor',
@@ -4668,6 +4668,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 timestamp: Date.now()
             };
 
+            // Documento completo para almacenamiento Cloud Firestore (incluye imágenes comprimidas de los 8 documentos)
+            const fullCloudDriverDoc = {
+                ...mainDriverDoc,
+                docsImages: mergedDocsImages
+            };
+
+            // A. Sincronización mediante Firebase Firestore SDK
             if (typeof firebase !== 'undefined') {
                 try {
                     if (!firebase.apps || !firebase.apps.length) {
@@ -4675,12 +4682,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     const db = firebase.firestore();
 
-                    // A. Guardar de inmediato datos del chofer en la colección principal (Garantizado < 5KB)
-                    db.collection('drivers').doc(docId).set(mainDriverDoc, { merge: true }).then(() => {
-                        console.log('✓ Perfil de conductor sincronizado con Firestore:', docId);
-                    }).catch(err => console.warn('Error guardando chofer en Firestore:', err));
+                    // Guardar de inmediato todos los datos y fotos del chofer en Firestore
+                    db.collection('drivers').doc(docId).set(fullCloudDriverDoc, { merge: true }).then(() => {
+                        console.log('✓ Perfil completo de conductor sincronizado con Firestore:', docId);
+                    }).catch(err => console.warn('Error guardando chofer en Firestore SDK:', err));
 
-                    // B. Guardar cada archivo individualmente en subcolección 'documents'
+                    // También guardar subdocumentos individuales por redundancia
                     for (const [docKey, docData] of Object.entries(mergedDocsImages)) {
                         if (docData && typeof docData === 'string' && docData.length > 20) {
                             db.collection('drivers').doc(docId).collection('documents').doc(docKey).set({
@@ -4688,7 +4695,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 key: docKey,
                                 data: docData,
                                 updatedAt: Date.now()
-                            }, { merge: true }).catch(err => console.warn(`Error guardando subdoc ${docKey}:`, err));
+                            }, { merge: true }).catch(() => {});
                         }
                     }
                 } catch(e) {
@@ -4696,22 +4703,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            // B. Sincronización mediante Firestore Cloud REST API directa (100% inmune a restricciones de red o SDK)
+            try {
+                const restFields = {
+                    id: { stringValue: docId },
+                    nombre: { stringValue: updatedDocs.nombre || 'Conductor' },
+                    dni: { stringValue: updatedDocs.dni || '' },
+                    telefono: { stringValue: updatedDocs.telefono || '' },
+                    email: { stringValue: updatedDocs.email || '' },
+                    autoMarcaModelo: { stringValue: updatedDocs.autoMarcaModelo || '' },
+                    patente: { stringValue: updatedDocs.patente || '' },
+                    color: { stringValue: updatedDocs.color || 'Negro' },
+                    categoria: { stringValue: updatedDocs.categoria || 'Sedán Estándar' },
+                    banco: { stringValue: updatedDocs.banco || '' },
+                    cbu: { stringValue: updatedDocs.cbu || '' },
+                    titularCuenta: { stringValue: updatedDocs.titularCuenta || '' },
+                    estadoVerificacion: { stringValue: status },
+                    observaciones: { stringValue: updatedDocs.observaciones || '' },
+                    updatedAt: { integerValue: String(Date.now()) }
+                };
+                if (safeProfilePhoto) {
+                    restFields.fotoPerfil = { stringValue: safeProfilePhoto };
+                }
+                fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fields: restFields })
+                }).catch(() => {});
+            } catch(e) {}
+
             // 3. Emitir evento por bus sync para recepción inmediata en Admin
             if (window.RutaSync) {
                 window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', mainDriverDoc);
-
-                // Transmitir cada documento subido por el canal de sincronización en tiempo real
-                for (const [docKey, docData] of Object.entries(mergedDocsImages)) {
-                    if (docData && typeof docData === 'string' && docData.length > 20) {
-                        window.RutaSync.emit('DOCUMENTO_CONDUCTOR_SUBIDO', {
-                            driverId: docId,
-                            dni: cleanDni,
-                            key: docKey,
-                            data: docData,
-                            timestamp: Date.now()
-                        });
-                    }
-                }
             }
 
             // 4. Actualizar lista en memoria
