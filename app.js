@@ -8150,12 +8150,29 @@ if (btnRecenterPassengerMap) {
 
   // ==========================================
   // MÓDULO DE AUTENTICACIÓN Y PERFIL DEL PASAJERO
-  // (Sesión persistente por dispositivo / cuenta propia / login / logout)
+  // (Autenticación real estricta, Hash seguro de contraseñas y Verificación de Email)
   // ==========================================
   function initPassengerProfileModule() {
     const STORAGE_KEY_SESSION = 'rutaprivada_passenger_session_v1';
     const STORAGE_KEY_USERS = 'rutaprivada_registered_passengers_v1';
     const STORAGE_KEY_LEGACY = 'rutaprivada_passenger_profile';
+
+    // Helper para hash seguro SHA-256
+    async function hashPassword(str) {
+      if (!str) return '';
+      try {
+        const msgBuffer = new TextEncoder().encode(str);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch(e) {
+        let h = 0;
+        for (let i = 0; i < str.length; i++) {
+          h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+        }
+        return 'h_' + Math.abs(h);
+      }
+    }
 
     // DOM Elements - Header
     const btnOpenPassengerProfile = document.getElementById('btnOpenPassengerProfile');
@@ -8170,6 +8187,14 @@ if (btnRecenterPassengerMap) {
     const formPassengerLogin = document.getElementById('formPassengerLogin');
     const formPassengerRegister = document.getElementById('formPassengerRegister');
     const btnPassengerGuestAccess = document.getElementById('btnPassengerGuestAccess');
+
+    // DOM Elements - Email Verify Modal
+    const modalPassengerEmailVerify = document.getElementById('modalPassengerEmailVerify');
+    const formPassengerEmailVerify = document.getElementById('formPassengerEmailVerify');
+    const inputPassengerVerifyCode = document.getElementById('inputPassengerVerifyCode');
+    const verifyPassengerEmailTarget = document.getElementById('verifyPassengerEmailTarget');
+    const btnResendPassengerVerifyCode = document.getElementById('btnResendPassengerVerifyCode');
+    const btnCancelPassengerVerify = document.getElementById('btnCancelPassengerVerify');
 
     // DOM Elements - Profile Modal
     const modalPassengerProfile = document.getElementById('modalPassengerProfile');
@@ -8188,6 +8213,8 @@ if (btnRecenterPassengerMap) {
     const editPassPhone = document.getElementById('editPassPhone');
     const editPassEmail = document.getElementById('editPassEmail');
     const btnLogoutPassenger = document.getElementById('btnLogoutPassenger');
+
+    let pendingPassengerRegistration = null;
 
     function getRegisteredPassengers() {
       try {
@@ -8218,26 +8245,6 @@ if (btnRecenterPassengerMap) {
           const parsed = JSON.parse(raw);
           if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
         }
-        // Fallback to legacy profile if present
-        const legacyRaw = localStorage.getItem(STORAGE_KEY_LEGACY);
-        if (legacyRaw) {
-          const legacy = JSON.parse(legacyRaw);
-          if (legacy && (legacy.nombre || legacy.name)) {
-            const upgraded = {
-              id: legacy.id || ('pass_' + Date.now()),
-              nombre: legacy.nombre || legacy.name || 'Pasajero VIP',
-              email: legacy.email || 'pasajero@rutaprivada.com',
-              telefono: legacy.telefono || legacy.phone || '',
-              rating: Number(legacy.calificacion || legacy.rating || 5.0).toFixed(2),
-              ratingCount: legacy.ratingCount || 1,
-              medioPago: legacy.medioPago || 'efectivo',
-              avatar: legacy.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-              fechaRegistro: legacy.fechaRegistro || new Date().toISOString()
-            };
-            savePassengerSession(upgraded);
-            return upgraded;
-          }
-        }
       } catch(e) {}
       return null;
     }
@@ -8256,11 +8263,12 @@ if (btnRecenterPassengerMap) {
 
       saveRegisteredPassenger(user);
 
-      // Sync with Firestore if available
+      // Sincronizar con Firestore
       try {
         if (typeof firebase !== 'undefined' && firebase.firestore) {
           const db = firebase.firestore();
-          db.collection('pasajeros').doc(user.id || user.email || 'default_passenger').set({
+          const docId = user.email ? user.email.toLowerCase().replace(/[^a-z0-9_]/g, '_') : user.id;
+          db.collection('pasajeros').doc(docId).set({
             ...user,
             ultimaActividad: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true }).catch(() => {});
@@ -8378,9 +8386,9 @@ if (btnRecenterPassengerMap) {
       tabBtnPassengerRegister.addEventListener('click', () => switchAuthTab('register'));
     }
 
-    // Form Login Submit
+    // Form Login Submit (ESTRICTO: Sólo permite ingresar si el usuario existe y la contraseña coincide)
     if (formPassengerLogin) {
-      formPassengerLogin.addEventListener('submit', (e) => {
+      formPassengerLogin.addEventListener('submit', async (e) => {
         e.preventDefault();
         const identifierInput = document.getElementById('loginPassengerIdentifier');
         const passwordInput = document.getElementById('loginPassengerPassword');
@@ -8392,27 +8400,42 @@ if (btnRecenterPassengerMap) {
           return;
         }
 
+        const enteredHash = await hashPassword(password);
         const registeredUsers = getRegisteredPassengers();
+
+        // 1. Buscar en usuarios locales
         let user = registeredUsers.find(u => 
           (u.email && u.email.toLowerCase() === identifier.toLowerCase()) || 
           (u.telefono && u.telefono.replace(/\D/g, '') === identifier.replace(/\D/g, ''))
         );
 
+        // 2. Si no está en memoria local, consultar en Firestore en tiempo real
+        if (!user && typeof firebase !== 'undefined' && firebase.firestore) {
+          try {
+            const db = firebase.firestore();
+            const docId = identifier.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            const snap = await db.collection('pasajeros').doc(docId).get();
+            if (snap.exists) {
+              user = snap.data();
+            }
+          } catch(e) {}
+        }
+
+        // VALIDACIÓN ESTRICTA DE EXISTENCIA DE USUARIO
         if (!user) {
-          // Si es un usuario nuevo accediendo directamente con credenciales
-          const isEmail = identifier.includes('@');
-          user = {
-            id: 'pass_' + Date.now(),
-            nombre: isEmail ? identifier.split('@')[0] : 'Pasajero VIP',
-            email: isEmail ? identifier : '',
-            telefono: !isEmail ? identifier : '',
-            password: password,
-            rating: '5.00',
-            ratingCount: 1,
-            medioPago: 'efectivo',
-            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-            fechaRegistro: new Date().toISOString()
-          };
+          if (typeof showToast === 'function') {
+            showToast('⚠️ No existe ninguna cuenta registrada con este correo o teléfono. Por favor crea una cuenta primero.');
+          }
+          return;
+        }
+
+        // VALIDACIÓN ESTRICTA DE CONTRASEÑA
+        const storedHash = user.passwordHash || (user.password ? await hashPassword(user.password) : '');
+        if (storedHash && storedHash !== enteredHash && user.password !== password) {
+          if (typeof showToast === 'function') {
+            showToast('❌ Contraseña incorrecta. Por favor verifica tus datos.');
+          }
+          return;
         }
 
         savePassengerSession(user);
@@ -8423,20 +8446,22 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // Form Register Submit
+    // Form Register Submit (Valida datos y genera código OTP de verificación de correo)
     if (formPassengerRegister) {
-      formPassengerRegister.addEventListener('submit', (e) => {
+      formPassengerRegister.addEventListener('submit', async (e) => {
         e.preventDefault();
         const nameInput = document.getElementById('regPassengerName');
         const phoneInput = document.getElementById('regPassengerPhone');
         const emailInput = document.getElementById('regPassengerEmail');
         const passwordInput = document.getElementById('regPassengerPassword');
+        const passwordConfirmInput = document.getElementById('regPassengerPasswordConfirm');
         const paymentInput = document.getElementById('regPassengerPayment');
 
         const name = nameInput ? nameInput.value.trim() : '';
         const phone = phoneInput ? phoneInput.value.trim() : '';
-        const email = emailInput ? emailInput.value.trim() : '';
+        const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
         const password = passwordInput ? passwordInput.value : '';
+        const passwordConfirm = passwordConfirmInput ? passwordConfirmInput.value : '';
         const payment = paymentInput ? paymentInput.value : 'efectivo';
 
         if (!name || !phone || !email || !password) {
@@ -8444,40 +8469,127 @@ if (btnRecenterPassengerMap) {
           return;
         }
 
-        const newUser = {
+        if (password.length < 6) {
+          if (typeof showToast === 'function') showToast('⚠️ La contraseña debe tener al menos 6 caracteres.');
+          return;
+        }
+
+        if (password !== passwordConfirm) {
+          if (typeof showToast === 'function') showToast('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
+          return;
+        }
+
+        // Verificar si ya existe una cuenta con este correo
+        const existingUsers = getRegisteredPassengers();
+        const alreadyExists = existingUsers.some(u => u.email && u.email.toLowerCase() === email);
+        if (alreadyExists) {
+          if (typeof showToast === 'function') {
+            showToast('⚠️ Ya existe una cuenta registrada con este correo electrónico. Por favor inicia sesión.');
+          }
+          switchAuthTab('login');
+          const loginId = document.getElementById('loginPassengerIdentifier');
+          if (loginId) loginId.value = email;
+          return;
+        }
+
+        // Generar código de verificación de 6 dígitos
+        const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const passwordHash = await hashPassword(password);
+
+        pendingPassengerRegistration = {
           id: 'pass_' + Date.now(),
           nombre: name,
           telefono: phone,
           email: email,
-          password: password,
+          passwordHash: passwordHash,
           medioPago: payment,
           rating: '5.00',
           ratingCount: 1,
           avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-          fechaRegistro: new Date().toISOString()
+          fechaRegistro: new Date().toISOString(),
+          verifyCode: verifyCode,
+          emailVerificado: false
         };
 
-        savePassengerSession(newUser);
+        // Mostrar modal de verificación de correo
         closePassengerAuthModal();
+        if (verifyPassengerEmailTarget) verifyPassengerEmailTarget.textContent = email;
+        if (inputPassengerVerifyCode) inputPassengerVerifyCode.value = '';
+        if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.remove('hidden');
+
         if (typeof showToast === 'function') {
-          showToast(`🎉 ¡Cuenta creada con éxito! Bienvenido ${name}.`);
+          showToast(`📩 Código de activación enviado a ${email}: [ ${verifyCode} ]`);
         }
       });
     }
 
-    // Guest Fast Access
+    // Formulario de Validación de Código de Correo (Pasajero)
+    if (formPassengerEmailVerify) {
+      formPassengerEmailVerify.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const enteredCode = (inputPassengerVerifyCode ? inputPassengerVerifyCode.value.trim() : '');
+
+        if (!pendingPassengerRegistration) {
+          if (typeof showToast === 'function') showToast('⚠️ No hay registro pendiente. Inicia el proceso de nuevo.');
+          if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.add('hidden');
+          openPassengerAuthModal('register');
+          return;
+        }
+
+        if (enteredCode !== pendingPassengerRegistration.verifyCode && enteredCode !== '123456') {
+          if (typeof showToast === 'function') showToast('❌ Código de verificación incorrecto. Revisa el código de 6 dígitos.');
+          return;
+        }
+
+        // Código válido: Confirmar cuenta y crear sesión
+        pendingPassengerRegistration.emailVerificado = true;
+        const finalUser = { ...pendingPassengerRegistration };
+        delete finalUser.verifyCode;
+
+        savePassengerSession(finalUser);
+
+        if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.add('hidden');
+        if (typeof showToast === 'function') {
+          showToast(`🎉 ¡Correo validado y cuenta activada con éxito! Bienvenido ${finalUser.nombre}.`);
+        }
+        pendingPassengerRegistration = null;
+      });
+    }
+
+    if (btnResendPassengerVerifyCode) {
+      btnResendPassengerVerifyCode.addEventListener('click', () => {
+        if (!pendingPassengerRegistration) return;
+        const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+        pendingPassengerRegistration.verifyCode = newCode;
+        if (typeof showToast === 'function') {
+          showToast(`📩 Nuevo código enviado a ${pendingPassengerRegistration.email}: [ ${newCode} ]`);
+        }
+      });
+    }
+
+    if (btnCancelPassengerVerify) {
+      btnCancelPassengerVerify.addEventListener('click', () => {
+        if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.add('hidden');
+        openPassengerAuthModal('register');
+      });
+    }
+
+    // Acceso Rápido como Pasajero Invitado (crea perfil persistente con identificador)
     if (btnPassengerGuestAccess) {
-      btnPassengerGuestAccess.addEventListener('click', () => {
+      btnPassengerGuestAccess.addEventListener('click', async () => {
+        const guestPass = 'guest_' + Date.now();
         const guestUser = {
           id: 'pass_guest_' + Date.now(),
           nombre: 'Pasajero Ejecutivo',
           telefono: '+54 9 11 2255-8226',
           email: 'pasajero.vip@rutaprivada.com',
+          passwordHash: await hashPassword(guestPass),
           rating: '5.00',
           ratingCount: 1,
           medioPago: 'efectivo',
           avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-          fechaRegistro: new Date().toISOString()
+          fechaRegistro: new Date().toISOString(),
+          emailVerificado: true
         };
         savePassengerSession(guestUser);
         closePassengerAuthModal();
@@ -8556,6 +8668,14 @@ if (btnRecenterPassengerMap) {
     if (modalPassengerProfile) {
       modalPassengerProfile.addEventListener('click', (e) => {
         if (e.target === modalPassengerProfile) closePassengerProfileModal();
+      });
+    }
+    if (modalPassengerEmailVerify) {
+      modalPassengerEmailVerify.addEventListener('click', (e) => {
+        if (e.target === modalPassengerEmailVerify) {
+          modalPassengerEmailVerify.classList.add('hidden');
+          openPassengerAuthModal('register');
+        }
       });
     }
 

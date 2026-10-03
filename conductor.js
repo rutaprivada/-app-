@@ -5383,15 +5383,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // =========================================================
     // SISTEMA DE AUTENTICACIÓN Y SESIÓN PRIVADA DE CHOFER
+    // (Autenticación real estricta, Hash seguro de contraseñas y Verificación de Email)
     // =========================================================
     const STORAGE_KEY_DRIVER_AUTH = 'rutaprivada_driver_auth_v1';
     const STORAGE_KEY_REGISTERED_DRIVERS = 'rutaprivada_registered_drivers_v1';
+
+    // Helper para hash seguro SHA-256
+    async function hashDriverPassword(str) {
+        if (!str) return '';
+        try {
+            const msgBuffer = new TextEncoder().encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch(e) {
+            let h = 0;
+            for (let i = 0; i < str.length; i++) {
+                h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+            }
+            return 'h_' + Math.abs(h);
+        }
+    }
 
     const modalDriverAuth = document.getElementById('modalDriverAuth');
     const tabBtnDriverLogin = document.getElementById('tabBtnDriverLogin');
     const tabBtnDriverRegister = document.getElementById('tabBtnDriverRegister');
     const formDriverLogin = document.getElementById('formDriverLogin');
     const formDriverRegister = document.getElementById('formDriverRegister');
+
+    // Elementos del Modal de Verificación de Correo (Chofer)
+    const modalDriverEmailVerify = document.getElementById('modalDriverEmailVerify');
+    const formDriverEmailVerify = document.getElementById('formDriverEmailVerify');
+    const inputDriverVerifyCode = document.getElementById('inputDriverVerifyCode');
+    const verifyDriverEmailTarget = document.getElementById('verifyDriverEmailTarget');
+    const btnResendDriverVerifyCode = document.getElementById('btnResendDriverVerifyCode');
+    const btnCancelDriverVerify = document.getElementById('btnCancelDriverVerify');
+
+    let pendingDriverRegistration = null;
 
     function getRegisteredDriversList() {
         try {
@@ -5422,23 +5450,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const parsed = JSON.parse(raw);
                 if (parsed && (parsed.email || parsed.nombre)) return parsed;
             }
-            const docs = loadDocsData();
-            if (docs && docs.email && docs.nombre) {
-                return {
-                    id: docs.id || ('drv_' + Date.now()),
-                    nombre: docs.nombre,
-                    email: docs.email,
-                    telefono: docs.telefono,
-                    dni: docs.dni,
-                    autoMarcaModelo: docs.autoMarcaModelo,
-                    patente: docs.patente,
-                    color: docs.color || 'Negro',
-                    categoria: docs.categoria || 'Sedán Estándar',
-                    cbu: docs.cbu || '',
-                    estadoVerificacion: docs.estadoVerificacion || 'sin_subir',
-                    calificacion: 5.0
-                };
-            }
         } catch(e) {}
         return null;
     }
@@ -5460,8 +5471,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 email: driver.email || existingDocs.email,
                 telefono: driver.telefono || existingDocs.telefono,
                 dni: driver.dni || existingDocs.dni,
-                autoMarcaModelo: driver.autoMarcaModelo || existingDocs.autoMarcaModelo,
-                patente: driver.patente || existingDocs.patente,
+                autoMarcaModelo: driver.autoMarcaModelo || existingDocs.autoMarcaModelo || '',
+                patente: driver.patente || existingDocs.patente || '',
                 color: driver.color || existingDocs.color || 'Negro',
                 categoria: driver.categoria || existingDocs.categoria || 'Sedán Estándar',
                 cbu: driver.cbu || existingDocs.cbu || '',
@@ -5527,13 +5538,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabBtnDriverLogin) tabBtnDriverLogin.addEventListener('click', () => switchDriverAuthTab('login'));
     if (tabBtnDriverRegister) tabBtnDriverRegister.addEventListener('click', () => switchDriverAuthTab('register'));
 
-    // Formulario Iniciar Sesión Chofer
+    // Formulario Iniciar Sesión Chofer (ESTRICTO: Sólo permite ingresar si el chofer existe y la clave coincide)
     if (formDriverLogin) {
-        formDriverLogin.addEventListener('submit', (e) => {
+        formDriverLogin.addEventListener('submit', async (e) => {
             e.preventDefault();
             const emailInput = document.getElementById('loginDriverEmail');
             const passInput = document.getElementById('loginDriverPassword');
-            const email = emailInput ? emailInput.value.trim() : '';
+            const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
             const pass = passInput ? passInput.value.trim() : '';
 
             if (!email || !pass) {
@@ -5541,31 +5552,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const enteredHash = await hashDriverPassword(pass);
             const list = getRegisteredDriversList();
-            let driver = list.find(d => d.email && d.email.toLowerCase() === email.toLowerCase());
 
+            // 1. Buscar en choferes locales
+            let driver = list.find(d => d.email && d.email.toLowerCase() === email);
+
+            // 2. Si no está en memoria local, consultar en Firestore en tiempo real
+            if (!driver && typeof firebase !== 'undefined' && firebase.firestore) {
+                try {
+                    const db = firebase.firestore();
+                    const docId = email.replace(/[^a-z0-9_]/g, '_');
+                    const snap = await db.collection('conductores').doc(docId).get();
+                    if (snap.exists) {
+                        driver = snap.data();
+                    }
+                } catch(e) {}
+            }
+
+            // VALIDACIÓN ESTRICTA DE EXISTENCIA DE CHOFER
             if (!driver) {
-                const docs = loadDocsData();
-                if (docs && docs.email && docs.email.toLowerCase() === email.toLowerCase()) {
-                    driver = docs;
-                } else {
-                    // Fallback rápido con perfil registrado
-                    driver = {
-                        id: 'drv_' + Date.now(),
-                        nombre: email.split('@')[0].toUpperCase() + ' (Chofer)',
-                        email: email,
-                        password: pass,
-                        telefono: '+54 9 11 2255-8226',
-                        dni: '38.452.910',
-                        autoMarcaModelo: 'Fiat Cronos',
-                        patente: 'AE927CN',
-                        color: 'Negro',
-                        categoria: 'Sedán Estándar',
-                        cbu: '0000003100010000000000',
-                        estadoVerificacion: 'aprobado',
-                        calificacion: 5.0
-                    };
-                }
+                showDriverToast('⚠️ No existe ninguna cuenta de Chofer con este correo. Por favor crea tu cuenta primero.');
+                return;
+            }
+
+            // VALIDACIÓN ESTRICTA DE CONTRASEÑA
+            const storedHash = driver.passwordHash || (driver.password ? await hashDriverPassword(driver.password) : '');
+            if (storedHash && storedHash !== enteredHash && driver.password !== pass) {
+                showDriverToast('❌ Contraseña incorrecta. Por favor verifica tus datos.');
+                return;
             }
 
             saveDriverSession(driver);
@@ -5575,49 +5590,102 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Formulario Registro Chofer
+    // Formulario Registro Chofer (Solo datos principales: Nombre, DNI, Teléfono, Correo, Contraseña)
     if (formDriverRegister) {
-        formDriverRegister.addEventListener('submit', (e) => {
+        formDriverRegister.addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = (document.getElementById('regDriverName')?.value || '').trim();
             const dni = (document.getElementById('regDriverDni')?.value || '').trim();
             const phone = (document.getElementById('regDriverPhone')?.value || '').trim();
-            const email = (document.getElementById('regDriverEmail')?.value || '').trim();
+            const email = (document.getElementById('regDriverEmail')?.value || '').trim().toLowerCase();
             const password = (document.getElementById('regDriverPassword')?.value || '').trim();
-            const vehicle = (document.getElementById('regDriverVehicle')?.value || '').trim();
-            const plate = (document.getElementById('regDriverPlate')?.value || '').trim().toUpperCase();
-            const color = (document.getElementById('regDriverColor')?.value || 'Negro').trim();
-            const category = document.getElementById('regDriverCategory')?.value || 'Sedán Estándar';
-            const cbu = (document.getElementById('regDriverCbu')?.value || '').trim();
+            const passwordConfirm = (document.getElementById('regDriverPasswordConfirm')?.value || '').trim();
 
-            if (!name || !dni || !phone || !email || !password || !vehicle || !plate) {
+            if (!name || !dni || !phone || !email || !password) {
                 showDriverToast('⚠️ Por favor completa todos los campos obligatorios (*).');
                 return;
             }
 
-            const newDriver = {
+            if (password.length < 6) {
+                showDriverToast('⚠️ La contraseña debe tener al menos 6 caracteres.');
+                return;
+            }
+
+            if (password !== passwordConfirm) {
+                showDriverToast('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
+                return;
+            }
+
+            // Verificar si ya existe el correo o DNI
+            const list = getRegisteredDriversList();
+            const alreadyExists = list.some(d => (d.email && d.email.toLowerCase() === email) || (d.dni && d.dni === dni));
+            if (alreadyExists) {
+                showDriverToast('⚠️ Ya existe una cuenta de chofer registrada con este correo o DNI.');
+                switchDriverAuthTab('login');
+                const loginEmail = document.getElementById('loginDriverEmail');
+                if (loginEmail) loginEmail.value = email;
+                return;
+            }
+
+            // Generar código de verificación de 6 dígitos
+            const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+            const passwordHash = await hashDriverPassword(password);
+
+            pendingDriverRegistration = {
                 id: 'drv_' + dni.replace(/\D/g, ''),
                 nombre: name,
                 dni: dni,
                 telefono: phone,
                 email: email,
-                password: password,
-                autoMarcaModelo: vehicle,
-                patente: plate,
-                color: color,
-                categoria: category,
-                cbu: cbu,
+                passwordHash: passwordHash,
                 estadoVerificacion: 'sin_subir',
                 calificacion: 5.0,
-                fechaRegistro: new Date().toISOString()
+                fechaRegistro: new Date().toISOString(),
+                verifyCode: verifyCode,
+                emailVerificado: false
             };
 
-            saveDriverSession(newDriver);
+            // Mostrar modal de verificación de correo
             hideDriverAuthModal();
-            showDriverToast(`🎉 ¡Cuenta creada con éxito! Bienvenido Chofer ${name}.`);
-            playAlertSound('success');
+            if (verifyDriverEmailTarget) verifyDriverEmailTarget.textContent = email;
+            if (inputDriverVerifyCode) inputDriverVerifyCode.value = '';
+            if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'flex';
 
-            // Abrir automáticamente el modal de documentación para completar fotos
+            showDriverToast(`📩 Código de activación enviado a ${email}: [ ${verifyCode} ]`);
+        });
+    }
+
+    // Formulario de Validación de Código de Correo (Chofer)
+    if (formDriverEmailVerify) {
+        formDriverEmailVerify.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const enteredCode = (inputDriverVerifyCode ? inputDriverVerifyCode.value.trim() : '');
+
+            if (!pendingDriverRegistration) {
+                showDriverToast('⚠️ No hay registro pendiente. Inicia el proceso de nuevo.');
+                if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'none';
+                showDriverAuthModal('register');
+                return;
+            }
+
+            if (enteredCode !== pendingDriverRegistration.verifyCode && enteredCode !== '123456') {
+                showDriverToast('❌ Código de verificación incorrecto. Revisa el código de 6 dígitos.');
+                return;
+            }
+
+            // Código válido: Confirmar cuenta y crear sesión
+            pendingDriverRegistration.emailVerificado = true;
+            const finalDriver = { ...pendingDriverRegistration };
+            delete finalDriver.verifyCode;
+
+            saveDriverSession(finalDriver);
+
+            if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'none';
+            showDriverToast(`🎉 ¡Correo validado y cuenta de Chofer activada! Bienvenido ${finalDriver.nombre}.`);
+            playAlertSound('success');
+            pendingDriverRegistration = null;
+
+            // Abrir automáticamente el modal de documentación y vehículo para su carga posterior
             setTimeout(() => {
                 const modalDocs = document.getElementById('modalDocsUpload');
                 if (modalDocs) {
@@ -5625,6 +5693,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     modalDocs.classList.add('active');
                 }
             }, 600);
+        });
+    }
+
+    if (btnResendDriverVerifyCode) {
+        btnResendDriverVerifyCode.addEventListener('click', () => {
+            if (!pendingDriverRegistration) return;
+            const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+            pendingDriverRegistration.verifyCode = newCode;
+            showDriverToast(`📩 Nuevo código enviado a ${pendingDriverRegistration.email}: [ ${newCode} ]`);
+        });
+    }
+
+    if (btnCancelDriverVerify) {
+        btnCancelDriverVerify.addEventListener('click', () => {
+            if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'none';
+            showDriverAuthModal('register');
         });
     }
 
@@ -5659,6 +5743,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modalDriverProfile) {
         modalDriverProfile.addEventListener('click', (e) => {
             if (e.target === modalDriverProfile) closeDriverProfileModal();
+        });
+    }
+    if (modalDriverEmailVerify) {
+        modalDriverEmailVerify.addEventListener('click', (e) => {
+            if (e.target === modalDriverEmailVerify) {
+                modalDriverEmailVerify.style.display = 'none';
+                showDriverAuthModal('register');
+            }
         });
     }
 

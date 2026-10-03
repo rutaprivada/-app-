@@ -944,88 +944,89 @@
                 </button>
             </form>
 
-            <!-- FORMULARIO 2: REGISTRO DE CHOFER PARTNER -->
+            <!-- FORMULARIO 2: REGISTRO DE CHOFER PARTNER (DATOS PRINCIPALES) -->
             <form id="formDriverRegister" style="display: none; flex-direction: column; gap: 12px;">
                 <div>
-                    <label for="regDriverName" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">
+                    <label for="regDriverName" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
                         👤 Nombre y Apellido Completo *
                     </label>
-                    <input type="text" id="regDriverName" placeholder="Ej: Daniel Felipe Pabón" required style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+                    <input type="text" id="regDriverName" placeholder="Ej: Daniel Felipe Pabón" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
-                        <label for="regDriverDni" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">
+                        <label for="regDriverDni" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
                             🪪 DNI / CUIT *
                         </label>
-                        <input type="text" id="regDriverDni" placeholder="Ej: 38.452.910" required style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+                        <input type="text" id="regDriverDni" placeholder="Ej: 38.452.910" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                     </div>
                     <div>
-                        <label for="regDriverPhone" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">
-                            📱 Teléfono / WhatsApp *
+                        <label for="regDriverPhone" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
+                            📱 Número de Teléfono *
                         </label>
-                        <input type="tel" id="regDriverPhone" placeholder="Ej: +54 9 11 2255-8226" required style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+                        <input type="tel" id="regDriverPhone" placeholder="Ej: +54 9 11 2255-8226" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                     </div>
                 </div>
 
                 <div>
-                    <label for="regDriverEmail" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">
+                    <label for="regDriverEmail" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
                         ✉️ Correo Electrónico *
                     </label>
-                    <input type="email" id="regDriverEmail" placeholder="Ej: chofer@rutaprivada.com" required style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+                    <input type="email" id="regDriverEmail" placeholder="Ej: chofer@rutaprivada.com" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                 </div>
 
-                <div>
-                    <label for="regDriverPassword" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">
-                        🔒 Crear Contraseña *
-                    </label>
-                    <input type="password" id="regDriverPassword" placeholder="Mínimo 6 caracteres" required minlength="6" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
-                        <label for="regDriverVehicle" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">
-                            🚘 Auto (Marca y Modelo) *
+                        <label for="regDriverPassword" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
+                            🔒 Contraseña *
                         </label>
-                        <input type="text" id="regDriverVehicle" placeholder="Ej: Fiat Cronos" required style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+                        <input type="password" id="regDriverPassword" placeholder="Mínimo 6 caracteres" required minlength="6" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                     </div>
                     <div>
-                        <label for="regDriverPlate" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">
-                            🔤 Patente *
+                        <label for="regDriverPasswordConfirm" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
+                            🔒 Confirmar *
                         </label>
-                        <input type="text" id="regDriverPlate" placeholder="Ej: AE927CN" required style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+                        <input type="password" id="regDriverPasswordConfirm" placeholder="Repite la contraseña" required minlength="6" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                    <div>
-                        <label for="regDriverColor" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">
-                            🎨 Color
-                        </label>
-                        <input type="text" id="regDriverColor" placeholder="Ej: Negro" value="Negro" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
-                    </div>
-                    <div>
-                        <label for="regDriverCategory" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">
-                            ⭐ Categoría
-                        </label>
-                        <select id="regDriverCategory" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;">
-                            <option value="Sedán Estándar">Sedán Estándar</option>
-                            <option value="Sedán Confort">Sedán Confort</option>
-                            <option value="Sedán Ejecutivo">Sedán Ejecutivo</option>
-                        </select>
-                    </div>
+                <div style="background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 10px; font-size: 0.75rem; color: #cbd5e1; margin-top: 2px;">
+                    ℹ️ Los datos de tu vehículo y cuenta bancaria se configurarán al ingresar en la sección de verificación y habilitación.
                 </div>
 
-                <div>
-                    <label for="regDriverCbu" style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 4px;">
-                        🏦 CBU / CVU para depósitos de viajes *
-                    </label>
-                    <input type="text" id="regDriverCbu" placeholder="22 dígitos o alias de tu cuenta bancaria" required style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 0.88rem; outline: none; font-family: monospace;" />
-                </div>
-
-                <button type="submit" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; padding: 13px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); margin-top: 6px;">
+                <button type="submit" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; padding: 13px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); margin-top: 4px;">
                     <i class="fa-solid fa-id-card"></i> Registrar Cuenta de Chofer
                 </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: VERIFICACIÓN DE CÓDIGO DE CORREO ELECTRÓNICO (CHOFER) -->
+    <div class="driver-modal-overlay" id="modalDriverEmailVerify" style="z-index: 10025; backdrop-filter: blur(14px); background: rgba(5, 10, 20, 0.94); display: none; align-items: center; justify-content: center; padding: 16px;">
+        <div class="driver-modal-sheet" style="max-width: 440px; width: 100%; margin: 0 auto; padding: 22px 20px; border: 1.5px solid rgba(16, 185, 129, 0.4); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(16, 185, 129, 0.2); text-align: center;">
+            <div style="width: 58px; height: 58px; margin: 0 auto 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.35);">
+                ✉️
+            </div>
+            <h3 style="color: #fff; margin: 0 0 6px; font-size: 1.2rem; font-weight: 800;">Verificación de Correo</h3>
+            <p style="color: #94a3b8; margin: 0 0 16px; font-size: 0.82rem; line-height: 1.4;">
+                Hemos enviado un código de 6 dígitos a <strong id="verifyDriverEmailTarget" style="color: #fbbf24;">tu correo</strong> para activar tu cuenta de Chofer Partner.
+            </p>
+
+            <form id="formDriverEmailVerify" style="display: flex; flex-direction: column; gap: 14px;">
+                <div>
+                    <input type="text" id="inputDriverVerifyCode" maxlength="6" placeholder="000000" required style="width: 100%; text-align: center; letter-spacing: 8px; font-size: 1.6rem; font-weight: 800; font-family: monospace; background: #0f172a; border: 2px solid #10b981; color: #fff; padding: 10px; border-radius: 12px; outline: none;" />
+                </div>
+                <button type="submit" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; padding: 13px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);">
+                    <i class="fa-solid fa-circle-check"></i> Validar y Activar Cuenta
+                </button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                    <button type="button" id="btnResendDriverVerifyCode" style="background: none; border: none; color: #38bdf8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">
+                        Reenviar código
+                    </button>
+                    <button type="button" id="btnCancelDriverVerify" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer;">
+                        Cancelar
+                    </button>
+                </div>
             </form>
         </div>
     </div>

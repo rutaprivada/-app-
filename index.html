@@ -1457,15 +1457,20 @@
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
             <div>
               <label for="regPassengerPhone" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
-                📱 Teléfono / WhatsApp *
+                📱 Número de Teléfono *
               </label>
               <input type="tel" id="regPassengerPhone" placeholder="Ej: 11 5544 3322" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
             </div>
             <div>
-              <label for="regPassengerPassword" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
-                🔒 Contraseña / PIN *
+              <label for="regPassengerPayment" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+                💳 Medio de Pago
               </label>
-              <input type="password" id="regPassengerPassword" placeholder="Mínimo 4 dígitos" required minlength="4" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+              <select id="regPassengerPayment" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 10px; border-radius: 10px; font-size: 0.85rem; outline: none;">
+                <option value="efectivo">💵 Efectivo</option>
+                <option value="transferencia">📲 Transferencia / CVU</option>
+                <option value="mercadopago">💳 Mercado Pago</option>
+                <option value="tarjeta">💳 Tarjeta</option>
+              </select>
             </div>
           </div>
 
@@ -1476,20 +1481,23 @@
             <input type="email" id="regPassengerEmail" placeholder="Ej: roberto.gomez@gmail.com" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
           </div>
 
-          <div>
-            <label for="regPassengerPayment" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
-              💳 Método de Pago Habitual
-            </label>
-            <select id="regPassengerPayment" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;">
-              <option value="efectivo">💵 Efectivo al Chofer</option>
-              <option value="transferencia">📲 Transferencia Bancaria / CVU</option>
-              <option value="mercadopago">💳 Mercado Pago</option>
-              <option value="tarjeta">💳 Tarjeta de Crédito / Débito</option>
-            </select>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div>
+              <label for="regPassengerPassword" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+                🔒 Contraseña *
+              </label>
+              <input type="password" id="regPassengerPassword" placeholder="Mínimo 6 caracteres" required minlength="6" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+            </div>
+            <div>
+              <label for="regPassengerPasswordConfirm" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+                🔒 Confirmar *
+              </label>
+              <input type="password" id="regPassengerPasswordConfirm" placeholder="Repite contraseña" required minlength="6" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+            </div>
           </div>
 
           <button type="submit" class="btn btn-primary full-width" style="margin-top: 4px; padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); cursor: pointer;">
-            ✨ Registrar y Crear Cuenta
+            ✨ Registrar y Validar Cuenta
           </button>
         </form>
 
@@ -1499,6 +1507,38 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: VALIDACIÓN DE CORREO ELECTRÓNICO (PASAJERO)
+       ========================================================= -->
+  <div id="modalPassengerEmailVerify" class="modal-backdrop hidden" style="z-index: 10020; backdrop-filter: blur(14px); background: rgba(5, 10, 20, 0.92);">
+    <div class="modal-dialog" style="max-width: 440px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid rgba(16, 185, 129, 0.4); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(16, 185, 129, 0.25); text-align: center; padding: 22px 20px;">
+      <div style="width: 58px; height: 58px; margin: 0 auto 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.35);">
+        ✉️
+      </div>
+      <h3 style="color: #fff; margin: 0 0 6px; font-size: 1.2rem; font-weight: 800;">Validación de Correo</h3>
+      <p style="color: #94a3b8; margin: 0 0 16px; font-size: 0.82rem; line-height: 1.4;">
+        Hemos generado un código de 6 dígitos para validar tu cuenta en <strong id="verifyPassengerEmailTarget" style="color: #38bdf8;">tu correo</strong>.
+      </p>
+
+      <form id="formPassengerEmailVerify" style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <input type="text" id="inputPassengerVerifyCode" maxlength="6" placeholder="000000" required style="width: 100%; text-align: center; letter-spacing: 8px; font-size: 1.6rem; font-weight: 800; font-family: monospace; background: #0b1329; border: 2px solid #10b981; color: #fff; padding: 10px; border-radius: 12px; outline: none;" />
+        </div>
+        <button type="submit" class="btn btn-primary full-width" style="padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); cursor: pointer;">
+          <i class="fa-solid fa-circle-check"></i> Confirmar y Acceder
+        </button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+          <button type="button" id="btnResendPassengerVerifyCode" style="background: none; border: none; color: #38bdf8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">
+            Reenviar código
+          </button>
+          <button type="button" id="btnCancelPassengerVerify" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer;">
+            Cancelar
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -1564,7 +1604,7 @@
               <input type="text" id="editPassName" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 0.84rem;" />
             </div>
             <div>
-              <label style="font-size: 0.72rem; color: #94a3b8; display: block;">Teléfono WhatsApp:</label>
+              <label style="font-size: 0.72rem; color: #94a3b8; display: block;">Número de Teléfono:</label>
               <input type="tel" id="editPassPhone" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 0.84rem;" />
             </div>
             <div>
