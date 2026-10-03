@@ -5607,6 +5607,42 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Servicio de Envío de Correo Electrónico Real mediante EmailJS API
+    async function sendEmailJsVerification(targetEmail, passcode) {
+        const expDate = new Date(Date.now() + 15 * 60 * 1000);
+        const timeStr = expDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+        
+        const payload = {
+            service_id: 'service_ri00bk4',
+            template_id: 'template_y849ceg',
+            user_id: 'ai6WOsUzJaXx1st1E',
+            template_params: {
+                email: targetEmail,
+                to_email: targetEmail,
+                passcode: passcode,
+                time: timeStr
+            }
+        };
+
+        try {
+            const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (resp.ok) {
+                return { success: true };
+            } else {
+                const errText = await resp.text();
+                console.warn('EmailJS error:', errText);
+                return { success: false, error: errText };
+            }
+        } catch (err) {
+            console.warn('EmailJS network error:', err);
+            return { success: false, error: err.message };
+        }
+    }
+
     // Formulario Registro Chofer (Solo datos principales: Nombre, DNI, Teléfono, Correo, Contraseña)
     if (formDriverRegister) {
         formDriverRegister.addEventListener('submit', async (e) => {
@@ -5649,7 +5685,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
             const passwordHash = await hashDriverPassword(password);
 
-            // IMPORTANTE: Inicia estrictamente como NO APROBADO / PENDIENTE en el panel de administración
+            // Inicia estrictamente en estado PENDIENTE de aprobación
             pendingDriverRegistration = {
                 id: 'drv_' + dni.replace(/\D/g, ''),
                 nombre: name,
@@ -5657,7 +5693,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 telefono: phone,
                 email: email,
                 passwordHash: passwordHash,
-                estadoVerificacion: 'pendiente', // Inicia no aprobado en admin
+                estadoVerificacion: 'pendiente',
                 estado: 'pendiente',
                 aprobado: false,
                 puedeAceptarViajes: false,
@@ -5673,7 +5709,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (inputDriverVerifyCode) inputDriverVerifyCode.value = '';
             if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'flex';
 
-            showDriverToast(`📩 Código de activación enviado a ${email}: [ ${verifyCode} ]`);
+            showDriverToast(`⏳ Enviando código de activación a ${email}...`);
+
+            // Despachar correo electrónico real a la casilla
+            sendEmailJsVerification(email, verifyCode).then((res) => {
+                if (res.success) {
+                    showDriverToast(`📨 ¡Código enviado con éxito a tu correo ${email}! Revisa tu buzón de entrada.`);
+                } else {
+                    showDriverToast(`⚠️ Revisa tu correo ${email}. Si no llega, presiona "Reenviar código".`);
+                }
+            });
         });
     }
 
@@ -5690,8 +5735,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (enteredCode !== pendingDriverRegistration.verifyCode && enteredCode !== '123456') {
-                showDriverToast('❌ Código de verificación incorrecto. Revisa el código de 6 dígitos.');
+            // Validación estricta: Solo pasa si el código coincide exactamente con el enviado
+            if (enteredCode !== pendingDriverRegistration.verifyCode) {
+                showDriverToast('❌ Código de verificación incorrecto. Revisa el código que te enviamos por correo.');
                 return;
             }
 
@@ -5723,7 +5769,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!pendingDriverRegistration) return;
             const newCode = Math.floor(100000 + Math.random() * 900000).toString();
             pendingDriverRegistration.verifyCode = newCode;
-            showDriverToast(`📩 Nuevo código enviado a ${pendingDriverRegistration.email}: [ ${newCode} ]`);
+            showDriverToast(`⏳ Reenviando código a ${pendingDriverRegistration.email}...`);
+            sendEmailJsVerification(pendingDriverRegistration.email, newCode).then((res) => {
+                if (res.success) {
+                    showDriverToast(`📨 ¡Nuevo código enviado a ${pendingDriverRegistration.email}!`);
+                } else {
+                    showDriverToast(`⚠️ Código generado. Revisa tu buzón.`);
+                }
+            });
         });
     }
 

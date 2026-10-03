@@ -8499,44 +8499,39 @@ if (btnRecenterPassengerMap) {
           return;
         }
 
-        // Configuración oficial de EmailJS
-        const EMAILJS_CONFIG = {
-          serviceId: 'service_ri00bk4',
-          templateId: 'template_y849ceg',
-          publicKey: 'ai6WOsUzJaXx1st1E'
-        };
-
-        async function dispatchEmailVerification(toEmail, code) {
-          const expiryDate = new Date(Date.now() + 15 * 60 * 1000);
-          const timeStr = expiryDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
-          const templateParams = {
-            email: toEmail,
-            to_email: toEmail,
-            passcode: code,
-            time: timeStr,
-            reply_to: 'privadaruta@gmail.com'
-          };
-          try {
-            if (typeof emailjs !== 'undefined') {
-              if (typeof emailjs.init === 'function') emailjs.init(EMAILJS_CONFIG.publicKey);
-              await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, templateParams, EMAILJS_CONFIG.publicKey);
-              return true;
-            } else {
-              const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  service_id: EMAILJS_CONFIG.serviceId,
-                  template_id: EMAILJS_CONFIG.templateId,
-                  user_id: EMAILJS_CONFIG.publicKey,
-                  template_params: templateParams
-                })
-              });
-              return resp.ok;
+        // Servicio de Envío de Correo Electrónico Real mediante EmailJS API
+        async function sendPassengerEmailJsVerification(targetEmail, passcode) {
+          const expDate = new Date(Date.now() + 15 * 60 * 1000);
+          const timeStr = expDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+          
+          const payload = {
+            service_id: 'service_ri00bk4',
+            template_id: 'template_y849ceg',
+            user_id: 'ai6WOsUzJaXx1st1E',
+            template_params: {
+              email: targetEmail,
+              to_email: targetEmail,
+              passcode: passcode,
+              time: timeStr
             }
-          } catch(e) {
-            console.warn('EmailJS dispatch warning:', e);
-            return false;
+          };
+
+          try {
+            const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (resp.ok) {
+              return { success: true };
+            } else {
+              const errText = await resp.text();
+              console.warn('EmailJS error:', errText);
+              return { success: false, error: errText };
+            }
+          } catch (err) {
+            console.warn('EmailJS network error:', err);
+            return { success: false, error: err.message };
           }
         }
 
@@ -8566,19 +8561,25 @@ if (btnRecenterPassengerMap) {
         if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.remove('hidden');
 
         if (typeof showToast === 'function') {
-          showToast(`📩 Enviando código de activación a ${email}...`);
+          showToast(`⏳ Enviando código de activación a ${email}...`);
         }
 
-        // Enviar correo real a través de EmailJS
-        dispatchEmailVerification(email, verifyCode).then(sent => {
-          if (sent && typeof showToast === 'function') {
-            showToast(`✅ Código de seguridad enviado a tu casilla de correo (${email})`);
+        // Despachar correo electrónico real mediante EmailJS
+        sendPassengerEmailJsVerification(email, verifyCode).then((res) => {
+          if (res.success) {
+            if (typeof showToast === 'function') {
+              showToast(`📨 ¡Código enviado con éxito a tu correo ${email}! Revisa tu buzón.`);
+            }
+          } else {
+            if (typeof showToast === 'function') {
+              showToast(`⚠️ Revisa tu correo ${email}. Si no llega, presiona "Reenviar código".`);
+            }
           }
         });
       });
     }
 
-    // Formulario de Validación de Código de Correo (Pasajero) - ESTRICTO: Solo valida si el código coincide
+    // Formulario de Validación de Código de Correo (Pasajero)
     if (formPassengerEmailVerify) {
       formPassengerEmailVerify.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -8591,15 +8592,9 @@ if (btnRecenterPassengerMap) {
           return;
         }
 
-        // Validación ESTRICTA del código
+        // Validación estricta: Solo pasa si el código coincide exactamente con el enviado
         if (enteredCode !== pendingPassengerRegistration.verifyCode) {
-          if (typeof showToast === 'function') {
-            showToast('❌ Código incorrecto. Revisa el correo recibido o solicita un nuevo código.');
-          }
-          if (inputPassengerVerifyCode) {
-            inputPassengerVerifyCode.style.borderColor = '#ef4444';
-            setTimeout(() => { inputPassengerVerifyCode.style.borderColor = '#10b981'; }, 2000);
-          }
+          if (typeof showToast === 'function') showToast('❌ Código de verificación incorrecto. Revisa el código que te enviamos por correo.');
           return;
         }
 
@@ -8624,30 +8619,19 @@ if (btnRecenterPassengerMap) {
         const newCode = Math.floor(100000 + Math.random() * 900000).toString();
         pendingPassengerRegistration.verifyCode = newCode;
         if (typeof showToast === 'function') {
-          showToast(`📩 Reenviando código a ${pendingPassengerRegistration.email}...`);
+          showToast(`⏳ Reenviando código a ${pendingPassengerRegistration.email}...`);
         }
-        const expiryDate = new Date(Date.now() + 15 * 60 * 1000);
-        const timeStr = expiryDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
-        fetch('https://api.emailjs.com/api/v1.0/email/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            service_id: 'service_ri00bk4',
-            template_id: 'template_y849ceg',
-            user_id: 'ai6WOsUzJaXx1st1E',
-            template_params: {
-              email: pendingPassengerRegistration.email,
-              to_email: pendingPassengerRegistration.email,
-              passcode: newCode,
-              time: timeStr,
-              reply_to: 'privadaruta@gmail.com'
+        sendPassengerEmailJsVerification(pendingPassengerRegistration.email, newCode).then((res) => {
+          if (res.success) {
+            if (typeof showToast === 'function') {
+              showToast(`📨 ¡Nuevo código enviado a ${pendingPassengerRegistration.email}!`);
             }
-          })
-        }).then(res => {
-          if (res.ok && typeof showToast === 'function') {
-            showToast(`✅ Nuevo código enviado a tu correo.`);
+          } else {
+            if (typeof showToast === 'function') {
+              showToast(`⚠️ Código generado. Revisa tu buzón.`);
+            }
           }
-        }).catch(() => {});
+        });
       });
     }
 
