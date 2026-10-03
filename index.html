@@ -1397,54 +1397,197 @@
     </div>
   </div>
 
-  <!-- MODAL: REGISTRO / BIENVENIDA OBLIGATORIA DEL PASAJERO -->
-  <div id="modalPassengerOnboarding" class="modal-backdrop hidden" style="z-index: 10010; backdrop-filter: blur(12px); background: rgba(5, 10, 20, 0.88);">
-    <div class="modal-dialog" style="max-width: 480px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 30px rgba(56, 189, 248, 0.2); overflow: hidden; padding: 0; position: relative;">
-      <button type="button" id="btnCloseOnboardingModal" style="position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; z-index: 10;">&times;</button>
+  <!-- =========================================================
+       MODAL / PANTALLA INICIAL DE AUTENTICACIÓN: PASAJERO
+       (Iniciar Sesión / Registro / Acceso Invitado con Sesión Persistente)
+       ========================================================= -->
+  <div id="modalPassengerAuth" class="modal-backdrop hidden" style="z-index: 10010; backdrop-filter: blur(14px); background: rgba(5, 10, 20, 0.92);">
+    <div class="modal-dialog" style="max-width: 480px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(56, 189, 248, 0.25); overflow: hidden; padding: 0; position: relative;">
+      <button type="button" id="btnClosePassengerAuthModal" style="position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; z-index: 10;">&times;</button>
       
-      <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 22px 22px 16px; text-align: center; display: block;">
-        <div style="width: 56px; height: 56px; margin: 0 auto 12px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(56, 189, 248, 0.35);">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 20px 20px 14px; text-align: center; display: block;">
+        <div style="width: 56px; height: 56px; margin: 0 auto 10px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(56, 189, 248, 0.35);">
           <span style="font-size: 1.8rem;">✨</span>
         </div>
-        <h3 style="color: #fff; margin: 0 0 6px; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.3px;">Bienvenido a RutaPrivada</h3>
-        <p style="color: #94a3b8; margin: 0; font-size: 0.82rem; line-height: 1.4;">Crea tu cuenta de pasajero para solicitar traslados ejecutivos y recibir tus comprobantes y facturas por correo.</p>
+        <h3 style="color: #fff; margin: 0 0 4px; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.3px;">Bienvenido a RutaPrivada</h3>
+        <p style="color: #94a3b8; margin: 0; font-size: 0.8rem; line-height: 1.35;">Tu cuenta privada de pasajero para solicitar traslados ejecutivos exclusivos</p>
       </div>
 
-      <div class="modal-body" style="padding: 22px;">
-        <form id="formPassengerOnboarding" style="display: flex; flex-direction: column; gap: 14px;">
+      <div class="modal-body" style="padding: 18px 20px;">
+        <!-- Selector de Pestañas: Iniciar Sesión vs Registrarse -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: rgba(255,255,255,0.06); padding: 4px; border-radius: 12px; margin-bottom: 16px;">
+          <button type="button" id="tabBtnPassengerLogin" class="active" style="padding: 9px; border-radius: 9px; border: none; font-weight: 700; font-size: 0.84rem; cursor: pointer; background: #38bdf8; color: #0f172a; transition: all 0.2s;">
+            🔑 Iniciar Sesión
+          </button>
+          <button type="button" id="tabBtnPassengerRegister" style="padding: 9px; border-radius: 9px; border: none; font-weight: 700; font-size: 0.84rem; cursor: pointer; background: transparent; color: #94a3b8; transition: all 0.2s;">
+            📝 Crear Cuenta
+          </button>
+        </div>
+
+        <!-- FORMULARIO 1: INICIAR SESIÓN -->
+        <form id="formPassengerLogin" style="display: flex; flex-direction: column; gap: 12px;">
           <div>
-            <label for="onboardingPassName" style="color: #e2e8f0; font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 6px;">
+            <label for="loginPassengerIdentifier" style="color: #e2e8f0; font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 5px;">
+              ✉️ Correo Electrónico o Teléfono *
+            </label>
+            <input type="text" id="loginPassengerIdentifier" placeholder="Ej: roberto@email.com o 11 5544 3322" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
+          </div>
+
+          <div>
+            <label for="loginPassengerPassword" style="color: #e2e8f0; font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 5px;">
+              🔒 Contraseña o Clave PIN *
+            </label>
+            <input type="password" id="loginPassengerPassword" placeholder="Tu contraseña de pasajero" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
+          </div>
+
+          <button type="submit" class="btn btn-primary full-width" style="margin-top: 4px; padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.35); cursor: pointer;">
+            🚀 Iniciar Sesión de Pasajero
+          </button>
+        </form>
+
+        <!-- FORMULARIO 2: REGISTRO DE PASAJERO -->
+        <form id="formPassengerRegister" style="display: none; flex-direction: column; gap: 11px;">
+          <div>
+            <label for="regPassengerName" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
               👤 Nombre y Apellido Completo *
             </label>
-            <input type="text" id="onboardingPassName" placeholder="Ej: Dr. Roberto Gómez" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.92rem; outline: none; transition: border-color 0.2s;" />
+            <input type="text" id="regPassengerName" placeholder="Ej: Dr. Roberto Gómez" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div>
+              <label for="regPassengerPhone" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+                📱 Teléfono / WhatsApp *
+              </label>
+              <input type="tel" id="regPassengerPhone" placeholder="Ej: 11 5544 3322" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+            </div>
+            <div>
+              <label for="regPassengerPassword" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+                🔒 Contraseña / PIN *
+              </label>
+              <input type="password" id="regPassengerPassword" placeholder="Mínimo 4 dígitos" required minlength="4" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+            </div>
           </div>
 
           <div>
-            <label for="onboardingPassPhone" style="color: #e2e8f0; font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 6px;">
-              📱 Número de Teléfono *
+            <label for="regPassengerEmail" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+              ✉️ Correo Electrónico * (Para Comprobantes y Factura)
             </label>
-            <input type="tel" id="onboardingPassPhone" placeholder="Ej: 11 5544 3322" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.92rem; outline: none; transition: border-color 0.2s;" />
-            <small style="color: #64748b; font-size: 0.72rem; display: block; margin-top: 4px;">Tu chofer asignado se comunicará por el chat in-app de manera privada.</small>
+            <input type="email" id="regPassengerEmail" placeholder="Ej: roberto.gomez@gmail.com" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
           </div>
 
           <div>
-            <label for="onboardingPassEmail" style="color: #e2e8f0; font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 6px;">
-              ✉️ Correo Electrónico * (Facturación & Comprobantes)
+            <label for="regPassengerPayment" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+              💳 Método de Pago Habitual
             </label>
-            <input type="email" id="onboardingPassEmail" placeholder="Ej: roberto.gomez@gmail.com" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.92rem; outline: none; transition: border-color 0.2s;" />
-            <small style="color: #38bdf8; font-size: 0.72rem; display: block; margin-top: 4px;">🔒 Te enviaremos automáticamente el comprobante oficial y la factura de cada traslado.</small>
+            <select id="regPassengerPayment" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;">
+              <option value="efectivo">💵 Efectivo al Chofer</option>
+              <option value="transferencia">📲 Transferencia Bancaria / CVU</option>
+              <option value="mercadopago">💳 Mercado Pago</option>
+              <option value="tarjeta">💳 Tarjeta de Crédito / Débito</option>
+            </select>
           </div>
 
-          <button type="submit" class="btn btn-primary full-width" style="margin-top: 6px; padding: 13px; font-size: 0.98rem; font-weight: 800; border-radius: 14px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; box-shadow: 0 6px 20px rgba(2, 132, 199, 0.4); cursor: pointer; transition: transform 0.15s ease;">
-            🚀 Crear Cuenta y Continuar
+          <button type="submit" class="btn btn-primary full-width" style="margin-top: 4px; padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); cursor: pointer;">
+            ✨ Registrar y Crear Cuenta
           </button>
-          
-          <div style="text-align: center; margin-top: 4px;">
-            <button type="button" id="btnSkipOnboarding" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; cursor: pointer; padding: 6px; text-decoration: underline;">
-              Continuar como pasajero invitado
-            </button>
-          </div>
         </form>
+
+        <div style="text-align: center; margin-top: 10px;">
+          <button type="button" id="btnPassengerGuestAccess" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer; padding: 4px; text-decoration: underline;">
+            Continuar con Acceso Rápido de Pasajero
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL / PANEL: MI PERFIL EJECUTIVO DEL PASAJERO
+       (Datos personales, Calificación, Edición y Cerrar Sesión)
+       ========================================================= -->
+  <div id="modalPassengerProfile" class="modal-backdrop hidden" style="z-index: 10015; backdrop-filter: blur(14px); background: rgba(5, 10, 20, 0.92);">
+    <div class="modal-dialog" style="max-width: 480px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid rgba(56, 189, 248, 0.35); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(56, 189, 248, 0.2); overflow: hidden; padding: 0; position: relative;">
+      
+      <!-- Header -->
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.2) 0%, rgba(15, 23, 42, 0.95) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; color: #fff;">
+            👤
+          </div>
+          <div>
+            <h3 style="color: #fff; margin: 0; font-size: 1.05rem; font-weight: 700;">Mi Perfil Pasajero</h3>
+            <p style="color: #94a3b8; margin: 0; font-size: 0.75rem;">Cuenta activa y preferencias de traslado</p>
+          </div>
+        </div>
+        <button type="button" id="btnClosePassengerProfileModal" class="modal-close" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
+      </div>
+
+      <!-- Body -->
+      <div class="modal-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+        
+        <!-- Tarjeta de Usuario y Calificación -->
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 14px; display: flex; align-items: center; gap: 14px;">
+          <div style="position: relative;">
+            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Avatar" id="modalProfilePassengerAvatar" style="width: 58px; height: 58px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);" />
+            <span style="position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; background: #10b981; border: 2px solid #0f172a; border-radius: 50%;"></span>
+          </div>
+          <div style="flex: 1;">
+            <h4 id="modalProfilePassengerName" style="color: #fff; margin: 0 0 2px; font-size: 1.05rem; font-weight: 800;">Pasajero VIP</h4>
+            <p id="modalProfilePassengerEmail" style="color: #94a3b8; margin: 0 0 4px; font-size: 0.78rem;">pasajero@rutaprivada.com</p>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px;">
+                ⭐ <span id="modalProfilePassengerRating">5.00</span> Pasajero VIP
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Estadísticas y Datos del Pasajero -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 12px;">
+            <span style="color: #94a3b8; font-size: 0.72rem; display: block; margin-bottom: 2px;">📱 Teléfono</span>
+            <strong id="modalProfilePassengerPhone" style="color: #fff; font-size: 0.86rem;">11 5544 3322</strong>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 12px;">
+            <span style="color: #94a3b8; font-size: 0.72rem; display: block; margin-bottom: 2px;">💳 Medio de Pago</span>
+            <strong id="modalProfilePassengerPayment" style="color: #38bdf8; font-size: 0.86rem;">Efectivo / MP</strong>
+          </div>
+        </div>
+
+        <!-- Formulario Ocultable para Editar Datos -->
+        <div id="boxEditPassengerProfile" style="display: none; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px; padding: 12px;">
+          <h5 style="color: #38bdf8; font-size: 0.82rem; margin: 0 0 10px; font-weight: 700;">✏️ Editar Información de Perfil</h5>
+          <form id="formEditPassengerProfile" style="display: flex; flex-direction: column; gap: 8px;">
+            <div>
+              <label style="font-size: 0.72rem; color: #94a3b8; display: block;">Nombre:</label>
+              <input type="text" id="editPassName" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 0.84rem;" />
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: #94a3b8; display: block;">Teléfono WhatsApp:</label>
+              <input type="tel" id="editPassPhone" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 0.84rem;" />
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: #94a3b8; display: block;">Correo Electrónico:</label>
+              <input type="email" id="editPassEmail" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 0.84rem;" />
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+              <button type="submit" style="flex: 1; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer;">Guardar Cambios</button>
+              <button type="button" id="btnCancelEditProfile" style="background: rgba(255,255,255,0.1); color: #94a3b8; border: none; border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; cursor: pointer;">Cancelar</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 2px;">
+          <button type="button" id="btnToggleEditProfile" style="width: 100%; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 12px; padding: 11px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            ✏️ Editar Mis Datos de Perfil
+          </button>
+
+          <button type="button" id="btnLogoutPassenger" style="width: 100%; background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 12px; padding: 11px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+            🚪 Cerrar Sesión de Pasajero
+          </button>
+        </div>
       </div>
     </div>
   </div>

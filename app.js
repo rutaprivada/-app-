@@ -8149,6 +8149,432 @@ if (btnRecenterPassengerMap) {
   }
 
   // ==========================================
+  // MÓDULO DE AUTENTICACIÓN Y PERFIL DEL PASAJERO
+  // (Sesión persistente por dispositivo / cuenta propia / login / logout)
+  // ==========================================
+  function initPassengerProfileModule() {
+    const STORAGE_KEY_SESSION = 'rutaprivada_passenger_session_v1';
+    const STORAGE_KEY_USERS = 'rutaprivada_registered_passengers_v1';
+    const STORAGE_KEY_LEGACY = 'rutaprivada_passenger_profile';
+
+    // DOM Elements - Header
+    const btnOpenPassengerProfile = document.getElementById('btnOpenPassengerProfile');
+    const headerPassengerName = document.getElementById('headerPassengerName');
+    const headerPassengerAvatar = document.getElementById('headerPassengerAvatar');
+
+    // DOM Elements - Auth Modal
+    const modalPassengerAuth = document.getElementById('modalPassengerAuth');
+    const btnClosePassengerAuthModal = document.getElementById('btnClosePassengerAuthModal');
+    const tabBtnPassengerLogin = document.getElementById('tabBtnPassengerLogin');
+    const tabBtnPassengerRegister = document.getElementById('tabBtnPassengerRegister');
+    const formPassengerLogin = document.getElementById('formPassengerLogin');
+    const formPassengerRegister = document.getElementById('formPassengerRegister');
+    const btnPassengerGuestAccess = document.getElementById('btnPassengerGuestAccess');
+
+    // DOM Elements - Profile Modal
+    const modalPassengerProfile = document.getElementById('modalPassengerProfile');
+    const btnClosePassengerProfileModal = document.getElementById('btnClosePassengerProfileModal');
+    const modalProfilePassengerName = document.getElementById('modalProfilePassengerName');
+    const modalProfilePassengerEmail = document.getElementById('modalProfilePassengerEmail');
+    const modalProfilePassengerPhone = document.getElementById('modalProfilePassengerPhone');
+    const modalProfilePassengerRating = document.getElementById('modalProfilePassengerRating');
+    const modalProfilePassengerPayment = document.getElementById('modalProfilePassengerPayment');
+    const modalProfilePassengerAvatar = document.getElementById('modalProfilePassengerAvatar');
+    const btnToggleEditProfile = document.getElementById('btnToggleEditProfile');
+    const boxEditPassengerProfile = document.getElementById('boxEditPassengerProfile');
+    const formEditPassengerProfile = document.getElementById('formEditPassengerProfile');
+    const btnCancelEditProfile = document.getElementById('btnCancelEditProfile');
+    const editPassName = document.getElementById('editPassName');
+    const editPassPhone = document.getElementById('editPassPhone');
+    const editPassEmail = document.getElementById('editPassEmail');
+    const btnLogoutPassenger = document.getElementById('btnLogoutPassenger');
+
+    function getRegisteredPassengers() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_USERS);
+        return raw ? JSON.parse(raw) : [];
+      } catch(e) {
+        return [];
+      }
+    }
+
+    function saveRegisteredPassenger(user) {
+      const users = getRegisteredPassengers();
+      const existingIdx = users.findIndex(u => (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase()) || (u.telefono && user.telefono && u.telefono === user.telefono));
+      if (existingIdx >= 0) {
+        users[existingIdx] = { ...users[existingIdx], ...user };
+      } else {
+        users.push(user);
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+      } catch(e) {}
+    }
+
+    function getPassengerSession() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_SESSION);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
+        }
+        // Fallback to legacy profile if present
+        const legacyRaw = localStorage.getItem(STORAGE_KEY_LEGACY);
+        if (legacyRaw) {
+          const legacy = JSON.parse(legacyRaw);
+          if (legacy && (legacy.nombre || legacy.name)) {
+            const upgraded = {
+              id: legacy.id || ('pass_' + Date.now()),
+              nombre: legacy.nombre || legacy.name || 'Pasajero VIP',
+              email: legacy.email || 'pasajero@rutaprivada.com',
+              telefono: legacy.telefono || legacy.phone || '',
+              rating: Number(legacy.calificacion || legacy.rating || 5.0).toFixed(2),
+              ratingCount: legacy.ratingCount || 1,
+              medioPago: legacy.medioPago || 'efectivo',
+              avatar: legacy.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+              fechaRegistro: legacy.fechaRegistro || new Date().toISOString()
+            };
+            savePassengerSession(upgraded);
+            return upgraded;
+          }
+        }
+      } catch(e) {}
+      return null;
+    }
+
+    function savePassengerSession(user) {
+      if (!user) return;
+      if (!user.id) user.id = 'pass_' + Date.now();
+      if (!user.rating) user.rating = '5.00';
+      if (!user.avatar) user.avatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+      if (!user.medioPago) user.medioPago = 'efectivo';
+      
+      try {
+        localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(user));
+        localStorage.setItem(STORAGE_KEY_LEGACY, JSON.stringify(user));
+      } catch(e) {}
+
+      saveRegisteredPassenger(user);
+
+      // Sync with Firestore if available
+      try {
+        if (typeof firebase !== 'undefined' && firebase.firestore) {
+          const db = firebase.firestore();
+          db.collection('pasajeros').doc(user.id || user.email || 'default_passenger').set({
+            ...user,
+            ultimaActividad: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true }).catch(() => {});
+        }
+      } catch(e) {}
+
+      // Update state in app
+      if (window.state) {
+        window.state.passengerName = user.nombre;
+        window.state.passengerPhone = user.telefono;
+        window.state.passengerEmail = user.email;
+        window.state.passengerRating = user.rating;
+      }
+
+      renderPassengerProfileUI(user);
+    }
+
+    function renderPassengerProfileUI(user) {
+      if (!user) {
+        if (headerPassengerName) headerPassengerName.textContent = 'Iniciar Sesión';
+        return;
+      }
+
+      // Update Header
+      if (headerPassengerName) {
+        const shortName = user.nombre ? user.nombre.split(' ')[0] : 'Mi Perfil';
+        headerPassengerName.textContent = shortName;
+      }
+      if (headerPassengerAvatar && user.avatar) {
+        headerPassengerAvatar.src = user.avatar;
+      }
+
+      // Update Profile Modal
+      if (modalProfilePassengerName) modalProfilePassengerName.textContent = user.nombre || 'Pasajero VIP';
+      if (modalProfilePassengerEmail) modalProfilePassengerEmail.textContent = user.email || 'pasajero@rutaprivada.com';
+      if (modalProfilePassengerPhone) modalProfilePassengerPhone.textContent = user.telefono || 'Sin teléfono';
+      if (modalProfilePassengerRating) modalProfilePassengerRating.textContent = Number(user.rating || 5.0).toFixed(2);
+      if (modalProfilePassengerAvatar && user.avatar) modalProfilePassengerAvatar.src = user.avatar;
+      
+      if (modalProfilePassengerPayment) {
+        const mapPayment = {
+          'efectivo': '💵 Efectivo',
+          'transferencia': '📲 Transferencia / CVU',
+          'mercadopago': '💳 Mercado Pago',
+          'tarjeta': '💳 Tarjeta'
+        };
+        modalProfilePassengerPayment.textContent = mapPayment[user.medioPago] || user.medioPago || 'Efectivo';
+      }
+
+      // Autofill booking inputs if they exist
+      const inputName = document.getElementById('user-name') || document.getElementById('client-name');
+      const inputPhone = document.getElementById('user-phone') || document.getElementById('client-phone');
+      const inputEmail = document.getElementById('user-email') || document.getElementById('client-email');
+      if (inputName && !inputName.value && user.nombre) inputName.value = user.nombre;
+      if (inputPhone && !inputPhone.value && user.telefono) inputPhone.value = user.telefono;
+      if (inputEmail && !inputEmail.value && user.email) inputEmail.value = user.email;
+    }
+
+    function openPassengerAuthModal(defaultTab = 'login') {
+      if (!modalPassengerAuth) return;
+      modalPassengerAuth.classList.remove('hidden');
+      switchAuthTab(defaultTab);
+    }
+
+    function closePassengerAuthModal() {
+      if (modalPassengerAuth) modalPassengerAuth.classList.add('hidden');
+    }
+
+    function openPassengerProfileModal() {
+      const session = getPassengerSession();
+      if (!session) {
+        openPassengerAuthModal('login');
+        return;
+      }
+      renderPassengerProfileUI(session);
+      if (boxEditPassengerProfile) boxEditPassengerProfile.style.display = 'none';
+      if (modalPassengerProfile) modalPassengerProfile.classList.remove('hidden');
+    }
+
+    function closePassengerProfileModal() {
+      if (modalPassengerProfile) modalPassengerProfile.classList.add('hidden');
+    }
+
+    function switchAuthTab(tab) {
+      if (tab === 'register') {
+        if (tabBtnPassengerRegister) {
+          tabBtnPassengerRegister.style.background = '#10b981';
+          tabBtnPassengerRegister.style.color = '#fff';
+        }
+        if (tabBtnPassengerLogin) {
+          tabBtnPassengerLogin.style.background = 'transparent';
+          tabBtnPassengerLogin.style.color = '#94a3b8';
+        }
+        if (formPassengerLogin) formPassengerLogin.style.display = 'none';
+        if (formPassengerRegister) formPassengerRegister.style.display = 'flex';
+      } else {
+        if (tabBtnPassengerLogin) {
+          tabBtnPassengerLogin.style.background = '#38bdf8';
+          tabBtnPassengerLogin.style.color = '#0f172a';
+        }
+        if (tabBtnPassengerRegister) {
+          tabBtnPassengerRegister.style.background = 'transparent';
+          tabBtnPassengerRegister.style.color = '#94a3b8';
+        }
+        if (formPassengerLogin) formPassengerLogin.style.display = 'flex';
+        if (formPassengerRegister) formPassengerRegister.style.display = 'none';
+      }
+    }
+
+    // Tab buttons
+    if (tabBtnPassengerLogin) {
+      tabBtnPassengerLogin.addEventListener('click', () => switchAuthTab('login'));
+    }
+    if (tabBtnPassengerRegister) {
+      tabBtnPassengerRegister.addEventListener('click', () => switchAuthTab('register'));
+    }
+
+    // Form Login Submit
+    if (formPassengerLogin) {
+      formPassengerLogin.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const identifierInput = document.getElementById('loginPassengerIdentifier');
+        const passwordInput = document.getElementById('loginPassengerPassword');
+        const identifier = identifierInput ? identifierInput.value.trim() : '';
+        const password = passwordInput ? passwordInput.value.trim() : '';
+
+        if (!identifier || !password) {
+          if (typeof showToast === 'function') showToast('⚠️ Por favor ingresa tu correo/teléfono y contraseña.');
+          return;
+        }
+
+        const registeredUsers = getRegisteredPassengers();
+        let user = registeredUsers.find(u => 
+          (u.email && u.email.toLowerCase() === identifier.toLowerCase()) || 
+          (u.telefono && u.telefono.replace(/\D/g, '') === identifier.replace(/\D/g, ''))
+        );
+
+        if (!user) {
+          // Si es un usuario nuevo accediendo directamente con credenciales
+          const isEmail = identifier.includes('@');
+          user = {
+            id: 'pass_' + Date.now(),
+            nombre: isEmail ? identifier.split('@')[0] : 'Pasajero VIP',
+            email: isEmail ? identifier : '',
+            telefono: !isEmail ? identifier : '',
+            password: password,
+            rating: '5.00',
+            ratingCount: 1,
+            medioPago: 'efectivo',
+            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+            fechaRegistro: new Date().toISOString()
+          };
+        }
+
+        savePassengerSession(user);
+        closePassengerAuthModal();
+        if (typeof showToast === 'function') {
+          showToast(`👋 ¡Bienvenido de nuevo, ${user.nombre}!`);
+        }
+      });
+    }
+
+    // Form Register Submit
+    if (formPassengerRegister) {
+      formPassengerRegister.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const nameInput = document.getElementById('regPassengerName');
+        const phoneInput = document.getElementById('regPassengerPhone');
+        const emailInput = document.getElementById('regPassengerEmail');
+        const passwordInput = document.getElementById('regPassengerPassword');
+        const paymentInput = document.getElementById('regPassengerPayment');
+
+        const name = nameInput ? nameInput.value.trim() : '';
+        const phone = phoneInput ? phoneInput.value.trim() : '';
+        const email = emailInput ? emailInput.value.trim() : '';
+        const password = passwordInput ? passwordInput.value : '';
+        const payment = paymentInput ? paymentInput.value : 'efectivo';
+
+        if (!name || !phone || !email || !password) {
+          if (typeof showToast === 'function') showToast('⚠️ Completa todos los campos obligatorios para registrarte.');
+          return;
+        }
+
+        const newUser = {
+          id: 'pass_' + Date.now(),
+          nombre: name,
+          telefono: phone,
+          email: email,
+          password: password,
+          medioPago: payment,
+          rating: '5.00',
+          ratingCount: 1,
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+          fechaRegistro: new Date().toISOString()
+        };
+
+        savePassengerSession(newUser);
+        closePassengerAuthModal();
+        if (typeof showToast === 'function') {
+          showToast(`🎉 ¡Cuenta creada con éxito! Bienvenido ${name}.`);
+        }
+      });
+    }
+
+    // Guest Fast Access
+    if (btnPassengerGuestAccess) {
+      btnPassengerGuestAccess.addEventListener('click', () => {
+        const guestUser = {
+          id: 'pass_guest_' + Date.now(),
+          nombre: 'Pasajero Ejecutivo',
+          telefono: '+54 9 11 2255-8226',
+          email: 'pasajero.vip@rutaprivada.com',
+          rating: '5.00',
+          ratingCount: 1,
+          medioPago: 'efectivo',
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+          fechaRegistro: new Date().toISOString()
+        };
+        savePassengerSession(guestUser);
+        closePassengerAuthModal();
+        if (typeof showToast === 'function') showToast('✨ Has ingresado con Perfil Rápido de Pasajero.');
+      });
+    }
+
+    // Toggle Edit Profile
+    if (btnToggleEditProfile) {
+      btnToggleEditProfile.addEventListener('click', () => {
+        const session = getPassengerSession();
+        if (!session) return;
+        if (boxEditPassengerProfile) {
+          const isHidden = boxEditPassengerProfile.style.display === 'none';
+          boxEditPassengerProfile.style.display = isHidden ? 'block' : 'none';
+          if (isHidden) {
+            if (editPassName) editPassName.value = session.nombre || '';
+            if (editPassPhone) editPassPhone.value = session.telefono || '';
+            if (editPassEmail) editPassEmail.value = session.email || '';
+          }
+        }
+      });
+    }
+
+    if (btnCancelEditProfile) {
+      btnCancelEditProfile.addEventListener('click', () => {
+        if (boxEditPassengerProfile) boxEditPassengerProfile.style.display = 'none';
+      });
+    }
+
+    // Form Edit Profile Submit
+    if (formEditPassengerProfile) {
+      formEditPassengerProfile.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const session = getPassengerSession() || {};
+        if (editPassName) session.nombre = editPassName.value.trim();
+        if (editPassPhone) session.telefono = editPassPhone.value.trim();
+        if (editPassEmail) session.email = editPassEmail.value.trim();
+        
+        savePassengerSession(session);
+        if (boxEditPassengerProfile) boxEditPassengerProfile.style.display = 'none';
+        if (typeof showToast === 'function') showToast('✅ Perfil actualizado correctamente.');
+      });
+    }
+
+    // Logout Handler
+    if (btnLogoutPassenger) {
+      btnLogoutPassenger.addEventListener('click', () => {
+        if (!confirm('¿Seguro que deseas cerrar tu sesión de pasajero en este dispositivo?')) return;
+        localStorage.removeItem(STORAGE_KEY_SESSION);
+        localStorage.removeItem(STORAGE_KEY_LEGACY);
+        if (headerPassengerName) headerPassengerName.textContent = 'Iniciar Sesión';
+        closePassengerProfileModal();
+        openPassengerAuthModal('login');
+        if (typeof showToast === 'function') showToast('🚪 Has cerrado sesión de pasajero correctamente.');
+      });
+    }
+
+    // Open Profile & Modals Listeners
+    if (btnOpenPassengerProfile) {
+      btnOpenPassengerProfile.addEventListener('click', openPassengerProfileModal);
+    }
+    if (btnClosePassengerProfileModal) {
+      btnClosePassengerProfileModal.addEventListener('click', closePassengerProfileModal);
+    }
+    if (btnClosePassengerAuthModal) {
+      btnClosePassengerAuthModal.addEventListener('click', closePassengerAuthModal);
+    }
+
+    // Click outside dismissals
+    if (modalPassengerAuth) {
+      modalPassengerAuth.addEventListener('click', (e) => {
+        if (e.target === modalPassengerAuth) closePassengerAuthModal();
+      });
+    }
+    if (modalPassengerProfile) {
+      modalPassengerProfile.addEventListener('click', (e) => {
+        if (e.target === modalPassengerProfile) closePassengerProfileModal();
+      });
+    }
+
+    // Initial check on startup
+    const currentSession = getPassengerSession();
+    if (currentSession) {
+      renderPassengerProfileUI(currentSession);
+    } else {
+      // Auto prompt auth on clean install
+      setTimeout(() => {
+        const sessionCheck = getPassengerSession();
+        if (!sessionCheck) {
+          openPassengerAuthModal('login');
+        }
+      }, 700);
+    }
+  }
+
+  // ==========================================
   // MÓDULO DE SEGURIDAD, SOS 24/7 Y COMPARTIR VIAJE
   // ==========================================
   function initPassengerSosModule() {

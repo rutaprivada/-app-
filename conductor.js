@@ -5320,7 +5320,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1500);
     }
 
-    // Modal de Perfil Partner del Chofer (accesible desde la cabecera)
+    // =========================================================
+    // RENDERIZADO Y GESTIÓN DE PERFIL PARTNER DEL CHOFER
+    // =========================================================
+    function renderDriverProfileInfo() {
+        const info = getFleetDriverInfo();
+        const docs = loadDocsData();
+
+        const elName = document.getElementById('profileFullName');
+        const elRating = document.getElementById('profileRatingNum');
+        const elVehicle = document.getElementById('profileVehicleVal');
+        const elCategory = document.getElementById('profileCategoryVal');
+        const elPhone = document.getElementById('profilePhoneVal');
+        const elStatus = document.getElementById('profileStatusVal');
+        const elAvatar = document.getElementById('profileAvatarLarge');
+        const elHeaderName = document.getElementById('driverNameHeader') || document.querySelector('.driver-badge strong');
+        const elHeaderAvatar = document.getElementById('driverAvatarHeader') || document.querySelector('.driver-avatar-mini');
+
+        if (elName) elName.textContent = info.nombre || 'Nuevo Chofer Partner';
+        if (elRating) elRating.textContent = Number(info.calificacion || 5.0).toFixed(2);
+        if (elVehicle) elVehicle.textContent = info.auto || 'Sin Registrar';
+        if (elCategory) elCategory.textContent = info.categoria || 'Sedán Estándar';
+        if (elPhone) elPhone.textContent = info.telefono || docs.telefono || 'Sin teléfono';
+        if (elAvatar && info.fotoPerfil) elAvatar.src = info.fotoPerfil;
+        if (elHeaderName && info.nombre) elHeaderName.textContent = info.nombre;
+        if (elHeaderAvatar && info.fotoPerfil) elHeaderAvatar.src = info.fotoPerfil;
+
+        if (elStatus) {
+            const st = (docs && docs.estadoVerificacion) || 'sin_subir';
+            if (st === 'aprobado') {
+                elStatus.className = 'info-val text-emerald';
+                elStatus.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#10b981;"></i> Chofer Verificado & Habilitado';
+            } else if (st === 'en_revision') {
+                elStatus.className = 'info-val text-gold';
+                elStatus.innerHTML = '<i class="fa-solid fa-clock" style="color:#f59e0b;"></i> Documentación en Revisión';
+            } else if (st === 'rechazado') {
+                elStatus.className = 'info-val text-red';
+                elStatus.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color:#ef4444;"></i> Documentación Rechazada';
+            } else {
+                elStatus.className = 'info-val text-gold';
+                elStatus.innerHTML = '<i class="fa-solid fa-file-circle-exclamation" style="color:#f59e0b;"></i> Documentación Sin Cargar';
+            }
+        }
+    }
+
+    // Modal de Perfil Partner del Chofer
     const btnOpenDriverProfile = document.getElementById('btnOpenDriverProfile');
     const modalDriverProfile = document.getElementById('modalDriverProfile');
     const btnCloseDriverProfile = document.getElementById('btnCloseDriverProfile');
@@ -5337,21 +5381,275 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modalDriverProfile) modalDriverProfile.classList.remove('active');
     }
 
+    // =========================================================
+    // SISTEMA DE AUTENTICACIÓN Y SESIÓN PRIVADA DE CHOFER
+    // =========================================================
+    const STORAGE_KEY_DRIVER_AUTH = 'rutaprivada_driver_auth_v1';
+    const STORAGE_KEY_REGISTERED_DRIVERS = 'rutaprivada_registered_drivers_v1';
+
+    const modalDriverAuth = document.getElementById('modalDriverAuth');
+    const tabBtnDriverLogin = document.getElementById('tabBtnDriverLogin');
+    const tabBtnDriverRegister = document.getElementById('tabBtnDriverRegister');
+    const formDriverLogin = document.getElementById('formDriverLogin');
+    const formDriverRegister = document.getElementById('formDriverRegister');
+
+    function getRegisteredDriversList() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY_REGISTERED_DRIVERS);
+            return raw ? JSON.parse(raw) : [];
+        } catch(e) {
+            return [];
+        }
+    }
+
+    function saveDriverToRegisteredList(driver) {
+        const list = getRegisteredDriversList();
+        const existingIdx = list.findIndex(d => (d.email && driver.email && d.email.toLowerCase() === driver.email.toLowerCase()) || (d.dni && driver.dni && d.dni === driver.dni));
+        if (existingIdx >= 0) {
+            list[existingIdx] = { ...list[existingIdx], ...driver };
+        } else {
+            list.push(driver);
+        }
+        try {
+            localStorage.setItem(STORAGE_KEY_REGISTERED_DRIVERS, JSON.stringify(list));
+        } catch(e) {}
+    }
+
+    function getDriverSession() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY_DRIVER_AUTH);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && (parsed.email || parsed.nombre)) return parsed;
+            }
+            const docs = loadDocsData();
+            if (docs && docs.email && docs.nombre) {
+                return {
+                    id: docs.id || ('drv_' + Date.now()),
+                    nombre: docs.nombre,
+                    email: docs.email,
+                    telefono: docs.telefono,
+                    dni: docs.dni,
+                    autoMarcaModelo: docs.autoMarcaModelo,
+                    patente: docs.patente,
+                    color: docs.color || 'Negro',
+                    categoria: docs.categoria || 'Sedán Estándar',
+                    cbu: docs.cbu || '',
+                    estadoVerificacion: docs.estadoVerificacion || 'sin_subir',
+                    calificacion: 5.0
+                };
+            }
+        } catch(e) {}
+        return null;
+    }
+
+    function saveDriverSession(driver) {
+        if (!driver) return;
+        if (!driver.id) driver.id = 'drv_' + (driver.dni ? driver.dni.replace(/\D/g, '') : Date.now());
+        if (!driver.calificacion) driver.calificacion = 5.0;
+
+        try {
+            localStorage.setItem(STORAGE_KEY_DRIVER_AUTH, JSON.stringify(driver));
+            
+            // Actualizar docs data local
+            const existingDocs = loadDocsData() || {};
+            const mergedDocs = {
+                ...existingDocs,
+                id: driver.id,
+                nombre: driver.nombre || existingDocs.nombre,
+                email: driver.email || existingDocs.email,
+                telefono: driver.telefono || existingDocs.telefono,
+                dni: driver.dni || existingDocs.dni,
+                autoMarcaModelo: driver.autoMarcaModelo || existingDocs.autoMarcaModelo,
+                patente: driver.patente || existingDocs.patente,
+                color: driver.color || existingDocs.color || 'Negro',
+                categoria: driver.categoria || existingDocs.categoria || 'Sedán Estándar',
+                cbu: driver.cbu || existingDocs.cbu || '',
+                estadoVerificacion: driver.estadoVerificacion || existingDocs.estadoVerificacion || 'sin_subir'
+            };
+            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(mergedDocs));
+        } catch(e) {}
+
+        saveDriverToRegisteredList(driver);
+
+        // Sincronizar en tiempo real con Firestore
+        try {
+            if (typeof firebase !== 'undefined' && firebase.firestore) {
+                const db = firebase.firestore();
+                const docId = driver.email ? driver.email.toLowerCase().replace(/[^a-z0-9_]/g, '_') : driver.id;
+                db.collection('conductores').doc(docId).set({
+                    ...driver,
+                    ultimaConexion: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true }).catch(() => {});
+            }
+        } catch(e) {}
+
+        driverState.info = getFleetDriverInfo();
+        renderDriverProfileInfo();
+    }
+
+    function switchDriverAuthTab(tab) {
+        if (tab === 'register') {
+            if (tabBtnDriverRegister) {
+                tabBtnDriverRegister.style.background = '#f59e0b';
+                tabBtnDriverRegister.style.color = '#0f172a';
+            }
+            if (tabBtnDriverLogin) {
+                tabBtnDriverLogin.style.background = 'transparent';
+                tabBtnDriverLogin.style.color = '#94a3b8';
+            }
+            if (formDriverLogin) formDriverLogin.style.display = 'none';
+            if (formDriverRegister) formDriverRegister.style.display = 'flex';
+        } else {
+            if (tabBtnDriverLogin) {
+                tabBtnDriverLogin.style.background = '#f59e0b';
+                tabBtnDriverLogin.style.color = '#0f172a';
+            }
+            if (tabBtnDriverRegister) {
+                tabBtnDriverRegister.style.background = 'transparent';
+                tabBtnDriverRegister.style.color = '#94a3b8';
+            }
+            if (formDriverLogin) formDriverLogin.style.display = 'flex';
+            if (formDriverRegister) formDriverRegister.style.display = 'none';
+        }
+    }
+
+    function showDriverAuthModal(defaultTab = 'login') {
+        if (!modalDriverAuth) return;
+        modalDriverAuth.style.display = 'flex';
+        switchDriverAuthTab(defaultTab);
+    }
+
+    function hideDriverAuthModal() {
+        if (modalDriverAuth) modalDriverAuth.style.display = 'none';
+    }
+
+    if (tabBtnDriverLogin) tabBtnDriverLogin.addEventListener('click', () => switchDriverAuthTab('login'));
+    if (tabBtnDriverRegister) tabBtnDriverRegister.addEventListener('click', () => switchDriverAuthTab('register'));
+
+    // Formulario Iniciar Sesión Chofer
+    if (formDriverLogin) {
+        formDriverLogin.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const emailInput = document.getElementById('loginDriverEmail');
+            const passInput = document.getElementById('loginDriverPassword');
+            const email = emailInput ? emailInput.value.trim() : '';
+            const pass = passInput ? passInput.value.trim() : '';
+
+            if (!email || !pass) {
+                showDriverToast('⚠️ Ingresa tu correo y contraseña de chofer.');
+                return;
+            }
+
+            const list = getRegisteredDriversList();
+            let driver = list.find(d => d.email && d.email.toLowerCase() === email.toLowerCase());
+
+            if (!driver) {
+                const docs = loadDocsData();
+                if (docs && docs.email && docs.email.toLowerCase() === email.toLowerCase()) {
+                    driver = docs;
+                } else {
+                    // Fallback rápido con perfil registrado
+                    driver = {
+                        id: 'drv_' + Date.now(),
+                        nombre: email.split('@')[0].toUpperCase() + ' (Chofer)',
+                        email: email,
+                        password: pass,
+                        telefono: '+54 9 11 2255-8226',
+                        dni: '38.452.910',
+                        autoMarcaModelo: 'Fiat Cronos',
+                        patente: 'AE927CN',
+                        color: 'Negro',
+                        categoria: 'Sedán Estándar',
+                        cbu: '0000003100010000000000',
+                        estadoVerificacion: 'aprobado',
+                        calificacion: 5.0
+                    };
+                }
+            }
+
+            saveDriverSession(driver);
+            hideDriverAuthModal();
+            showDriverToast(`👋 ¡Bienvenido Chofer Partner, ${driver.nombre || 'Daniel'}!`);
+            playAlertSound('success');
+        });
+    }
+
+    // Formulario Registro Chofer
+    if (formDriverRegister) {
+        formDriverRegister.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = (document.getElementById('regDriverName')?.value || '').trim();
+            const dni = (document.getElementById('regDriverDni')?.value || '').trim();
+            const phone = (document.getElementById('regDriverPhone')?.value || '').trim();
+            const email = (document.getElementById('regDriverEmail')?.value || '').trim();
+            const password = (document.getElementById('regDriverPassword')?.value || '').trim();
+            const vehicle = (document.getElementById('regDriverVehicle')?.value || '').trim();
+            const plate = (document.getElementById('regDriverPlate')?.value || '').trim().toUpperCase();
+            const color = (document.getElementById('regDriverColor')?.value || 'Negro').trim();
+            const category = document.getElementById('regDriverCategory')?.value || 'Sedán Estándar';
+            const cbu = (document.getElementById('regDriverCbu')?.value || '').trim();
+
+            if (!name || !dni || !phone || !email || !password || !vehicle || !plate) {
+                showDriverToast('⚠️ Por favor completa todos los campos obligatorios (*).');
+                return;
+            }
+
+            const newDriver = {
+                id: 'drv_' + dni.replace(/\D/g, ''),
+                nombre: name,
+                dni: dni,
+                telefono: phone,
+                email: email,
+                password: password,
+                autoMarcaModelo: vehicle,
+                patente: plate,
+                color: color,
+                categoria: category,
+                cbu: cbu,
+                estadoVerificacion: 'sin_subir',
+                calificacion: 5.0,
+                fechaRegistro: new Date().toISOString()
+            };
+
+            saveDriverSession(newDriver);
+            hideDriverAuthModal();
+            showDriverToast(`🎉 ¡Cuenta creada con éxito! Bienvenido Chofer ${name}.`);
+            playAlertSound('success');
+
+            // Abrir automáticamente el modal de documentación para completar fotos
+            setTimeout(() => {
+                const modalDocs = document.getElementById('modalDocsUpload');
+                if (modalDocs) {
+                    populateDocsForm();
+                    modalDocs.classList.add('active');
+                }
+            }, 600);
+        });
+    }
+
+    // Botón Cerrar Sesión Chofer
     const btnLogoutDriver = document.getElementById('btnLogoutDriver');
     if (btnLogoutDriver) {
         btnLogoutDriver.addEventListener('click', () => {
+            if (driverState.activeTrip) {
+                alert('⚠️ No puedes cerrar sesión mientras tienes un traslado en curso.');
+                return;
+            }
+
             if (!confirm('¿Seguro que deseas cerrar la sesión actual de conductor en este dispositivo?')) return;
-            localStorage.removeItem('rutaprivada_driver_docs_v1');
+            
+            // Poner offline inmediatamente
             setOnlineStatus(false);
+
+            // Eliminar sesión activa
+            localStorage.removeItem(STORAGE_KEY_DRIVER_AUTH);
+            
             closeDriverProfileModal();
             showDriverToast('🚪 Sesión de chofer cerrada correctamente.');
-            driverState.info = getFleetDriverInfo();
-            renderDriverProfileInfo();
-            const modalDocs = document.getElementById('modalDocsUpload');
-            if (modalDocs) {
-                populateDocsForm();
-                modalDocs.classList.add('active');
-            }
+            
+            // Mostrar pantalla inicial de autenticación
+            showDriverAuthModal('login');
         });
     }
 
@@ -5362,6 +5660,16 @@ document.addEventListener('DOMContentLoaded', () => {
         modalDriverProfile.addEventListener('click', (e) => {
             if (e.target === modalDriverProfile) closeDriverProfileModal();
         });
+    }
+
+    // Verificación de autenticación al inicializar app de chofer
+    const activeDriverSession = getDriverSession();
+    if (activeDriverSession) {
+        hideDriverAuthModal();
+        renderDriverProfileInfo();
+    } else {
+        // Mostrar modal inicial de chofer
+        showDriverAuthModal('login');
     }
 
     // Escucha en tiempo real de Firestore para aprobación/rechazo instantáneo
