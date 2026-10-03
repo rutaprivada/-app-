@@ -655,15 +655,15 @@
             <div class="passenger-fields-grid">
               <div class="field-item">
                 <label for="passenger-name-input">Nombre y Apellido *</label>
-                <input type="text" id="passenger-name-input" placeholder="Ej: Dr. Roberto Gómez" autocomplete="name" required />
+                <input type="text" id="passenger-name-input" placeholder="Ej: Juan Pérez" autocomplete="name" required />
               </div>
               <div class="field-item">
                 <label for="passenger-phone-input">Número de Celular *</label>
-                <input type="tel" id="passenger-phone-input" placeholder="Ej: 11 5544 3322" autocomplete="tel" required />
+                <input type="tel" id="passenger-phone-input" placeholder="Ej: 11 0000 0000" autocomplete="tel" required />
               </div>
               <div class="field-item full-width">
                 <label for="passenger-notes-input">Notas / Vuelo / Equipaje (Opcional)</label>
-                <input type="text" id="passenger-notes-input" placeholder="Ej: Vuelo AR1234, 2 valijas grandes..." />
+                <input type="text" id="passenger-notes-input" placeholder="Ej: 2 valijas medianas..." />
               </div>
             </div>
           </div>
@@ -752,7 +752,7 @@
             </div>
             <div class="inapp-driver-info">
               <div class="driver-name-row">
-                <h4 id="pDriverName">Daniel Pabon</h4>
+                <h4 id="pDriverName">Chofer Asignado</h4>
                 <span class="driver-rating-pill"><span class="star-icon">★</span> <span id="pDriverRating">4.98</span></span>
               </div>
               <p class="driver-car-desc" id="pDriverCar">Fiat Cronos Negro · Patente: AE927CN</p>
@@ -962,7 +962,7 @@
           <div class="driver-avatar-row">
             <div class="driver-avatar">🚘</div>
             <div class="driver-status">
-              <h4>Daniel • Chofer Ejecutivo</h4>
+              <h4>Chofer Ejecutivo</h4>
               <span class="status-online"><span class="dot-pulse"></span> Atendiendo tu mensaje en WhatsApp</span>
             </div>
           </div>
@@ -1289,17 +1289,17 @@
 
             <div class="field-item">
               <label for="profPassengerName" style="color:#94a3b8; font-size:0.8rem;">Nombre y Apellido *</label>
-              <input type="text" id="profPassengerName" placeholder="Ej: Dr. Roberto Gómez" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" required />
+              <input type="text" id="profPassengerName" placeholder="Ej: Juan Pérez" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" required />
             </div>
 
             <div class="field-item">
               <label for="profPassengerPhone" style="color:#94a3b8; font-size:0.8rem;">Número de Celular * (para llamadas y coordinación con el chofer)</label>
-              <input type="tel" id="profPassengerPhone" placeholder="Ej: 11 5544 3322" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" required />
+              <input type="tel" id="profPassengerPhone" placeholder="Ej: 11 0000 0000" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" required />
             </div>
 
             <div class="field-item">
               <label for="profPassengerEmail" style="color:#94a3b8; font-size:0.8rem;">Correo Electrónico (para comprobantes de viaje)</label>
-              <input type="email" id="profPassengerEmail" placeholder="Ej: roberto.gomez@gmail.com" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" />
+              <input type="email" id="profPassengerEmail" placeholder="Ej: usuario@ejemplo.com" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" />
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 12px; align-items: center;">
@@ -1403,12 +1403,14 @@
        ========================================================= -->
   <div id="modalPassengerAuth" class="modal-backdrop hidden" style="z-index: 10010; backdrop-filter: blur(14px); background: rgba(5, 10, 20, 0.92);">
     <div class="modal-dialog" style="max-width: 480px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(56, 189, 248, 0.25); overflow: hidden; padding: 0; position: relative;">
+      <button type="button" id="btnClosePassengerAuthModal" style="position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; z-index: 10;">&times;</button>
+      
       <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 20px 20px 14px; text-align: center; display: block;">
         <div style="width: 56px; height: 56px; margin: 0 auto 10px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(56, 189, 248, 0.35);">
           <span style="font-size: 1.8rem;">✨</span>
         </div>
         <h3 style="color: #fff; margin: 0 0 4px; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.3px;">Bienvenido a RutaPrivada</h3>
-        <p style="color: #94a3b8; margin: 0; font-size: 0.8rem; line-height: 1.35;">Inicia sesión o crea tu cuenta personal de pasajero para solicitar viajes ejecutivos</p>
+        <p style="color: #94a3b8; margin: 0; font-size: 0.8rem; line-height: 1.35;">Tu cuenta privada de pasajero para solicitar traslados ejecutivos exclusivos</p>
       </div>
 
       <div class="modal-body" style="padding: 18px 20px;">
@@ -1428,14 +1430,14 @@
             <label for="loginPassengerIdentifier" style="color: #e2e8f0; font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 5px;">
               ✉️ Correo Electrónico o Teléfono *
             </label>
-            <input type="text" id="loginPassengerIdentifier" placeholder="Ej: roberto@email.com o 11 5544 3322" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
+            <input type="text" id="loginPassengerIdentifier" placeholder="Ej: usuario@ejemplo.com o 11 0000 0000" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
           </div>
 
           <div>
             <label for="loginPassengerPassword" style="color: #e2e8f0; font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 5px;">
-              🔒 Contraseña *
+              🔒 Contraseña o Clave PIN *
             </label>
-            <input type="password" id="loginPassengerPassword" placeholder="Ingresa tu contraseña" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
+            <input type="password" id="loginPassengerPassword" placeholder="Tu contraseña de pasajero" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
           </div>
 
           <button type="submit" class="btn btn-primary full-width" style="margin-top: 4px; padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.35); cursor: pointer;">
@@ -1449,7 +1451,7 @@
             <label for="regPassengerName" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
               👤 Nombre y Apellido Completo *
             </label>
-            <input type="text" id="regPassengerName" placeholder="Ej: Roberto Gómez" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+            <input type="text" id="regPassengerName" placeholder="Ej: María Gómez" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -1457,7 +1459,7 @@
               <label for="regPassengerPhone" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
                 📱 Número de Teléfono *
               </label>
-              <input type="tel" id="regPassengerPhone" placeholder="Ej: 11 5544 3322" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+              <input type="tel" id="regPassengerPhone" placeholder="Ej: 11 0000 0000" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
             </div>
             <div>
               <label for="regPassengerPayment" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
@@ -1474,28 +1476,28 @@
 
           <div>
             <label for="regPassengerEmail" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
-              ✉️ Correo Electrónico * (Para Comprobantes y Validación)
+              ✉️ Correo Electrónico * (Para Comprobantes y Factura)
             </label>
-            <input type="email" id="regPassengerEmail" placeholder="Ej: roberto.gomez@gmail.com" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+            <input type="email" id="regPassengerEmail" placeholder="Ej: pasajero@ejemplo.com" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
             <div>
               <label for="regPassengerPassword" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
-                🔒 Contraseña * <span style="font-size:0.7rem; color:#38bdf8;">(Mín. 8 caracteres y 1 número)</span>
+                🔒 Contraseña *
               </label>
-              <input type="password" id="regPassengerPassword" placeholder="Mínimo 8 caracteres (1 número)" required minlength="8" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+              <input type="password" id="regPassengerPassword" placeholder="Mín. 8 car. (con 1 número)" required minlength="8" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
             </div>
             <div>
               <label for="regPassengerPasswordConfirm" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
-                🔒 Confirmar Contraseña *
+                🔒 Confirmar *
               </label>
-              <input type="password" id="regPassengerPasswordConfirm" placeholder="Repite contraseña" required minlength="8" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+              <input type="password" id="regPassengerPasswordConfirm" placeholder="Repite la contraseña" required minlength="8" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
             </div>
           </div>
 
-          <button type="submit" class="btn btn-primary full-width" style="margin-top: 4px; padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); cursor: pointer;">
-            ✨ Crear Cuenta y Validar Correo
+          <button type="submit" class="btn btn-primary full-width" style="margin-top: 6px; padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); cursor: pointer;">
+            ✨ Registrar y Validar Cuenta
           </button>
         </form>
       </div>
@@ -1512,7 +1514,7 @@
       </div>
       <h3 style="color: #fff; margin: 0 0 6px; font-size: 1.2rem; font-weight: 800;">Validación de Correo</h3>
       <p style="color: #94a3b8; margin: 0 0 16px; font-size: 0.82rem; line-height: 1.4;">
-        Hemos generado un código de 6 dígitos para validar tu cuenta en <strong id="verifyPassengerEmailTarget" style="color: #38bdf8;">tu correo</strong>.
+        Hemos enviado un enlace de activación y un código de 6 dígitos para validar tu cuenta en <strong id="verifyPassengerEmailTarget" style="color: #38bdf8;">tu correo</strong>.
       </p>
 
       <form id="formPassengerEmailVerify" style="display: flex; flex-direction: column; gap: 14px;">
@@ -1524,7 +1526,7 @@
         </button>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
           <button type="button" id="btnResendPassengerVerifyCode" style="background: none; border: none; color: #38bdf8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">
-            Reenviar código
+            Reenviar código / enlace
           </button>
           <button type="button" id="btnCancelPassengerVerify" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer;">
             Cancelar

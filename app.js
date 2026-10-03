@@ -6006,27 +6006,31 @@ if (btnRequestInapp) {
       return;
     }
 
+    // REGLA: Obligatorio contar con cuenta / sesión de pasajero activa para solicitar viaje
+    const session = (typeof getPassengerSession === 'function') ? getPassengerSession() : null;
+    if (!session) {
+      showToast('🔒 Debes iniciar sesión o crear tu cuenta de pasajero para solicitar un traslado.');
+      if (typeof openPassengerAuthModal === 'function') openPassengerAuthModal('login');
+      return;
+    }
+
     const nameInput = document.getElementById('passenger-name-input');
     const phoneInput = document.getElementById('passenger-phone-input');
     const notesInput = document.getElementById('passenger-notes-input');
 
-    const profileData = loadPassengerProfile();
-    const passName = nameInput ? (nameInput.value.trim() || profileData.nombre) : profileData.nombre;
-    const passPhone = phoneInput ? (phoneInput.value.trim() || profileData.telefono) : profileData.telefono;
-    const passEmail = profileData.email || document.getElementById('profPassengerEmail')?.value?.trim() || '';
+    const profileData = loadPassengerProfile() || session;
+    const passName = (nameInput && nameInput.value.trim()) || session.nombre || profileData.nombre;
+    const passPhone = (phoneInput && phoneInput.value.trim()) || session.telefono || profileData.telefono;
+    const passEmail = session.email || profileData.email || document.getElementById('profPassengerEmail')?.value?.trim() || '';
     const passNotes = notesInput ? notesInput.value.trim() : '';
 
     if (!passName) {
       showToast('⚠️ Por favor ingresa tu Nombre y Apellido.');
-      const modalOnboarding = document.getElementById('modalPassengerOnboarding');
-      if (modalOnboarding) modalOnboarding.classList.remove('hidden');
       return;
     }
 
     if (!passPhone || passPhone.length < 6) {
-      showToast('⚠️ Por favor ingresa el número de WhatsApp de contacto.');
-      const modalOnboarding = document.getElementById('modalPassengerOnboarding');
-      if (modalOnboarding) modalOnboarding.classList.remove('hidden');
+      showToast('⚠️ Por favor ingresa tu número de teléfono de contacto.');
       return;
     }
 
@@ -8469,8 +8473,11 @@ if (btnRecenterPassengerMap) {
           return;
         }
 
+        // Regla: Contraseña de 8 caracteres mínimo con al menos un número
         if (password.length < 8 || !/\d/.test(password)) {
-          if (typeof showToast === 'function') showToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener al menos un número.');
+          if (typeof showToast === 'function') {
+            showToast('⚠️ La contraseña debe tener al menos 8 caracteres e incluir al menos un número.');
+          }
           return;
         }
 
@@ -8518,7 +8525,7 @@ if (btnRecenterPassengerMap) {
         if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.remove('hidden');
 
         if (typeof showToast === 'function') {
-          showToast(`📩 Código de activación generado para ${email}: [ ${verifyCode} ]`);
+          showToast(`📩 Código de activación enviado a ${email}: [ ${verifyCode} ]`);
         }
       });
     }

@@ -2459,11 +2459,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function acceptSelectedTrip(trip) {
-        // Regla 0: Guard estricto de aprobación de chofer
+        // Regla 0: Guard estricto de aprobación de cuenta del chofer
         const docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
         const statusVerif = (docs && docs.estadoVerificacion) ? docs.estadoVerificacion : 'pendiente';
         if (statusVerif !== 'aprobado') {
-            alert('⏳ CUENTA PENDIENTE DE APROBACIÓN:\n\nTu cuenta y documentación aún no han sido aprobadas por el Administrador de RutaPrivada.\n\nNo puedes realizar ni aceptar viajes hasta ser validado.');
+            alert(
+                '⏳ CUENTA EN PROCESO DE APROBACIÓN:\n\n' +
+                'Tu cuenta y documentación aún no han sido aprobadas por el Administrador de RutaPrivada.\n\n' +
+                'No puedes aceptar ni realizar viajes hasta que tu cuenta sea validada y habilitada.'
+            );
+            const modalDocsUpload = document.getElementById('modalDocsUpload');
+            if (modalDocsUpload) {
+                if (typeof populateDocsForm === 'function') populateDocsForm();
+                modalDocsUpload.classList.add('active');
+            }
             return;
         }
 
@@ -5593,7 +5602,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             saveDriverSession(driver);
             hideDriverAuthModal();
-            showDriverToast(`👋 ¡Bienvenido Chofer Partner, ${driver.nombre || 'Daniel'}!`);
+            showDriverToast(`👋 ¡Bienvenido Chofer Partner, ${driver.nombre || 'Conductor'}!`);
             playAlertSound('success');
         });
     }
@@ -5614,8 +5623,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Regla: Contraseña de 8 caracteres mínimo con al menos un número
             if (password.length < 8 || !/\d/.test(password)) {
-                showDriverToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener al menos un número.');
+                showDriverToast('⚠️ La contraseña debe tener al menos 8 caracteres e incluir al menos un número.');
                 return;
             }
 
@@ -5639,6 +5649,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
             const passwordHash = await hashDriverPassword(password);
 
+            // IMPORTANTE: Inicia estrictamente como NO APROBADO / PENDIENTE en el panel de administración
             pendingDriverRegistration = {
                 id: 'drv_' + dni.replace(/\D/g, ''),
                 nombre: name,
@@ -5646,8 +5657,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 telefono: phone,
                 email: email,
                 passwordHash: passwordHash,
-                estadoVerificacion: 'sin_subir',
+                estadoVerificacion: 'pendiente', // Inicia no aprobado en admin
+                estado: 'pendiente',
                 aprobado: false,
+                puedeAceptarViajes: false,
                 calificacion: 5.0,
                 fechaRegistro: new Date().toISOString(),
                 verifyCode: verifyCode,
@@ -5660,7 +5673,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (inputDriverVerifyCode) inputDriverVerifyCode.value = '';
             if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'flex';
 
-            showDriverToast(`📩 Código de activación generado para ${email}: [ ${verifyCode} ]`);
+            showDriverToast(`📩 Código de activación enviado a ${email}: [ ${verifyCode} ]`);
         });
     }
 
