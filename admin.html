@@ -1549,12 +1549,6 @@
                                 loadRechargesData();
                             }, (err) => console.warn('Firestore recharges listener warning:', err));
 
-                            // 4. Polling de respaldo cada 3 segundos para garantizar datos en vivo siempre
-                            setInterval(() => {
-                                fetchDriversFromFirestore(db);
-                                fetchRechargesFromFirestore(db);
-                            }, 3000);
-
                         } catch(e) {
                             console.warn('Error setting up admin firestore sync:', e);
                         }
@@ -1565,6 +1559,12 @@
                 };
 
                 attachListener();
+
+                // Polling REST global incondicional cada 3 segundos
+                setInterval(() => {
+                    if (typeof fetchDriversFromFirestoreRest === 'function') fetchDriversFromFirestoreRest();
+                    if (typeof fetchRechargesFromFirestoreRest === 'function') fetchRechargesFromFirestoreRest();
+                }, 3000);
             }
 
             initFirestoreRealtimeSync();
@@ -2109,19 +2109,13 @@
                                         </div>
                                         ${contentHtml}
                                     </div>
-                                    <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
-                                        <label class="admin-btn" style="width: 100%; justify-content: center; font-size: 0.74rem; padding: 6px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.35); cursor: pointer; text-align: center;">
-                                            <input type="file" class="admin-doc-file-input" data-key="${item.key}" data-index="${idx}" accept="image/*,application/pdf" style="display: none;">
-                                            <i class="fa-solid fa-cloud-arrow-up"></i> ${hasData ? 'Reemplazar Archivo' : 'Subir Archivo desde PC'}
-                                        </label>
-                                        <div style="display: flex; gap: 6px;">
-                                            <button type="button" class="admin-btn btn-doc-approve" data-index="${idx}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">
-                                                <i class="fa-solid fa-check"></i> Válido
-                                            </button>
-                                            <button type="button" class="admin-btn btn-doc-reject" data-index="${idx}" data-title="${item.title}" style="flex:1; padding:6px; font-size:0.75rem; justify-content:center; background:rgba(239,68,68,0.2); color:#f87171; border-color:rgba(239,68,68,0.4);">
-                                                <i class="fa-solid fa-xmark"></i> Observar
-                                            </button>
-                                        </div>
+                                    <div style="display: flex; gap: 6px; margin-top: 8px;">
+                                        <button type="button" class="admin-btn btn-doc-approve" data-index="${idx}" style="flex:1; padding:7px; font-size:0.75rem; justify-content:center; background:rgba(16,185,129,0.2); color:#34d399; border-color:rgba(16,185,129,0.4);">
+                                            <i class="fa-solid fa-check"></i> Válido
+                                        </button>
+                                        <button type="button" class="admin-btn btn-doc-reject" data-index="${idx}" data-title="${item.title}" style="flex:1; padding:7px; font-size:0.75rem; justify-content:center; background:rgba(239,68,68,0.2); color:#f87171; border-color:rgba(239,68,68,0.4);">
+                                            <i class="fa-solid fa-xmark"></i> Observar
+                                        </button>
                                     </div>
                                 </div>
                             `;
@@ -2405,6 +2399,21 @@
                         firebase.firestore().collection('drivers').doc(driverDocId).set(safeDoc, { merge: true }).catch((err) => console.warn('Firestore update driver warning:', err));
                     } catch(e){}
                 }
+
+                // Sincronización REST directa garantizada
+                try {
+                    fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${driverDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4&updateMask.fieldPaths=estadoVerificacion&updateMask.fieldPaths=observaciones&updateMask.fieldPaths=updatedAt`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            fields: {
+                                estadoVerificacion: { stringValue: newStatus },
+                                observaciones: { stringValue: notesVal },
+                                updatedAt: { integerValue: String(Date.now()) }
+                            }
+                        })
+                    }).catch(() => {});
+                } catch(e) {}
 
                 if (window.RutaSync) {
                     if (typeof window.RutaSync.guardarDocumentosConductor === 'function') {

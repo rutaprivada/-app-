@@ -6,6 +6,16 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+    const FIREBASE_CONFIG_CONDUCTOR = {
+        apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
+        authDomain: "rutaprivada-app.firebaseapp.com",
+        projectId: "rutaprivada-app",
+        storageBucket: "rutaprivada-app.firebasestorage.app",
+        messagingSenderId: "349256222860",
+        appId: "1:349256222860:web:6bdac96975582de57093a9",
+        measurementId: "G-EXXS3VHD14"
+    };
+
     // Detección de Modo App Nativa / PWA vs Web
     const isAppMode = window.matchMedia('(display-mode: standalone)').matches || 
                      window.navigator.standalone === true || 
@@ -4421,6 +4431,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function updateDocsStatusBanner(status) {
+            const currentData = loadDocsData();
+            const adminObs = currentData.observaciones || '';
             const docsStatusBanner = document.getElementById('docsStatusBanner');
             const docsStatusIcon = document.getElementById('docsStatusIcon');
             const docsStatusTitle = document.getElementById('docsStatusTitle');
@@ -4443,11 +4455,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (homeVerifSub) homeVerifSub.textContent = 'En proceso de validación por el Administrador. Toca para ver tus datos.';
                 } else if (status === 'rechazado') {
                     homeVerifBanner.style.display = 'block';
-                    homeVerifBanner.style.background = 'rgba(239, 68, 68, 0.12)';
-                    homeVerifBanner.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                    homeVerifBanner.style.background = 'rgba(239, 68, 68, 0.15)';
+                    homeVerifBanner.style.borderColor = 'rgba(239, 68, 68, 0.4)';
                     if (homeVerifIcon) homeVerifIcon.className = 'fa-solid fa-circle-xmark text-danger';
                     if (homeVerifTitle) homeVerifTitle.textContent = 'Documentación Observada / Rechazada';
-                    if (homeVerifSub) homeVerifSub.textContent = 'Revisa las observaciones del Administrador para corregir tus datos.';
+                    if (homeVerifSub) {
+                        homeVerifSub.innerHTML = adminObs ? 
+                            `⚠️ <strong>Observación:</strong> "${adminObs}" — <span style="text-decoration:underline;">Toca para corregir</span>` :
+                            'Revisa las observaciones del Administrador para corregir tus datos.';
+                    }
                 } else {
                     homeVerifBanner.style.display = 'block';
                     homeVerifBanner.style.background = 'rgba(245, 158, 11, 0.15)';
@@ -4473,11 +4489,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (docsStatusTitle) docsStatusTitle.textContent = 'Pendiente de Validación por Administración';
                 if (docsStatusDesc) docsStatusDesc.textContent = 'Los documentos y datos subidos se encuentran en proceso de revisión.';
             } else if (status === 'rechazado') {
-                docsStatusBanner.style.background = 'rgba(239, 68, 68, 0.12)';
-                docsStatusBanner.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                docsStatusBanner.style.background = 'rgba(239, 68, 68, 0.15)';
+                docsStatusBanner.style.borderColor = 'rgba(239, 68, 68, 0.4)';
                 if (docsStatusIcon) docsStatusIcon.className = 'fa-solid fa-circle-xmark text-danger';
                 if (docsStatusTitle) docsStatusTitle.textContent = 'Solicitud Rechazada u Observada';
-                if (docsStatusDesc) docsStatusDesc.textContent = 'Por favor revisa tus documentos o datos bancarios y vuelve a enviarlos para revisión.';
+                if (docsStatusDesc) {
+                    docsStatusDesc.innerHTML = adminObs ?
+                        `<div style="margin-bottom: 6px; color: #fff;"><strong>Motivo u Observación del Administrador:</strong></div><div style="background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px; color: #fca5a5; font-size: 0.88rem; border-left: 3px solid #ef4444;">"${adminObs}"</div><div style="margin-top: 6px; font-size: 0.78rem; color: #cbd5e1;">Por favor reemplaza o corrige los datos indicados arriba y presiona Guardar.</div>` :
+                        'Por favor revisa tus documentos o datos bancarios y vuelve a enviarlos para revisión.';
+                }
             } else {
                 docsStatusBanner.style.background = 'rgba(245, 158, 11, 0.12)';
                 docsStatusBanner.style.borderColor = 'rgba(245, 158, 11, 0.3)';
@@ -5145,46 +5165,85 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Escucha en tiempo real de Firestore para aprobación/rechazo instantáneo
     function startFirestoreDriverListener() {
-        if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
-        try {
-            const db = firebase.firestore();
-            db.collection('drivers').onSnapshot(snapshot => {
-                snapshot.docChanges().forEach(change => {
-                    const data = change.doc.data();
-                    if (!data) return;
-                    const localDocs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
-                    if (!localDocs) return;
+        const processDriverUpdate = (incomingStatus, incomingObs) => {
+            const localDocs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+            if (!localDocs) return;
+            const prevStatus = localDocs.estadoVerificacion;
+            const prevObs = localDocs.observaciones || '';
+            const newStatus = incomingStatus || prevStatus || 'sin_subir';
+            const newObs = incomingObs !== undefined ? incomingObs : prevObs;
 
-                    const cleanDniIncoming = (data.dni || data.id || '').replace(/\D/g, '');
-                    const cleanDniLocal = (localDocs.dni || '').replace(/\D/g, '');
+            if (prevStatus !== newStatus || prevObs !== newObs) {
+                localDocs.estadoVerificacion = newStatus;
+                localDocs.observaciones = newObs;
+                try {
+                    localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
+                    window.dispatchEvent(new Event('storage'));
+                } catch(e) {}
 
-                    if ((cleanDniIncoming && cleanDniLocal && cleanDniIncoming === cleanDniLocal) || data.id === 'driver_local' || data.id === 'drv_' + cleanDniLocal) {
-                        const prevStatus = localDocs.estadoVerificacion;
-                        const newStatus = data.estadoVerificacion || data.estado || 'sin_subir';
-                        
-                        if (prevStatus !== newStatus || data.observaciones !== localDocs.observaciones) {
-                            localDocs.estadoVerificacion = newStatus;
-                            localDocs.observaciones = data.observaciones || '';
-                            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
-                            window.dispatchEvent(new Event('storage'));
-                            
-                            if (typeof updateDocsStatusBanner === 'function') updateDocsStatusBanner(newStatus);
-                            renderDriverProfileInfo();
-                            
-                            if (newStatus === 'aprobado' && prevStatus !== 'aprobado') {
-                                showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el Administrador!');
-                                try { playAlertSound('success'); } catch(e){}
-                                alert('🎉 ¡ENHORABUENA!\n\nTu documentación y vehículo han sido APROBADOS por el Administrador de RutaPrivada.\n\nYa puedes presionar "ESTÁS EN LÍNEA" para conectarte y empezar a recibir viajes en tiempo real.');
-                            } else if (newStatus === 'rechazado' && prevStatus !== 'rechazado') {
-                                showDriverToast('⚠️ Tu documentación fue observada o rechazada.');
-                                if (driverState.isOnline) setOnlineStatus(false);
-                                alert(`❌ DOCUMENTACIÓN OBSERVADA O RECHAZADA:\n\nEl Administrador indicó:\n\n"${data.observaciones || 'Documentación incompleta o ilegible'}"\n\nPor favor actualiza o vuelve a subir los documentos requeridos en tu perfil.`);
-                            }
+                if (typeof updateDocsStatusBanner === 'function') updateDocsStatusBanner(newStatus);
+                renderDriverProfileInfo();
+
+                if (newStatus === 'aprobado' && prevStatus !== 'aprobado') {
+                    showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el Administrador!');
+                    try { playAlertSound('success'); } catch(e){}
+                    alert('🎉 ¡ENHORABUENA!\n\nTu documentación y vehículo han sido APROBADOS por el Administrador de RutaPrivada.\n\nYa puedes presionar "ESTÁS EN LÍNEA" para conectarte y empezar a recibir viajes en tiempo real.');
+                } else if (newStatus === 'rechazado' && (prevStatus !== 'rechazado' || prevObs !== newObs)) {
+                    showDriverToast('⚠️ Tu documentación fue observada o rechazada.');
+                    if (driverState.isOnline) setOnlineStatus(false);
+                    try { playAlertSound('chat'); } catch(e){}
+                    alert(`❌ DOCUMENTACIÓN OBSERVADA O RECHAZADA:\n\nEl Administrador indicó:\n\n"${newObs || 'Documentación incompleta o ilegible'}"\n\nPor favor actualiza o vuelve a subir los documentos requeridos en tu perfil.`);
+                }
+            }
+        };
+
+        // 1. Polling directo vía Firestore REST (funciona siempre en celular/WebView)
+        const pollDriverStatusRest = async () => {
+            try {
+                const localDocs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+                if (!localDocs) return;
+                const cleanDni = (localDocs.dni || '').replace(/\D/g, '') || (localDocs.telefono || '').replace(/\D/g, '');
+                if (!cleanDni) return;
+
+                const resp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/drv_${cleanDni}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
+                if (resp.ok) {
+                    const json = await resp.json();
+                    if (json && json.fields) {
+                        const getStr = (f, def = '') => (json.fields[f] && json.fields[f].stringValue !== undefined) ? json.fields[f].stringValue : def;
+                        const status = getStr('estadoVerificacion', '');
+                        const obs = getStr('observaciones', '');
+                        if (status) {
+                            processDriverUpdate(status, obs);
                         }
                     }
-                });
-            }, err => console.warn('Firestore driver onSnapshot warn:', err));
-        } catch(e) {}
+                }
+            } catch(e) {}
+        };
+
+        setInterval(pollDriverStatusRest, 3500);
+        pollDriverStatusRest();
+
+        // 2. Listener en tiempo real vía Firestore SDK
+        if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+            try {
+                const db = firebase.firestore();
+                db.collection('drivers').onSnapshot(snapshot => {
+                    snapshot.docChanges().forEach(change => {
+                        const data = change.doc.data();
+                        if (!data) return;
+                        const localDocs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+                        if (!localDocs) return;
+
+                        const cleanDniIncoming = (data.dni || data.id || '').replace(/\D/g, '');
+                        const cleanDniLocal = (localDocs.dni || '').replace(/\D/g, '');
+
+                        if ((cleanDniIncoming && cleanDniLocal && cleanDniIncoming === cleanDniLocal) || data.id === 'driver_local' || data.id === 'drv_' + cleanDniLocal) {
+                            processDriverUpdate(data.estadoVerificacion || data.estado, data.observaciones);
+                        }
+                    });
+                }, err => console.warn('Firestore driver onSnapshot warn:', err));
+            } catch(e) {}
+        }
     }
 
     setTimeout(startFirestoreDriverListener, 1000);
@@ -5867,24 +5926,35 @@ document.addEventListener('DOMContentLoaded', () => {
                     prompt('Copia los datos de transferencia:', cvuText);
                 }
             });
-        }
-
         const rechargeTransferRef = document.getElementById('rechargeTransferRef');
 
         if (btnConfirmRechargeWhatsapp) {
             btnConfirmRechargeWhatsapp.addEventListener('click', () => {
                 const amount = Number(customRechargeAmount ? customRechargeAmount.value : 10000) || 10000;
                 if (amount < 1000) {
-                    alert('El monto mínimo de recarga es de $1.000 ARS.');
+                    showDriverToast('⚠️ El monto mínimo de recarga es de $1.000 ARS.');
                     return;
                 }
 
                 const refCode = (rechargeTransferRef ? rechargeTransferRef.value.trim() : '') || '';
                 if (refCode.length < 3) {
-                    alert('⚠️ Comprobante Requerido:\n\nPor favor, ingresa el Número de Comprobante / Referencia de la transferencia que realizaste desde tu cuenta bancaria o billetera virtual para que el sistema pueda conciliarla.');
+                    showDriverToast('⚠️ Por favor ingresa el Número de Comprobante / Trámite.');
                     if (rechargeTransferRef) rechargeTransferRef.focus();
                     return;
                 }
+
+                // Evitar envíos múltiples: deshabilitar botón y cerrar modal inmediatamente
+                btnConfirmRechargeWhatsapp.disabled = true;
+                btnConfirmRechargeWhatsapp.style.opacity = '0.6';
+                btnConfirmRechargeWhatsapp.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+
+                if (modalRecargarSaldo) {
+                    modalRecargarSaldo.classList.remove('active');
+                    modalRecargarSaldo.style.display = 'none';
+                    setTimeout(() => { modalRecargarSaldo.style.display = ''; }, 300);
+                }
+
+                if (rechargeTransferRef) rechargeTransferRef.value = '';
 
                 const wallet = loadDriverWallet();
                 const now = new Date();
@@ -5927,7 +5997,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     estado: 'pendiente'
                 };
 
-                // 1. Guardar localmente para disponibilidad inmediata
+                // 1. Guardar localmente
                 try {
                     let localRecharges = JSON.parse(localStorage.getItem('rutaprivada_driver_recharges_v1') || '[]');
                     localRecharges.unshift(rechargePayload);
@@ -5940,13 +6010,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.RutaSync.emit('SOLICITUD_RECARGA_SALDO', rechargePayload);
                 }
 
-                if (modalRecargarSaldo) modalRecargarSaldo.classList.remove('active');
-                if (rechargeTransferRef) rechargeTransferRef.value = '';
-
                 showDriverToast(`⏳ Transferencia enviada a conciliación: $${amount.toLocaleString('es-AR')}`);
-                alert(`✓ Transferencia Registrada en Conciliación Bancaria.\n\nSe ha recibido tu aviso de recarga por $${amount.toLocaleString('es-AR')} con Comprobante N° ${refCode}.\n\nEl saldo se acreditará en tu cuenta tan pronto como el sistema o la Administración verifiquen el ingreso de los fondos en la cuenta bancaria.`);
+                try { playAlertSound('chat'); } catch(e){}
 
-                // 3. Sincronizar recarga pendiente con Firestore (SDK y REST)
+                // 3. Sincronizar recarga con Firestore (SDK y REST)
                 if (typeof firebase !== 'undefined') {
                     try {
                         if (!firebase.apps || !firebase.apps.length) {
@@ -5983,8 +6050,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         })
                     }).catch(() => {});
                 } catch(e) {}
+
+                // Reactivar botón después de 3 segundos
+                setTimeout(() => {
+                    if (btnConfirmRechargeWhatsapp) {
+                        btnConfirmRechargeWhatsapp.disabled = false;
+                        btnConfirmRechargeWhatsapp.style.opacity = '1';
+                        btnConfirmRechargeWhatsapp.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Enviar Transferencia a Conciliación';
+                    }
+                }, 3000);
             });
         }
+
+
 
         // Listener en tiempo real vía RutaSync (0ms de latencia) para acreditaciones aprobadas por Administración
         if (window.RutaSync) {
