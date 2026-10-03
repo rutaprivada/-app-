@@ -131,6 +131,46 @@ class RutaSyncManager {
                             console.warn('Firestore drivers collection listener warning:', err);
                         });
 
+                    // Escuchar colección de recargas de saldo en tiempo real
+                    this.firestore.collection('wallet_recharges')
+                        .onSnapshot((snapshot) => {
+                            snapshot.docChanges().forEach((change) => {
+                                const data = change.doc.data();
+                                if (data) {
+                                    data.id = data.id || change.doc.id;
+                                    if (data.senderId !== this.deviceId) {
+                                        if (data.estado === 'pendiente' || change.type === 'added') {
+                                            this.handleIncoming({
+                                                id: 'rec_req_' + data.id + '_' + (data.timestamp || Date.now()),
+                                                type: 'SOLICITUD_RECARGA_SALDO',
+                                                payload: data,
+                                                senderId: data.senderId,
+                                                timestamp: data.timestamp || Date.now()
+                                            });
+                                        }
+                                        if (data.estado === 'aprobado' || data.estado === 'rechazado') {
+                                            this.handleIncoming({
+                                                id: 'rec_proc_' + data.id + '_' + (data.timestampAprobacion || Date.now()),
+                                                type: 'RECARGA_SALDO_PROCESADA',
+                                                payload: {
+                                                    rechargeId: data.id,
+                                                    estado: data.estado,
+                                                    monto: data.monto,
+                                                    driverDni: data.driverDni,
+                                                    comprobante: data.comprobante,
+                                                    timestamp: data.timestampAprobacion || Date.now()
+                                                },
+                                                senderId: data.senderId,
+                                                timestamp: Date.now()
+                                            });
+                                        }
+                                    }
+                                }
+                            });
+                        }, (err) => {
+                            console.warn('Firestore recharges listener warning:', err);
+                        });
+
                     // Escuchar colección de reservas 'bookings' en tiempo real (Multi-dispositivo Pasajero <-> Chofer)
                     this.firestore.collection('bookings')
                         .onSnapshot((snapshot) => {
@@ -295,10 +335,17 @@ class RutaSyncManager {
     // ==========================================
     emit(type, payload = {}) {
         const now = Date.now();
+
+        // Sanitize payload to avoid payload-too-large errors across SSE/network
+        let safePayload = payload ? { ...payload } : {};
+        if (safePayload.docsImages) {
+            delete safePayload.docsImages;
+        }
+
         const message = {
             id: 'evt_' + now + '_' + Math.random().toString(36).substr(2, 5),
             type: type,
-            payload: payload,
+            payload: safePayload,
             senderId: this.deviceId,
             timestamp: now
         };
@@ -321,37 +368,50 @@ class RutaSyncManager {
                 this.firestore.collection('fleet_events').doc(message.id).set(message).catch(() => {});
                 if (type === 'NUEVO_VIAJE_SOLICITADO' || type === 'VIAJE_ACEPTADO' || type === 'ESTADO_VIAJE_CAMBIADO') {
                     this.firestore.collection('live_trips').doc('current_active_trip').set({
-                        ...payload,
+                        ...safePayload,
                         senderId: this.deviceId,
                         timestamp: now,
                         ultimoEstadoEn: now
                     }, { merge: true }).catch(() => {});
                 } else if (type === 'UBICACION_CHOFER_ACTUALIZADA') {
                     this.firestore.collection('live_trips').doc('driver_location').set({
-                        ...payload,
+                        ...safePayload,
                         senderId: this.deviceId,
                         timestamp: now
                     }).catch(() => {});
                 } else if (type === 'ESTADO_CONDUCTOR_ACTUALIZADO' || type === 'DOCUMENTOS_CONDUCTOR_ACTUALIZADOS') {
-                    if (payload && (payload.id || payload.dni)) {
-                        const cleanDni = String(payload.dni || '').replace(/\D/g, '');
-                        const drvDocId = String(payload.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
+                    if (safePayload && (safePayload.id || safePayload.dni)) {
+                        const cleanDni = String(safePayload.dni || '').replace(/\D/g, '');
+                        const drvDocId = String(safePayload.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
                         this.firestore.collection('drivers').doc(drvDocId).set({
-                            ...payload,
+                            ...safePayload,
                             id: drvDocId,
                             actualizadoEn: now
                         }, { merge: true }).catch(() => {});
                     }
-                } else if (type === 'RESERVA_CREADA' && payload && payload.id) {
-                    this.firestore.collection('bookings').doc(String(payload.id)).set({
-                        ...payload,
+                } else if (type === 'SOLICITUD_RECARGA_SALDO' && safePayload && (safePayload.id || safePayload.comprobante)) {
+                    const recId = String(safePayload.id || ('rec_' + now));
+                    this.firestore.collection('wallet_recharges').doc(recId).set({
+                        ...safePayload,
+                        id: recId,
+                        senderId: this.deviceId,
+                        timestamp: safePayload.timestamp || now
+                    }, { merge: true }).catch(() => {});
+                } else if (type === 'RECARGA_SALDO_PROCESADA' && safePayload && safePayload.rechargeId) {
+                    this.firestore.collection('wallet_recharges').doc(String(safePayload.rechargeId)).set({
+                        estado: safePayload.estado || 'aprobado',
+                        timestampAprobacion: now
+                    }, { merge: true }).catch(() => {});
+                } else if (type === 'RESERVA_CREADA' && safePayload && safePayload.id) {
+                    this.firestore.collection('bookings').doc(String(safePayload.id)).set({
+                        ...safePayload,
                         senderId: this.deviceId,
                         timestamp: now
                     }).catch(() => {});
-                } else if ((type === 'RESERVA_ACEPTADA' || type === 'RESERVA_LIBERADA' || type === 'RESERVA_COMPLETADA' || type === 'RESERVA_CANCELADA') && payload && (payload.reservaId || payload.id)) {
-                    const bkId = String(payload.reservaId || payload.id);
+                } else if ((type === 'RESERVA_ACEPTADA' || type === 'RESERVA_LIBERADA' || type === 'RESERVA_COMPLETADA' || type === 'RESERVA_CANCELADA') && safePayload && (safePayload.reservaId || safePayload.id)) {
+                    const bkId = String(safePayload.reservaId || safePayload.id);
                     this.firestore.collection('bookings').doc(bkId).set({
-                        ...payload,
+                        ...safePayload,
                         senderId: this.deviceId,
                         timestamp: now
                     }, { merge: true }).catch(() => {});

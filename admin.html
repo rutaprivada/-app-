@@ -1083,6 +1083,101 @@
                 });
             }
 
+            // Helper de compresión de imágenes
+            function compressImageFile(file) {
+                return new Promise((resolve, reject) => {
+                    if (!file) return resolve(null);
+                    const fileName = (file.name || '').toLowerCase();
+                    if (file.type === 'application/pdf' || fileName.endsWith('.pdf')) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve({ type: 'pdf', name: file.name, data: e.target.result });
+                        reader.onerror = (err) => reject(err);
+                        reader.readAsDataURL(file);
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            try {
+                                const canvas = document.createElement('canvas');
+                                let width = img.width || 800;
+                                let height = img.height || 600;
+                                const maxDim = 800;
+                                if (width > maxDim || height > maxDim) {
+                                    if (width > height) {
+                                        height = Math.round((height * maxDim) / width);
+                                        width = maxDim;
+                                    } else {
+                                        width = Math.round((width * maxDim) / height);
+                                        height = maxDim;
+                                    }
+                                }
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, width, height);
+                                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+                                resolve({ type: 'image', name: file.name, data: compressedBase64 });
+                            } catch(err) {
+                                resolve({ type: 'image', name: file.name, data: e.target.result });
+                            }
+                        };
+                        img.onerror = () => resolve({ type: 'image', name: file.name, data: e.target.result });
+                        img.src = e.target.result;
+                    };
+                    reader.onerror = (err) => reject(err);
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            // Guardar conductor actualizado y sincronizar con Firestore
+            function saveUpdatedDriverToStorage(driverData) {
+                if (!driverData) return;
+                const cleanDni = String(driverData.dni || '').replace(/\D/g, '');
+                const docId = String(driverData.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
+                driverData.id = docId;
+
+                const idx = currentDrivers.findIndex(d => (d.id && d.id === docId) || (d.dni && driverData.dni && d.dni === driverData.dni));
+                if (idx >= 0) {
+                    currentDrivers[idx] = { ...currentDrivers[idx], ...driverData };
+                } else {
+                    currentDrivers.unshift(driverData);
+                }
+
+                try {
+                    localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(currentDrivers));
+                } catch(e) {}
+
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                    try {
+                        const db = firebase.firestore();
+                        const safeDoc = { ...driverData };
+                        if (safeDoc.docsImages) delete safeDoc.docsImages;
+                        db.collection('drivers').doc(docId).set(safeDoc, { merge: true }).catch(err => console.warn('Firestore driver save warning:', err));
+
+                        if (driverData.docsImages) {
+                            for (const [k, v] of Object.entries(driverData.docsImages)) {
+                                if (v && typeof v === 'string' && v.length > 20) {
+                                    db.collection('drivers').doc(docId).collection('documents').doc(k).set({
+                                        id: k,
+                                        key: k,
+                                        data: v,
+                                        updatedAt: Date.now()
+                                    }, { merge: true }).catch(err => console.warn(`Firestore subdoc save warning (${k}):`, err));
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+
+                if (window.RutaSync) {
+                    window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driverData);
+                }
+                renderMetrics();
+                renderDriversTable();
+            }
+
             // Control de Vistas (Pestañas)
             function switchAdminView(view) {
                 if (view === 'recharges') {
@@ -1482,7 +1577,7 @@
                     const cbuShort = d.cbu ? (d.cbu.substring(0, 10) + '...') : 'Sin CBU';
                     const holderMatch = Boolean(d.titularCuenta && d.nombre && (d.titularCuenta.toLowerCase().trim() === d.nombre.toLowerCase().trim() || d.titularCuenta.toLowerCase().includes(d.nombre.toLowerCase()) || d.nombre.toLowerCase().includes(d.titularCuenta.toLowerCase())));
                     const safeId = String(d.id || d.dni || d.nombre);
-                    const docsCount = d.docsImages ? Object.keys(d.docsImages).filter(k => d.docsImages[k] && d.docsImages[k].length > 20).length : 0;
+                    const docsCount = d.docsCount || (d.docsSummary ? Object.values(d.docsSummary).filter(Boolean).length : (d.docsImages ? Object.keys(d.docsImages).filter(k => d.docsImages[k] && d.docsImages[k].length > 20).length : 0));
 
                     return `
                         <tr>
@@ -1970,7 +2065,9 @@
 
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
-                        firebase.firestore().collection('drivers').doc(driverDocId).set(driverPayload, { merge: true }).catch(() => {});
+                        const safeDoc = { ...driverPayload };
+                        if (safeDoc.docsImages) delete safeDoc.docsImages;
+                        firebase.firestore().collection('drivers').doc(driverDocId).set(safeDoc, { merge: true }).catch((err) => console.warn('Firestore update driver warning:', err));
                     } catch(e){}
                 }
 

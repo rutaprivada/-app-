@@ -4634,6 +4634,40 @@ document.addEventListener('DOMContentLoaded', () => {
             const docId = 'drv_' + cleanDni;
             updatedDocs.id = docId;
 
+            // Resumen ligero de documentos subidos para el documento principal
+            const docsUploadedSummary = {};
+            for (const [k, v] of Object.entries(mergedDocsImages)) {
+                docsUploadedSummary[k] = Boolean(v && typeof v === 'string' && v.length > 20);
+            }
+
+            // Foto de perfil compacta (< 70KB)
+            const safeProfilePhoto = (photoSrc && photoSrc.length < 80000) ? photoSrc : '';
+
+            // Documento principal liviano (< 5KB) que nunca excede la cuota de 1MB de Firestore
+            const mainDriverDoc = {
+                id: docId,
+                nombre: updatedDocs.nombre || 'Conductor',
+                dni: updatedDocs.dni || '',
+                telefono: updatedDocs.telefono || '',
+                email: updatedDocs.email || '',
+                aceptaComunicaciones: updatedDocs.aceptaComunicaciones !== false,
+                autoMarcaModelo: updatedDocs.autoMarcaModelo || '',
+                patente: updatedDocs.patente || '',
+                color: updatedDocs.color || '',
+                categoria: updatedDocs.categoria || 'Sedán Estándar',
+                fotoPerfil: safeProfilePhoto,
+                banco: updatedDocs.banco || '',
+                cbu: updatedDocs.cbu || '',
+                titularCuenta: updatedDocs.titularCuenta || '',
+                estadoVerificacion: status,
+                observaciones: updatedDocs.observaciones || '',
+                isOnline: Boolean(driverState.isOnline),
+                docsSummary: docsUploadedSummary,
+                docsCount: Object.values(docsUploadedSummary).filter(Boolean).length,
+                updatedAt: Date.now(),
+                timestamp: Date.now()
+            };
+
             if (typeof firebase !== 'undefined') {
                 try {
                     if (!firebase.apps || !firebase.apps.length) {
@@ -4641,13 +4675,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     const db = firebase.firestore();
 
-                    // A. Guardar de inmediato datos del chofer en la colección principal
-                    const mainDriverDoc = {
-                        ...updatedDocs,
-                        isOnline: driverState.isOnline,
-                        timestamp: Date.now()
-                    };
-
+                    // A. Guardar de inmediato datos del chofer en la colección principal (Garantizado < 5KB)
                     db.collection('drivers').doc(docId).set(mainDriverDoc, { merge: true }).then(() => {
                         console.log('✓ Perfil de conductor sincronizado con Firestore:', docId);
                     }).catch(err => console.warn('Error guardando chofer en Firestore:', err));
@@ -4656,6 +4684,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     for (const [docKey, docData] of Object.entries(mergedDocsImages)) {
                         if (docData && typeof docData === 'string' && docData.length > 20) {
                             db.collection('drivers').doc(docId).collection('documents').doc(docKey).set({
+                                id: docKey,
                                 key: docKey,
                                 data: docData,
                                 updatedAt: Date.now()
@@ -4669,7 +4698,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 3. Emitir evento por bus sync para recepción inmediata en Admin
             if (window.RutaSync) {
-                window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', updatedDocs);
+                window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', mainDriverDoc);
             }
 
             // 4. Actualizar lista en memoria
@@ -4693,6 +4722,67 @@ document.addEventListener('DOMContentLoaded', () => {
             return updatedDocs;
         }
 
+        // Listener en tiempo real desde Firestore para aprobaciones/observaciones de administración
+        function initDriverApprovalRealtimeListener() {
+            const docs = loadDocsData();
+            const cleanDni = (docs.dni || driverState.info.dni || '').replace(/\D/g, '') || (docs.telefono || driverState.info.telefono || '').replace(/\D/g, '');
+            if (!cleanDni) return;
+
+            const docId = 'drv_' + cleanDni;
+
+            if (typeof firebase !== 'undefined') {
+                try {
+                    if (!firebase.apps || !firebase.apps.length) {
+                        firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
+                    }
+                    const db = firebase.firestore();
+                    db.collection('drivers').doc(docId).onSnapshot((doc) => {
+                        if (doc.exists) {
+                            const cloudData = doc.data();
+                            if (cloudData && cloudData.estadoVerificacion) {
+                                const currentLocal = loadDocsData();
+                                if (currentLocal.estadoVerificacion !== cloudData.estadoVerificacion || currentLocal.observaciones !== cloudData.observaciones) {
+                                    currentLocal.estadoVerificacion = cloudData.estadoVerificacion;
+                                    currentLocal.observaciones = cloudData.observaciones || '';
+                                    try {
+                                        localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(currentLocal));
+                                    } catch(e){}
+                                    updateDocsStatusBanner(cloudData.estadoVerificacion);
+                                    if (cloudData.estadoVerificacion === 'aprobado') {
+                                        showDriverToast('🎉 ¡Tu cuenta y documentos fueron APROBADOS por Administración!');
+                                        try { playAlertSound('success'); } catch(e){}
+                                    } else if (cloudData.estadoVerificacion === 'rechazado') {
+                                        showDriverToast('⚠️ Tu documentación tiene observaciones. Toca el banner para revisar.');
+                                        try { playAlertSound('urgent'); } catch(e){}
+                                    }
+                                }
+                            }
+                        }
+                    }, err => console.warn('Driver Firestore status listener:', err));
+                } catch(e){}
+            }
+
+            if (window.RutaSync) {
+                window.RutaSync.on('ESTADO_CONDUCTOR_ACTUALIZADO', (data) => {
+                    if (!data) return;
+                    const dDni = (data.dni || '').replace(/\D/g, '');
+                    if (dDni && dDni === cleanDni && data.estadoVerificacion) {
+                        const currentLocal = loadDocsData();
+                        if (currentLocal.estadoVerificacion !== data.estadoVerificacion || currentLocal.observaciones !== data.observaciones) {
+                            currentLocal.estadoVerificacion = data.estadoVerificacion;
+                            currentLocal.observaciones = data.observaciones || '';
+                            try {
+                                localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(currentLocal));
+                            } catch(e){}
+                            updateDocsStatusBanner(data.estadoVerificacion);
+                        }
+                    }
+                });
+            }
+        }
+
+        initDriverApprovalRealtimeListener();
+
         if (formDocsUpload) {
             formDocsUpload.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -4708,8 +4798,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 saveDocsData('pendiente');
                 updateDocsStatusBanner('pendiente');
+                initDriverApprovalRealtimeListener();
                 showDriverToast('📄 Documentación enviada a revisión.');
-                alert('✓ Documentación y Datos Guardados Correctamente.\n\nTus archivos y datos han sido enviados para su verificación por parte de la Administración.');
+                alert('✓ Documentación y Datos Guardados Correctamente.\n\nTus archivos y datos han sido enviados para su verificación en tiempo real por parte de la Administración.');
             });
         }
 
