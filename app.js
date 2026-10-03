@@ -5784,7 +5784,7 @@ function startPassengerRealtimePoll(tripId) {
       activeTrip = window.RutaSync.obtenerViajeActivo();
     }
     
-    // Check Firestore directly for instant real-time sync
+    // 1. Check Firestore SDK directly
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
       try {
         const doc = await firebase.firestore().collection('live_trips').doc('current_active_trip').get();
@@ -5792,6 +5792,24 @@ function startPassengerRealtimePoll(tripId) {
           const fsData = doc.data();
           if (fsData && fsData.estado && fsData.estado !== 'buscando_conductor' && fsData.estado !== 'solicitado') {
             activeTrip = fsData;
+          }
+        }
+      } catch(e){}
+    }
+
+    // 2. Check Firestore REST API directly (100% fiable entre redes y dispositivos móviles)
+    if (!activeTrip || activeTrip.estado === 'buscando_conductor' || activeTrip.estado === 'solicitado') {
+      try {
+        const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json && json.fields) {
+            const tripObj = (typeof window.firestoreDocToObject === 'function')
+              ? window.firestoreDocToObject(json)
+              : (typeof firestoreDocToObject === 'function' ? firestoreDocToObject(json) : null);
+            if (tripObj && tripObj.estado && tripObj.estado !== 'buscando_conductor' && tripObj.estado !== 'solicitado') {
+              activeTrip = tripObj;
+            }
           }
         }
       } catch(e){}

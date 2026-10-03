@@ -2826,22 +2826,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Sincronizar con la app de Pasajero (Uber / Cabify style)
-        if (window.RutaSync) {
-            const conductorProfile = {
-                nombre: driverState.info.nombre || 'Daniel Pabon',
-                auto: driverState.info.auto || 'Fiat Cronos Negro',
-                patente: driverState.info.patente || 'AE927CN',
-                calificacion: driverState.info.calificacion || '4.98',
-                telefono: driverState.info.telefono || '+5491122558226',
-                fotoPerfil: driverState.info.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
-            };
+        const conductorProfile = {
+            nombre: driverState.info.nombre || 'Daniel Pabon',
+            auto: driverState.info.auto || 'Fiat Cronos Negro',
+            patente: driverState.info.patente || 'AE927CN',
+            calificacion: driverState.info.calificacion || '4.98',
+            telefono: driverState.info.telefono || '+5491122558226',
+            fotoPerfil: driverState.info.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
+        };
 
+        if (window.RutaSync) {
             window.RutaSync.aceptarViaje(driverState.activeTrip, conductorProfile);
             window.RutaSync.actualizarEstadoViaje(driverState.activeTrip.etapa || 'en_camino', {
                 ...driverState.activeTrip,
                 conductor: conductorProfile
             });
         }
+
+        // Respaldo REST directo para recepción instantánea en cualquier celular/red
+        try {
+            const patchPayload = {
+                ...driverState.activeTrip,
+                estado: 'aceptado',
+                etapa: driverState.activeTrip.etapa || 'en_camino',
+                conductor: conductorProfile,
+                aceptadoEn: Date.now(),
+                ultimoEstadoEn: Date.now()
+            };
+            if (typeof window.objectToFirestoreFields === 'function') {
+                fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fields: window.objectToFirestoreFields(patchPayload) })
+                }).catch(() => {});
+            }
+        } catch(e) {}
 
         updateTripStageUI();
         initDriverLiveMap(driverState.activeTrip);
@@ -5107,22 +5126,21 @@ document.addEventListener('DOMContentLoaded', () => {
         setInterval(async () => {
             if (!driverState.isOnline || driverState.activeTrip) return;
 
+            let incomingFound = null;
+
             // 1. Consulta al bus de sincronización local
             if (window.RutaSync) {
                 const activeSync = window.RutaSync.obtenerViajeActivo();
                 if (activeSync && ['buscando_conductor', 'solicitado'].includes(activeSync.estado)) {
                     const tripAge = Date.now() - (activeSync.timestamp || activeSync.creadoEn || 0);
                     if (tripAge < 15 * 60 * 1000) {
-                        if (!driverState.incomingTrip || driverState.incomingTrip.id !== activeSync.id) {
-                            enqueueIncomingTrip(activeSync);
-                            showIncomingTrip(activeSync);
-                        }
+                        incomingFound = activeSync;
                     }
                 }
             }
 
-            // 2. Consulta directa a Firebase Cloud Firestore
-            if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+            // 2. Consulta directa a Firebase Cloud Firestore SDK
+            if (!incomingFound && typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                 try {
                     const docSnap = await firebase.firestore().collection('live_trips').doc('current_active_trip').get();
                     if (docSnap.exists) {
@@ -5130,14 +5148,39 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (fsData && ['buscando_conductor', 'solicitado'].includes(fsData.estado)) {
                             const tripAge = Date.now() - (fsData.timestamp || fsData.creadoEn || fsData.ultimoEstadoEn || 0);
                             if (tripAge < 15 * 60 * 1000) {
-                                if (!driverState.incomingTrip || driverState.incomingTrip.id !== fsData.id) {
-                                    enqueueIncomingTrip(fsData);
-                                    showIncomingTrip(fsData);
+                                incomingFound = fsData;
+                            }
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            // 3. Consulta directa vía Firestore REST API (100% confiable en celular/PWA/Capacitor)
+            if (!incomingFound) {
+                try {
+                    const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+                    if (resp.ok) {
+                        const json = await resp.json();
+                        if (json && json.fields) {
+                            const tripObj = (typeof window.firestoreDocToObject === 'function')
+                                ? window.firestoreDocToObject(json)
+                                : (typeof firestoreDocToObject === 'function' ? firestoreDocToObject(json) : null);
+                            if (tripObj && ['buscando_conductor', 'solicitado'].includes(tripObj.estado)) {
+                                const tripAge = Date.now() - (tripObj.timestamp || tripObj.creadoEn || tripObj.ultimoEstadoEn || 0);
+                                if (tripAge < 15 * 60 * 1000) {
+                                    incomingFound = tripObj;
                                 }
                             }
                         }
                     }
                 } catch(e) {}
+            }
+
+            if (incomingFound) {
+                if (!driverState.incomingTrip || driverState.incomingTrip.id !== incomingFound.id) {
+                    enqueueIncomingTrip(incomingFound);
+                    showIncomingTrip(incomingFound);
+                }
             }
         }, 1500);
     }

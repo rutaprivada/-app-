@@ -11,6 +11,74 @@
  * 6. localStorage Storage Event Bus (Persistencia y resiliencia).
  */
 
+function objectToFirestoreFields(obj) {
+    if (!obj || typeof obj !== 'object') return {};
+    const fields = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (value === undefined || value === null) continue;
+        if (typeof value === 'string') {
+            fields[key] = { stringValue: value };
+        } else if (typeof value === 'number') {
+            if (Number.isInteger(value)) {
+                fields[key] = { integerValue: String(value) };
+            } else {
+                fields[key] = { doubleValue: value };
+            }
+        } else if (typeof value === 'boolean') {
+            fields[key] = { booleanValue: value };
+        } else if (Array.isArray(value)) {
+            fields[key] = {
+                arrayValue: {
+                    values: value.map(v => {
+                        if (typeof v === 'string') return { stringValue: v };
+                        if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+                        if (typeof v === 'boolean') return { booleanValue: v };
+                        if (typeof v === 'object' && v !== null) return { mapValue: { fields: objectToFirestoreFields(v) } };
+                        return { stringValue: String(v) };
+                    })
+                }
+            };
+        } else if (typeof value === 'object') {
+            fields[key] = { mapValue: { fields: objectToFirestoreFields(value) } };
+        }
+    }
+    return fields;
+}
+
+function firestoreDocToObject(doc) {
+    if (!doc) return null;
+    const f = doc.fields ? doc.fields : doc;
+    if (!f || typeof f !== 'object') return null;
+    
+    const parseValue = (v) => {
+        if (!v || typeof v !== 'object') return v;
+        if (v.stringValue !== undefined) return v.stringValue;
+        if (v.integerValue !== undefined) return parseInt(v.integerValue, 10);
+        if (v.doubleValue !== undefined) return parseFloat(v.doubleValue);
+        if (v.booleanValue !== undefined) return v.booleanValue;
+        if (v.timestampValue !== undefined) return v.timestampValue;
+        if (v.arrayValue && v.arrayValue.values) return v.arrayValue.values.map(parseValue);
+        if (v.mapValue && v.mapValue.fields) {
+            const res = {};
+            for (const [k, fv] of Object.entries(v.mapValue.fields)) {
+                res[k] = parseValue(fv);
+            }
+            return res;
+        }
+        return null;
+    };
+    const result = {};
+    for (const [k, fv] of Object.entries(f)) {
+        result[k] = parseValue(fv);
+    }
+    return result;
+}
+
+if (typeof window !== 'undefined') {
+    window.objectToFirestoreFields = objectToFirestoreFields;
+    window.firestoreDocToObject = firestoreDocToObject;
+}
+
 class RutaSyncManager {
     constructor() {
         this.channelName = 'rutaprivada_sync_global_v3';
@@ -29,6 +97,20 @@ class RutaSyncManager {
         this.initServerHttpSync();
         this.initNotificationManager();
         this.iniciarMotorMonitoreoReservas();
+    }
+
+    postFirestoreDocREST(collection, docId, data) {
+        try {
+            const apiKey = "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4";
+            const projectId = "rutaprivada-app";
+            const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collection}/${docId}?key=${apiKey}`;
+            const fields = objectToFirestoreFields(data);
+            fetch(url, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fields })
+            }).catch(() => {});
+        } catch(e) {}
     }
 
     // ==========================================
@@ -417,6 +499,16 @@ class RutaSyncManager {
                     }, { merge: true }).catch(() => {});
                 }
             } catch (e) {}
+        }
+
+        // 1.B Direct Cloud Firestore REST Patch (Inmune a fallos de SDK o desconexión WebSockets)
+        if (type === 'NUEVO_VIAJE_SOLICITADO' || type === 'VIAJE_ACEPTADO' || type === 'ESTADO_VIAJE_CAMBIADO') {
+            this.postFirestoreDocREST('live_trips', 'current_active_trip', {
+                ...safePayload,
+                senderId: this.deviceId,
+                timestamp: now,
+                ultimoEstadoEn: now
+            });
         }
 
         // 2. Enviar a través de Cloud SSE / Push Bus (ntfy.sh)
