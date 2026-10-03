@@ -5926,6 +5926,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     prompt('Copia los datos de transferencia:', cvuText);
                 }
             });
+        }
+
         const rechargeTransferRef = document.getElementById('rechargeTransferRef');
 
         if (btnConfirmRechargeWhatsapp) {
