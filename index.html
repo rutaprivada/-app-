@@ -1236,7 +1236,7 @@
       <div class="modal-header">
         <div class="profile-header-title-wrap">
           <div class="passenger-avatar-box-lg">
-            <img id="profileModalAvatarImg" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Avatar Pasajero" />
+            <img id="profileModalHeaderAvatarImg" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Avatar Pasajero" />
           </div>
           <div>
             <h3 id="profileModalNameTitle" style="margin: 0; font-size: 1.1rem; color: #fff;">Mi Perfil de Pasajero</h3>
@@ -1533,96 +1533,6 @@
           </button>
         </div>
       </form>
-    </div>
-  </div>
-
-  <!-- =========================================================
-       MODAL / PANEL: MI PERFIL EJECUTIVO DEL PASAJERO
-       (Datos personales, Calificación, Edición y Cerrar Sesión)
-       ========================================================= -->
-  <div id="modalPassengerProfile" class="modal-backdrop hidden" style="z-index: 10015; backdrop-filter: blur(14px); background: rgba(5, 10, 20, 0.92);">
-    <div class="modal-dialog" style="max-width: 480px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid rgba(56, 189, 248, 0.35); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(56, 189, 248, 0.2); overflow: hidden; padding: 0; position: relative;">
-      
-      <!-- Header -->
-      <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.2) 0%, rgba(15, 23, 42, 0.95) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; color: #fff;">
-            👤
-          </div>
-          <div>
-            <h3 style="color: #fff; margin: 0; font-size: 1.05rem; font-weight: 700;">Mi Perfil Pasajero</h3>
-            <p style="color: #94a3b8; margin: 0; font-size: 0.75rem;">Cuenta activa y preferencias de traslado</p>
-          </div>
-        </div>
-        <button type="button" id="btnClosePassengerProfileModal" class="modal-close" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
-      </div>
-
-      <!-- Body -->
-      <div class="modal-body" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
-        
-        <!-- Tarjeta de Usuario y Calificación -->
-        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 14px; display: flex; align-items: center; gap: 14px;">
-          <div style="position: relative;">
-            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Avatar" id="modalProfilePassengerAvatar" style="width: 58px; height: 58px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);" />
-            <span style="position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; background: #10b981; border: 2px solid #0f172a; border-radius: 50%;"></span>
-          </div>
-          <div style="flex: 1;">
-            <h4 id="modalProfilePassengerName" style="color: #fff; margin: 0 0 2px; font-size: 1.05rem; font-weight: 800;">Pasajero VIP</h4>
-            <p id="modalProfilePassengerEmail" style="color: #94a3b8; margin: 0 0 4px; font-size: 0.78rem;">pasajero@rutaprivada.com</p>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px;">
-                ⭐ <span id="modalProfilePassengerRating">5.00</span> Pasajero VIP
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Estadísticas y Datos del Pasajero -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 12px;">
-            <span style="color: #94a3b8; font-size: 0.72rem; display: block; margin-bottom: 2px;">📱 Teléfono</span>
-            <strong id="modalProfilePassengerPhone" style="color: #fff; font-size: 0.86rem;">11 5544 3322</strong>
-          </div>
-          <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 10px 12px;">
-            <span style="color: #94a3b8; font-size: 0.72rem; display: block; margin-bottom: 2px;">💳 Medio de Pago</span>
-            <strong id="modalProfilePassengerPayment" style="color: #38bdf8; font-size: 0.86rem;">Efectivo / MP</strong>
-          </div>
-        </div>
-
-        <!-- Formulario Ocultable para Editar Datos -->
-        <div id="boxEditPassengerProfile" style="display: none; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px; padding: 12px;">
-          <h5 style="color: #38bdf8; font-size: 0.82rem; margin: 0 0 10px; font-weight: 700;">✏️ Editar Información de Perfil</h5>
-          <form id="formEditPassengerProfile" style="display: flex; flex-direction: column; gap: 8px;">
-            <div>
-              <label style="font-size: 0.72rem; color: #94a3b8; display: block;">Nombre:</label>
-              <input type="text" id="editPassName" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 0.84rem;" />
-            </div>
-            <div>
-              <label style="font-size: 0.72rem; color: #94a3b8; display: block;">Número de Teléfono:</label>
-              <input type="tel" id="editPassPhone" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 0.84rem;" />
-            </div>
-            <div>
-              <label style="font-size: 0.72rem; color: #94a3b8; display: block;">Correo Electrónico:</label>
-              <input type="email" id="editPassEmail" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 0.84rem;" />
-            </div>
-            <div style="display: flex; gap: 8px; margin-top: 4px;">
-              <button type="submit" style="flex: 1; background: #10b981; color: #fff; border: none; border-radius: 8px; padding: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer;">Guardar Cambios</button>
-              <button type="button" id="btnCancelEditProfile" style="background: rgba(255,255,255,0.1); color: #94a3b8; border: none; border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; cursor: pointer;">Cancelar</button>
-            </div>
-          </form>
-        </div>
-
-        <!-- Botones de Acción -->
-        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 2px;">
-          <button type="button" id="btnToggleEditProfile" style="width: 100%; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 12px; padding: 11px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
-            ✏️ Editar Mis Datos de Perfil
-          </button>
-
-          <button type="button" id="btnLogoutPassenger" style="width: 100%; background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 12px; padding: 11px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
-            🚪 Cerrar Sesión de Pasajero
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 

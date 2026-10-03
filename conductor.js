@@ -5702,11 +5702,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 verifyCode: verifyCode,
                 emailVerificado: false
             };
+            try {
+                localStorage.setItem('rutaprivada_pending_driver_reg', JSON.stringify(pendingDriverRegistration));
+            } catch(e) {}
 
             // Mostrar modal de verificación de correo
             hideDriverAuthModal();
             if (verifyDriverEmailTarget) verifyDriverEmailTarget.textContent = email;
-            if (inputDriverVerifyCode) inputDriverVerifyCode.value = '';
+            if (inputDriverVerifyCode) {
+                inputDriverVerifyCode.value = '';
+                setTimeout(() => inputDriverVerifyCode.focus(), 300);
+            }
             if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'flex';
 
             showDriverToast(`⏳ Enviando código de activación a ${email}...`);
@@ -5726,29 +5732,45 @@ document.addEventListener('DOMContentLoaded', () => {
     if (formDriverEmailVerify) {
         formDriverEmailVerify.addEventListener('submit', (e) => {
             e.preventDefault();
-            const enteredCode = (inputDriverVerifyCode ? inputDriverVerifyCode.value.trim() : '');
+            const rawEntered = (inputDriverVerifyCode ? inputDriverVerifyCode.value : '');
+            const enteredCode = rawEntered.replace(/\D/g, '').trim();
 
-            if (!pendingDriverRegistration) {
+            let pending = pendingDriverRegistration;
+            if (!pending) {
+                try {
+                    const saved = localStorage.getItem('rutaprivada_pending_driver_reg');
+                    if (saved) pending = JSON.parse(saved);
+                } catch(e) {}
+            }
+
+            if (!pending) {
                 showDriverToast('⚠️ No hay registro pendiente. Inicia el proceso de nuevo.');
                 if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'none';
                 showDriverAuthModal('register');
                 return;
             }
 
+            const expectedCode = String(pending.verifyCode || '').replace(/\D/g, '').trim();
+
             // Validación estricta: Solo pasa si el código coincide exactamente con el enviado
-            if (enteredCode !== pendingDriverRegistration.verifyCode) {
+            if (!enteredCode || enteredCode !== expectedCode) {
                 showDriverToast('❌ Código de verificación incorrecto. Revisa el código que te enviamos por correo.');
+                if (inputDriverVerifyCode) inputDriverVerifyCode.focus();
                 return;
             }
 
             // Código válido: Confirmar cuenta y crear sesión
-            pendingDriverRegistration.emailVerificado = true;
-            const finalDriver = { ...pendingDriverRegistration };
+            pending.emailVerificado = true;
+            const finalDriver = { ...pending };
             delete finalDriver.verifyCode;
 
             saveDriverSession(finalDriver);
+            try {
+                localStorage.removeItem('rutaprivada_pending_driver_reg');
+            } catch(e) {}
 
             if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'none';
+            hideDriverAuthModal();
             showDriverToast(`🎉 ¡Correo validado y cuenta de Chofer activada! Bienvenido ${finalDriver.nombre}.`);
             playAlertSound('success');
             pendingDriverRegistration = null;
@@ -5766,13 +5788,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnResendDriverVerifyCode) {
         btnResendDriverVerifyCode.addEventListener('click', () => {
-            if (!pendingDriverRegistration) return;
+            let pending = pendingDriverRegistration;
+            if (!pending) {
+                try {
+                    const saved = localStorage.getItem('rutaprivada_pending_driver_reg');
+                    if (saved) pending = JSON.parse(saved);
+                } catch(e) {}
+            }
+            if (!pending) {
+                showDriverToast('⚠️ No hay registro pendiente.');
+                return;
+            }
             const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-            pendingDriverRegistration.verifyCode = newCode;
-            showDriverToast(`⏳ Reenviando código a ${pendingDriverRegistration.email}...`);
-            sendEmailJsVerification(pendingDriverRegistration.email, newCode).then((res) => {
+            pending.verifyCode = newCode;
+            pendingDriverRegistration = pending;
+            try {
+                localStorage.setItem('rutaprivada_pending_driver_reg', JSON.stringify(pending));
+            } catch(e) {}
+
+            showDriverToast(`⏳ Reenviando código a ${pending.email}...`);
+            sendEmailJsVerification(pending.email, newCode).then((res) => {
                 if (res.success) {
-                    showDriverToast(`📨 ¡Nuevo código enviado a ${pendingDriverRegistration.email}!`);
+                    showDriverToast(`📨 ¡Nuevo código enviado a ${pending.email}!`);
                 } else {
                     showDriverToast(`⚠️ Código generado. Revisa tu buzón.`);
                 }
@@ -5783,6 +5820,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnCancelDriverVerify) {
         btnCancelDriverVerify.addEventListener('click', () => {
             if (modalDriverEmailVerify) modalDriverEmailVerify.style.display = 'none';
+            try {
+                localStorage.removeItem('rutaprivada_pending_driver_reg');
+            } catch(e) {}
             showDriverAuthModal('register');
         });
     }

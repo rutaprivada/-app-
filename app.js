@@ -7572,214 +7572,8 @@ if (btnRecenterPassengerMap) {
     }
   };
 
-  function initPassengerProfileModule() {
-    const prof = loadPassengerProfile();
-    updatePassengerHeaderAndInputs(prof);
-    renderSavedCardsUI();
-
-    // Check if passenger has completed onboarding registration
-    const modalOnboarding = document.getElementById('modalPassengerOnboarding');
-    const formOnboarding = document.getElementById('formPassengerOnboarding');
-    const onbName = document.getElementById('onboardingPassName');
-    const onbPhone = document.getElementById('onboardingPassPhone');
-    const onbEmail = document.getElementById('onboardingPassEmail');
-
-    if (modalOnboarding && (!prof.nombre || !prof.telefono || !prof.isRegistered)) {
-      if (onbName && prof.nombre) onbName.value = prof.nombre;
-      if (onbPhone && prof.telefono) onbPhone.value = prof.telefono;
-      if (onbEmail && prof.email) onbEmail.value = prof.email;
-      modalOnboarding.classList.remove('hidden');
-    }
-
-    const btnCloseOnboarding = document.getElementById('btnCloseOnboardingModal');
-    const btnSkipOnboarding = document.getElementById('btnSkipOnboarding');
-
-    if (btnCloseOnboarding && modalOnboarding) {
-      btnCloseOnboarding.addEventListener('click', () => {
-        modalOnboarding.classList.add('hidden');
-      });
-    }
-
-    if (btnSkipOnboarding && modalOnboarding) {
-      btnSkipOnboarding.addEventListener('click', () => {
-        modalOnboarding.classList.add('hidden');
-        showToast('ℹ️ Modo invitado activo. Podrás registrar tus datos al confirmar un traslado.');
-      });
-    }
-
-    if (formOnboarding) {
-      formOnboarding.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const nameVal = onbName ? onbName.value.trim() : '';
-        const phoneVal = onbPhone ? onbPhone.value.trim() : '';
-        const emailVal = onbEmail ? onbEmail.value.trim() : '';
-
-        if (!nameVal || nameVal.length < 3) {
-          showToast('⚠️ Ingresa tu nombre y apellido completo.');
-          if (onbName) onbName.focus();
-          return;
-        }
-
-        if (!phoneVal || phoneVal.length < 6) {
-          showToast('⚠️ Ingresa un número de celular de contacto válido.');
-          if (onbPhone) onbPhone.focus();
-          return;
-        }
-
-        if (!emailVal || !emailVal.includes('@') || !emailVal.includes('.')) {
-          showToast('⚠️ Ingresa un correo electrónico válido para enviarte los comprobantes.');
-          if (onbEmail) onbEmail.focus();
-          return;
-        }
-
-        const newProfile = {
-          nombre: nameVal,
-          telefono: phoneVal,
-          email: emailVal,
-          avatar: prof.avatar || '',
-          metodoPagoPredeterminado: prof.metodoPagoPredeterminado || 'efectivo',
-          isRegistered: true,
-          createdAt: Date.now()
-        };
-
-        savePassengerProfile(newProfile, false);
-        if (modalOnboarding) modalOnboarding.classList.add('hidden');
-        showToast(`🎉 ¡Bienvenido a RutaPrivada, ${nameVal.split(' ')[0]}! Cuenta lista para viajar.`);
-        try { playPassengerTone('confirmed'); } catch(e){}
-      });
-    }
-
-    // Abrir modal desde el botón de la barra superior
-    const btnOpenProf = document.getElementById('btnOpenPassengerProfile');
-    const btnQuickOpen = document.getElementById('btnQuickOpenProfile');
-    const modalProf = document.getElementById('modalPassengerProfile');
-    const btnCloseProf = document.getElementById('btnClosePassengerProfile');
-
-    function openModal() {
-      if (modalProf) {
-        modalProf.classList.remove('hidden');
-        renderPassengerHistoryUI();
-        renderSavedCardsUI();
-      }
-    }
-
-    function closeModal() {
-      if (modalProf) modalProf.classList.add('hidden');
-    }
-
-    if (btnOpenProf) btnOpenProf.addEventListener('click', openModal);
-    if (btnQuickOpen) btnQuickOpen.addEventListener('click', openModal);
-    if (btnCloseProf) btnCloseProf.addEventListener('click', closeModal);
-    if (modalProf) {
-      modalProf.addEventListener('click', (e) => {
-        if (e.target === modalProf) closeModal();
-      });
-    }
-
-    // Subida de foto personalizada desde archivo o celular
-    const fileInput = document.getElementById('passengerPhotoFileInput');
-    const btnTriggerUpload = document.getElementById('btnTriggerPhotoUpload');
-    const btnRemovePhoto = document.getElementById('btnRemoveProfilePhoto');
-
-    if (btnTriggerUpload && fileInput) {
-      btnTriggerUpload.addEventListener('click', () => fileInput.click());
-    }
-
-    if (fileInput) {
-      fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        if (file.size > 5 * 1024 * 1024) {
-          showToast('⚠️ La imagen no debe superar los 5MB.');
-          return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const base64 = event.target.result;
-          const current = loadPassengerProfile();
-          current.avatar = base64;
-          savePassengerProfile(current);
-          showToast('📸 Foto de perfil actualizada correctamente.');
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-
-    if (btnRemovePhoto) {
-      btnRemovePhoto.addEventListener('click', () => {
-        const current = loadPassengerProfile();
-        current.avatar = '';
-        savePassengerProfile(current);
-        showToast('Foto de perfil eliminada.');
-      });
-    }
-
-    // Pestañas del modal
-    document.querySelectorAll('.p-tab-btn').forEach(tabBtn => {
-      tabBtn.addEventListener('click', () => {
-        document.querySelectorAll('.p-tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.p-tab-content').forEach(c => {
-          c.classList.add('hidden');
-          c.classList.remove('active');
-        });
-
-        tabBtn.classList.add('active');
-        const targetId = tabBtn.getAttribute('data-tab');
-        const targetContent = document.getElementById(targetId);
-        if (targetContent) {
-          targetContent.classList.remove('hidden');
-          targetContent.classList.add('active');
-        }
-        if (targetId === 'tabProfileHistory') {
-          renderPassengerHistoryUI();
-        } else if (targetId === 'tabProfilePayments') {
-          renderSavedCardsUI();
-        }
-      });
-    });
-
-    // Formulario de datos de perfil
-    const formProf = document.getElementById('passengerProfileForm');
-    if (formProf) {
-      formProf.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const current = loadPassengerProfile();
-        const updated = {
-          ...current,
-          nombre: document.getElementById('profPassengerName')?.value.trim() || current.nombre,
-          telefono: document.getElementById('profPassengerPhone')?.value.trim() || current.telefono,
-          email: document.getElementById('profPassengerEmail')?.value.trim() || current.email
-        };
-
-        savePassengerProfile(updated);
-        closeModal();
-      });
-    }
-
-    // Botón Cerrar Sesión del Pasajero
-    const btnLogoutPassenger = document.getElementById('btnLogoutPassenger');
-    if (btnLogoutPassenger) {
-      btnLogoutPassenger.addEventListener('click', () => {
-        if (!confirm('¿Seguro que deseas cerrar la sesión actual del pasajero?')) return;
-        localStorage.removeItem('rutaprivada_passenger_profile');
-        closeModal();
-        updatePassengerHeaderAndInputs(DEFAULT_PASSENGER_PROFILE);
-        showToast('🚪 Sesión de pasajero cerrada correctamente.');
-
-        const modalOnboarding = document.getElementById('modalPassengerOnboarding');
-        const onbName = document.getElementById('onboardingPassName');
-        const onbPhone = document.getElementById('onboardingPassPhone');
-        const onbEmail = document.getElementById('onboardingPassEmail');
-        if (onbName) onbName.value = '';
-        if (onbPhone) onbPhone.value = '';
-        if (onbEmail) onbEmail.value = '';
-        if (modalOnboarding) modalOnboarding.classList.remove('hidden');
-      });
-    }
-
-    // Gestión de múltiples tarjetas
+  // Medios de pago y tarjetas (helpers)
+  function initCardManagementHelpers() {
     const btnToggleCard = document.getElementById('btnToggleAddCard');
     const formCard = document.getElementById('addCardFormWrap');
     const btnCancelAddCard = document.getElementById('btnCancelAddCard');
@@ -7831,6 +7625,7 @@ if (btnRecenterPassengerMap) {
         showToast(`💳 Tarjeta terminada en ${last4} vinculada exitosamente.`);
       });
     }
+  }
 
     // Setup de botones 'X' para borrar direcciones en el Paso 3
     const origInp = document.getElementById('origin-input');
@@ -8190,7 +7985,6 @@ if (btnRecenterPassengerMap) {
     const tabBtnPassengerRegister = document.getElementById('tabBtnPassengerRegister');
     const formPassengerLogin = document.getElementById('formPassengerLogin');
     const formPassengerRegister = document.getElementById('formPassengerRegister');
-    const btnPassengerGuestAccess = document.getElementById('btnPassengerGuestAccess');
 
     // DOM Elements - Email Verify Modal
     const modalPassengerEmailVerify = document.getElementById('modalPassengerEmailVerify');
@@ -8200,22 +7994,20 @@ if (btnRecenterPassengerMap) {
     const btnResendPassengerVerifyCode = document.getElementById('btnResendPassengerVerifyCode');
     const btnCancelPassengerVerify = document.getElementById('btnCancelPassengerVerify');
 
-    // DOM Elements - Profile Modal
+    // DOM Elements - Profile Modal (Real Modal Completo)
     const modalPassengerProfile = document.getElementById('modalPassengerProfile');
-    const btnClosePassengerProfileModal = document.getElementById('btnClosePassengerProfileModal');
-    const modalProfilePassengerName = document.getElementById('modalProfilePassengerName');
-    const modalProfilePassengerEmail = document.getElementById('modalProfilePassengerEmail');
-    const modalProfilePassengerPhone = document.getElementById('modalProfilePassengerPhone');
-    const modalProfilePassengerRating = document.getElementById('modalProfilePassengerRating');
-    const modalProfilePassengerPayment = document.getElementById('modalProfilePassengerPayment');
-    const modalProfilePassengerAvatar = document.getElementById('modalProfilePassengerAvatar');
-    const btnToggleEditProfile = document.getElementById('btnToggleEditProfile');
-    const boxEditPassengerProfile = document.getElementById('boxEditPassengerProfile');
-    const formEditPassengerProfile = document.getElementById('formEditPassengerProfile');
-    const btnCancelEditProfile = document.getElementById('btnCancelEditProfile');
-    const editPassName = document.getElementById('editPassName');
-    const editPassPhone = document.getElementById('editPassPhone');
-    const editPassEmail = document.getElementById('editPassEmail');
+    const btnClosePassengerProfile = document.getElementById('btnClosePassengerProfile');
+    const profileModalNameTitle = document.getElementById('profileModalNameTitle');
+    const profileModalHeaderAvatarImg = document.getElementById('profileModalHeaderAvatarImg');
+    const profileModalAvatarImg = document.getElementById('profileModalAvatarImg');
+    const profileModalAvatarPlaceholder = document.getElementById('profileModalAvatarPlaceholder');
+    const passengerPhotoFileInput = document.getElementById('passengerPhotoFileInput');
+    const btnTriggerPhotoUpload = document.getElementById('btnTriggerPhotoUpload');
+    const btnRemoveProfilePhoto = document.getElementById('btnRemoveProfilePhoto');
+    const profPassengerName = document.getElementById('profPassengerName');
+    const profPassengerPhone = document.getElementById('profPassengerPhone');
+    const profPassengerEmail = document.getElementById('profPassengerEmail');
+    const passengerProfileForm = document.getElementById('passengerProfileForm');
     const btnLogoutPassenger = document.getElementById('btnLogoutPassenger');
 
     let pendingPassengerRegistration = null;
@@ -8231,7 +8023,7 @@ if (btnRecenterPassengerMap) {
 
     function saveRegisteredPassenger(user) {
       const users = getRegisteredPassengers();
-      const existingIdx = users.findIndex(u => (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase()) || (u.telefono && user.telefono && u.telefono === user.telefono));
+      const existingIdx = users.findIndex(u => (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase()) || (u.telefono && user.telefono && u.telefono.replace(/\D/g,'') === user.telefono.replace(/\D/g,'')));
       if (existingIdx >= 0) {
         users[existingIdx] = { ...users[existingIdx], ...user };
       } else {
@@ -8244,7 +8036,7 @@ if (btnRecenterPassengerMap) {
 
     function getPassengerSession() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY_SESSION);
+        const raw = localStorage.getItem(STORAGE_KEY_SESSION) || localStorage.getItem(STORAGE_KEY_LEGACY);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
@@ -8279,12 +8071,13 @@ if (btnRecenterPassengerMap) {
         }
       } catch(e) {}
 
-      // Update state in app
+      // Actualizar estado global de la app
       if (window.state) {
         window.state.passengerName = user.nombre;
         window.state.passengerPhone = user.telefono;
         window.state.passengerEmail = user.email;
         window.state.passengerRating = user.rating;
+        window.state.passengerAvatar = user.avatar;
       }
 
       renderPassengerProfileUI(user);
@@ -8296,7 +8089,7 @@ if (btnRecenterPassengerMap) {
         return;
       }
 
-      // Update Header
+      // Update Header Bar
       if (headerPassengerName) {
         const shortName = user.nombre ? user.nombre.split(' ')[0] : 'Mi Perfil';
         headerPassengerName.textContent = shortName;
@@ -8305,30 +8098,49 @@ if (btnRecenterPassengerMap) {
         headerPassengerAvatar.src = user.avatar;
       }
 
-      // Update Profile Modal
-      if (modalProfilePassengerName) modalProfilePassengerName.textContent = user.nombre || 'Pasajero VIP';
-      if (modalProfilePassengerEmail) modalProfilePassengerEmail.textContent = user.email || 'pasajero@rutaprivada.com';
-      if (modalProfilePassengerPhone) modalProfilePassengerPhone.textContent = user.telefono || 'Sin teléfono';
-      if (modalProfilePassengerRating) modalProfilePassengerRating.textContent = Number(user.rating || 5.0).toFixed(2);
-      if (modalProfilePassengerAvatar && user.avatar) modalProfilePassengerAvatar.src = user.avatar;
-      
-      if (modalProfilePassengerPayment) {
-        const mapPayment = {
-          'efectivo': '💵 Efectivo',
-          'transferencia': '📲 Transferencia / CVU',
-          'mercadopago': '💳 Mercado Pago',
-          'tarjeta': '💳 Tarjeta'
-        };
-        modalProfilePassengerPayment.textContent = mapPayment[user.medioPago] || user.medioPago || 'Efectivo';
+      // Pre-cargar datos en el modal de perfil de forma automática
+      if (profileModalNameTitle) {
+        profileModalNameTitle.textContent = user.nombre || 'Mi Perfil de Pasajero';
+      }
+      if (profileModalHeaderAvatarImg && user.avatar) {
+        profileModalHeaderAvatarImg.src = user.avatar;
       }
 
-      // Autofill booking inputs if they exist
+      if (profPassengerName) profPassengerName.value = user.nombre || '';
+      if (profPassengerPhone) profPassengerPhone.value = user.telefono || '';
+      if (profPassengerEmail) profPassengerEmail.value = user.email || '';
+
+      // Foto de perfil en tab Mis Datos
+      if (user.avatar && user.avatar.length > 5) {
+        if (profileModalAvatarImg) {
+          profileModalAvatarImg.src = user.avatar;
+          profileModalAvatarImg.style.display = 'block';
+        }
+        if (profileModalAvatarPlaceholder) {
+          profileModalAvatarPlaceholder.style.display = 'none';
+        }
+        if (btnRemoveProfilePhoto) {
+          btnRemoveProfilePhoto.classList.remove('hidden');
+        }
+      } else {
+        if (profileModalAvatarImg) {
+          profileModalAvatarImg.style.display = 'none';
+        }
+        if (profileModalAvatarPlaceholder) {
+          profileModalAvatarPlaceholder.style.display = 'block';
+        }
+        if (btnRemoveProfilePhoto) {
+          btnRemoveProfilePhoto.classList.add('hidden');
+        }
+      }
+
+      // Autofill automático de inputs del flujo de cotización y reserva para que el usuario no deba reescribirlos
       const inputName = document.getElementById('user-name') || document.getElementById('client-name');
       const inputPhone = document.getElementById('user-phone') || document.getElementById('client-phone');
       const inputEmail = document.getElementById('user-email') || document.getElementById('client-email');
-      if (inputName && !inputName.value && user.nombre) inputName.value = user.nombre;
-      if (inputPhone && !inputPhone.value && user.telefono) inputPhone.value = user.telefono;
-      if (inputEmail && !inputEmail.value && user.email) inputEmail.value = user.email;
+      if (inputName && user.nombre) inputName.value = user.nombre;
+      if (inputPhone && user.telefono) inputPhone.value = user.telefono;
+      if (inputEmail && user.email) inputEmail.value = user.email;
     }
 
     function openPassengerAuthModal(defaultTab = 'login') {
@@ -8348,7 +8160,8 @@ if (btnRecenterPassengerMap) {
         return;
       }
       renderPassengerProfileUI(session);
-      if (boxEditPassengerProfile) boxEditPassengerProfile.style.display = 'none';
+      renderPassengerHistoryUI();
+      renderSavedCardsUI();
       if (modalPassengerProfile) modalPassengerProfile.classList.remove('hidden');
     }
 
@@ -8553,11 +8366,17 @@ if (btnRecenterPassengerMap) {
           verifyCode: verifyCode,
           emailVerificado: false
         };
+        try {
+          localStorage.setItem('rutaprivada_pending_passenger_reg', JSON.stringify(pendingPassengerRegistration));
+        } catch(e) {}
 
         // Mostrar modal de verificación de correo
         closePassengerAuthModal();
         if (verifyPassengerEmailTarget) verifyPassengerEmailTarget.textContent = email;
-        if (inputPassengerVerifyCode) inputPassengerVerifyCode.value = '';
+        if (inputPassengerVerifyCode) {
+          inputPassengerVerifyCode.value = '';
+          setTimeout(() => inputPassengerVerifyCode.focus(), 300);
+        }
         if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.remove('hidden');
 
         if (typeof showToast === 'function') {
@@ -8583,27 +8402,42 @@ if (btnRecenterPassengerMap) {
     if (formPassengerEmailVerify) {
       formPassengerEmailVerify.addEventListener('submit', (e) => {
         e.preventDefault();
-        const enteredCode = (inputPassengerVerifyCode ? inputPassengerVerifyCode.value.trim() : '');
+        const rawEntered = (inputPassengerVerifyCode ? inputPassengerVerifyCode.value : '');
+        const enteredCode = rawEntered.replace(/\D/g, '').trim();
 
-        if (!pendingPassengerRegistration) {
+        let pending = pendingPassengerRegistration;
+        if (!pending) {
+          try {
+            const saved = localStorage.getItem('rutaprivada_pending_passenger_reg');
+            if (saved) pending = JSON.parse(saved);
+          } catch(e) {}
+        }
+
+        if (!pending) {
           if (typeof showToast === 'function') showToast('⚠️ No hay registro pendiente. Inicia el proceso de nuevo.');
           if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.add('hidden');
           openPassengerAuthModal('register');
           return;
         }
 
+        const expectedCode = String(pending.verifyCode || '').replace(/\D/g, '').trim();
+
         // Validación estricta: Solo pasa si el código coincide exactamente con el enviado
-        if (enteredCode !== pendingPassengerRegistration.verifyCode) {
+        if (!enteredCode || enteredCode !== expectedCode) {
           if (typeof showToast === 'function') showToast('❌ Código de verificación incorrecto. Revisa el código que te enviamos por correo.');
+          if (inputPassengerVerifyCode) inputPassengerVerifyCode.focus();
           return;
         }
 
         // Código válido: Confirmar cuenta y crear sesión
-        pendingPassengerRegistration.emailVerificado = true;
-        const finalUser = { ...pendingPassengerRegistration };
+        pending.emailVerificado = true;
+        const finalUser = { ...pending };
         delete finalUser.verifyCode;
 
         savePassengerSession(finalUser);
+        try {
+          localStorage.removeItem('rutaprivada_pending_passenger_reg');
+        } catch(e) {}
 
         if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.add('hidden');
         if (typeof showToast === 'function') {
@@ -8615,16 +8449,29 @@ if (btnRecenterPassengerMap) {
 
     if (btnResendPassengerVerifyCode) {
       btnResendPassengerVerifyCode.addEventListener('click', () => {
-        if (!pendingPassengerRegistration) return;
-        const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-        pendingPassengerRegistration.verifyCode = newCode;
-        if (typeof showToast === 'function') {
-          showToast(`⏳ Reenviando código a ${pendingPassengerRegistration.email}...`);
+        let pending = pendingPassengerRegistration;
+        if (!pending) {
+          try {
+            const saved = localStorage.getItem('rutaprivada_pending_passenger_reg');
+            if (saved) pending = JSON.parse(saved);
+          } catch(e) {}
         }
-        sendPassengerEmailJsVerification(pendingPassengerRegistration.email, newCode).then((res) => {
+        if (!pending) return;
+
+        const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+        pending.verifyCode = newCode;
+        pendingPassengerRegistration = pending;
+        try {
+          localStorage.setItem('rutaprivada_pending_passenger_reg', JSON.stringify(pending));
+        } catch(e) {}
+
+        if (typeof showToast === 'function') {
+          showToast(`⏳ Reenviando código a ${pending.email}...`);
+        }
+        sendPassengerEmailJsVerification(pending.email, newCode).then((res) => {
           if (res.success) {
             if (typeof showToast === 'function') {
-              showToast(`📨 ¡Nuevo código enviado a ${pendingPassengerRegistration.email}!`);
+              showToast(`📨 ¡Nuevo código enviado a ${pending.email}!`);
             }
           } else {
             if (typeof showToast === 'function') {
@@ -8638,45 +8485,85 @@ if (btnRecenterPassengerMap) {
     if (btnCancelPassengerVerify) {
       btnCancelPassengerVerify.addEventListener('click', () => {
         if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.add('hidden');
+        try {
+          localStorage.removeItem('rutaprivada_pending_passenger_reg');
+        } catch(e) {}
         openPassengerAuthModal('register');
       });
     }
 
-    // Toggle Edit Profile
-    if (btnToggleEditProfile) {
-      btnToggleEditProfile.addEventListener('click', () => {
-        const session = getPassengerSession();
-        if (!session) return;
-        if (boxEditPassengerProfile) {
-          const isHidden = boxEditPassengerProfile.style.display === 'none';
-          boxEditPassengerProfile.style.display = isHidden ? 'block' : 'none';
-          if (isHidden) {
-            if (editPassName) editPassName.value = session.nombre || '';
-            if (editPassPhone) editPassPhone.value = session.telefono || '';
-            if (editPassEmail) editPassEmail.value = session.email || '';
-          }
+    // Subida de Foto de Perfil desde Celular / Archivo
+    if (btnTriggerPhotoUpload && passengerPhotoFileInput) {
+      btnTriggerPhotoUpload.addEventListener('click', () => passengerPhotoFileInput.click());
+    }
+
+    if (passengerPhotoFileInput) {
+      passengerPhotoFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+          if (typeof showToast === 'function') showToast('⚠️ La imagen no debe superar los 5MB.');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64 = event.target.result;
+          const session = getPassengerSession() || {};
+          session.avatar = base64;
+          savePassengerSession(session);
+          if (typeof showToast === 'function') showToast('📸 Foto de perfil guardada con éxito.');
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (btnRemoveProfilePhoto) {
+      btnRemoveProfilePhoto.addEventListener('click', () => {
+        const session = getPassengerSession() || {};
+        session.avatar = '';
+        savePassengerSession(session);
+        if (typeof showToast === 'function') showToast('Foto de perfil eliminada.');
+      });
+    }
+
+    // Pestañas del Modal de Perfil (Mis Datos | Medios de Pago | Historial de Viajes)
+    document.querySelectorAll('.p-tab-btn').forEach(tabBtn => {
+      tabBtn.addEventListener('click', () => {
+        document.querySelectorAll('.p-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.p-tab-content').forEach(c => {
+          c.classList.add('hidden');
+          c.classList.remove('active');
+        });
+
+        tabBtn.classList.add('active');
+        const targetId = tabBtn.getAttribute('data-tab');
+        const targetContent = document.getElementById(targetId);
+        if (targetContent) {
+          targetContent.classList.remove('hidden');
+          targetContent.classList.add('active');
+        }
+        if (targetId === 'tabProfileHistory') {
+          renderPassengerHistoryUI();
+        } else if (targetId === 'tabProfilePayments') {
+          renderSavedCardsUI();
         }
       });
-    }
+    });
 
-    if (btnCancelEditProfile) {
-      btnCancelEditProfile.addEventListener('click', () => {
-        if (boxEditPassengerProfile) boxEditPassengerProfile.style.display = 'none';
-      });
-    }
-
-    // Form Edit Profile Submit
-    if (formEditPassengerProfile) {
-      formEditPassengerProfile.addEventListener('submit', (e) => {
+    // Guardar cambios en el formulario de Mis Datos
+    if (passengerProfileForm) {
+      passengerProfileForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const session = getPassengerSession() || {};
-        if (editPassName) session.nombre = editPassName.value.trim();
-        if (editPassPhone) session.telefono = editPassPhone.value.trim();
-        if (editPassEmail) session.email = editPassEmail.value.trim();
+        if (profPassengerName) session.nombre = profPassengerName.value.trim();
+        if (profPassengerPhone) session.telefono = profPassengerPhone.value.trim();
+        if (profPassengerEmail) session.email = profPassengerEmail.value.trim();
         
         savePassengerSession(session);
-        if (boxEditPassengerProfile) boxEditPassengerProfile.style.display = 'none';
-        if (typeof showToast === 'function') showToast('✅ Perfil actualizado correctamente.');
+        closePassengerProfileModal();
+        if (typeof showToast === 'function') showToast('✅ Datos de perfil guardados correctamente.');
       });
     }
 
@@ -8693,12 +8580,19 @@ if (btnRecenterPassengerMap) {
       });
     }
 
+    // Inicializar helpers de medios de pago
+    try { initCardManagementHelpers(); } catch(e) {}
+
     // Open Profile & Modals Listeners
     if (btnOpenPassengerProfile) {
       btnOpenPassengerProfile.addEventListener('click', openPassengerProfileModal);
     }
-    if (btnClosePassengerProfileModal) {
-      btnClosePassengerProfileModal.addEventListener('click', closePassengerProfileModal);
+    const btnQuickOpenProfile = document.getElementById('btnQuickOpenProfile');
+    if (btnQuickOpenProfile) {
+      btnQuickOpenProfile.addEventListener('click', openPassengerProfileModal);
+    }
+    if (btnClosePassengerProfile) {
+      btnClosePassengerProfile.addEventListener('click', closePassengerProfileModal);
     }
     if (btnClosePassengerAuthModal) {
       btnClosePassengerAuthModal.addEventListener('click', closePassengerAuthModal);
