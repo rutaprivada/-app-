@@ -941,14 +941,15 @@
                 });
             }
 
-            // Utilidad de compresión ultra liviana para imágenes y soporte PDF
+            // Helper de compresión y lectura de archivos / PDF
             function compressImageFile(file) {
                 return new Promise((resolve, reject) => {
+                    if (!file) return resolve(null);
                     const fileName = (file.name || '').toLowerCase();
                     if (file.type === 'application/pdf' || fileName.endsWith('.pdf')) {
                         const reader = new FileReader();
-                        reader.onload = (e) => resolve({ type: 'pdf', data: e.target.result });
-                        reader.onerror = reject;
+                        reader.onload = (e) => resolve({ type: 'pdf', name: file.name, data: e.target.result });
+                        reader.onerror = (err) => reject(err);
                         reader.readAsDataURL(file);
                         return;
                     }
@@ -974,31 +975,33 @@
                                 canvas.height = height;
                                 const ctx = canvas.getContext('2d');
                                 ctx.drawImage(img, 0, 0, width, height);
-                                resolve({ type: 'image', data: canvas.toDataURL('image/jpeg', 0.65) });
+                                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+                                resolve({ type: 'image', name: file.name, data: compressedBase64 });
                             } catch(err) {
-                                resolve({ type: 'image', data: e.target.result });
+                                resolve({ type: 'image', name: file.name, data: e.target.result });
                             }
                         };
-                        img.onerror = () => resolve({ type: 'image', data: e.target.result });
+                        img.onerror = () => resolve({ type: 'image', name: file.name, data: e.target.result });
                         img.src = e.target.result;
                     };
-                    reader.onerror = reject;
+                    reader.onerror = (err) => reject(err);
                     reader.readAsDataURL(file);
                 });
             }
 
-            function saveUpdatedDriverToStorage(driver) {
-                if (!driver) return;
-                const cleanDni = String(driver.dni || '').replace(/\D/g, '');
-                const driverDocId = String(driver.id || (cleanDni ? 'drv_' + cleanDni : ('drv_' + (driver.nombre || 'chofer').replace(/\s+/g, '_').toLowerCase())));
-                driver.id = driverDocId;
-                driver.updatedAt = Date.now();
+            // Guardar conductor actualizado y sincronizar con Firestore y LocalStorage
+            function saveUpdatedDriverToStorage(driverData) {
+                if (!driverData) return;
+                const cleanDni = String(driverData.dni || '').replace(/\D/g, '');
+                const docId = String(driverData.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
+                driverData.id = docId;
+                driverData.updatedAt = Date.now();
 
-                const idx = currentDrivers.findIndex(d => (d.id && d.id === driverDocId) || (d.dni && driver.dni && String(d.dni).replace(/\D/g, '') === cleanDni) || (d.nombre && d.nombre.trim().toLowerCase() === String(driver.nombre).trim().toLowerCase()));
+                const idx = currentDrivers.findIndex(d => (d.id && d.id === docId) || (d.dni && driverData.dni && String(d.dni).replace(/\D/g, '') === cleanDni) || (d.nombre && driverData.nombre && d.nombre.trim().toLowerCase() === String(driverData.nombre).trim().toLowerCase()));
                 if (idx >= 0) {
-                    currentDrivers[idx] = { ...currentDrivers[idx], ...driver };
+                    currentDrivers[idx] = { ...currentDrivers[idx], ...driverData };
                 } else {
-                    currentDrivers.unshift(driver);
+                    currentDrivers.unshift(driverData);
                 }
 
                 try {
@@ -1010,8 +1013,8 @@
                     if (rawLocal) {
                         const docsObj = JSON.parse(rawLocal);
                         const localDni = String(docsObj.dni || '').replace(/\D/g, '');
-                        if (!cleanDni || localDni === cleanDni || docsObj.nombre === driver.nombre) {
-                            const merged = { ...docsObj, ...driver };
+                        if (!cleanDni || localDni === cleanDni || docsObj.nombre === driverData.nombre) {
+                            const merged = { ...docsObj, ...driverData };
                             localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(merged));
                         }
                     }
@@ -1019,20 +1022,112 @@
 
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
-                        firebase.firestore().collection('drivers').doc(driverDocId).set(driver, { merge: true }).catch(err => console.warn('Firestore sync warning:', err));
-                    } catch(e){}
+                        const db = firebase.firestore();
+                        const safeDoc = { ...driverData };
+                        if (safeDoc.docsImages) delete safeDoc.docsImages;
+                        db.collection('drivers').doc(docId).set(safeDoc, { merge: true }).catch(err => console.warn('Firestore driver save warning:', err));
+
+                        if (driverData.docsImages) {
+                            for (const [k, v] of Object.entries(driverData.docsImages)) {
+                                if (v && typeof v === 'string' && v.length > 20) {
+                                    db.collection('drivers').doc(docId).collection('documents').doc(k).set({
+                                        id: k,
+                                        key: k,
+                                        data: v,
+                                        updatedAt: Date.now()
+                                    }, { merge: true }).catch(err => console.warn(`Firestore subdoc save warning (${k}):`, err));
+                                }
+                            }
+                        }
+                    } catch(e) {}
                 }
 
                 if (window.RutaSync) {
                     if (typeof window.RutaSync.guardarDocumentosConductor === 'function') {
-                        window.RutaSync.guardarDocumentosConductor(driver);
+                        window.RutaSync.guardarDocumentosConductor(driverData);
                     }
-                    window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driver);
+                    window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driverData);
                 }
 
                 window.dispatchEvent(new Event('storage'));
                 renderMetrics();
                 renderDriversTable();
+            }
+
+            // Función para actualizar estado de elegibilidad para aprobación
+            function updateMasterApprovalEligibility() {
+                const validCount = docValidationState.filter(d => d.hasData && d.isValid && !d.isObserved).length;
+                if (revDocValidCount) revDocValidCount.textContent = `${validCount}/9 Validados`;
+
+                const allValid = (validCount >= 9);
+
+                if (btnApproveDriverMaster) {
+                    if (allValid) {
+                        btnApproveDriverMaster.disabled = false;
+                        btnApproveDriverMaster.style.opacity = '1';
+                        btnApproveDriverMaster.style.cursor = 'pointer';
+                        btnApproveDriverMaster.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                    } else {
+                        btnApproveDriverMaster.disabled = true;
+                        btnApproveDriverMaster.style.opacity = '0.4';
+                        btnApproveDriverMaster.style.cursor = 'not-allowed';
+                        btnApproveDriverMaster.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                    }
+                }
+
+                if (docApprovalWarningBanner) {
+                    if (allValid) {
+                        docApprovalWarningBanner.style.background = 'rgba(16, 185, 129, 0.15)';
+                        docApprovalWarningBanner.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+                        docApprovalWarningBanner.style.color = '#6ee7b7';
+                        if (docApprovalWarningIcon) {
+                            docApprovalWarningIcon.className = 'fa-solid fa-circle-check';
+                            docApprovalWarningIcon.style.color = '#34d399';
+                        }
+                        if (docApprovalWarningText) {
+                            docApprovalWarningText.textContent = '✓ Todos los 9 documentos requeridos están validados. Ya puedes habilitar al conductor para operar.';
+                        }
+                    } else {
+                        docApprovalWarningBanner.style.background = 'rgba(239, 68, 68, 0.15)';
+                        docApprovalWarningBanner.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                        docApprovalWarningBanner.style.color = '#fca5a5';
+                        if (docApprovalWarningIcon) {
+                            docApprovalWarningIcon.className = 'fa-solid fa-lock';
+                            docApprovalWarningIcon.style.color = '#ef4444';
+                        }
+                        if (docApprovalWarningText) {
+                            docApprovalWarningText.textContent = `Botón de Aprobación Bloqueado: Faltan validar ${Math.max(0, 9 - validCount)} documento(s) para habilitar al chofer.`;
+                        }
+                    }
+                }
+            }
+
+            if (btnValidateAllDocs) {
+                btnValidateAllDocs.addEventListener('click', () => {
+                    let validatedCount = 0;
+                    docValidationState.forEach((doc, idx) => {
+                        if (doc.hasData) {
+                            doc.isValid = true;
+                            doc.isObserved = false;
+                            validatedCount++;
+                            const card = document.getElementById(`docCard_${idx}`);
+                            if (card) {
+                                card.style.borderColor = '#10b981';
+                                card.style.background = 'rgba(16, 185, 129, 0.08)';
+                                const badge = card.querySelector('.doc-item-badge');
+                                if (badge) {
+                                    badge.textContent = '✓ Verificado';
+                                    badge.style.background = 'rgba(16, 185, 129, 0.3)';
+                                    badge.style.color = '#34d399';
+                                }
+                            }
+                        }
+                    });
+                    updateMasterApprovalEligibility();
+                    if (validatedCount === 0) {
+                        alert('⚠️ El conductor aún no ha subido documentos para validar.');
+                    }
+                });
             }
 
             if (formManualDriver) {
@@ -1081,101 +1176,6 @@
                     alert(`✓ Conductor ${name} registrado correctamente en el sistema.\n\nSe abrirá a continuación el panel de revisión documental para que puedas cargar o validar sus archivos desde tu PC.`);
                     openDocReviewModal(newDriver.id);
                 });
-            }
-
-            // Helper de compresión de imágenes
-            function compressImageFile(file) {
-                return new Promise((resolve, reject) => {
-                    if (!file) return resolve(null);
-                    const fileName = (file.name || '').toLowerCase();
-                    if (file.type === 'application/pdf' || fileName.endsWith('.pdf')) {
-                        const reader = new FileReader();
-                        reader.onload = (e) => resolve({ type: 'pdf', name: file.name, data: e.target.result });
-                        reader.onerror = (err) => reject(err);
-                        reader.readAsDataURL(file);
-                        return;
-                    }
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            try {
-                                const canvas = document.createElement('canvas');
-                                let width = img.width || 800;
-                                let height = img.height || 600;
-                                const maxDim = 800;
-                                if (width > maxDim || height > maxDim) {
-                                    if (width > height) {
-                                        height = Math.round((height * maxDim) / width);
-                                        width = maxDim;
-                                    } else {
-                                        width = Math.round((width * maxDim) / height);
-                                        height = maxDim;
-                                    }
-                                }
-                                canvas.width = width;
-                                canvas.height = height;
-                                const ctx = canvas.getContext('2d');
-                                ctx.drawImage(img, 0, 0, width, height);
-                                const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
-                                resolve({ type: 'image', name: file.name, data: compressedBase64 });
-                            } catch(err) {
-                                resolve({ type: 'image', name: file.name, data: e.target.result });
-                            }
-                        };
-                        img.onerror = () => resolve({ type: 'image', name: file.name, data: e.target.result });
-                        img.src = e.target.result;
-                    };
-                    reader.onerror = (err) => reject(err);
-                    reader.readAsDataURL(file);
-                });
-            }
-
-            // Guardar conductor actualizado y sincronizar con Firestore
-            function saveUpdatedDriverToStorage(driverData) {
-                if (!driverData) return;
-                const cleanDni = String(driverData.dni || '').replace(/\D/g, '');
-                const docId = String(driverData.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
-                driverData.id = docId;
-
-                const idx = currentDrivers.findIndex(d => (d.id && d.id === docId) || (d.dni && driverData.dni && d.dni === driverData.dni));
-                if (idx >= 0) {
-                    currentDrivers[idx] = { ...currentDrivers[idx], ...driverData };
-                } else {
-                    currentDrivers.unshift(driverData);
-                }
-
-                try {
-                    localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(currentDrivers));
-                } catch(e) {}
-
-                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
-                    try {
-                        const db = firebase.firestore();
-                        const safeDoc = { ...driverData };
-                        if (safeDoc.docsImages) delete safeDoc.docsImages;
-                        db.collection('drivers').doc(docId).set(safeDoc, { merge: true }).catch(err => console.warn('Firestore driver save warning:', err));
-
-                        if (driverData.docsImages) {
-                            for (const [k, v] of Object.entries(driverData.docsImages)) {
-                                if (v && typeof v === 'string' && v.length > 20) {
-                                    db.collection('drivers').doc(docId).collection('documents').doc(k).set({
-                                        id: k,
-                                        key: k,
-                                        data: v,
-                                        updatedAt: Date.now()
-                                    }, { merge: true }).catch(err => console.warn(`Firestore subdoc save warning (${k}):`, err));
-                                }
-                            }
-                        }
-                    } catch(e) {}
-                }
-
-                if (window.RutaSync) {
-                    window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driverData);
-                }
-                renderMetrics();
-                renderDriversTable();
             }
 
             // Control de Vistas (Pestañas)
@@ -1927,26 +1927,32 @@
 
                 renderGrid();
 
-                // Carga en segundo plano de los documentos desde Firestore subcolección 'documents'
-                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length && driver.id) {
+                // Carga y escucha en tiempo real de los documentos desde Firestore subcolección 'documents'
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
                         const db = firebase.firestore();
-                        db.collection('drivers').doc(driver.id).collection('documents').get().then(subSnap => {
-                            if (subSnap && !subSnap.empty) {
-                                if (!driver.docsImages) driver.docsImages = {};
-                                let hasNewData = false;
-                                subSnap.forEach(subDoc => {
-                                    const sData = subDoc.data();
-                                    if (sData && sData.data && sData.data.length > 20) {
-                                        driver.docsImages[subDoc.id] = sData.data;
-                                        hasNewData = true;
+                        const cleanDni = String(driver.dni || '').replace(/\D/g, '');
+                        const cleanPhone = String(driver.telefono || '').replace(/\D/g, '');
+                        const targetId = driver.id || (cleanDni ? 'drv_' + cleanDni : (cleanPhone ? 'drv_' + cleanPhone : ''));
+
+                        if (targetId) {
+                            db.collection('drivers').doc(targetId).collection('documents').onSnapshot(subSnap => {
+                                if (subSnap && !subSnap.empty) {
+                                    if (!driver.docsImages) driver.docsImages = {};
+                                    let hasNewData = false;
+                                    subSnap.forEach(subDoc => {
+                                        const sData = subDoc.data();
+                                        if (sData && sData.data && sData.data.length > 20) {
+                                            driver.docsImages[subDoc.id] = sData.data;
+                                            hasNewData = true;
+                                        }
+                                    });
+                                    if (hasNewData && activeReviewDriver) {
+                                        renderGrid();
                                     }
-                                });
-                                if (hasNewData && activeReviewDriver && activeReviewDriver.id === driver.id) {
-                                    renderGrid();
                                 }
-                            }
-                        }).catch(err => console.warn('Firestore subcollection load warning:', err));
+                            }, err => console.warn('Firestore subcollection realtime warning:', err));
+                        }
                     } catch(e){}
                 }
 

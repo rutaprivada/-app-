@@ -4804,37 +4804,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        const btnSendDocsViaWhatsApp = document.getElementById('btnSendDocsViaWhatsApp');
-        if (btnSendDocsViaWhatsApp) {
-            btnSendDocsViaWhatsApp.addEventListener('click', () => {
-                const name = docInputDriverName ? docInputDriverName.value.trim() : '';
-                const dni = docInputDniNum ? docInputDniNum.value.trim() : '';
-                const phone = docInputPhone ? docInputPhone.value.trim() : '';
-                const email = docInputEmail ? docInputEmail.value.trim() : '';
-                const vehicle = docInputVehicleModel ? docInputVehicleModel.value.trim() : '';
-                const plate = docInputPlate ? docInputPlate.value.trim() : '';
-                const color = docInputColor ? docInputColor.value.trim() : '';
-                const bank = docInputBankName ? docInputBankName.value.trim() : '';
-                const cbu = docInputCbu ? docInputCbu.value.trim() : '';
-                const holder = docInputBankHolder ? docInputBankHolder.value.trim() : '';
-
-                const text = `*SOLICITUD DE ALTA Y DOCUMENTACIÓN DE CONDUCTOR - RUTA PRIVADA*\n\n` +
-                    `👤 *Nombre y Apellido:* ${name || 'Sin especificar'}\n` +
-                    `🪪 *DNI / Pasaporte:* ${dni || 'Sin especificar'}\n` +
-                    `📱 *Teléfono:* ${phone || 'Sin especificar'}\n` +
-                    `📧 *Email:* ${email || 'Sin especificar'}\n` +
-                    `🚗 *Vehículo:* ${vehicle || 'Sin especificar'} (${color || 'Color estándar'})\n` +
-                    `🔢 *Patente:* ${plate || 'Sin especificar'}\n` +
-                    `🏦 *Banco / Billetera:* ${bank || 'Mercado Pago'}\n` +
-                    `💳 *CBU / CVU / Alias:* ${cbu || 'Sin CBU'}\n` +
-                    `📋 *Titular Cuenta:* ${holder || name || 'Mismo titular'}\n\n` +
-                    `_Adjunto a continuación las imágenes de mis 9 documentos requeridos (DNI, Licencia, Cédula, Seguro, Antecedentes y Foto de Perfil) para su revisión y habilitación en el sistema._`;
-
-                const encoded = encodeURIComponent(text);
-                window.open(`https://wa.me/5491122604604?text=${encoded}`, '_blank');
-            });
-        }
-
         // ==========================================
         // SISTEMA PIP (VENTANA FLOTANTE FUERA DE LA APP)
         // ==========================================
@@ -5872,12 +5841,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveDriverWallet(wallet);
                 updateWalletUI();
 
+                const currentDocsData = loadDocsData();
+                const actualDriverDni = currentDocsData.dni || driverState.info.dni || 'S/D';
+                const actualDriverName = currentDocsData.nombre || driverState.info.nombre || 'Conductor Registrado';
+                const actualDriverPatente = currentDocsData.patente || driverState.info.patente || 'S/P';
+                const actualDriverPhone = currentDocsData.telefono || driverState.info.telefono || '';
+                const cleanDni = String(actualDriverDni).replace(/\D/g, '') || String(actualDriverPhone).replace(/\D/g, '');
+
                 const rechargePayload = {
                     id: rechargeId,
-                    driverId: driverState.info.telefono || driverState.info.dni || 'chofer_current',
-                    driverName: driverState.info.nombre || 'Conductor Registrado',
-                    driverPatente: driverState.info.patente || 'S/P',
-                    driverDni: driverState.info.dni || 'S/D',
+                    driverId: cleanDni ? 'drv_' + cleanDni : (actualDriverPhone || 'drv_conductor'),
+                    driverName: actualDriverName,
+                    driverPatente: actualDriverPatente,
+                    driverDni: actualDriverDni,
+                    driverPhone: actualDriverPhone,
                     monto: amount,
                     comprobante: refCode,
                     timestamp: Date.now(),
