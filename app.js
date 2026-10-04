@@ -7690,7 +7690,6 @@ if (btnRecenterPassengerMap) {
         updateCalculation();
       }
     });
-  }
 
   // ==========================================
   // GESTIÓN DE RESERVAS DEL PASAJERO ("MIS RESERVAS")
