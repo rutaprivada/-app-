@@ -5728,6 +5728,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Helper global para mostrar / ocultar contraseñas
+    window.togglePasswordVisibility = function(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const isPass = input.type === 'password';
+        input.type = isPass ? 'text' : 'password';
+        const icon = btn ? btn.querySelector('i') : null;
+        if (icon) {
+            if (isPass) {
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+                btn.style.color = '#fbbf24';
+            } else {
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+                btn.style.color = '#94a3b8';
+            }
+        }
+    };
+
+    // Formatear automáticamente el input de código de verificación
+    if (inputDriverVerifyCode) {
+        inputDriverVerifyCode.addEventListener('input', (e) => {
+            const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
+            e.target.value = clean;
+        });
+    }
+
     // Formulario de Validación de Código de Correo (Chofer)
     if (formDriverEmailVerify) {
         formDriverEmailVerify.addEventListener('submit', (e) => {
@@ -5751,10 +5779,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const expectedCode = String(pending.verifyCode || '').replace(/\D/g, '').trim();
+            const validCodes = [expectedCode, ...(pending.recentCodes || [])].filter(Boolean);
 
-            // Validación estricta: Solo pasa si el código coincide exactamente con el enviado
-            if (!enteredCode || enteredCode !== expectedCode) {
-                showDriverToast('❌ Código de verificación incorrecto. Revisa el código que te enviamos por correo.');
+            // Validación: Acepta el código exacto actual o cualquiera de los reenviados al correo
+            const isCodeValid = (enteredCode.length === 6 && (validCodes.includes(enteredCode) || enteredCode === expectedCode));
+
+            if (!isCodeValid) {
+                showDriverToast('❌ Código de verificación incorrecto. Ingresa los 6 dígitos que recibiste por correo.');
                 if (inputDriverVerifyCode) inputDriverVerifyCode.focus();
                 return;
             }
@@ -5763,6 +5794,7 @@ document.addEventListener('DOMContentLoaded', () => {
             pending.emailVerificado = true;
             const finalDriver = { ...pending };
             delete finalDriver.verifyCode;
+            delete finalDriver.recentCodes;
 
             saveDriverSession(finalDriver);
             try {
@@ -5800,6 +5832,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+            if (!pending.recentCodes) pending.recentCodes = [];
+            if (pending.verifyCode) pending.recentCodes.push(pending.verifyCode);
             pending.verifyCode = newCode;
             pendingDriverRegistration = pending;
             try {
@@ -5809,9 +5843,9 @@ document.addEventListener('DOMContentLoaded', () => {
             showDriverToast(`⏳ Reenviando código a ${pending.email}...`);
             sendEmailJsVerification(pending.email, newCode).then((res) => {
                 if (res.success) {
-                    showDriverToast(`📨 ¡Nuevo código enviado a ${pending.email}!`);
+                    showDriverToast(`📨 ¡Nuevo código enviado a ${pending.email}! Revisa tu buzón de entrada.`);
                 } else {
-                    showDriverToast(`⚠️ Código generado. Revisa tu buzón.`);
+                    showDriverToast(`⚠️ Revisa tu correo ${pending.email}.`);
                 }
             });
         });

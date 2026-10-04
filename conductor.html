@@ -576,7 +576,7 @@
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             <div>
                                 <label style="font-size: 0.75rem; color: #94a3b8;">N° de DNI *</label>
-                                <input type="text" id="docInputDniNum" class="driver-form-input" placeholder="Ej. 30123456" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
+                                <input type="tel" inputmode="numeric" pattern="[0-9]*" id="docInputDniNum" class="driver-form-input" placeholder="Ej. 30123456" required style="width:100%; background:#0f172a; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:9px 12px; border-radius:8px; font-size:0.88rem;">
                             </div>
                             <div>
                                 <label style="font-size: 0.75rem; color: #94a3b8;">Teléfono de Contacto *</label>
@@ -929,14 +929,19 @@
                     <label for="loginDriverEmail" style="font-size: 0.78rem; font-weight: 700; color: #e2e8f0; display: block; margin-bottom: 5px;">
                         ✉️ Correo Electrónico *
                     </label>
-                    <input type="email" id="loginDriverEmail" placeholder="Ej: conductor@email.com" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.92rem; outline: none;" />
+                    <input type="email" id="loginDriverEmail" inputmode="email" placeholder="Ej: conductor@email.com" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.92rem; outline: none;" />
                 </div>
 
                 <div>
                     <label for="loginDriverPassword" style="font-size: 0.78rem; font-weight: 700; color: #e2e8f0; display: block; margin-bottom: 5px;">
                         🔒 Contraseña *
                     </label>
-                    <input type="password" id="loginDriverPassword" placeholder="Tu contraseña de chofer partner" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.92rem; outline: none;" />
+                    <div style="position: relative; display: flex; align-items: center;">
+                        <input type="password" id="loginDriverPassword" placeholder="Tu contraseña de chofer partner" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 44px 11px 14px; border-radius: 12px; font-size: 0.92rem; outline: none;" />
+                        <button type="button" onclick="togglePasswordVisibility('loginDriverPassword', this)" style="position: absolute; right: 10px; background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer; padding: 4px;" title="Ver contraseña">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <button type="submit" style="width: 100%; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #0f172a; border: none; padding: 13px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35); margin-top: 4px;">
@@ -958,13 +963,13 @@
                         <label for="regDriverDni" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
                             🪪 DNI *
                         </label>
-                        <input type="text" id="regDriverDni" placeholder="Ej: 30123456" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
+                        <input type="tel" id="regDriverDni" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 30123456" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                     </div>
                     <div>
                         <label for="regDriverPhone" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
                             📱 Número de Teléfono *
                         </label>
-                        <input type="tel" id="regDriverPhone" placeholder="Ej: +54 9 11 0000-0000" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
+                        <input type="tel" id="regDriverPhone" inputmode="tel" placeholder="Ej: +54 9 11 0000-0000" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                     </div>
                 </div>
 
@@ -972,7 +977,7 @@
                     <label for="regDriverEmail" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
                         ✉️ Correo Electrónico *
                     </label>
-                    <input type="email" id="regDriverEmail" placeholder="Ej: conductor@ejemplo.com" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
+                    <input type="email" id="regDriverEmail" inputmode="email" placeholder="Ej: conductor@ejemplo.com" required style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -980,13 +985,23 @@
                         <label for="regDriverPassword" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
                             🔒 Contraseña *
                         </label>
-                        <input type="password" id="regDriverPassword" placeholder="Mín. 8 car. (con 1 número)" required minlength="8" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="password" id="regDriverPassword" placeholder="Mín. 8 car. (1 núm)" required minlength="8" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 38px 11px 12px; border-radius: 12px; font-size: 0.88rem; outline: none;" />
+                            <button type="button" onclick="togglePasswordVisibility('regDriverPassword', this)" style="position: absolute; right: 6px; background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer; padding: 2px;" title="Ver contraseña">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label for="regDriverPasswordConfirm" style="font-size: 0.78rem; color: #e2e8f0; font-weight: 700; display: block; margin-bottom: 5px;">
                             🔒 Confirmar *
                         </label>
-                        <input type="password" id="regDriverPasswordConfirm" placeholder="Repite la contraseña" required minlength="8" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 14px; border-radius: 12px; font-size: 0.9rem; outline: none;" />
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <input type="password" id="regDriverPasswordConfirm" placeholder="Repite contraseña" required minlength="8" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 11px 38px 11px 12px; border-radius: 12px; font-size: 0.88rem; outline: none;" />
+                            <button type="button" onclick="togglePasswordVisibility('regDriverPasswordConfirm', this)" style="position: absolute; right: 6px; background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer; padding: 2px;" title="Ver contraseña">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1014,7 +1029,7 @@
 
             <form id="formDriverEmailVerify" style="display: flex; flex-direction: column; gap: 14px;">
                 <div>
-                    <input type="text" id="inputDriverVerifyCode" maxlength="6" placeholder="000000" required style="width: 100%; text-align: center; letter-spacing: 8px; font-size: 1.6rem; font-weight: 800; font-family: monospace; background: #0f172a; border: 2px solid #10b981; color: #fff; padding: 10px; border-radius: 12px; outline: none;" />
+                    <input type="tel" id="inputDriverVerifyCode" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="000000" required style="width: 100%; text-align: center; letter-spacing: 8px; font-size: 1.6rem; font-weight: 800; font-family: monospace; background: #0f172a; border: 2px solid #10b981; color: #fff; padding: 10px; border-radius: 12px; outline: none;" />
                 </div>
                 <button type="submit" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; padding: 13px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);">
                     <i class="fa-solid fa-circle-check"></i> Validar y Activar Cuenta

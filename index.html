@@ -143,19 +143,7 @@
 </head>
 <body>
 
-  <!-- Top Announcement Bar -->
-  <aside class="top-announcement web-only" aria-label="Información de servicio">
-    <div class="container top-announcement-content">
-      <span>✨ <strong>Servicio Privado Puerta a Puerta en Argentina</strong> — Flota Ejecutiva, vehículos higienizados y puntualidad garantizada</span>
-      <div class="top-actions">
-        <span class="currency-locked-badge">🇦🇷 Tarifas en Pesos Argentinos (ARS)</span>
-        <!-- Protected Admin Access Button -->
-        <button id="open-config-btn" class="icon-btn admin-lock-btn" title="Panel exclusivo del administrador" aria-label="Administración">
-          🔒 Admin
-        </button>
-      </div>
-    </div>
-  </aside>
+
 
   <!-- Navigation Header -->
   <header class="main-header">
@@ -1436,7 +1424,12 @@
             <label for="loginPassengerPassword" style="color: #e2e8f0; font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 5px;">
               🔒 Contraseña o Clave PIN *
             </label>
-            <input type="password" id="loginPassengerPassword" placeholder="Tu contraseña de pasajero" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="password" id="loginPassengerPassword" placeholder="Tu contraseña de pasajero" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 42px 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
+              <button type="button" onclick="togglePasswordVisibility('loginPassengerPassword', this)" style="position: absolute; right: 10px; background: none; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer; padding: 4px;" title="Ver contraseña">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+            </div>
           </div>
 
           <button type="submit" class="btn btn-primary full-width" style="margin-top: 4px; padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.35); cursor: pointer;">
@@ -1458,7 +1451,7 @@
               <label for="regPassengerPhone" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
                 📱 Número de Teléfono *
               </label>
-              <input type="tel" id="regPassengerPhone" placeholder="Ej: 11 0000 0000" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+              <input type="tel" id="regPassengerPhone" inputmode="tel" placeholder="Ej: 11 0000 0000" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
             </div>
             <div>
               <label for="regPassengerPayment" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
@@ -1477,7 +1470,7 @@
             <label for="regPassengerEmail" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
               ✉️ Correo Electrónico * (Para Comprobantes y Factura)
             </label>
-            <input type="email" id="regPassengerEmail" placeholder="Ej: pasajero@ejemplo.com" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+            <input type="email" id="regPassengerEmail" inputmode="email" placeholder="Ej: pasajero@ejemplo.com" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -1485,13 +1478,23 @@
               <label for="regPassengerPassword" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
                 🔒 Contraseña *
               </label>
-              <input type="password" id="regPassengerPassword" placeholder="Mín. 8 car. (con 1 número)" required minlength="8" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+              <div style="position: relative; display: flex; align-items: center;">
+                <input type="password" id="regPassengerPassword" placeholder="Mín. 8 car. (1 núm)" required minlength="8" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 36px 9px 10px; border-radius: 10px; font-size: 0.85rem; outline: none;" />
+                <button type="button" onclick="togglePasswordVisibility('regPassengerPassword', this)" style="position: absolute; right: 6px; background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer; padding: 2px;" title="Ver contraseña">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+              </div>
             </div>
             <div>
               <label for="regPassengerPasswordConfirm" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
                 🔒 Confirmar *
               </label>
-              <input type="password" id="regPassengerPasswordConfirm" placeholder="Repite la contraseña" required minlength="8" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+              <div style="position: relative; display: flex; align-items: center;">
+                <input type="password" id="regPassengerPasswordConfirm" placeholder="Repite contraseña" required minlength="8" style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 36px 9px 10px; border-radius: 10px; font-size: 0.85rem; outline: none;" />
+                <button type="button" onclick="togglePasswordVisibility('regPassengerPasswordConfirm', this)" style="position: absolute; right: 6px; background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer; padding: 2px;" title="Ver contraseña">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1518,7 +1521,7 @@
 
       <form id="formPassengerEmailVerify" style="display: flex; flex-direction: column; gap: 14px;">
         <div>
-          <input type="text" id="inputPassengerVerifyCode" maxlength="6" placeholder="000000" required style="width: 100%; text-align: center; letter-spacing: 8px; font-size: 1.6rem; font-weight: 800; font-family: monospace; background: #0b1329; border: 2px solid #10b981; color: #fff; padding: 10px; border-radius: 12px; outline: none;" />
+          <input type="tel" id="inputPassengerVerifyCode" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="000000" required style="width: 100%; text-align: center; letter-spacing: 8px; font-size: 1.6rem; font-weight: 800; font-family: monospace; background: #0b1329; border: 2px solid #10b981; color: #fff; padding: 10px; border-radius: 12px; outline: none;" />
         </div>
         <button type="submit" class="btn btn-primary full-width" style="padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); cursor: pointer;">
           <i class="fa-solid fa-circle-check"></i> Confirmar y Acceder

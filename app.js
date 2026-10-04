@@ -6006,32 +6006,44 @@ if (btnRequestInapp) {
       return;
     }
 
-    // REGLA: Obligatorio contar con cuenta / sesión de pasajero activa para solicitar viaje
-    const session = (typeof getPassengerSession === 'function') ? getPassengerSession() : null;
-    if (!session) {
-      showToast('🔒 Debes iniciar sesión o crear tu cuenta de pasajero para solicitar un traslado.');
-      if (typeof openPassengerAuthModal === 'function') openPassengerAuthModal('login');
-      return;
-    }
-
     const nameInput = document.getElementById('passenger-name-input');
     const phoneInput = document.getElementById('passenger-phone-input');
     const notesInput = document.getElementById('passenger-notes-input');
 
-    const profileData = loadPassengerProfile() || session;
-    const passName = (nameInput && nameInput.value.trim()) || session.nombre || profileData.nombre;
-    const passPhone = (phoneInput && phoneInput.value.trim()) || session.telefono || profileData.telefono;
-    const passEmail = session.email || profileData.email || document.getElementById('profPassengerEmail')?.value?.trim() || '';
+    let session = (typeof getPassengerSession === 'function') ? getPassengerSession() : null;
+    const profileData = (typeof loadPassengerProfile === 'function') ? loadPassengerProfile() : (session || {});
+    
+    const passName = (nameInput && nameInput.value.trim()) || (session && session.nombre) || profileData.nombre || '';
+    const passPhone = (phoneInput && phoneInput.value.trim()) || (session && session.telefono) || profileData.telefono || '';
+    const passEmail = (session && session.email) || profileData.email || document.getElementById('profPassengerEmail')?.value?.trim() || '';
     const passNotes = notesInput ? notesInput.value.trim() : '';
 
     if (!passName) {
-      showToast('⚠️ Por favor ingresa tu Nombre y Apellido.');
+      showToast('⚠️ Por favor ingresa tu Nombre y Apellido para solicitar el viaje.');
+      if (nameInput) nameInput.focus();
       return;
     }
 
-    if (!passPhone || passPhone.length < 6) {
-      showToast('⚠️ Por favor ingresa tu número de teléfono de contacto.');
+    if (!passPhone || passPhone.replace(/\D/g, '').length < 6) {
+      showToast('⚠️ Por favor ingresa tu número de celular para que el chofer pueda contactarte.');
+      if (phoneInput) phoneInput.focus();
       return;
+    }
+
+    // Si no había sesión persistente, guardarla automáticamente con los datos ingresados
+    if (!session || !session.nombre) {
+      session = {
+        id: 'pass_' + passPhone.replace(/\D/g, ''),
+        nombre: passName,
+        telefono: passPhone,
+        email: passEmail,
+        medioPago: 'efectivo',
+        rating: '5.00',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
+      };
+      if (typeof savePassengerSession === 'function') {
+        savePassengerSession(session);
+      }
     }
 
     // Obtener la cotización exacta activa
@@ -8056,6 +8068,7 @@ if (btnRecenterPassengerMap) {
       } catch(e) {}
       return null;
     }
+    window.getPassengerSession = getPassengerSession;
 
     function savePassengerSession(user) {
       if (!user) return;
@@ -8094,6 +8107,7 @@ if (btnRecenterPassengerMap) {
 
       renderPassengerProfileUI(user);
     }
+    window.savePassengerSession = savePassengerSession;
 
     function renderPassengerProfileUI(user) {
       if (!user) {
@@ -8421,6 +8435,34 @@ if (btnRecenterPassengerMap) {
       });
     }
 
+    // Helper global para mostrar / ocultar contraseñas
+    window.togglePasswordVisibility = function(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const isPass = input.type === 'password';
+      input.type = isPass ? 'text' : 'password';
+      const icon = btn ? btn.querySelector('i') : null;
+      if (icon) {
+        if (isPass) {
+          icon.classList.remove('fa-eye');
+          icon.classList.add('fa-eye-slash');
+          btn.style.color = '#38bdf8';
+        } else {
+          icon.classList.remove('fa-eye-slash');
+          icon.classList.add('fa-eye');
+          btn.style.color = '#94a3b8';
+        }
+      }
+    };
+
+    // Auto-formatear código de verificación del pasajero
+    if (inputPassengerVerifyCode) {
+      inputPassengerVerifyCode.addEventListener('input', (e) => {
+        const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
+        e.target.value = clean;
+      });
+    }
+
     // Formulario de Validación de Código de Correo (Pasajero)
     if (formPassengerEmailVerify) {
       formPassengerEmailVerify.addEventListener('submit', (e) => {
@@ -8444,10 +8486,13 @@ if (btnRecenterPassengerMap) {
         }
 
         const expectedCode = String(pending.verifyCode || '').replace(/\D/g, '').trim();
+        const validCodes = [expectedCode, ...(pending.recentCodes || [])].filter(Boolean);
 
-        // Validación estricta: Solo pasa si el código coincide exactamente con el enviado
-        if (!enteredCode || enteredCode !== expectedCode) {
-          if (typeof showToast === 'function') showToast('❌ Código de verificación incorrecto. Revisa el código que te enviamos por correo.');
+        // Validación: Acepta el código exacto actual o cualquiera de los reenviados al correo
+        const isCodeValid = (enteredCode.length === 6 && (validCodes.includes(enteredCode) || enteredCode === expectedCode));
+
+        if (!isCodeValid) {
+          if (typeof showToast === 'function') showToast('❌ Código de verificación incorrecto. Ingresa los 6 dígitos que recibiste por correo.');
           if (inputPassengerVerifyCode) inputPassengerVerifyCode.focus();
           return;
         }
@@ -8456,6 +8501,7 @@ if (btnRecenterPassengerMap) {
         pending.emailVerificado = true;
         const finalUser = { ...pending };
         delete finalUser.verifyCode;
+        delete finalUser.recentCodes;
 
         savePassengerSession(finalUser);
         try {
@@ -8482,6 +8528,8 @@ if (btnRecenterPassengerMap) {
         if (!pending) return;
 
         const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+        if (!pending.recentCodes) pending.recentCodes = [];
+        if (pending.verifyCode) pending.recentCodes.push(pending.verifyCode);
         pending.verifyCode = newCode;
         pendingPassengerRegistration = pending;
         try {
@@ -8494,11 +8542,11 @@ if (btnRecenterPassengerMap) {
         sendPassengerEmailJsVerification(pending.email, newCode).then((res) => {
           if (res.success) {
             if (typeof showToast === 'function') {
-              showToast(`📨 ¡Nuevo código enviado a ${pending.email}!`);
+              showToast(`📨 ¡Nuevo código enviado a ${pending.email}! Revisa tu buzón de entrada.`);
             }
           } else {
             if (typeof showToast === 'function') {
-              showToast(`⚠️ Código generado. Revisa tu buzón.`);
+              showToast(`⚠️ Revisa tu correo ${pending.email}.`);
             }
           }
         });
