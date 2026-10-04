@@ -8160,26 +8160,37 @@ if (btnRecenterPassengerMap) {
       modalPassengerAuth.classList.remove('hidden');
       switchAuthTab(defaultTab);
     }
+    window.openPassengerAuthModal = openPassengerAuthModal;
 
     function closePassengerAuthModal() {
       if (modalPassengerAuth) modalPassengerAuth.classList.add('hidden');
     }
+    window.closePassengerAuthModal = closePassengerAuthModal;
 
     function openPassengerProfileModal() {
-      const session = getPassengerSession();
+      let session = getPassengerSession();
       if (!session) {
-        openPassengerAuthModal('login');
-        return;
+        session = {
+          id: 'pass_' + Date.now(),
+          nombre: '',
+          telefono: '',
+          email: '',
+          rating: '5.00',
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+          medioPago: 'efectivo'
+        };
       }
       renderPassengerProfileUI(session);
       renderPassengerHistoryUI();
       renderSavedCardsUI();
       if (modalPassengerProfile) modalPassengerProfile.classList.remove('hidden');
     }
+    window.openPassengerProfileModal = openPassengerProfileModal;
 
     function closePassengerProfileModal() {
       if (modalPassengerProfile) modalPassengerProfile.classList.add('hidden');
     }
+    window.closePassengerProfileModal = closePassengerProfileModal;
 
     function switchAuthTab(tab) {
       if (tab === 'register') {

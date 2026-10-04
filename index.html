@@ -133,13 +133,14 @@
 
   <!-- Google Fonts: Plus Jakarta Sans -->
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <!-- Leaflet CSS & JS for Map -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=56" />
+  <link rel="stylesheet" href="styles.css?v=57" />
 </head>
 <body>
 
@@ -177,14 +178,14 @@
       <!-- Contenedor Ejecutivo Unificado de Acciones del Pasajero -->
       <div class="passenger-header-actions">
         <!-- Botón Acceso a Mis Reservas Programadas -->
-        <button type="button" class="btn-header-reservations clickable-header-profile" id="btnOpenPassengerReservations" title="Ver mis Reservas Programadas">
+        <button type="button" class="btn-header-reservations clickable-header-profile" id="btnOpenPassengerReservations" onclick="openPassengerReservationsModal()" title="Ver mis Reservas Programadas">
           <i class="fa-solid fa-calendar-days" style="font-size: 1.05rem; color: #fbbf24;"></i>
           <span class="header-reservas-label">Mis Reservas</span>
           <span class="reservations-badge-count" id="passengerReservationsBadge" style="display: none;">0</span>
         </button>
 
         <!-- Passenger Profile Avatar Trigger -->
-        <div class="passenger-header-profile clickable-header-profile" id="btnOpenPassengerProfile" title="Ver mi Perfil, Medios de Pago e Historial de Viajes">
+        <div class="passenger-header-profile clickable-header-profile" id="btnOpenPassengerProfile" onclick="openPassengerProfileModal()" title="Ver mi Perfil, Medios de Pago e Historial de Viajes">
           <div class="passenger-avatar-wrap">
             <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80" alt="Pasajero" class="passenger-avatar" id="headerPassengerAvatar" />
           </div>
@@ -706,7 +707,7 @@
             <p class="inapp-status-sub" id="passengerTripModalSub">Conectando con la flota en tiempo real</p>
           </div>
         </div>
-        <button id="close-inapp-trip-btn" class="modal-close" aria-label="Cerrar">&times;</button>
+        <button id="close-inapp-trip-btn" onclick="closeInAppTripModal()" class="modal-close" aria-label="Cerrar">&times;</button>
       </div>
 
       <div class="modal-body inapp-trip-body">
@@ -862,7 +863,7 @@
             <span class="chat-status-sub" style="font-size: 0.75rem; color: #10b981;">● Conectado en tiempo real</span>
           </div>
         </div>
-        <button id="close-passenger-chat-btn" class="modal-close" aria-label="Cerrar chat">&times;</button>
+        <button id="close-passenger-chat-btn" onclick="closePassengerChatModal()" class="modal-close" aria-label="Cerrar chat">&times;</button>
       </div>
 
       <div class="modal-body chat-modal-body">
@@ -899,7 +900,7 @@
           <h3 style="font-size: 1.25rem; margin: 0; color: #fff;">¡Has llegado a tu destino!</h3>
           <p style="font-size: 0.85rem; color: #10b981; margin: 2px 0 0;">✨ Gracias por viajar con RutaPrivada</p>
         </div>
-        <button id="close-passenger-completed-btn" class="modal-close" aria-label="Cerrar">&times;</button>
+        <button id="close-passenger-completed-btn" onclick="document.getElementById('modalPassengerTripCompleted').classList.add('hidden')" class="modal-close" aria-label="Cerrar">&times;</button>
       </div>
 
       <div class="modal-body trip-completed-body">
@@ -952,7 +953,7 @@
           <h3>¡Solicitud Enviada a WhatsApp!</h3>
           <p class="success-subtitle">Confirmación y espera cordial de tu chofer</p>
         </div>
-        <button id="close-success-modal-btn" class="modal-close" aria-label="Cerrar ventana">&times;</button>
+        <button id="close-success-modal-btn" onclick="document.getElementById('booking-success-modal').classList.add('hidden')" class="modal-close" aria-label="Cerrar ventana">&times;</button>
       </div>
 
       <div class="modal-body success-body">
@@ -1021,7 +1022,7 @@
     <div class="modal-dialog">
       <div class="modal-header">
         <h3>💬 Enlace Directo a WhatsApp</h3>
-        <button id="close-reservation-modal-btn" class="modal-close" aria-label="Cerrar ventana">&times;</button>
+        <button id="close-reservation-modal-btn" onclick="document.getElementById('reservation-modal').classList.add('hidden')" class="modal-close" aria-label="Cerrar ventana">&times;</button>
       </div>
       <div class="modal-body">
         <p class="modal-note">Tu cotización está lista. Puedes abrir WhatsApp directamente o copiar el mensaje estructurado:</p>
@@ -1242,7 +1243,7 @@
             <span class="profile-member-badge">⭐ Pasajero Ejecutivo RutaPrivada</span>
           </div>
         </div>
-        <button id="btnClosePassengerProfile" class="modal-close" aria-label="Cerrar">&times;</button>
+        <button id="btnClosePassengerProfile" class="modal-close" onclick="closePassengerProfileModal()" aria-label="Cerrar">&times;</button>
       </div>
 
       <!-- Navigation Tabs: Perfil | Medios de Pago | Historial de Viajes -->
@@ -1385,7 +1386,7 @@
             <p style="color: #94a3b8; margin: 0; font-size: 0.75rem;">Traslados agendados con anticipación</p>
           </div>
         </div>
-        <button type="button" id="close-passenger-reservations-btn" class="modal-close" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
+        <button type="button" id="close-passenger-reservations-btn" onclick="closePassengerReservationsModal()" class="modal-close" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
       </div>
 
       <div class="modal-body" style="padding: 16px; max-height: 75vh; overflow-y: auto;">
@@ -1402,7 +1403,7 @@
        ========================================================= -->
   <div id="modalPassengerAuth" class="modal-backdrop hidden" style="z-index: 10010; backdrop-filter: blur(14px); background: rgba(5, 10, 20, 0.92);">
     <div class="modal-dialog" style="max-width: 480px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(56, 189, 248, 0.25); overflow: hidden; padding: 0; position: relative;">
-      <button type="button" id="btnClosePassengerAuthModal" style="position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; z-index: 10;">&times;</button>
+      <button type="button" id="btnClosePassengerAuthModal" onclick="closePassengerAuthModal()" style="position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; z-index: 10;">&times;</button>
       
       <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 20px 20px 14px; text-align: center; display: block;">
         <div style="width: 56px; height: 56px; margin: 0 auto 10px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(56, 189, 248, 0.35);">
@@ -1527,7 +1528,7 @@
           <button type="button" id="btnResendPassengerVerifyCode" style="background: none; border: none; color: #38bdf8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">
             Reenviar código / enlace
           </button>
-          <button type="button" id="btnCancelPassengerVerify" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer;">
+          <button type="button" id="btnCancelPassengerVerify" onclick="document.getElementById('modalPassengerEmailVerify').classList.add('hidden')" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer;">
             Cancelar
           </button>
         </div>
@@ -1546,7 +1547,7 @@
             <p style="color: #94a3b8; margin: 0; font-size: 0.75rem;">Monitoreo en vivo 24/7 y asistencia de viaje</p>
           </div>
         </div>
-        <button type="button" id="btnCloseSosModal" class="modal-close" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
+        <button type="button" id="btnCloseSosModal" onclick="document.getElementById('modalPassengerSosShare').classList.add('hidden')" class="modal-close" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
       </div>
 
       <div class="modal-body" style="padding: 18px; display: flex; flex-direction: column; gap: 14px;">
