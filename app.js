@@ -7758,6 +7758,18 @@ if (btnRecenterPassengerMap) {
   }
   window.closePassengerReservationsModal = closePassengerReservationsModal;
 
+  if (btnOpenReservations) {
+    btnOpenReservations.addEventListener('click', openPassengerReservationsModal);
+  }
+  if (btnCloseReservations) {
+    btnCloseReservations.addEventListener('click', closePassengerReservationsModal);
+  }
+  if (modalReservations) {
+    modalReservations.addEventListener('click', (e) => {
+      if (e.target === modalReservations) closePassengerReservationsModal();
+    });
+  }
+
   function renderPassengerReservationsList() {
     if (!reservationsListContainer) return;
     const list = loadPassengerReservations();
@@ -8528,6 +8540,223 @@ if (btnRecenterPassengerMap) {
       });
     }
 
+    // Helper de Medios de Pago (Tarjetas del Pasajero)
+    function loadSavedCards() {
+      try {
+        return JSON.parse(localStorage.getItem('rutaprivada_passenger_cards') || '[]');
+      } catch(e) {
+        return [];
+      }
+    }
+
+    function saveCardsList(cards) {
+      try {
+        localStorage.setItem('rutaprivada_passenger_cards', JSON.stringify(cards));
+      } catch(e) {}
+    }
+
+    function renderSavedCardsUI() {
+      const container = document.getElementById('savedCardsListContainer');
+      const cards = loadSavedCards();
+      const session = getPassengerSession() || {};
+      const activeMethod = session.medioPago || 'efectivo';
+
+      const payCash = document.getElementById('payMethodCash');
+      if (payCash) {
+        if (activeMethod === 'efectivo') {
+          payCash.classList.add('active');
+          const badge = payCash.querySelector('.pay-check-badge');
+          if (badge) badge.textContent = '✓ Activo';
+        } else {
+          payCash.classList.remove('active');
+          const badge = payCash.querySelector('.pay-check-badge');
+          if (badge) badge.textContent = 'Seleccionar';
+        }
+        payCash.onclick = () => {
+          session.medioPago = 'efectivo';
+          savePassengerSession(session);
+          renderSavedCardsUI();
+          if (typeof showToast === 'function') showToast('💵 Pago en Efectivo seleccionado.');
+        };
+      }
+
+      if (!container) return;
+
+      if (cards.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 14px; color: #94a3b8; font-size: 0.78rem; background: rgba(255,255,255,0.02); border-radius: 10px; border: 1px dashed rgba(255,255,255,0.1);">
+            No tienes tarjetas vinculadas. Puedes añadir una tarjeta de crédito/débito para tus viajes.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = cards.map((c, idx) => {
+        const isSelected = activeMethod === c.id;
+        const last4 = c.number ? c.number.slice(-4) : '****';
+        return `
+          <div class="payment-option-card ${isSelected ? 'active' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: rgba(30, 41, 59, 0.7); border: 1.5px solid ${isSelected ? '#38bdf8' : 'rgba(255,255,255,0.1)'}; border-radius: 12px; cursor: pointer;">
+            <div class="pay-option-left" style="display: flex; align-items: center; gap: 12px;" onclick="window.selectPassengerCard('${c.id}')">
+              <span class="pay-icon" style="font-size: 1.4rem;">💳</span>
+              <div>
+                <strong style="color: #fff; font-size: 0.88rem; display: block;">Tarjeta **** ${last4}</strong>
+                <small style="color: #94a3b8; font-size: 0.75rem;">${c.holder || 'Titular'} · Vence: ${c.expiry || '--/--'}</small>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="pay-check-badge" onclick="window.selectPassengerCard('${c.id}')" style="font-size: 0.75rem; font-weight: 700; color: ${isSelected ? '#38bdf8' : '#94a3b8'}; cursor: pointer;">
+                ${isSelected ? '✓ Activo' : 'Seleccionar'}
+              </span>
+              <button type="button" onclick="window.deletePassengerCard(${idx})" style="background: none; border: none; color: #f87171; font-size: 0.85rem; cursor: pointer; padding: 4px;" title="Eliminar tarjeta">
+                🗑️
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    window.selectPassengerCard = function(cardId) {
+      const session = getPassengerSession() || {};
+      session.medioPago = cardId;
+      savePassengerSession(session);
+      renderSavedCardsUI();
+      if (typeof showToast === 'function') showToast('💳 Tarjeta seleccionada como método principal.');
+    };
+
+    window.deletePassengerCard = function(idx) {
+      const cards = loadSavedCards();
+      cards.splice(idx, 1);
+      saveCardsList(cards);
+      renderSavedCardsUI();
+      if (typeof showToast === 'function') showToast('Tarjeta eliminada correctamente.');
+    };
+
+    function initCardManagementHelpers() {
+      const btnToggle = document.getElementById('btnToggleAddCard');
+      const wrap = document.getElementById('addCardFormWrap');
+      const btnCancel = document.getElementById('btnCancelAddCard');
+      const btnSave = document.getElementById('btnSaveCard');
+
+      if (btnToggle && wrap) {
+        btnToggle.addEventListener('click', () => {
+          wrap.classList.toggle('hidden');
+        });
+      }
+      if (btnCancel && wrap) {
+        btnCancel.addEventListener('click', () => {
+          wrap.classList.add('hidden');
+        });
+      }
+      if (btnSave) {
+        btnSave.addEventListener('click', () => {
+          const holder = (document.getElementById('cardHolderName')?.value || '').trim();
+          const number = (document.getElementById('cardNumber')?.value || '').replace(/\D/g, '').trim();
+          const expiry = (document.getElementById('cardExpiry')?.value || '').trim();
+          const cvc = (document.getElementById('cardCvc')?.value || '').trim();
+
+          if (!holder || number.length < 13 || !expiry || !cvc) {
+            if (typeof showToast === 'function') showToast('⚠️ Por favor completa los datos válidos de la tarjeta.');
+            return;
+          }
+
+          const cards = loadSavedCards();
+          const newCard = {
+            id: 'card_' + Date.now(),
+            holder,
+            number: '**** **** **** ' + number.slice(-4),
+            expiry,
+            addedAt: Date.now()
+          };
+          cards.push(newCard);
+          saveCardsList(cards);
+
+          const session = getPassengerSession() || {};
+          session.medioPago = newCard.id;
+          savePassengerSession(session);
+
+          if (wrap) wrap.classList.add('hidden');
+          if (document.getElementById('cardHolderName')) document.getElementById('cardHolderName').value = '';
+          if (document.getElementById('cardNumber')) document.getElementById('cardNumber').value = '';
+          if (document.getElementById('cardExpiry')) document.getElementById('cardExpiry').value = '';
+          if (document.getElementById('cardCvc')) document.getElementById('cardCvc').value = '';
+
+          renderSavedCardsUI();
+          if (typeof showToast === 'function') showToast('✅ Tarjeta vinculada exitosamente.');
+        });
+      }
+    }
+
+    // Helper de Historial de Viajes del Pasajero
+    function renderPassengerHistoryUI() {
+      const listView = document.getElementById('passengerHistoryListView');
+      const detailView = document.getElementById('passengerHistoryDetailView');
+      if (!listView) return;
+
+      if (detailView) detailView.classList.add('hidden');
+      listView.classList.remove('hidden');
+
+      let trips = [];
+      try {
+        const rawBookings = localStorage.getItem('rutaprivada_bookings_v1');
+        if (rawBookings) {
+          const all = JSON.parse(rawBookings);
+          trips = all.filter(t => t && (t.estado === 'completado' || t.estado === 'completada' || t.status === 'completado' || t.status === 'completada' || t.estado === 'en_curso' || t.estado === 'asignado'));
+        }
+      } catch(e) {}
+
+      try {
+        const passRes = loadPassengerReservations();
+        passRes.forEach(r => {
+          if (r && !trips.some(t => t.id === r.id)) {
+            trips.push(r);
+          }
+        });
+      } catch(e) {}
+
+      if (trips.length === 0) {
+        listView.innerHTML = `
+          <div style="text-align: center; padding: 36px 16px; color: #94a3b8;">
+            <div style="font-size: 2.8rem; margin-bottom: 10px;">📜</div>
+            <h4 style="color: #fff; font-size: 1rem; margin-bottom: 6px;">Sin historial de viajes aún</h4>
+            <p style="font-size: 0.8rem; line-height: 1.4; margin-bottom: 16px;">Aquí verás el detalle, comprobantes y recibos de todos tus traslados finalizados.</p>
+          </div>
+        `;
+        return;
+      }
+
+      listView.innerHTML = trips.map(trip => {
+        const total = Number(trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0);
+        const toll = Number(trip.tollCost || trip.tollFare || trip.peajes || 0);
+        const fecha = trip.fecha || trip.date || (trip.creadoEn ? new Date(trip.creadoEn).toLocaleDateString('es-AR') : '--');
+        const hora = trip.hora || trip.time || (trip.creadoEn ? new Date(trip.creadoEn).toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' }) : '--');
+        const driver = (trip.conductor && trip.conductor.nombre) || trip.driverAssigned || 'Chofer Ejecutivo';
+
+        return `
+          <div class="passenger-history-card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px;">
+              <span style="font-size: 0.8rem; color: #94a3b8;">📅 ${fecha} · 🕒 ${hora} hs</span>
+              <strong style="color: #38bdf8; font-size: 0.95rem;">$${total.toLocaleString('es-AR')}</strong>
+            </div>
+            <div style="font-size: 0.82rem; color: #e2e8f0; display: flex; flex-direction: column; gap: 4px;">
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <span style="color: #34d399;">🟢</span>
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${trip.origen || trip.pickupAddress || 'Origen'}</span>
+              </div>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <span style="color: #38bdf8;">🏁</span>
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${trip.destino || trip.dropoffAddress || 'Destino'}</span>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; color: #94a3b8; background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 8px;">
+              <span>🚖 ${driver}</span>
+              ${toll > 0 ? `<span style="color: #fbbf24;">(Inc. Peajes: $${toll.toLocaleString('es-AR')})</span>` : '<span>(Sin peajes)</span>'}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
     // Pestañas del Modal de Perfil (Mis Datos | Medios de Pago | Historial de Viajes)
     document.querySelectorAll('.p-tab-btn').forEach(tabBtn => {
       tabBtn.addEventListener('click', () => {
@@ -8618,18 +8847,10 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // Initial check on startup
+    // Cargar perfil en inicio si existe sesión activa
     const currentSession = getPassengerSession();
     if (currentSession) {
       renderPassengerProfileUI(currentSession);
-    } else {
-      // Auto prompt auth on clean install
-      setTimeout(() => {
-        const sessionCheck = getPassengerSession();
-        if (!sessionCheck) {
-          openPassengerAuthModal('login');
-        }
-      }, 700);
     }
   }
 
