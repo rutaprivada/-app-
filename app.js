@@ -1983,34 +1983,30 @@ function updateDateDisplay() {
 
 function initMap() {
   const mapElem = document.getElementById('map-container');
-  if (!mapElem || map || (mapElem && mapElem._leaflet_id)) return;
-  if (typeof L === 'undefined' || !L.map) return;
-  try {
-    const defaultCoords = [-34.6037, -58.3816]; // Buenos Aires (Obelisco)
+  if (!mapElem) return;
 
-    map = L.map('map-container', {
-      zoomControl: true,
-      scrollWheelZoom: false
-    }).setView(defaultCoords, 12);
+  const defaultCoords = [-34.6037, -58.3816]; // Buenos Aires (Obelisco)
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19
-    }).addTo(map);
+  map = L.map('map-container', {
+    zoomControl: true,
+    scrollWheelZoom: false
+  }).setView(defaultCoords, 12);
 
-    // Geolocalización suave inicial
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const userLatLng = [pos.coords.latitude, pos.coords.longitude];
-          if (map) map.setView(userLatLng, 13);
-        },
-        () => {},
-        { timeout: 5000 }
-      );
-    }
-  } catch(e) {
-    console.warn('Leaflet init notice:', e);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  // Geolocalización suave inicial
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const userLatLng = [pos.coords.latitude, pos.coords.longitude];
+        map.setView(userLatLng, 13);
+      },
+      () => {},
+      { timeout: 5000 }
+    );
   }
 }
 
@@ -8164,12 +8160,10 @@ if (btnRecenterPassengerMap) {
       modalPassengerAuth.classList.remove('hidden');
       switchAuthTab(defaultTab);
     }
-    window.openPassengerAuthModal = openPassengerAuthModal;
 
     function closePassengerAuthModal() {
       if (modalPassengerAuth) modalPassengerAuth.classList.add('hidden');
     }
-    window.closePassengerAuthModal = closePassengerAuthModal;
 
     function openPassengerProfileModal() {
       const session = getPassengerSession();
@@ -8177,17 +8171,15 @@ if (btnRecenterPassengerMap) {
         openPassengerAuthModal('login');
         return;
       }
-      try { renderPassengerProfileUI(session); } catch(e){}
-      try { renderPassengerHistoryUI(); } catch(e){}
-      try { renderSavedCardsUI(); } catch(e){}
+      renderPassengerProfileUI(session);
+      renderPassengerHistoryUI();
+      renderSavedCardsUI();
       if (modalPassengerProfile) modalPassengerProfile.classList.remove('hidden');
     }
-    window.openPassengerProfileModal = openPassengerProfileModal;
 
     function closePassengerProfileModal() {
       if (modalPassengerProfile) modalPassengerProfile.classList.add('hidden');
     }
-    window.closePassengerProfileModal = closePassengerProfileModal;
 
     function switchAuthTab(tab) {
       if (tab === 'register') {

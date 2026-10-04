@@ -505,11 +505,9 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 2px;
-  cursor: pointer;
 }
 
 .field-body input {
-  width: 100%;
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -517,8 +515,6 @@ body {
   font-weight: 500;
   font-family: inherit;
   outline: none;
-  pointer-events: auto !important;
-  cursor: text;
 }
 
 .field-body input::placeholder {
