@@ -4,8 +4,7 @@
   "webDir": ".",
   "bundledWebRuntime": false,
   "server": {
-    "androidScheme": "https",
-    "url": "index.html?mode=app"
+    "androidScheme": "https"
   },
   "plugins": {
     "SplashScreen": {
