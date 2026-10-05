@@ -26,10 +26,24 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.add('is-app-mode');
     }
 
+    function getActiveDriverId() {
+        try {
+            const raw = localStorage.getItem('rutaprivada_driver_auth_v1');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.id) return parsed.id;
+                if (parsed && parsed.dni) return 'drv_' + String(parsed.dni).replace(/\D/g, '');
+                if (parsed && parsed.email) return 'drv_' + String(parsed.email).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            }
+        } catch(e) {}
+        return 'default';
+    }
+
     function getFleetDriverInfo() {
         let docs = null;
+        const drvId = getActiveDriverId();
         try {
-            const rawDocs = localStorage.getItem('rutaprivada_driver_docs_v1');
+            const rawDocs = (drvId !== 'default') ? (localStorage.getItem(`rutaprivada_driver_docs_${drvId}`) || localStorage.getItem('rutaprivada_driver_docs_v1')) : localStorage.getItem('rutaprivada_driver_docs_v1');
             if (rawDocs) docs = JSON.parse(rawDocs);
         } catch(e) {}
 
@@ -37,42 +51,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (docs && (docs.nombre || docs.dni)) {
             return {
+                id: docs.id || drvId,
                 nombre: docs.nombre || 'Nuevo Chofer Partner',
                 auto: docs.autoMarcaModelo ? `${docs.autoMarcaModelo} ${docs.color ? '(' + docs.color + ')' : ''}` : 'Vehículo Sin Registrar',
                 patente: docs.patente || 'S/P',
-                calificacion: 5.0,
+                calificacion: docs.calificacion || 5.0,
                 telefono: docs.telefono || 'Sin teléfono',
-                fotoPerfil: docs.fotoPerfil || defaultPhoto,
-                categoria: docs.categoria || 'Sedán Estándar'
+                email: docs.email || '',
+                fotoPerfil: docs.fotoPerfil || '',
+                categoria: docs.categoria || 'Sedán Estándar',
+                estadoVerificacion: docs.estadoVerificacion || 'pendiente'
             };
         }
 
         return {
+            id: drvId,
             nombre: 'Nuevo Chofer Partner',
             auto: 'Vehículo Sin Registrar',
             patente: 'S/P',
             calificacion: 5.0,
             telefono: 'Sin teléfono',
-            fotoPerfil: defaultPhoto,
-            categoria: 'Sedán Estándar'
+            email: '',
+            fotoPerfil: '',
+            categoria: 'Sedán Estándar',
+            estadoVerificacion: 'pendiente'
         };
     }
 
     function loadDocsData() {
+        const drvId = getActiveDriverId();
+        if (drvId !== 'default') {
+            try {
+                const specificRaw = localStorage.getItem(`rutaprivada_driver_docs_${drvId}`);
+                if (specificRaw) {
+                    const parsed = JSON.parse(specificRaw);
+                    if (parsed && (parsed.nombre || parsed.dni || parsed.email)) return parsed;
+                }
+            } catch(e) {}
+        }
+
         try {
             const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
             if (raw) {
                 const parsed = JSON.parse(raw);
-                if (parsed && (parsed.nombre || parsed.dni || parsed.estadoVerificacion || parsed.email)) {
-                    return parsed;
+                if (parsed && (parsed.nombre || parsed.dni || parsed.email)) {
+                    if (drvId === 'default' || !parsed.id || parsed.id === drvId) {
+                        return parsed;
+                    }
                 }
             }
         } catch(e) {}
+
+        // Plantilla limpia para chofer nuevo
+        let sessionInfo = {};
+        try {
+            const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
+            if (rawAuth) sessionInfo = JSON.parse(rawAuth);
+        } catch(e) {}
+
         return {
-            nombre: '',
-            dni: '',
-            telefono: '',
-            email: '',
+            id: sessionInfo.id || drvId,
+            nombre: sessionInfo.nombre || '',
+            dni: sessionInfo.dni || '',
+            telefono: sessionInfo.telefono || '',
+            email: sessionInfo.email || '',
             aceptaComunicaciones: true,
             autoMarcaModelo: '',
             patente: '',
@@ -82,9 +124,11 @@ document.addEventListener('DOMContentLoaded', () => {
             banco: '',
             cbu: '',
             titularCuenta: '',
-            estadoVerificacion: 'sin_subir',
+            estadoVerificacion: 'pendiente',
             observaciones: '',
-            docsImages: {}
+            docsImages: {},
+            docsSummary: {},
+            docsCount: 0
         };
     }
 
@@ -5465,55 +5509,200 @@ document.addEventListener('DOMContentLoaded', () => {
             const raw = localStorage.getItem(STORAGE_KEY_DRIVER_AUTH);
             if (raw) {
                 const parsed = JSON.parse(raw);
-                if (parsed && (parsed.email || parsed.nombre)) return parsed;
+                if (parsed && (parsed.email || parsed.nombre || parsed.id)) return parsed;
             }
         } catch(e) {}
         return null;
     }
 
-    function saveDriverSession(driver) {
+    function saveDriverSession(driver, isNew = false) {
         if (!driver) return;
-        if (!driver.id) driver.id = 'drv_' + (driver.dni ? driver.dni.replace(/\D/g, '') : Date.now());
+        if (!driver.id) {
+            const cleanDni = driver.dni ? String(driver.dni).replace(/\D/g, '') : '';
+            driver.id = cleanDni ? ('drv_' + cleanDni) : ('drv_' + Date.now());
+        }
         if (!driver.calificacion) driver.calificacion = 5.0;
 
         try {
             localStorage.setItem(STORAGE_KEY_DRIVER_AUTH, JSON.stringify(driver));
             
-            // Actualizar docs data local
-            const existingDocs = loadDocsData() || {};
-            const mergedDocs = {
-                ...existingDocs,
-                id: driver.id,
-                nombre: driver.nombre || existingDocs.nombre,
-                email: driver.email || existingDocs.email,
-                telefono: driver.telefono || existingDocs.telefono,
-                dni: driver.dni || existingDocs.dni,
-                autoMarcaModelo: driver.autoMarcaModelo || existingDocs.autoMarcaModelo || '',
-                patente: driver.patente || existingDocs.patente || '',
-                color: driver.color || existingDocs.color || 'Negro',
-                categoria: driver.categoria || existingDocs.categoria || 'Sedán Estándar',
-                cbu: driver.cbu || existingDocs.cbu || '',
-                estadoVerificacion: driver.estadoVerificacion || existingDocs.estadoVerificacion || 'sin_subir'
-            };
-            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(mergedDocs));
+            // Si es un chofer nuevo, garantizar estado limpio sin documentos ni fotos recicladas
+            let driverDocs;
+            if (isNew) {
+                driverDocs = {
+                    id: driver.id,
+                    nombre: driver.nombre || '',
+                    dni: driver.dni || '',
+                    telefono: driver.telefono || '',
+                    email: driver.email || '',
+                    aceptaComunicaciones: driver.aceptaComunicaciones !== false,
+                    autoMarcaModelo: '',
+                    patente: '',
+                    color: 'Negro',
+                    categoria: 'Sedán Estándar',
+                    fotoPerfil: '',
+                    banco: '',
+                    cbu: '',
+                    titularCuenta: '',
+                    estadoVerificacion: 'pendiente',
+                    observaciones: '',
+                    docsImages: {},
+                    docsSummary: {},
+                    docsCount: 0,
+                    updatedAt: Date.now()
+                };
+
+                // Inicializar billetera limpia con $15.000 de bienvenida
+                const newWallet = {
+                    balance: 15000,
+                    totalRecargas: 15000,
+                    comisionesPagadas: 0,
+                    viajesTarjeta: 0,
+                    movimientos: [
+                        {
+                            id: 'mov_init_' + Date.now(),
+                            fecha: new Date().toLocaleDateString('es-AR'),
+                            hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+                            tipo: 'recarga',
+                            descripcion: 'Bono / Saldo Inicial de Bienvenida Partner',
+                            monto: 15000,
+                            saldoPosterior: 15000
+                        }
+                    ]
+                };
+                localStorage.setItem(`rutaprivada_driver_wallet_${driver.id}`, JSON.stringify(newWallet));
+                localStorage.setItem('rutaprivada_driver_wallet_v1', JSON.stringify(newWallet));
+                localStorage.removeItem('rutaprivada_driver_recharges_v1');
+            } else {
+                // Cargar datos previos de este chofer específico
+                const specificDocs = localStorage.getItem(`rutaprivada_driver_docs_${driver.id}`);
+                const existingDocs = specificDocs ? JSON.parse(specificDocs) : {};
+                driverDocs = {
+                    ...existingDocs,
+                    id: driver.id,
+                    nombre: driver.nombre || existingDocs.nombre || '',
+                    email: driver.email || existingDocs.email || '',
+                    telefono: driver.telefono || existingDocs.telefono || '',
+                    dni: driver.dni || existingDocs.dni || '',
+                    autoMarcaModelo: existingDocs.autoMarcaModelo || '',
+                    patente: existingDocs.patente || '',
+                    color: existingDocs.color || 'Negro',
+                    categoria: existingDocs.categoria || 'Sedán Estándar',
+                    fotoPerfil: existingDocs.fotoPerfil || '',
+                    banco: existingDocs.banco || '',
+                    cbu: existingDocs.cbu || '',
+                    titularCuenta: existingDocs.titularCuenta || '',
+                    estadoVerificacion: existingDocs.estadoVerificacion || 'pendiente',
+                    docsImages: existingDocs.docsImages || {},
+                    docsSummary: existingDocs.docsSummary || {},
+                    docsCount: existingDocs.docsCount || 0
+                };
+            }
+
+            localStorage.setItem(`rutaprivada_driver_docs_${driver.id}`, JSON.stringify(driverDocs));
+            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(driverDocs));
         } catch(e) {}
 
         saveDriverToRegisteredList(driver);
 
-        // Sincronizar en tiempo real con Firestore
+        // Actualizar también en la lista rutaprivada_drivers_v1 que lee el Panel Admin
         try {
-            if (typeof firebase !== 'undefined' && firebase.firestore) {
+            let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+            const existingIdx = driversList.findIndex(d => (d.id && driver.id && d.id === driver.id) || (d.email && driver.email && d.email.toLowerCase() === driver.email.toLowerCase()));
+            const driverToStore = {
+                id: driver.id,
+                nombre: driver.nombre,
+                dni: driver.dni || '',
+                telefono: driver.telefono || '',
+                email: driver.email || '',
+                autoMarcaModelo: driver.autoMarcaModelo || '',
+                patente: driver.patente || '',
+                color: driver.color || 'Negro',
+                categoria: driver.categoria || 'Sedán Estándar',
+                fotoPerfil: driver.fotoPerfil || '',
+                estadoVerificacion: driver.estadoVerificacion || 'pendiente',
+                isOnline: false,
+                banco: driver.banco || '',
+                cbu: driver.cbu || '',
+                titularCuenta: driver.titularCuenta || driver.nombre,
+                docsImages: driver.docsImages || {},
+                docsSummary: driver.docsSummary || {},
+                docsCount: driver.docsCount || 0,
+                updatedAt: Date.now()
+            };
+            if (existingIdx >= 0) {
+                driversList[existingIdx] = { ...driversList[existingIdx], ...driverToStore };
+            } else {
+                driversList.unshift(driverToStore);
+            }
+            localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
+        } catch(e) {}
+
+        // Sincronizar en tiempo real con Firestore en la colección 'drivers' (para Admin) y 'conductores'
+        try {
+            if (typeof firebase !== 'undefined') {
+                if (!firebase.apps || !firebase.apps.length) {
+                    firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
+                }
                 const db = firebase.firestore();
-                const docId = driver.email ? driver.email.toLowerCase().replace(/[^a-z0-9_]/g, '_') : driver.id;
-                db.collection('conductores').doc(docId).set({
-                    ...driver,
-                    ultimaConexion: firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true }).catch(() => {});
+                const docId = driver.id || ('drv_' + String(driver.dni || Date.now()).replace(/\D/g, ''));
+                
+                const cloudPayload = {
+                    id: docId,
+                    nombre: driver.nombre || 'Conductor',
+                    dni: driver.dni || '',
+                    telefono: driver.telefono || '',
+                    email: driver.email || '',
+                    aceptaComunicaciones: driver.aceptaComunicaciones !== false,
+                    autoMarcaModelo: driver.autoMarcaModelo || '',
+                    patente: driver.patente || '',
+                    color: driver.color || 'Negro',
+                    categoria: driver.categoria || 'Sedán Estándar',
+                    fotoPerfil: driver.fotoPerfil || '',
+                    estadoVerificacion: driver.estadoVerificacion || 'pendiente',
+                    observaciones: driver.observaciones || '',
+                    isOnline: false,
+                    docsSummary: driver.docsSummary || {},
+                    docsCount: driver.docsCount || 0,
+                    ultimaConexion: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: Date.now()
+                };
+
+                db.collection('drivers').doc(docId).set(cloudPayload, { merge: true }).catch(() => {});
+                db.collection('conductores').doc(docId).set(cloudPayload, { merge: true }).catch(() => {});
             }
         } catch(e) {}
 
+        // Sincronización mediante Firestore Cloud REST API
+        try {
+            const cleanDni = (driver.dni || '').replace(/\D/g, '') || String(Date.now());
+            const docId = driver.id || ('drv_' + cleanDni);
+            const restFields = {
+                id: { stringValue: docId },
+                nombre: { stringValue: driver.nombre || 'Conductor' },
+                dni: { stringValue: driver.dni || '' },
+                telefono: { stringValue: driver.telefono || '' },
+                email: { stringValue: driver.email || '' },
+                estadoVerificacion: { stringValue: driver.estadoVerificacion || 'pendiente' },
+                updatedAt: { integerValue: String(Date.now()) }
+            };
+            fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fields: restFields })
+            }).catch(() => {});
+        } catch(e) {}
+
+        // Emitir evento por bus sync para recepción inmediata en el Panel de Administrador
+        if (window.RutaSync) {
+            window.RutaSync.emit('CONDUCTOR_REGISTRADO', driver);
+            window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driver);
+        }
+
         driverState.info = getFleetDriverInfo();
         renderDriverProfileInfo();
+        if (typeof updateWalletUI === 'function') updateWalletUI();
+        if (typeof updateDocsStatusBanner === 'function') updateDocsStatusBanner(driver.estadoVerificacion || 'pendiente');
     }
 
     function switchDriverAuthTab(tab) {
@@ -5790,13 +5979,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Código válido: Confirmar cuenta y crear sesión
+            // Código válido: Confirmar cuenta y crear sesión como nuevo conductor
             pending.emailVerificado = true;
             const finalDriver = { ...pending };
             delete finalDriver.verifyCode;
             delete finalDriver.recentCodes;
 
-            saveDriverSession(finalDriver);
+            saveDriverSession(finalDriver, true);
             try {
                 localStorage.removeItem('rutaprivada_pending_driver_reg');
             } catch(e) {}
@@ -5875,9 +6064,23 @@ document.addEventListener('DOMContentLoaded', () => {
             // Poner offline inmediatamente
             setOnlineStatus(false);
 
-            // Eliminar sesión activa
+            // Eliminar sesión activa y cachés locales
             localStorage.removeItem(STORAGE_KEY_DRIVER_AUTH);
+            localStorage.removeItem('rutaprivada_driver_docs_v1');
+            localStorage.removeItem('rutaprivada_driver_wallet_v1');
+            localStorage.removeItem('rutaprivada_driver_recharges_v1');
+            localStorage.removeItem('rutaprivada_driver_is_online');
             
+            // Limpiar formulario y foto de documentación
+            loadedDocsImages = {};
+            const previewFotoPerfil = document.getElementById('previewFotoPerfil');
+            if (previewFotoPerfil) previewFotoPerfil.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+            
+            ['docInputDriverName', 'docInputDniNum', 'docInputPhone', 'docInputEmail', 'docInputVehicleModel', 'docInputPlate', 'docInputBankName', 'docInputCbu', 'docInputBankHolder'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+
             closeDriverProfileModal();
             showDriverToast('🚪 Sesión de chofer cerrada correctamente.');
             
@@ -6478,6 +6681,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // 14. BILLETERA VIRTUAL PARTNER & SALDO DEL CONDUCTOR
     // ==========================================
     function loadDriverWallet() {
+        const drvId = getActiveDriverId();
+        if (drvId !== 'default') {
+            try {
+                const specificRaw = localStorage.getItem(`rutaprivada_driver_wallet_${drvId}`);
+                if (specificRaw) {
+                    const parsed = JSON.parse(specificRaw);
+                    if (parsed && typeof parsed.balance === 'number') {
+                        return parsed;
+                    }
+                }
+            } catch(e) {}
+        }
+
         try {
             const raw = localStorage.getItem('rutaprivada_driver_wallet_v1');
             if (raw) {
@@ -6495,9 +6711,9 @@ document.addEventListener('DOMContentLoaded', () => {
             viajesTarjeta: 0,
             movimientos: [
                 {
-                    id: 'mov_init_1',
+                    id: 'mov_init_' + Date.now(),
                     fecha: new Date().toLocaleDateString('es-AR'),
-                    hora: '08:00',
+                    hora: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
                     tipo: 'recarga',
                     descripcion: 'Bono / Saldo Inicial de Bienvenida Partner',
                     monto: 15000,
@@ -6510,7 +6726,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function saveDriverWallet(wallet) {
+        const drvId = getActiveDriverId();
         try {
+            if (drvId !== 'default') {
+                localStorage.setItem(`rutaprivada_driver_wallet_${drvId}`, JSON.stringify(wallet));
+            }
             localStorage.setItem('rutaprivada_driver_wallet_v1', JSON.stringify(wallet));
         } catch(e) {}
     }

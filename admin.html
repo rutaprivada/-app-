@@ -1584,6 +1584,30 @@
                     }
                 });
 
+                window.RutaSync.on('CONDUCTOR_REGISTRADO', (newDriver) => {
+                    if (newDriver) {
+                        try {
+                            let regList = JSON.parse(localStorage.getItem('rutaprivada_registered_drivers_v1') || '[]');
+                            if (!regList.some(d => d.email && newDriver.email && d.email.toLowerCase() === newDriver.email.toLowerCase())) {
+                                regList.unshift(newDriver);
+                                localStorage.setItem('rutaprivada_registered_drivers_v1', JSON.stringify(regList));
+                            }
+                            let localList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+                            if (!localList.some(d => d.email && newDriver.email && d.email.toLowerCase() === newDriver.email.toLowerCase())) {
+                                localList.unshift(newDriver);
+                                localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(localList));
+                            }
+                        } catch(e) {}
+                        loadDriversData();
+                    }
+                });
+
+                window.RutaSync.on('DOCUMENTOS_CONDUCTOR_ACTUALIZADOS', (updatedDriver) => {
+                    if (updatedDriver) {
+                        loadDriversData();
+                    }
+                });
+
                 window.RutaSync.on('ESTADO_CONDUCTOR_ACTUALIZADO', (updatedDriver) => {
                     if (updatedDriver) {
                         try {
@@ -1677,6 +1701,19 @@
                 try {
                     const raw = localStorage.getItem('rutaprivada_drivers_v1');
                     if (raw) storedDrivers = JSON.parse(raw);
+                } catch(e) {}
+                try {
+                    const rawReg = localStorage.getItem('rutaprivada_registered_drivers_v1');
+                    if (rawReg) {
+                        const parsedReg = JSON.parse(rawReg);
+                        if (Array.isArray(parsedReg)) {
+                            parsedReg.forEach(reg => {
+                                if (!storedDrivers.some(d => (d.id && reg.id && d.id === reg.id) || (d.email && reg.email && d.email.toLowerCase() === reg.email.toLowerCase()))) {
+                                    storedDrivers.push(reg);
+                                }
+                            });
+                        }
+                    }
                 } catch(e) {}
 
                 let drivers = [];

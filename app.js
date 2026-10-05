@@ -48,6 +48,91 @@ const DEFAULT_CONFIG = {
   googleMapsApiKey: '',            // Clave opcional de Google Maps Platform (Directions / Routes API)
 };
 
+function loadConfig() {
+  try {
+    ['rutaprivada_config', 'rutaprivada_config_v2', 'rutaprivada_config_v3', 'rutaprivada_config_v4', 'rutaprivada_config_v5', 'rutaprivada_config_v6', 'rutaprivada_config_v7', 'rutaprivada_config_v8', 'rutaprivada_config_v9', 'rutaprivada_config_v10'].forEach(k => {
+      try { localStorage.removeItem(k); } catch(e) {}
+    });
+
+    const saved = localStorage.getItem('rutaprivada_config_v11');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (!parsed.whatsappNumber || parsed.whatsappNumber.includes('8225') || parsed.whatsappNumber.includes('4455')) {
+        parsed.whatsappNumber = DEFAULT_CONFIG.whatsappNumber;
+      }
+      parsed.currency = 'ARS';
+      parsed.adminPin = '4824';
+      if (!parsed.petFee || parsed.petFee < 4000) parsed.petFee = 4000;
+      if (!parsed.mapboxToken || parsed.mapboxToken.trim() === '') {
+        parsed.mapboxToken = DEFAULT_CONFIG.mapboxToken;
+      }
+      const merged = { ...DEFAULT_CONFIG, ...parsed };
+      try {
+        localStorage.setItem('rutaprivada_config_v11', JSON.stringify(merged));
+      } catch(e) {}
+      return merged;
+    }
+  } catch (e) {
+    console.warn('No se pudo leer la configuración previa:', e);
+  }
+  return { ...DEFAULT_CONFIG };
+}
+
+// ==========================================
+// 2. ESTADO GLOBAL DE LA APLICACIÓN
+// ==========================================
+let state = {
+  config: loadConfig(),
+  origin: null,           // { lat, lng, address }
+  destination: null,      // { lat, lng, address }
+  intermediateStop: null, // { lat, lng, address }
+  hasIntermediateStop: false,
+  stopFee: 1000,
+  stopDetourKm: 0,
+  directDistanceKm: 0,
+  distanceKm: 0,
+  durationMin: 0,
+  baseDurationMin: 0,
+  date: '',
+  time: '',
+  timeMultiplier: 1.0,
+  trafficEngine: 'osrm',
+  trafficCongestion: 'normal',
+  mapboxCongestionLabel: '',
+  routeHasTolls: false,
+  tollDetails: [],
+  tollPlazas: 0,
+  tollRoadNames: [],
+  selectedWaFormat: 'with-9',
+  userRating: 5,
+  passengerName: '',
+  passengerPhone: '',
+  passengerEmail: '',
+  weather: {
+    isRaining: false,
+    rainMm: 0,
+    code: 0,
+    temp: 20,
+    surgePercent: 0,
+    label: 'Clima óptimo',
+    icon: '☀️'
+  },
+  extras: {
+    roundtrip: false,
+    pet: false
+  },
+  totalPrice: 0,
+  breakdown: {}
+};
+window.state = state;
+
+// Instancias de Leaflet
+let map = null;
+let originMarker = null;
+let destinationMarker = null;
+let stopMarker = null;
+let routePolyline = null;
+
 // ==========================================
 // 1.2 MULTI-STEP WIZARD CONTROLLER (PASO A PASO PASAJERO)
 // ==========================================
@@ -1044,91 +1129,8 @@ const CURRENCY_SYMBOLS = {
 };
 
 // ==========================================
-// 2. ESTADO DE LA APLICACIÓN
+// 3. CONFIGURACIÓN Y PERSISTENCIA DE TARIFAS
 // ==========================================
-
-let state = {
-  config: loadConfig(),
-  origin: null,           // { lat, lng, address }
-  destination: null,      // { lat, lng, address }
-  intermediateStop: null, // { lat, lng, address }
-  hasIntermediateStop: false,
-  stopFee: 1000,          // $1.000 estándar / $2.000 con desvío pronunciado
-  stopDetourKm: 0,
-  directDistanceKm: 0,
-  distanceKm: 0,
-  durationMin: 0,
-  baseDurationMin: 0,     // Duración base OSRM (flujo libre) antes del factor de tráfico
-  date: '',
-  time: '',
-  timeMultiplier: 1.0,
-  trafficEngine: 'osrm',       // 'mapbox' (tiempo real) o 'osrm' (estimación horaria)
-  trafficCongestion: 'normal', // 'low', 'moderate', 'heavy', 'severe'
-  mapboxCongestionLabel: '',   // Etiqueta descriptiva del tráfico en vivo
-  routeHasTolls: false,   // Detectado automáticamente
-  tollDetails: [],        // Concesiones oficiales detectadas
-  tollPlazas: 0,
-  tollRoadNames: [],
-  selectedWaFormat: 'with-9',
-  userRating: 5,
-  weather: {
-    isRaining: false,
-    rainMm: 0,
-    code: 0,
-    temp: 20,
-    surgePercent: 0,
-    label: 'Clima óptimo',
-    icon: '☀️'
-  },
-  extras: {
-    roundtrip: false,
-    pet: false
-  },
-  totalPrice: 0,
-  breakdown: {}
-};
-
-// Instancias de Leaflet
-let map = null;
-let originMarker = null;
-let destinationMarker = null;
-let stopMarker = null;
-let routePolyline = null;
-
-// ==========================================
-// 3. INICIALIZACIÓN PRINCIPAL (SE EJECUTA AL FINAL DEL ARCHIVO TRAS DEFINIR TODAS LAS FUNCIONES)
-// ==========================================
-
-
-function loadConfig() {
-  try {
-    ['rutaprivada_config', 'rutaprivada_config_v2', 'rutaprivada_config_v3', 'rutaprivada_config_v4', 'rutaprivada_config_v5', 'rutaprivada_config_v6', 'rutaprivada_config_v7', 'rutaprivada_config_v8', 'rutaprivada_config_v9', 'rutaprivada_config_v10'].forEach(k => {
-      try { localStorage.removeItem(k); } catch(e) {}
-    });
-
-    const saved = localStorage.getItem('rutaprivada_config_v11');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (!parsed.whatsappNumber || parsed.whatsappNumber.includes('8225') || parsed.whatsappNumber.includes('4455')) {
-        parsed.whatsappNumber = DEFAULT_CONFIG.whatsappNumber;
-      }
-      parsed.currency = 'ARS';
-      parsed.adminPin = '4824';
-      if (!parsed.petFee || parsed.petFee < 4000) parsed.petFee = 4000;
-      if (!parsed.mapboxToken || parsed.mapboxToken.trim() === '') {
-        parsed.mapboxToken = DEFAULT_CONFIG.mapboxToken;
-      }
-      const merged = { ...DEFAULT_CONFIG, ...parsed };
-      try {
-        localStorage.setItem('rutaprivada_config_v11', JSON.stringify(merged));
-      } catch(e) {}
-      return merged;
-    }
-  } catch (e) {
-    console.warn('No se pudo leer la configuración previa:', e);
-  }
-  return { ...DEFAULT_CONFIG };
-}
 
 function saveConfig(newConfig) {
   if (typeof state === 'undefined' || !state) return;
@@ -8182,17 +8184,10 @@ if (btnRecenterPassengerMap) {
     window.closePassengerAuthModal = closePassengerAuthModal;
 
     function openPassengerProfileModal() {
-      let session = getPassengerSession();
-      if (!session) {
-        session = {
-          id: 'pass_' + Date.now(),
-          nombre: '',
-          telefono: '',
-          email: '',
-          rating: '5.00',
-          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-          medioPago: 'efectivo'
-        };
+      const session = getPassengerSession();
+      if (!session || (!session.nombre && !session.email && !session.telefono)) {
+        openPassengerAuthModal('login');
+        return;
       }
       renderPassengerProfileUI(session);
       renderPassengerHistoryUI();
@@ -8861,7 +8856,28 @@ if (btnRecenterPassengerMap) {
         if (!confirm('¿Seguro que deseas cerrar tu sesión de pasajero en este dispositivo?')) return;
         localStorage.removeItem(STORAGE_KEY_SESSION);
         localStorage.removeItem(STORAGE_KEY_LEGACY);
+        
         if (headerPassengerName) headerPassengerName.textContent = 'Iniciar Sesión';
+        if (headerPassengerAvatar) headerPassengerAvatar.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+        if (profileModalHeaderAvatarImg) profileModalHeaderAvatarImg.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+        if (profileModalAvatarImg) {
+          profileModalAvatarImg.src = '';
+          profileModalAvatarImg.style.display = 'none';
+        }
+        if (profileModalAvatarPlaceholder) profileModalAvatarPlaceholder.style.display = 'block';
+        if (btnRemoveProfilePhoto) btnRemoveProfilePhoto.classList.add('hidden');
+        if (profPassengerName) profPassengerName.value = '';
+        if (profPassengerPhone) profPassengerPhone.value = '';
+        if (profPassengerEmail) profPassengerEmail.value = '';
+        if (profileModalNameTitle) profileModalNameTitle.textContent = 'Mi Perfil de Pasajero';
+
+        if (window.state) {
+          window.state.passengerName = '';
+          window.state.passengerPhone = '';
+          window.state.passengerEmail = '';
+          window.state.passengerAvatar = '';
+        }
+
         closePassengerProfileModal();
         openPassengerAuthModal('login');
         if (typeof showToast === 'function') showToast('🚪 Has cerrado sesión de pasajero correctamente.');
