@@ -8090,11 +8090,43 @@ if (btnRecenterPassengerMap) {
       try {
         if (typeof firebase !== 'undefined' && firebase.firestore) {
           const db = firebase.firestore();
-          const docId = user.email ? user.email.toLowerCase().replace(/[^a-z0-9_]/g, '_') : user.id;
-          db.collection('pasajeros').doc(docId).set({
+          const emailDocId = user.email ? user.email.toLowerCase().replace(/[^a-z0-9_]/g, '_') : '';
+          const phoneDocId = user.telefono ? ('pass_' + user.telefono.replace(/\D/g, '')) : '';
+          const userId = user.id || emailDocId || phoneDocId;
+          const cloudPayload = {
             ...user,
+            id: userId,
+            email: (user.email || '').toLowerCase(),
+            telefono: user.telefono || '',
+            passwordHash: user.passwordHash || '',
+            password: user.password || '',
             ultimaActividad: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true }).catch(() => {});
+          };
+
+          if (emailDocId) db.collection('pasajeros').doc(emailDocId).set(cloudPayload, { merge: true }).catch(() => {});
+          if (userId) db.collection('pasajeros').doc(userId).set(cloudPayload, { merge: true }).catch(() => {});
+          if (phoneDocId) db.collection('pasajeros').doc(phoneDocId).set(cloudPayload, { merge: true }).catch(() => {});
+        }
+      } catch(e) {}
+
+      // Sincronización mediante Firestore Cloud REST API
+      try {
+        const emailDocId = user.email ? user.email.toLowerCase().replace(/[^a-z0-9_]/g, '_') : '';
+        if (emailDocId) {
+          const restFields = {
+            id: { stringValue: user.id || emailDocId },
+            nombre: { stringValue: user.nombre || 'Pasajero' },
+            telefono: { stringValue: user.telefono || '' },
+            email: { stringValue: (user.email || '').toLowerCase() },
+            passwordHash: { stringValue: user.passwordHash || '' },
+            password: { stringValue: user.password || '' },
+            rating: { stringValue: user.rating || '5.00' }
+          };
+          fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/pasajeros/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: restFields })
+          }).catch(() => {});
         }
       } catch(e) {}
 
@@ -8235,7 +8267,7 @@ if (btnRecenterPassengerMap) {
       tabBtnPassengerRegister.addEventListener('click', () => switchAuthTab('register'));
     }
 
-    // Form Login Submit (ESTRICTO: Sólo permite ingresar si el usuario existe y la contraseña coincide)
+    // Form Login Submit (Cross-Device: Valida contra memoria local, Firestore Cloud y REST API)
     if (formPassengerLogin) {
       formPassengerLogin.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -8252,20 +8284,72 @@ if (btnRecenterPassengerMap) {
         const enteredHash = await hashPassword(password);
         const registeredUsers = getRegisteredPassengers();
 
-        // 1. Buscar en usuarios locales
+        // 1. Buscar en usuarios guardados en este dispositivo
         let user = registeredUsers.find(u => 
           (u.email && u.email.toLowerCase() === identifier.toLowerCase()) || 
           (u.telefono && u.telefono.replace(/\D/g, '') === identifier.replace(/\D/g, ''))
         );
 
-        // 2. Si no está en memoria local, consultar en Firestore en tiempo real
+        // 2. Si no está en este dispositivo, consultar en Firestore Cloud en tiempo real
         if (!user && typeof firebase !== 'undefined' && firebase.firestore) {
           try {
             const db = firebase.firestore();
-            const docId = identifier.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-            const snap = await db.collection('pasajeros').doc(docId).get();
+            const emailDocId = identifier.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            const cleanPhone = identifier.replace(/\D/g, '');
+            const phoneDocId = cleanPhone ? ('pass_' + cleanPhone) : '';
+
+            // Intento A: Documento por email normalizado
+            let snap = await db.collection('pasajeros').doc(emailDocId).get();
             if (snap.exists) {
               user = snap.data();
+            }
+
+            // Intento B: Documento por teléfono
+            if (!user && phoneDocId) {
+              snap = await db.collection('pasajeros').doc(phoneDocId).get();
+              if (snap.exists) {
+                user = snap.data();
+              }
+            }
+
+            // Intento C: Query WHERE email
+            if (!user) {
+              const qSnap = await db.collection('pasajeros').where('email', '==', identifier.toLowerCase()).limit(1).get();
+              if (!qSnap.empty) {
+                user = qSnap.docs[0].data();
+              }
+            }
+
+            // Intento D: Query WHERE telefono
+            if (!user && cleanPhone) {
+              const qSnap2 = await db.collection('pasajeros').where('telefono', '==', identifier).limit(1).get();
+              if (!qSnap2.empty) {
+                user = qSnap2.docs[0].data();
+              }
+            }
+          } catch(e) {
+            console.warn('Consulta Firestore pasajero falló, usando REST fallback:', e);
+          }
+        }
+
+        // 3. Fallback directo mediante Firestore Cloud REST API
+        if (!user) {
+          try {
+            const emailDocId = identifier.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            const restResp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/pasajeros/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`);
+            if (restResp.ok) {
+              const data = await restResp.json();
+              if (data && data.fields) {
+                user = {
+                  id: data.fields.id?.stringValue || emailDocId,
+                  nombre: data.fields.nombre?.stringValue || 'Pasajero',
+                  telefono: data.fields.telefono?.stringValue || '',
+                  email: data.fields.email?.stringValue || identifier,
+                  passwordHash: data.fields.passwordHash?.stringValue || '',
+                  password: data.fields.password?.stringValue || '',
+                  rating: data.fields.rating?.stringValue || '5.00'
+                };
+              }
             }
           } catch(e) {}
         }
@@ -8280,7 +8364,9 @@ if (btnRecenterPassengerMap) {
 
         // VALIDACIÓN ESTRICTA DE CONTRASEÑA
         const storedHash = user.passwordHash || (user.password ? await hashPassword(user.password) : '');
-        if (storedHash && storedHash !== enteredHash && user.password !== password) {
+        const isPasswordCorrect = (storedHash && storedHash === enteredHash) || (user.password && user.password === password);
+
+        if (!isPasswordCorrect) {
           if (typeof showToast === 'function') {
             showToast('❌ Contraseña incorrecta. Por favor verifica tus datos.');
           }

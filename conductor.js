@@ -5645,14 +5645,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
                 }
                 const db = firebase.firestore();
-                const docId = driver.id || ('drv_' + String(driver.dni || Date.now()).replace(/\D/g, ''));
+                const cleanDni = (driver.dni || '').replace(/\D/g, '') || String(Date.now());
+                const docId = driver.id || ('drv_' + cleanDni);
+                const emailDocId = (driver.email || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
                 
                 const cloudPayload = {
                     id: docId,
                     nombre: driver.nombre || 'Conductor',
                     dni: driver.dni || '',
                     telefono: driver.telefono || '',
-                    email: driver.email || '',
+                    email: (driver.email || '').toLowerCase(),
+                    passwordHash: driver.passwordHash || '',
+                    password: driver.password || '',
                     aceptaComunicaciones: driver.aceptaComunicaciones !== false,
                     autoMarcaModelo: driver.autoMarcaModelo || '',
                     patente: driver.patente || '',
@@ -5668,8 +5672,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     updatedAt: Date.now()
                 };
 
+                // Guardar en colecciones conductores y drivers por ID y por email
                 db.collection('drivers').doc(docId).set(cloudPayload, { merge: true }).catch(() => {});
                 db.collection('conductores').doc(docId).set(cloudPayload, { merge: true }).catch(() => {});
+                if (emailDocId) {
+                    db.collection('drivers').doc(emailDocId).set(cloudPayload, { merge: true }).catch(() => {});
+                    db.collection('conductores').doc(emailDocId).set(cloudPayload, { merge: true }).catch(() => {});
+                }
             }
         } catch(e) {}
 
@@ -5677,15 +5686,23 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const cleanDni = (driver.dni || '').replace(/\D/g, '') || String(Date.now());
             const docId = driver.id || ('drv_' + cleanDni);
+            const emailDocId = (driver.email || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
             const restFields = {
                 id: { stringValue: docId },
                 nombre: { stringValue: driver.nombre || 'Conductor' },
                 dni: { stringValue: driver.dni || '' },
                 telefono: { stringValue: driver.telefono || '' },
-                email: { stringValue: driver.email || '' },
+                email: { stringValue: (driver.email || '').toLowerCase() },
+                passwordHash: { stringValue: driver.passwordHash || '' },
+                password: { stringValue: driver.password || '' },
                 estadoVerificacion: { stringValue: driver.estadoVerificacion || 'pendiente' },
                 updatedAt: { integerValue: String(Date.now()) }
             };
+            fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/conductores/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fields: restFields })
+            }).catch(() => {});
             fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -5744,7 +5761,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabBtnDriverLogin) tabBtnDriverLogin.addEventListener('click', () => switchDriverAuthTab('login'));
     if (tabBtnDriverRegister) tabBtnDriverRegister.addEventListener('click', () => switchDriverAuthTab('register'));
 
-    // Formulario Iniciar Sesión Chofer (ESTRICTO: Sólo permite ingresar si el chofer existe y la clave coincide)
+    // Formulario Iniciar Sesión Chofer (Cross-Device: Valida contra memoria local, Firestore Cloud y REST API)
     if (formDriverLogin) {
         formDriverLogin.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -5761,17 +5778,71 @@ document.addEventListener('DOMContentLoaded', () => {
             const enteredHash = await hashDriverPassword(pass);
             const list = getRegisteredDriversList();
 
-            // 1. Buscar en choferes locales
+            // 1. Buscar en choferes guardados en este dispositivo
             let driver = list.find(d => d.email && d.email.toLowerCase() === email);
 
-            // 2. Si no está en memoria local, consultar en Firestore en tiempo real
-            if (!driver && typeof firebase !== 'undefined' && firebase.firestore) {
+            // 2. Si no está en este dispositivo, consultar en Firebase Firestore en la nube
+            if (!driver && typeof firebase !== 'undefined') {
                 try {
+                    if (!firebase.apps || !firebase.apps.length) {
+                        firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
+                    }
                     const db = firebase.firestore();
-                    const docId = email.replace(/[^a-z0-9_]/g, '_');
-                    const snap = await db.collection('conductores').doc(docId).get();
+                    const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
+                    
+                    // Intento A: Documento por email en 'conductores'
+                    let snap = await db.collection('conductores').doc(emailDocId).get();
                     if (snap.exists) {
                         driver = snap.data();
+                    }
+
+                    // Intento B: Documento por email en 'drivers'
+                    if (!driver) {
+                        snap = await db.collection('drivers').doc(emailDocId).get();
+                        if (snap.exists) {
+                            driver = snap.data();
+                        }
+                    }
+
+                    // Intento C: Búsqueda por query WHERE email
+                    if (!driver) {
+                        const qSnap = await db.collection('conductores').where('email', '==', email).limit(1).get();
+                        if (!qSnap.empty) {
+                            driver = qSnap.docs[0].data();
+                        }
+                    }
+
+                    // Intento D: Búsqueda por query WHERE email en drivers
+                    if (!driver) {
+                        const qSnap2 = await db.collection('drivers').where('email', '==', email).limit(1).get();
+                        if (!qSnap2.empty) {
+                            driver = qSnap2.docs[0].data();
+                        }
+                    }
+                } catch(err) {
+                    console.warn('Consulta Firestore falló, usando fallback REST:', err);
+                }
+            }
+
+            // 3. Fallback directo mediante Firestore Cloud REST API (para máxima compatibilidad sin depender del SDK)
+            if (!driver) {
+                try {
+                    const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
+                    const restResp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/conductores/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`);
+                    if (restResp.ok) {
+                        const data = await restResp.json();
+                        if (data && data.fields) {
+                            driver = {
+                                id: data.fields.id?.stringValue || ('drv_' + emailDocId),
+                                nombre: data.fields.nombre?.stringValue || 'Conductor',
+                                dni: data.fields.dni?.stringValue || '',
+                                telefono: data.fields.telefono?.stringValue || '',
+                                email: data.fields.email?.stringValue || email,
+                                passwordHash: data.fields.passwordHash?.stringValue || '',
+                                password: data.fields.password?.stringValue || '',
+                                estadoVerificacion: data.fields.estadoVerificacion?.stringValue || 'pendiente'
+                            };
+                        }
                     }
                 } catch(e) {}
             }
@@ -5784,12 +5855,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // VALIDACIÓN ESTRICTA DE CONTRASEÑA
             const storedHash = driver.passwordHash || (driver.password ? await hashDriverPassword(driver.password) : '');
-            if (storedHash && storedHash !== enteredHash && driver.password !== pass) {
+            const isPasswordCorrect = (storedHash && storedHash === enteredHash) || (driver.password && driver.password === pass);
+
+            if (!isPasswordCorrect) {
                 showDriverToast('❌ Contraseña incorrecta. Por favor verifica tus datos.');
                 return;
             }
 
-            saveDriverSession(driver);
+            saveDriverSession(driver, false);
             hideDriverAuthModal();
             showDriverToast(`👋 ¡Bienvenido Chofer Partner, ${driver.nombre || 'Conductor'}!`);
             playAlertSound('success');
