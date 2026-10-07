@@ -5669,7 +5669,7 @@ function initPwa() {
   // 1. Registro del Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
+      navigator.serviceWorker.register('./sw.js?v=86')
         .then((reg) => {
           console.log('Service Worker de RutaPrivada registrado con éxito:', reg.scope);
           // Forzar verificación de nueva versión en cada recarga
