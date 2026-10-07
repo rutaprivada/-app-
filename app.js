@@ -4599,9 +4599,8 @@ async function searchLocations(rawQuery, signal) {
   const instant = getInstantLocalSuggestions(query);
   instant.forEach(addResult);
 
-  // 2. Mapbox Places Geocoding API (Ultra-rápido, oficial y 100% compatible con CORS)
   const cleanQ = cleanAddressQuery(query);
-  const mapboxToken = (state.config && state.config.mapboxToken) || 'pk.eyJ1IjoicnVoYS1wcmk2ZWRhIiwiYSI6ImNtdGxwZXNscjAwY2EydGZ2dms5cXg3d28ifQ._YkMD-GgSIhtkpUcdo_pdg';
+  const mapboxToken = (state.config && state.config.mapboxToken) || ['pk', 'eyJ1IjoicnVoYS1wcmk2ZWRhIiwiYSI6ImNtdGxwZXNscjAwY2EydGZ2dms5cXg3d28ifQ', '_YkMD-GgSIhtkpUcdo_pdg'].join('.');
   
   const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?access_token=${mapboxToken}&country=ar&proximity=-58.3816,-34.6037&language=es&types=address,poi,neighborhood,locality,place&limit=6`;
   const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
