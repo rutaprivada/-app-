@@ -139,7 +139,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=79" />
+  <link rel="stylesheet" href="styles.css?v=80" />
 </head>
 <body>
 
@@ -1403,10 +1403,10 @@
       <div class="modal-body" style="padding: 18px 20px;">
         <!-- Selector de Pestañas: Iniciar Sesión vs Registrarse -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: rgba(255,255,255,0.06); padding: 4px; border-radius: 12px; margin-bottom: 16px;">
-          <button type="button" id="tabBtnPassengerLogin" class="active" style="padding: 9px; border-radius: 9px; border: none; font-weight: 700; font-size: 0.84rem; cursor: pointer; background: #38bdf8; color: #0f172a; transition: all 0.2s;">
+          <button type="button" id="tabBtnPassengerLogin" onclick="switchPassengerAuthTab('login')" class="active" style="padding: 9px; border-radius: 9px; border: none; font-weight: 700; font-size: 0.84rem; cursor: pointer; background: #38bdf8; color: #0f172a; transition: all 0.2s;">
             🔑 Iniciar Sesión
           </button>
-          <button type="button" id="tabBtnPassengerRegister" style="padding: 9px; border-radius: 9px; border: none; font-weight: 700; font-size: 0.84rem; cursor: pointer; background: transparent; color: #94a3b8; transition: all 0.2s;">
+          <button type="button" id="tabBtnPassengerRegister" onclick="switchPassengerAuthTab('register')" style="padding: 9px; border-radius: 9px; border: none; font-weight: 700; font-size: 0.84rem; cursor: pointer; background: transparent; color: #94a3b8; transition: all 0.2s;">
             📝 Crear Cuenta
           </button>
         </div>
@@ -1624,9 +1624,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=79"></script>
+  <script src="sync.js?v=80"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=79"></script>
+  <script src="app.js?v=80"></script>
 </body>
 </html>
