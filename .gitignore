@@ -1,4 +1,20 @@
-# Temporary reference folders
-scratch_ref/
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build & System
 .DS_Store
 Thumbs.db
+*.log
+.idea/
+.vscode/
+
+# Android Build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+android/captures/
+android/.idea/
+
+# Temporary reference folders
+scratch_ref/

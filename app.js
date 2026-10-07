@@ -7704,16 +7704,19 @@ if (btnRecenterPassengerMap) {
         updateCalculation();
       }
     });
-  }
 
   // ==========================================
   // GESTIÓN DE RESERVAS DEL PASAJERO ("MIS RESERVAS")
   // ==========================================
-  const modalReservations = document.getElementById('passenger-reservations-modal');
-  const btnOpenReservations = document.getElementById('btnOpenPassengerReservations');
-  const btnCloseReservations = document.getElementById('close-passenger-reservations-btn');
-  const reservationsListContainer = document.getElementById('passengerReservationsListContainer');
-  const reservationsBadge = document.getElementById('passengerReservationsBadge');
+  function getModalReservationsEl() {
+    return document.getElementById('passenger-reservations-modal');
+  }
+  function getReservationsBadgeEl() {
+    return document.getElementById('passengerReservationsBadge');
+  }
+  function getReservationsListContainerEl() {
+    return document.getElementById('passengerReservationsListContainer');
+  }
 
   function loadPassengerReservations() {
     try {
@@ -7745,46 +7748,54 @@ if (btnRecenterPassengerMap) {
   }
 
   function updatePassengerReservationsBadge() {
-    if (!reservationsBadge) return;
+    const badge = getReservationsBadgeEl();
+    if (!badge) return;
     const list = loadPassengerReservations();
     const activeUpcoming = list.filter(r => !['cancelada', 'completada'].includes(r.estado && r.estado.toLowerCase()));
     if (activeUpcoming.length > 0) {
-      reservationsBadge.textContent = activeUpcoming.length;
-      reservationsBadge.style.display = 'inline-block';
+      badge.textContent = activeUpcoming.length;
+      badge.style.display = 'inline-block';
     } else {
-      reservationsBadge.style.display = 'none';
+      badge.style.display = 'none';
     }
   }
   window.updatePassengerReservationsBadge = updatePassengerReservationsBadge;
 
   function openPassengerReservationsModal() {
-    if (modalReservations) {
-      modalReservations.classList.remove('hidden');
+    const modal = getModalReservationsEl();
+    if (modal) {
+      modal.classList.remove('hidden');
       renderPassengerReservationsList();
     }
   }
   window.openPassengerReservationsModal = openPassengerReservationsModal;
 
   function closePassengerReservationsModal() {
-    if (modalReservations) {
-      modalReservations.classList.add('hidden');
+    const modal = getModalReservationsEl();
+    if (modal) {
+      modal.classList.add('hidden');
     }
   }
   window.closePassengerReservationsModal = closePassengerReservationsModal;
 
-  if (btnOpenReservations) {
-    btnOpenReservations.addEventListener('click', openPassengerReservationsModal);
+  const btnOpenReservationsInit = document.getElementById('btnOpenPassengerReservations');
+  const btnCloseReservationsInit = document.getElementById('close-passenger-reservations-btn');
+  const modalReservationsInit = document.getElementById('passenger-reservations-modal');
+
+  if (btnOpenReservationsInit) {
+    btnOpenReservationsInit.addEventListener('click', openPassengerReservationsModal);
   }
-  if (btnCloseReservations) {
-    btnCloseReservations.addEventListener('click', closePassengerReservationsModal);
+  if (btnCloseReservationsInit) {
+    btnCloseReservationsInit.addEventListener('click', closePassengerReservationsModal);
   }
-  if (modalReservations) {
-    modalReservations.addEventListener('click', (e) => {
-      if (e.target === modalReservations) closePassengerReservationsModal();
+  if (modalReservationsInit) {
+    modalReservationsInit.addEventListener('click', (e) => {
+      if (e.target === modalReservationsInit) closePassengerReservationsModal();
     });
   }
 
   function renderPassengerReservationsList() {
+    const reservationsListContainer = getReservationsListContainerEl();
     if (!reservationsListContainer) return;
     const list = loadPassengerReservations();
 
@@ -8204,14 +8215,17 @@ if (btnRecenterPassengerMap) {
     }
 
     function openPassengerAuthModal(defaultTab = 'login') {
-      if (!modalPassengerAuth) return;
-      modalPassengerAuth.classList.remove('hidden');
-      switchAuthTab(defaultTab);
+      const modal = modalPassengerAuth || document.getElementById('modalPassengerAuth');
+      if (modal) {
+        modal.classList.remove('hidden');
+        switchAuthTab(defaultTab);
+      }
     }
     window.openPassengerAuthModal = openPassengerAuthModal;
 
     function closePassengerAuthModal() {
-      if (modalPassengerAuth) modalPassengerAuth.classList.add('hidden');
+      const modal = modalPassengerAuth || document.getElementById('modalPassengerAuth');
+      if (modal) modal.classList.add('hidden');
     }
     window.closePassengerAuthModal = closePassengerAuthModal;
 
@@ -8224,12 +8238,14 @@ if (btnRecenterPassengerMap) {
       renderPassengerProfileUI(session);
       renderPassengerHistoryUI();
       renderSavedCardsUI();
-      if (modalPassengerProfile) modalPassengerProfile.classList.remove('hidden');
+      const modal = modalPassengerProfile || document.getElementById('modalPassengerProfile');
+      if (modal) modal.classList.remove('hidden');
     }
     window.openPassengerProfileModal = openPassengerProfileModal;
 
     function closePassengerProfileModal() {
-      if (modalPassengerProfile) modalPassengerProfile.classList.add('hidden');
+      const modal = modalPassengerProfile || document.getElementById('modalPassengerProfile');
+      if (modal) modal.classList.add('hidden');
     }
     window.closePassengerProfileModal = closePassengerProfileModal;
 
