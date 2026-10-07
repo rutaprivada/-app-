@@ -399,71 +399,104 @@ async function handleStep1Next() {
   const originInput = document.getElementById('origin-input');
   const destInput = document.getElementById('destination-input');
   const stopInput = document.getElementById('stop-input');
+  const btnNext = document.getElementById('btn-next-step1');
 
   const originVal = originInput ? originInput.value.trim() : '';
   const destVal = destInput ? destInput.value.trim() : '';
   const stopVal = stopInput ? stopInput.value.trim() : '';
 
   if (!originVal || !destVal) {
-    showToast('⚠️ Por favor escribe el Punto de Partida (Origen) y el Destino Final.');
+    showToast('⚠️ Por favor completa el Punto de Partida (Origen) y el Destino Final.');
     if (!originVal && originInput) {
       originInput.focus();
+      originInput.style.borderColor = '#ef4444';
+      setTimeout(() => { if (originInput) originInput.style.borderColor = ''; }, 2000);
     } else if (!destVal && destInput) {
       destInput.focus();
+      destInput.style.borderColor = '#ef4444';
+      setTimeout(() => { if (destInput) destInput.style.borderColor = ''; }, 2000);
     }
     return;
   }
 
-  // Geocodificar origen si falta latitud o cambió el texto
-  if (!state.origin || !state.origin.lat || (state.origin.address && state.origin.address !== originVal && !originVal.includes(state.origin.address.split(',')[0]))) {
-    if (typeof searchLocations === 'function') {
-      try {
-        const results = await searchLocations(originVal);
-        if (results && results.length > 0) {
-          state.origin = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || originVal };
-        }
-      } catch(e){}
+  if (btnNext) {
+    btnNext.disabled = true;
+    btnNext.innerHTML = 'Calculando ruta... ⏳';
+  }
+
+  try {
+    // Geocodificar en paralelo si faltan coordenadas
+    const geoTasks = [];
+
+    if (!state.origin || !state.origin.lat || (state.origin.address && state.origin.address !== originVal && !originVal.includes(state.origin.address.split(',')[0]))) {
+      geoTasks.push(
+        (async () => {
+          if (typeof searchLocations === 'function') {
+            try {
+              const res = await searchLocations(originVal);
+              if (res && res.length > 0) {
+                state.origin = { lat: parseFloat(res[0].lat), lng: parseFloat(res[0].lon), address: res[0].display_name || originVal };
+              }
+            } catch(e){}
+          }
+        })()
+      );
+    }
+
+    if (!state.destination || !state.destination.lat || (state.destination.address && state.destination.address !== destVal && !destVal.includes(state.destination.address.split(',')[0]))) {
+      geoTasks.push(
+        (async () => {
+          if (typeof searchLocations === 'function') {
+            try {
+              const res = await searchLocations(destVal);
+              if (res && res.length > 0) {
+                state.destination = { lat: parseFloat(res[0].lat), lng: parseFloat(res[0].lon), address: res[0].display_name || destVal };
+              }
+            } catch(e){}
+          }
+        })()
+      );
+    }
+
+    if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
+      geoTasks.push(
+        (async () => {
+          if (typeof searchLocations === 'function') {
+            try {
+              const res = await searchLocations(stopVal);
+              if (res && res.length > 0) {
+                state.intermediateStop = { lat: parseFloat(res[0].lat), lng: parseFloat(res[0].lon), address: res[0].display_name || stopVal };
+              }
+            } catch(e){}
+          }
+        })()
+      );
+    }
+
+    if (geoTasks.length > 0) {
+      await Promise.allSettled(geoTasks);
+    }
+
+    // Fallbacks seguros para que nunca quede bloqueado
+    if (!state.origin || !state.origin.lat) {
+      state.origin = { lat: -34.6037, lng: -58.3816, address: originVal };
+    }
+    if (!state.destination || !state.destination.lat) {
+      state.destination = { lat: -34.8127, lng: -58.5372, address: destVal };
+    }
+
+    // Calcular distancias y peajes
+    if (typeof checkAndRoute === 'function') {
+      try { await checkAndRoute(); } catch(e){}
+    }
+
+    goToWizardStep(2);
+  } finally {
+    if (btnNext) {
+      btnNext.disabled = false;
+      btnNext.innerHTML = 'Siguiente: Ver Mapa ➔';
     }
   }
-
-  // Geocodificar destino si falta latitud o cambió el texto
-  if (!state.destination || !state.destination.lat || (state.destination.address && state.destination.address !== destVal && !destVal.includes(state.destination.address.split(',')[0]))) {
-    if (typeof searchLocations === 'function') {
-      try {
-        const results = await searchLocations(destVal);
-        if (results && results.length > 0) {
-          state.destination = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || destVal };
-        }
-      } catch(e){}
-    }
-  }
-
-  // Geocodificar parada intermedia si aplica
-  if (state.hasIntermediateStop && stopVal && (!state.intermediateStop || !state.intermediateStop.lat)) {
-    if (typeof searchLocations === 'function') {
-      try {
-        const results = await searchLocations(stopVal);
-        if (results && results.length > 0) {
-          state.intermediateStop = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon), address: results[0].display_name || stopVal };
-        }
-      } catch(e){}
-    }
-  }
-
-  // Fallbacks de coordenadas seguros
-  if (!state.origin || !state.origin.lat) {
-    state.origin = { lat: -34.6037, lng: -58.3816, address: originVal };
-  }
-  if (!state.destination || !state.destination.lat) {
-    state.destination = { lat: -34.8127, lng: -58.5372, address: destVal };
-  }
-
-  // Calcular ruta y distancias con tráfico real
-  if (typeof checkAndRoute === 'function') {
-    try { await checkAndRoute(); } catch(e){}
-  }
-
-  goToWizardStep(2);
 }
 
 function handleStep3Next() {
@@ -8230,11 +8263,7 @@ if (btnRecenterPassengerMap) {
     window.closePassengerAuthModal = closePassengerAuthModal;
 
     function openPassengerProfileModal() {
-      const session = getPassengerSession();
-      if (!session || (!session.nombre && !session.email && !session.telefono)) {
-        openPassengerAuthModal('login');
-        return;
-      }
+      const session = getPassengerSession() || loadPassengerProfile() || { nombre: '', telefono: '', email: '', avatar: '' };
       renderPassengerProfileUI(session);
       renderPassengerHistoryUI();
       renderSavedCardsUI();
