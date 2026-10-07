@@ -4393,10 +4393,109 @@ function prepareAddressForUsig(rawQuery) {
   };
 }
 
-// Motor inteligente de geocodificación de alta precisión en paralelo (Landmarks 0ms + USIG + Photon + Nominatim)
+// Generador de sugerencias inmediatas (0ms) en memoria para CABA y GBA
+function getInstantLocalSuggestions(rawQuery) {
+  const query = (rawQuery || '').trim();
+  if (query.length < 2) return [];
+
+  const results = [];
+  const seen = new Set();
+
+  function pushItem(item) {
+    if (!item || !item.lat || !item.lon) return;
+    const key = `${parseFloat(item.lat).toFixed(3)},${parseFloat(item.lon).toFixed(3)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      results.push(item);
+    }
+  }
+
+  // 1. Coincidencias exactas en puntos de interés y aeropuertos
+  if (Array.isArray(STRATEGIC_LANDMARKS)) {
+    STRATEGIC_LANDMARKS.forEach(l => {
+      if (l.regex && l.regex.test(query)) {
+        pushItem({
+          lat: l.lat,
+          lon: l.lon,
+          display_name: `${l.mainTitle}, ${l.subTitle}`,
+          _isIntersection: false,
+          _isPoi: true,
+          _poiBadge: l.badge || 'Punto Estratégico',
+          _icon: l.icon || '📍',
+          _mainTitle: l.mainTitle,
+          _subTitle: l.subTitle
+        });
+      }
+    });
+  }
+
+  // 2. Coincidencias de Avenidas y Calles con Altura en CABA / GBA
+  const matchNumber = query.match(/\b\d{1,5}\b/);
+  const numberStr = matchNumber ? matchNumber[0] : '';
+  const streetOnly = query.replace(/\b\d{1,5}\b/, '').trim();
+
+  const POPULAR_STREETS = [
+    { name: 'Av. Córdoba', lat: -34.5975, lon: -58.4230, sub: 'Palermo / Recoleta, CABA' },
+    { name: 'Av. Santa Fe', lat: -34.5878, lon: -58.4115, sub: 'Palermo / Recoleta, CABA' },
+    { name: 'Av. Corrientes', lat: -34.6038, lon: -58.3980, sub: 'Balvanera / San Nicolás, CABA' },
+    { name: 'Av. 9 de Julio', lat: -34.6037, lon: -58.3816, sub: 'Centro / Retiro, CABA' },
+    { name: 'Av. del Libertador', lat: -34.5720, lon: -58.4200, sub: 'Palermo / Núñez / Vicente López' },
+    { name: 'Av. Cabildo', lat: -34.5620, lon: -58.4560, sub: 'Belgrano / Colegiales, CABA' },
+    { name: 'Av. Rivadavia', lat: -34.6150, lon: -58.4300, sub: 'Caballito / Almagro / Flores, CABA' },
+    { name: 'Av. Callao', lat: -34.6000, lon: -58.3920, sub: 'Recoleta / Balvanera, CABA' },
+    { name: 'Av. Pueyrredón', lat: -34.5950, lon: -58.4000, sub: 'Recoleta / Once, CABA' },
+    { name: 'Av. Belgrano', lat: -34.6120, lon: -58.3880, sub: 'Monserrat / Balvanera, CABA' },
+    { name: 'Av. San Martín', lat: -34.5980, lon: -58.4650, sub: 'Villa Crespo / Agronomía, CABA' },
+    { name: 'Av. Juan B. Justo', lat: -34.5920, lon: -58.4380, sub: 'Palermo / Villa Crespo, CABA' },
+    { name: 'Av. Las Heras', lat: -34.5860, lon: -58.3980, sub: 'Recoleta / Palermo, CABA' },
+    { name: 'Av. Leandro N. Alem', lat: -34.6010, lon: -58.3710, sub: 'San Nicolás / Puerto Madero, CABA' },
+    { name: 'Av. Paseo Colón', lat: -34.6150, lon: -58.3680, sub: 'San Telmo / Puerto Madero, CABA' },
+    { name: 'Av. Monroe', lat: -34.5630, lon: -58.4600, sub: 'Belgrano / Villa Urquiza, CABA' },
+    { name: 'Av. Juramento', lat: -34.5620, lon: -58.4550, sub: 'Belgrano, CABA' },
+    { name: 'Av. Triunvirato', lat: -34.5800, lon: -58.4750, sub: 'Villa Urquiza, CABA' }
+  ];
+
+  POPULAR_STREETS.forEach(s => {
+    const cleanStreetName = s.name.replace(/^Av\.?\s+/i, '').toLowerCase();
+    const queryClean = streetOnly.replace(/^Av\.?\s+/i, '').toLowerCase();
+    if (queryClean.length >= 2 && cleanStreetName.includes(queryClean)) {
+      const fullTitle = numberStr ? `${s.name} ${numberStr}` : s.name;
+      pushItem({
+        lat: String(s.lat),
+        lon: String(s.lon),
+        display_name: `${fullTitle}, ${s.sub}`,
+        _isIntersection: false,
+        _isPoi: false,
+        _poiBadge: 'Dirección CABA',
+        _icon: '📍',
+        _mainTitle: fullTitle,
+        _subTitle: s.sub
+      });
+    }
+  });
+
+  // 3. Fallback genérico del término exacto escrito si no hubo coincidencia
+  if (results.length === 0 && query.length >= 3) {
+    pushItem({
+      lat: '-34.6037',
+      lon: '-58.3816',
+      display_name: `${capitalizeWords(query)}, Buenos Aires`,
+      _isIntersection: false,
+      _isPoi: false,
+      _poiBadge: 'Ubicación ingresada',
+      _icon: '📍',
+      _mainTitle: capitalizeWords(query),
+      _subTitle: 'Buenos Aires, Argentina'
+    });
+  }
+
+  return results;
+}
+
+// Motor inteligente de geocodificación de alta precisión en paralelo
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
-  if (query.length < 3) return [];
+  if (query.length < 2) return [];
 
   const cornerPattern = /^(.+?)\s+(?:y|e|esquina|esq\.?|con|cruce(?:\s+con)?|e\/|\/|&)\s+(.+)$/i;
   const isCorner = cornerPattern.test(query) || /^(esquina|esq\.?|cruce)\s+/i.test(query);
@@ -4416,26 +4515,11 @@ async function searchLocations(rawQuery, signal) {
     }
   }
 
-  // 1. Detección instantánea en memoria (0 ms) de puntos estratégicos y aeropuertos
-  if (Array.isArray(STRATEGIC_LANDMARKS)) {
-    STRATEGIC_LANDMARKS.forEach(landmark => {
-      if (landmark.regex.test(query)) {
-        addResult({
-          lat: landmark.lat,
-          lon: landmark.lon,
-          display_name: `${landmark.mainTitle}, ${landmark.subTitle}`,
-          _isIntersection: landmark.badge ? landmark.badge.includes('Esquina') : false,
-          _isPoi: true,
-          _poiBadge: landmark.badge || 'Punto de Interés',
-          _icon: landmark.icon || '📍',
-          _mainTitle: landmark.mainTitle,
-          _subTitle: landmark.subTitle
-        });
-      }
-    });
-  }
+  // 1. Agregar resultados instantáneos
+  const instant = getInstantLocalSuggestions(query);
+  instant.forEach(addResult);
 
-  // 2. Ejecutar proveedores en PARALELO para velocidad instantánea
+  // 2. Ejecutar proveedores en PARALELO con timeout de 900ms para no demorar la UI
   const { cleanedAddress, neighborhood } = prepareAddressForUsig(query);
   const usigUrl = `https://servicios.usig.buenosaires.gob.ar/normalizar/?direccion=${encodeURIComponent(cleanedAddress)}&geocodificar=TRUE`;
   const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=-34.6037&lon=-58.3816&limit=6`;
@@ -4446,7 +4530,7 @@ async function searchLocations(rawQuery, signal) {
     // Task A: USIG Buenos Aires
     (async () => {
       try {
-        const res = await fetchWithTimeout(usigUrl, {}, 1800, signal);
+        const res = await fetchWithTimeout(usigUrl, {}, 950, signal);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.direccionesNormalizadas)) {
@@ -4488,7 +4572,7 @@ async function searchLocations(rawQuery, signal) {
                   display_name: fullDisplay,
                   _isIntersection: isUsigCorner || isCorner,
                   _isPoi: false,
-                  _poiBadge: isUsigCorner ? 'Esquina Oficial CABA/GBA' : 'Dirección Oficial CABA/GBA',
+                  _poiBadge: isUsigCorner ? 'Esquina Oficial' : 'Dirección Oficial',
                   _icon: isUsigCorner ? '🚦' : '📍',
                   _cornerTitle: isUsigCorner ? `${street1} y ${street2}` : null,
                   _mainTitle: mainTitle,
@@ -4504,7 +4588,7 @@ async function searchLocations(rawQuery, signal) {
     // Task B: Photon OSM Geocoder
     (async () => {
       try {
-        const res = await fetchWithTimeout(photonUrl, {}, 1800, signal);
+        const res = await fetchWithTimeout(photonUrl, {}, 950, signal);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.features)) {
@@ -4569,10 +4653,10 @@ async function searchLocations(rawQuery, signal) {
       } catch(e) {}
     })(),
 
-    // Task C: Nominatim OpenStreetMap
+    // Task C: Nominatim
     (async () => {
       try {
-        const res = await fetchWithTimeout(nomUrl, {}, 1800, signal);
+        const res = await fetchWithTimeout(nomUrl, {}, 950, signal);
         if (res.ok) {
           const nomData = await res.json();
           if (Array.isArray(nomData)) {
@@ -4591,49 +4675,6 @@ async function searchLocations(rawQuery, signal) {
   ];
 
   await Promise.allSettled(fetchTasks);
-
-  // 3. Fallback inteligente instantáneo si los servicios no arrojaron coordenadas
-  if (results.length === 0 && query.length >= 3) {
-    let fallbackLat = '-34.6037';
-    let fallbackLon = '-58.3816';
-
-    // Estimaciones según calle / zona
-    if (/cordoba|c[oó]rdoba/i.test(query)) {
-      fallbackLat = '-34.5975';
-      fallbackLon = '-58.4230';
-    } else if (/santa fe/i.test(query)) {
-      fallbackLat = '-34.5878';
-      fallbackLon = '-58.4115';
-    } else if (/corrientes/i.test(query)) {
-      fallbackLat = '-34.6038';
-      fallbackLon = '-58.3980';
-    } else if (/ezeiza|aeropuerto.*ezeiza/i.test(query)) {
-      fallbackLat = '-34.8222';
-      fallbackLon = '-58.5358';
-    } else if (/aeroparque/i.test(query)) {
-      fallbackLat = '-34.5580';
-      fallbackLon = '-58.4173';
-    } else if (/palermo/i.test(query)) {
-      fallbackLat = '-34.5889';
-      fallbackLon = '-58.4306';
-    } else if (/belgrano/i.test(query)) {
-      fallbackLat = '-34.5627';
-      fallbackLon = '-58.4564';
-    }
-
-    addResult({
-      lat: fallbackLat,
-      lon: fallbackLon,
-      display_name: `${capitalizeWords(query)}, Buenos Aires`,
-      _isIntersection: isCorner,
-      _isPoi: false,
-      _poiBadge: 'Dirección CABA/GBA',
-      _icon: '📍',
-      _mainTitle: capitalizeWords(query),
-      _subTitle: 'CABA, Buenos Aires'
-    });
-  }
-
   return results;
 }
 
@@ -4653,21 +4694,14 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     activeIndex = -1;
 
     if (!items || items.length === 0) {
-      if (searchedQuery && searchedQuery.length >= 3) {
-        list.classList.remove('hidden');
-        list.innerHTML = `<div class="suggestions-loading" style="color: #94a3b8;"><span>📍</span> <span>Sin resultados para "${escapeHtml(searchedQuery)}". Probá con el nombre del lugar, esquina o localidad.</span></div>`;
-        setTimeout(() => {
-          if (currentResults.length === 0) list.classList.add('hidden');
-        }, 3200);
-      } else {
-        list.classList.add('hidden');
-      }
+      list.classList.add('hidden');
       return;
     }
 
     list.classList.remove('hidden');
+    list.style.display = 'block';
 
-    items.forEach((place) => {
+    items.slice(0, 6).forEach((place) => {
       const item = document.createElement('div');
       item.className = 'suggestion-item';
       if (place._isIntersection) item.classList.add('is-intersection');
@@ -4681,11 +4715,11 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
       item.innerHTML = `
         <span style="font-size:1.2rem; flex-shrink:0;">${icon}</span>
-        <div class="suggestion-content">
+        <div class="suggestion-content" style="flex: 1; min-width: 0;">
           ${poiBadge ? `<span class="suggestion-badge-poi">${escapeHtml(poiBadge)}</span>` : ''}
           ${isCorner && !poiBadge ? `<span class="suggestion-badge-intersection">🚦 Esquina / Cruce</span>` : ''}
-          <span class="suggestion-title">${escapeHtml(mainTitle)}</span>
-          <span class="suggestion-sub">${escapeHtml(subAddress)}</span>
+          <span class="suggestion-title" style="display: block; font-weight: 700; color: #fff;">${escapeHtml(mainTitle)}</span>
+          <span class="suggestion-sub" style="display: block; font-size: 0.76rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(subAddress)}</span>
         </div>
       `;
 
@@ -4697,7 +4731,6 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       };
 
       item.addEventListener('pointerdown', handleSelect);
-      item.addEventListener('touchstart', handleSelect, { passive: false });
       item.addEventListener('mousedown', handleSelect);
       item.addEventListener('click', handleSelect);
 
@@ -4710,7 +4743,6 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     const cleanSub = place._subTitle || cleanAddressDisplay(place.display_name);
     const mainTitle = place._mainTitle || (place.display_name ? place.display_name.split(',')[0] : '');
     
-    // Al seleccionar, colocamos la dirección completa y exacta para el chofer y la cotización
     let cleanName = place.display_name || mainTitle;
     if (mainTitle && cleanSub) {
       if (mainTitle.toLowerCase().includes(cleanSub.toLowerCase())) {
@@ -4743,48 +4775,19 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     }
     abortController = new AbortController();
 
-    list.classList.remove('hidden');
-    list.innerHTML = `<div class="suggestions-loading"><span>🔍</span> <span>Buscando ubicación...</span></div>`;
-
     try {
       const results = await searchLocations(query, abortController.signal);
       if (results && results.length > 0) {
         renderList(results, query);
-      } else {
-        // Fallback garantizado inmediato para que el usuario nunca quede bloqueado
-        renderList([{
-          lat: '-34.6037',
-          lon: '-58.3816',
-          display_name: `${capitalizeWords(query)}, Buenos Aires`,
-          _isIntersection: false,
-          _isPoi: false,
-          _poiBadge: 'Dirección CABA/GBA',
-          _icon: '📍',
-          _mainTitle: capitalizeWords(query),
-          _subTitle: 'CABA, Buenos Aires'
-        }], query);
       }
-    } catch (err) {
-      console.warn('Geocoding notice:', err);
-      renderList([{
-        lat: '-34.6037',
-        lon: '-58.3816',
-        display_name: `${capitalizeWords(query)}, Buenos Aires`,
-        _isIntersection: false,
-        _isPoi: false,
-        _poiBadge: 'Dirección CABA/GBA',
-        _icon: '📍',
-        _mainTitle: capitalizeWords(query),
-        _subTitle: 'CABA, Buenos Aires'
-      }], query);
-    }
+    } catch (err) {}
   }
 
   input.addEventListener('input', () => {
     clearTimeout(debounceTimeout);
     const query = input.value.trim();
 
-    if (query.length < 3) {
+    if (query.length < 2) {
       if (abortController) abortController.abort();
       list.innerHTML = '';
       list.classList.add('hidden');
@@ -4792,12 +4795,28 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       return;
     }
 
+    // 1. Mostrar sugerencias instantáneas (0ms) directamente
+    const instantItems = getInstantLocalSuggestions(query);
+    if (instantItems.length > 0) {
+      renderList(instantItems, query);
+    }
+
+    // 2. Refinar con geocodificación en segundo plano
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 320);
+    }, 250);
   });
 
-  // Soporte de navegación por teclado y Enter instantáneo
+  input.addEventListener('focus', () => {
+    const query = input.value.trim();
+    if (query.length >= 2) {
+      const instantItems = getInstantLocalSuggestions(query);
+      if (instantItems.length > 0) {
+        renderList(instantItems, query);
+      }
+    }
+  });
+
   input.addEventListener('keydown', async (e) => {
     const items = list.querySelectorAll('.suggestion-item');
 
@@ -4820,32 +4839,9 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       if (currentResults.length > 0) {
         const target = activeIndex >= 0 ? currentResults[activeIndex] : currentResults[0];
         selectItem(target);
-      } else if (input.value.trim().length >= 3) {
-        if (abortController) abortController.abort();
-        abortController = new AbortController();
-        list.classList.remove('hidden');
-        list.innerHTML = `<div class="suggestions-loading"><span>🔍</span> <span>Localizando dirección...</span></div>`;
-        const results = await searchLocations(input.value.trim(), abortController.signal);
-        if (results && results.length > 0) {
-          selectItem(results[0]);
-        } else {
-          list.innerHTML = `<div class="suggestions-loading" style="color:#f87171;"><span>❌</span> <span>No se encontró la dirección. Intenta agregar la localidad.</span></div>`;
-          setTimeout(() => list.classList.add('hidden'), 2500);
-        }
       }
     } else if (e.key === 'Escape') {
       list.classList.add('hidden');
-    }
-  });
-
-  // Auto-resolver si el usuario termina de escribir y hace clic fuera (blur o change)
-  input.addEventListener('change', async () => {
-    const val = input.value.trim();
-    if (val.length >= 3 && currentResults.length === 0) {
-      const res = await searchLocations(val);
-      if (res && res.length > 0) {
-        selectItem(res[0]);
-      }
     }
   });
 
@@ -8247,10 +8243,11 @@ if (btnRecenterPassengerMap) {
       if (inputEmail && user.email) inputEmail.value = user.email;
     }
 
-    function openPassengerAuthModal(defaultTab = 'login') {
+    function openPassengerAuthModal(defaultTab = 'register') {
       const modal = modalPassengerAuth || document.getElementById('modalPassengerAuth');
       if (modal) {
         modal.classList.remove('hidden');
+        modal.style.display = 'flex';
         switchAuthTab(defaultTab);
       }
     }
@@ -8258,25 +8255,43 @@ if (btnRecenterPassengerMap) {
 
     function closePassengerAuthModal() {
       const modal = modalPassengerAuth || document.getElementById('modalPassengerAuth');
-      if (modal) modal.classList.add('hidden');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+      }
     }
     window.closePassengerAuthModal = closePassengerAuthModal;
 
     function openPassengerProfileModal() {
-      const session = getPassengerSession() || loadPassengerProfile() || { nombre: '', telefono: '', email: '', avatar: '' };
+      const session = getPassengerSession();
+      // Si no tiene perfil registrado, abrir modal de Registro de Pasajero obligatoriamente
+      if (!session || (!session.nombre && !session.email && !session.telefono)) {
+        openPassengerAuthModal('register');
+        return;
+      }
       renderPassengerProfileUI(session);
       renderPassengerHistoryUI();
       renderSavedCardsUI();
       const modal = modalPassengerProfile || document.getElementById('modalPassengerProfile');
-      if (modal) modal.classList.remove('hidden');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+      }
     }
     window.openPassengerProfileModal = openPassengerProfileModal;
 
     function closePassengerProfileModal() {
       const modal = modalPassengerProfile || document.getElementById('modalPassengerProfile');
-      if (modal) modal.classList.add('hidden');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+      }
     }
     window.closePassengerProfileModal = closePassengerProfileModal;
+
+    if (btnOpenPassengerProfile) {
+      btnOpenPassengerProfile.addEventListener('click', openPassengerProfileModal);
+    }
 
     function switchAuthTab(tab) {
       if (tab === 'register') {
