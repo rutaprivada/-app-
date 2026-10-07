@@ -134,6 +134,94 @@ let stopMarker = null;
 let routePolyline = null;
 
 // ==========================================
+// ACCESOS GLOBALES TEMPRANOS PARA MODALES Y ACCIONES
+// ==========================================
+window.getPassengerSession = function() {
+  try {
+    const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || localStorage.getItem('rutaprivada_passenger_profile');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
+    }
+  } catch(e) {}
+  return null;
+};
+
+window.openPassengerProfileModal = function() {
+  const session = window.getPassengerSession();
+  if (!session || (!session.nombre && !session.email && !session.telefono)) {
+    window.openPassengerAuthModal('register');
+    return;
+  }
+  if (typeof renderPassengerProfileUI === 'function') renderPassengerProfileUI(session);
+  if (typeof renderPassengerHistoryUI === 'function') renderPassengerHistoryUI();
+  if (typeof renderSavedCardsUI === 'function') renderSavedCardsUI();
+  const modal = document.getElementById('modalPassengerProfile');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
+};
+
+window.closePassengerProfileModal = function() {
+  const modal = document.getElementById('modalPassengerProfile');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+};
+
+window.openPassengerAuthModal = function(defaultTab = 'register') {
+  const modal = document.getElementById('modalPassengerAuth');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    const tabBtnRegister = document.getElementById('tabBtnPassengerRegister');
+    const tabBtnLogin = document.getElementById('tabBtnPassengerLogin');
+    const formLogin = document.getElementById('formPassengerLogin');
+    const formRegister = document.getElementById('formPassengerRegister');
+    if (defaultTab === 'register') {
+      if (tabBtnRegister) { tabBtnRegister.style.background = '#10b981'; tabBtnRegister.style.color = '#fff'; }
+      if (tabBtnLogin) { tabBtnLogin.style.background = 'transparent'; tabBtnLogin.style.color = '#94a3b8'; }
+      if (formLogin) formLogin.style.display = 'none';
+      if (formRegister) formRegister.style.display = 'flex';
+    } else {
+      if (tabBtnLogin) { tabBtnLogin.style.background = '#38bdf8'; tabBtnLogin.style.color = '#0f172a'; }
+      if (tabBtnRegister) { tabBtnRegister.style.background = 'transparent'; tabBtnRegister.style.color = '#94a3b8'; }
+      if (formLogin) formLogin.style.display = 'flex';
+      if (formRegister) formRegister.style.display = 'none';
+    }
+  }
+};
+
+window.closePassengerAuthModal = function() {
+  const modal = document.getElementById('modalPassengerAuth');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+};
+
+window.openPassengerReservationsModal = function() {
+  if (typeof renderPassengerReservationsList === 'function') {
+    renderPassengerReservationsList();
+  }
+  const modal = document.getElementById('passenger-reservations-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
+};
+
+window.closePassengerReservationsModal = function() {
+  const modal = document.getElementById('passenger-reservations-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+};
+
+// ==========================================
 // 1.2 MULTI-STEP WIZARD CONTROLLER (PASO A PASO PASAJERO)
 // ==========================================
 let currentWizardStep = 1;
@@ -3709,6 +3797,55 @@ function initEventListeners() {
     });
   }
 
+  // Botones para borrar texto de dirección
+  const btnClearOrigin = document.getElementById('btn-clear-origin');
+  if (btnClearOrigin) {
+    btnClearOrigin.addEventListener('click', () => {
+      const origInp = document.getElementById('origin-input');
+      if (origInp) {
+        origInp.value = '';
+        origInp.focus();
+      }
+      state.origin = null;
+      if (originMarker && map) {
+        map.removeLayer(originMarker);
+        originMarker = null;
+      }
+      const list = document.getElementById('origin-suggestions');
+      if (list) {
+        list.innerHTML = '';
+        list.classList.add('hidden');
+        list.style.display = 'none';
+      }
+      btnClearOrigin.classList.add('hidden');
+      updateCalculation();
+    });
+  }
+
+  const btnClearDest = document.getElementById('btn-clear-destination');
+  if (btnClearDest) {
+    btnClearDest.addEventListener('click', () => {
+      const destInp = document.getElementById('destination-input');
+      if (destInp) {
+        destInp.value = '';
+        destInp.focus();
+      }
+      state.destination = null;
+      if (destinationMarker && map) {
+        map.removeLayer(destinationMarker);
+        destinationMarker = null;
+      }
+      const list = document.getElementById('destination-suggestions');
+      if (list) {
+        list.innerHTML = '';
+        list.classList.add('hidden');
+        list.style.display = 'none';
+      }
+      btnClearDest.classList.add('hidden');
+      updateCalculation();
+    });
+  }
+
   // Botón ubicación actual
   const btnUseLocation = document.getElementById('btn-use-location');
   if (btnUseLocation) {
@@ -4695,6 +4832,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
     if (!items || items.length === 0) {
       list.classList.add('hidden');
+      list.style.display = 'none';
       return;
     }
 
@@ -4757,7 +4895,11 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     input.value = cleanName;
     list.innerHTML = '';
     list.classList.add('hidden');
+    list.style.display = 'none';
     currentResults = [];
+
+    const clearBtn = input.parentElement ? input.parentElement.querySelector('.btn-clear-address') : null;
+    if (clearBtn) clearBtn.classList.remove('hidden');
 
     const pLat = parseFloat(place.lat || place.latitude);
     const pLon = parseFloat(place.lon || place.lng || place.longitude);
@@ -4787,10 +4929,17 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     clearTimeout(debounceTimeout);
     const query = input.value.trim();
 
+    const clearBtn = input.parentElement ? input.parentElement.querySelector('.btn-clear-address') : null;
+    if (clearBtn) {
+      if (query.length > 0) clearBtn.classList.remove('hidden');
+      else clearBtn.classList.add('hidden');
+    }
+
     if (query.length < 2) {
       if (abortController) abortController.abort();
       list.innerHTML = '';
       list.classList.add('hidden');
+      list.style.display = 'none';
       currentResults = [];
       return;
     }
@@ -4804,7 +4953,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     // 2. Refinar con geocodificación en segundo plano
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 250);
+    }, 200);
   });
 
   input.addEventListener('focus', () => {
@@ -4842,15 +4991,20 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       }
     } else if (e.key === 'Escape') {
       list.classList.add('hidden');
+      list.style.display = 'none';
     }
   });
 
   document.addEventListener('click', (e) => {
     if (!input.contains(e.target) && !list.contains(e.target)) {
       list.classList.add('hidden');
+      list.style.display = 'none';
     }
   });
 }
+
+window.setupAddressAutocomplete = setupAddressAutocomplete;
+window.searchLocations = searchLocations;
 
 async function reverseGeocode(lat, lon) {
   try {

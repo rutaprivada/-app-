@@ -521,6 +521,31 @@ body {
   color: var(--text-muted);
 }
 
+.btn-clear-address {
+  position: absolute;
+  right: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #94a3b8;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  transition: all 0.18s ease;
+  z-index: 5;
+}
+
+.btn-clear-address:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fff;
+  border-color: #ef4444;
+}
+
 .location-btn {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-subtle);
