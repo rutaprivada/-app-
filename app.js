@@ -286,7 +286,9 @@ let routePolyline = null;
 // ==========================================
 window.getPassengerSession = function() {
   try {
-    const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || localStorage.getItem('rutaprivada_passenger_profile');
+    const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
+                localStorage.getItem('rutaprivada_passenger_profile') || 
+                localStorage.getItem('rutaprivada_user_session');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
@@ -295,10 +297,30 @@ window.getPassengerSession = function() {
   return null;
 };
 
+window.switchPassengerAuthTab = function(tab) {
+  const tabBtnLogin = document.getElementById('tabBtnPassengerLogin');
+  const tabBtnRegister = document.getElementById('tabBtnPassengerRegister');
+  const formLogin = document.getElementById('formPassengerLogin');
+  const formRegister = document.getElementById('formPassengerRegister');
+
+  if (tab === 'register') {
+    if (tabBtnRegister) { tabBtnRegister.style.background = '#10b981'; tabBtnRegister.style.color = '#fff'; }
+    if (tabBtnLogin) { tabBtnLogin.style.background = 'transparent'; tabBtnLogin.style.color = '#94a3b8'; }
+    if (formLogin) { formLogin.style.display = 'none'; }
+    if (formRegister) { formRegister.style.display = 'flex'; }
+  } else {
+    if (tabBtnLogin) { tabBtnLogin.style.background = '#38bdf8'; tabBtnLogin.style.color = '#0f172a'; }
+    if (tabBtnRegister) { tabBtnRegister.style.background = 'transparent'; tabBtnRegister.style.color = '#94a3b8'; }
+    if (formLogin) { formLogin.style.display = 'flex'; }
+    if (formRegister) { formRegister.style.display = 'none'; }
+  }
+};
+
 window.openPassengerProfileModal = function() {
   const session = window.getPassengerSession();
   if (!session || (!session.nombre && !session.email && !session.telefono)) {
-    window.openPassengerAuthModal('register');
+    // Si no hay sesión iniciada, abrir directamente la pestaña de INICIAR SESIÓN
+    window.openPassengerAuthModal('login');
     return;
   }
   if (typeof renderPassengerProfileUI === 'function') renderPassengerProfileUI(session);
@@ -319,26 +341,12 @@ window.closePassengerProfileModal = function() {
   }
 };
 
-window.openPassengerAuthModal = function(defaultTab = 'register') {
+window.openPassengerAuthModal = function(defaultTab = 'login') {
   const modal = document.getElementById('modalPassengerAuth');
   if (modal) {
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
-    const tabBtnRegister = document.getElementById('tabBtnPassengerRegister');
-    const tabBtnLogin = document.getElementById('tabBtnPassengerLogin');
-    const formLogin = document.getElementById('formPassengerLogin');
-    const formRegister = document.getElementById('formPassengerRegister');
-    if (defaultTab === 'register') {
-      if (tabBtnRegister) { tabBtnRegister.style.background = '#10b981'; tabBtnRegister.style.color = '#fff'; }
-      if (tabBtnLogin) { tabBtnLogin.style.background = 'transparent'; tabBtnLogin.style.color = '#94a3b8'; }
-      if (formLogin) formLogin.style.display = 'none';
-      if (formRegister) formRegister.style.display = 'flex';
-    } else {
-      if (tabBtnLogin) { tabBtnLogin.style.background = '#38bdf8'; tabBtnLogin.style.color = '#0f172a'; }
-      if (tabBtnRegister) { tabBtnRegister.style.background = 'transparent'; tabBtnRegister.style.color = '#94a3b8'; }
-      if (formLogin) formLogin.style.display = 'flex';
-      if (formRegister) formRegister.style.display = 'none';
-    }
+    window.switchPassengerAuthTab(defaultTab);
   }
 };
 
@@ -3893,387 +3901,9 @@ function formatNumber(num) {
 }
 
 // ==========================================
-// 8. EVENT LISTENERS E INTERACTIVIDAD
+// 8. HELPERS DE FORMATEO Y MONEDA
 // ==========================================
 
-function initEventListeners() {
-  // Moneda fija: Pesos Argentinos (ARS)
-  state.config.currency = 'ARS';
-
-  // Autocompletado de direcciones con filtro de Argentina
-  setupAddressAutocomplete('origin-input', 'origin-suggestions', (place) => {
-    setOrigin(place.lat, place.lon, place.display_name);
-  });
-
-  setupAddressAutocomplete('destination-input', 'destination-suggestions', (place) => {
-    setDestination(place.lat, place.lon, place.display_name);
-  });
-
-  // Recálculo dinámico y geocodificación al escribir/salir de las direcciones
-  const destInputEl = document.getElementById('destination-input');
-  if (destInputEl) {
-    destInputEl.addEventListener('input', () => {
-      updateCalculation();
-    });
-    destInputEl.addEventListener('blur', async () => {
-      const val = destInputEl.value.trim();
-      if (val && (!state.destination || !state.destination.lat)) {
-        try {
-          const results = await searchLocations(val);
-          if (results && results.length > 0) {
-            setDestination(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
-          }
-        } catch(e){}
-      }
-    });
-  }
-  const originInputEl = document.getElementById('origin-input');
-  if (originInputEl) {
-    originInputEl.addEventListener('input', () => {
-      updateCalculation();
-    });
-    originInputEl.addEventListener('blur', async () => {
-      const val = originInputEl.value.trim();
-      if (val && (!state.origin || !state.origin.lat)) {
-        try {
-          const results = await searchLocations(val);
-          if (results && results.length > 0) {
-            setOrigin(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].display_name);
-          }
-        } catch(e){}
-      }
-    });
-  }
-
-  // Botones para borrar texto de dirección
-  const btnClearOrigin = document.getElementById('btn-clear-origin');
-  if (btnClearOrigin) {
-    btnClearOrigin.addEventListener('click', () => {
-      const origInp = document.getElementById('origin-input');
-      if (origInp) {
-        origInp.value = '';
-        origInp.focus();
-      }
-      state.origin = null;
-      if (originMarker && map) {
-        map.removeLayer(originMarker);
-        originMarker = null;
-      }
-      const list = document.getElementById('origin-suggestions');
-      if (list) {
-        list.innerHTML = '';
-        list.classList.add('hidden');
-        list.style.display = 'none';
-      }
-      btnClearOrigin.classList.add('hidden');
-      updateCalculation();
-    });
-  }
-
-  const btnClearDest = document.getElementById('btn-clear-destination');
-  if (btnClearDest) {
-    btnClearDest.addEventListener('click', () => {
-      const destInp = document.getElementById('destination-input');
-      if (destInp) {
-        destInp.value = '';
-        destInp.focus();
-      }
-      state.destination = null;
-      if (destinationMarker && map) {
-        map.removeLayer(destinationMarker);
-        destinationMarker = null;
-      }
-      const list = document.getElementById('destination-suggestions');
-      if (list) {
-        list.innerHTML = '';
-        list.classList.add('hidden');
-        list.style.display = 'none';
-      }
-      btnClearDest.classList.add('hidden');
-      updateCalculation();
-    });
-  }
-
-  // Botón ubicación actual
-  const btnUseLocation = document.getElementById('btn-use-location');
-  if (btnUseLocation) {
-    btnUseLocation.addEventListener('click', () => {
-      if (!('geolocation' in navigator)) {
-        showToast('Tu navegador no tiene activada la geolocalización.');
-        return;
-      }
-      showToast('Obteniendo tu ubicación actual...');
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const { latitude, longitude } = pos.coords;
-          const address = await reverseGeocode(latitude, longitude);
-          const origInp = document.getElementById('origin-input');
-          if (origInp) origInp.value = address;
-          setOrigin(latitude, longitude, address);
-          if (map) map.setView([latitude, longitude], 14);
-          showToast('📍 Origen fijado en tu ubicación.');
-        },
-        () => {
-          showToast('No se pudo acceder a tu ubicación. Escribe la dirección.');
-        }
-      );
-    });
-  }
-
-  // Invertir origen y destino
-  const btnSwapRoute = document.getElementById('btn-swap-route');
-  if (btnSwapRoute) {
-    btnSwapRoute.addEventListener('click', () => {
-      if (!state.origin && !state.destination) return;
-      
-      const tempOrigin = state.origin;
-      const tempDest = state.destination;
-
-      const originInput = document.getElementById('origin-input');
-      const destInput = document.getElementById('destination-input');
-      const tempVal = originInput ? originInput.value : '';
-      if (originInput && destInput) {
-        originInput.value = destInput.value;
-        destInput.value = tempVal;
-      }
-
-      state.origin = null;
-      state.destination = null;
-
-      if (tempDest) setOrigin(tempDest.lat, tempDest.lng, tempDest.address);
-      if (tempOrigin) setDestination(tempOrigin.lat, tempOrigin.lng, tempOrigin.address);
-
-      showToast('Ruta invertida.');
-    });
-  }
-
-  // Control de parada intermedia en itinerario
-  const btnToggleStop = document.getElementById('btn-toggle-stop');
-  const stopFieldWrap = document.getElementById('stop-field-wrap');
-  const stopToggleWrap = document.getElementById('stop-toggle-wrapper');
-  const btnRemoveStop = document.getElementById('btn-remove-stop');
-  const stopInput = document.getElementById('stop-input');
-
-  if (btnToggleStop && stopFieldWrap) {
-    btnToggleStop.addEventListener('click', () => {
-      state.hasIntermediateStop = true;
-      stopFieldWrap.classList.remove('hidden');
-      if (stopToggleWrap) stopToggleWrap.classList.add('hidden');
-      if (stopInput) stopInput.focus();
-      updateCalculation();
-    });
-  }
-
-  if (btnRemoveStop) {
-    btnRemoveStop.addEventListener('click', () => {
-      state.hasIntermediateStop = false;
-      state.intermediateStop = null;
-      if (stopInput) stopInput.value = '';
-      if (stopMarker && map) {
-        map.removeLayer(stopMarker);
-        stopMarker = null;
-      }
-      if (stopFieldWrap) stopFieldWrap.classList.add('hidden');
-      if (stopToggleWrap) stopToggleWrap.classList.remove('hidden');
-      checkAndRoute();
-      showToast('Parada intermedia eliminada.');
-    });
-  }
-
-  // Autocompletado para la parada intermedia
-  setupAddressAutocomplete('stop-input', 'stop-suggestions', (place) => {
-    setIntermediateStop(place.lat, place.lon, place.display_name);
-  });
-
-  // Opciones adicionales
-  const extrasMap = [
-    { id: 'extra-roundtrip', key: 'roundtrip' },
-    { id: 'extra-pet', key: 'pet' }
-  ];
-
-  extrasMap.forEach(({ id, key }) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    state.extras[key] = el.checked;
-    el.addEventListener('change', (e) => {
-      state.extras[key] = e.target.checked;
-      updateCalculation();
-    });
-  });
-
-
-
-  // Acciones principales
-  const btnReserveWa = document.getElementById('btn-reserve-whatsapp');
-  if (btnReserveWa) btnReserveWa.addEventListener('click', sendWhatsAppReservation);
-
-  const btnPrintQuote = document.getElementById('btn-print-quote');
-  if (btnPrintQuote) btnPrintQuote.addEventListener('click', prepareAndPrintQuote);
-
-  const btnCopyQuote = document.getElementById('btn-copy-quote');
-  if (btnCopyQuote) btnCopyQuote.addEventListener('click', copyQuoteToClipboard);
-
-  // Botones de formatos de WhatsApp
-  document.querySelectorAll('.wa-pill[data-format]').forEach(pill => {
-    pill.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.querySelectorAll('.wa-pill[data-format]').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      state.selectedWaFormat = pill.dataset.format;
-      renderQuote();
-      const current = getFormattedWhatsAppNumber();
-      showToast(`Formato WhatsApp: +${current}`);
-    });
-  });
-
-  // Botón para cambiar número de prueba
-  const btnCustomWa = document.getElementById('btn-custom-wa-num');
-  if (btnCustomWa) {
-    btnCustomWa.addEventListener('click', (e) => {
-      e.preventDefault();
-      const promptVal = prompt('Ingresa el número al que deseas enviar la reserva para probar (ej: tu celular u otro número):', state.config.whatsappNumber);
-      if (promptVal && promptVal.trim().length >= 8) {
-        state.config.whatsappNumber = promptVal.trim().replace(/\D/g, '');
-        saveConfig({ whatsappNumber: state.config.whatsappNumber });
-        renderQuote();
-        showToast('Número de WhatsApp actualizado.');
-      }
-    });
-  }
-
-  // Modal alternativo de asistencia
-  const resModal = document.getElementById('reservation-modal');
-  const closeResModalBtn = document.getElementById('close-reservation-modal-btn');
-  if (closeResModalBtn && resModal) {
-    closeResModalBtn.addEventListener('click', () => {
-      resModal.classList.add('hidden');
-    });
-    resModal.addEventListener('click', (e) => {
-      if (e.target === resModal) resModal.classList.add('hidden');
-    });
-  }
-
-  // Copiar mensaje desde modal alternativo
-  const resBtnCopy = document.getElementById('res-btn-copy-msg');
-  if (resBtnCopy) {
-    resBtnCopy.addEventListener('click', () => {
-      const msg = buildReservationMessage();
-      navigator.clipboard.writeText(msg).then(() => {
-        showToast('📋 Mensaje copiado para enviar por WhatsApp.');
-      });
-    });
-  }
-
-  // Actualizar número desde modal
-  const resBtnUpdateNum = document.getElementById('res-btn-update-num');
-  const resInputNumber = document.getElementById('res-input-number');
-  if (resBtnUpdateNum && resInputNumber) {
-    resBtnUpdateNum.addEventListener('click', () => {
-      const val = resInputNumber.value.trim().replace(/\D/g, '');
-      if (val.length >= 8) {
-        state.config.whatsappNumber = val;
-        saveConfig({ whatsappNumber: val });
-        renderQuote();
-        const msg = buildReservationMessage();
-        const phone = getFormattedWhatsAppNumber();
-        const newUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-        const newWeb = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
-        const linkWame = document.getElementById('res-link-wame');
-        const linkWeb = document.getElementById('res-link-web');
-        if (linkWame) linkWame.href = newUrl;
-        if (linkWeb) linkWeb.href = newWeb;
-        window.open(newUrl, '_blank');
-        showToast(`Probando con +${phone}...`);
-      } else {
-        showToast('Ingresa un número válido.');
-      }
-    });
-  }
-
-  // Seguridad & Administración: Modal con PIN (sin mostrar la clave predeterminada)
-  const authModal = document.getElementById('admin-auth-modal');
-  const configModal = document.getElementById('config-modal');
-  const pinInput = document.getElementById('admin-pin-input');
-  const openConfigBtn = document.getElementById('open-config-btn');
-
-  if (openConfigBtn) {
-    openConfigBtn.addEventListener('click', () => {
-      if (pinInput) pinInput.value = '';
-      if (authModal) authModal.classList.remove('hidden');
-      if (pinInput) setTimeout(() => pinInput.focus(), 150);
-    });
-  }
-
-  const closeAuthBtn = document.getElementById('close-auth-btn');
-  if (closeAuthBtn && authModal) {
-    closeAuthBtn.addEventListener('click', () => {
-      authModal.classList.add('hidden');
-    });
-  }
-
-  const btnCancelAuth = document.getElementById('btn-cancel-auth');
-  if (btnCancelAuth && authModal) {
-    btnCancelAuth.addEventListener('click', () => {
-      authModal.classList.add('hidden');
-    });
-  }
-
-  // Validar clave de administrador
-  const adminAuthForm = document.getElementById('admin-auth-form');
-  if (adminAuthForm) {
-    adminAuthForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const enteredPin = pinInput ? pinInput.value.trim() : '';
-      const currentPin = state.config.adminPin || '1234';
-
-      if (enteredPin === currentPin) {
-        if (authModal) authModal.classList.add('hidden');
-        loadConfigToModal();
-        if (configModal) configModal.classList.remove('hidden');
-        showToast('🔓 Acceso de administrador concedido.');
-      } else {
-        showToast('❌ Clave incorrecta. Acceso restringido.');
-        if (pinInput) {
-          pinInput.value = '';
-          pinInput.focus();
-        }
-      }
-    });
-  }
-
-  // Cerrar modal de configuración
-  const closeConfigBtn = document.getElementById('close-config-btn');
-  if (closeConfigBtn && configModal) {
-    closeConfigBtn.addEventListener('click', () => {
-      configModal.classList.add('hidden');
-    });
-  }
-
-  // Guardar configuración (solo admin)
-  const configForm = document.getElementById('config-form');
-  if (configForm) {
-    configForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      saveModalConfig();
-      if (configModal) configModal.classList.add('hidden');
-      updateCalculation();
-      showToast('Tarifas y configuración actualizadas.');
-    });
-  }
-
-  const btnResetConfig = document.getElementById('btn-reset-config');
-  if (btnResetConfig) {
-    btnResetConfig.addEventListener('click', () => {
-      if (confirm('¿Deseas restablecer las tarifas a los valores predeterminados?')) {
-        state.config = { ...DEFAULT_CONFIG };
-        saveConfig(DEFAULT_CONFIG);
-        loadConfigToModal();
-        updateCalculation();
-        showToast('Tarifas restablecidas.');
-      }
-    });
-  }
-}
 
 // ==========================================
 // 9. EXPERIENCIA POST-RESERVA Y CALIFICACIÓN
@@ -4658,34 +4288,31 @@ function stripAccents(str) {
     .trim();
 }
 
-// Normalizador y extractor de barrios/localidades para consulta precisa a USIG
-function prepareAddressForUsig(rawQuery) {
-  let text = (rawQuery || '').trim();
-  
-  // Extraer mención de barrio o localidad si fue escrita por el usuario
-  const neighborhoodMatch = text.match(/\b(palermo|recoleta|belgrano|caballito|villa\s+urquiza|nuñez|almagro|san\s+telmo|puerto\s+madero|monserrat|balvanera|villa\s+crespo|chacarita|colegiales|barracas|flores|floresta|liniers|villa\s+devoto|saavedra|caba|buenos\s+aires|capital\s+federal|san\s+isidro|vicente\s+lopez|olivos|martinez|tigre|pilar|san\s+martin|moron|avellaneda|lanus|quilmes|ramos\s+mejia)\b/i);
-  const neighborhood = neighborhoodMatch ? capitalizeWords(neighborhoodMatch[0]) : '';
+// Helper para capitalizar nombres de calles y lugares
+function capitalizeWords(str) {
+  if (!str) return '';
+  return String(str).toLowerCase().replace(/(?:^|\s|\/|-|\.)\S/g, (a) => a.toUpperCase());
+}
 
-  // Limpiar prefijos comunes como "esquina", "esq.", "cruce"
-  let cleaned = text
-    .replace(/^(esquina|esq\.?|cruce\s+de|cruce|intersecci[oó]n\s+de)\s+/i, '')
+// Helper para limpiar la presentación de direcciones
+function cleanAddressDisplay(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .replace(/,\s*Comuna\s*\d+/gi, '')
+    .replace(/,\s*Argentina$/i, '')
+    .replace(/,\s*Ciudad Autónoma de Buenos Aires/gi, ', CABA')
+    .replace(/,\s*CABA,\s*CABA/gi, ', CABA')
+    .replace(/,\s*,/g, ',')
     .trim();
+}
 
-  // Limpiar sufijos de barrio o ciudad para que la API de USIG no falle en el cruce de calles
-  if (neighborhoodMatch) {
-    cleaned = cleaned
-      .replace(new RegExp(`[,\\s]+${neighborhoodMatch[0]}\\b.*$`, 'i'), '')
-      .replace(new RegExp(`^${neighborhoodMatch[0]}[,\\s]+`, 'i'), '')
-      .trim();
-  }
-
-  // Normalizar conectores de esquinas (&, /, con, e, cruce con -> y)
-  cleaned = cleaned.replace(/\s+(?:y|e|con|cruce(?:\s+con)?|e\/|\/|&)\s+/i, ' y ');
-
-  return {
-    cleanedAddress: cleaned.trim() || text,
-    neighborhood: neighborhood
-  };
+// Normalizador de búsqueda para geocodificadores
+function cleanAddressQuery(raw) {
+  let text = (raw || '').trim();
+  // Limpiar prefijos innecesarios
+  text = text.replace(/^(esquina|esq\.?|cruce\s+de|cruce|intersecci[oó]n\s+de)\s+/i, '');
+  text = text.replace(/\s+(?:y|e|con|cruce(?:\s+con)?|e\/|\/|&)\s+/i, ' y ');
+  return text.trim();
 }
 
 // Generador de sugerencias inmediatas (0ms) en memoria para CABA y GBA
@@ -4710,156 +4337,143 @@ function getInstantLocalSuggestions(rawQuery) {
   const QUICK_POIS = [
     {
       keywords: ['aeroparque', 'jorge newbery', 'newbery', 'aep'],
-      lat: -34.5580,
-      lon: -58.4170,
+      lat: -34.5580, lon: -58.4170,
       mainTitle: 'Aeroparque Internacional Jorge Newbery (AEP)',
       subTitle: 'Av. Costanera Rafael Obligado s/n, Palermo, CABA',
-      badge: 'Aeropuerto',
-      icon: '✈️'
+      badge: 'Aeropuerto', icon: '✈️'
     },
     {
-      keywords: ['ezeiza', 'pistarini', 'aeropuerto ezeiza', 'terminal ezeiza'],
-      lat: -34.8222,
-      lon: -58.5358,
+      keywords: ['ezeiza', 'pistarini', 'aeropuerto ezeiza', 'terminal ezeiza', 'eze'],
+      lat: -34.8222, lon: -58.5358,
       mainTitle: 'Aeropuerto Internacional Ministro Pistarini (Ezeiza)',
       subTitle: 'Autopista Tte. Gral. Ricchieri Km 33.5, Ezeiza, PBA',
-      badge: 'Aeropuerto',
-      icon: '✈️'
+      badge: 'Aeropuerto', icon: '✈️'
     },
     {
       keywords: ['obelisco', 'plaza de la republica', '9 de julio y corrientes'],
-      lat: -34.6037,
-      lon: -58.3816,
+      lat: -34.6037, lon: -58.3816,
       mainTitle: 'Obelisco de Buenos Aires',
       subTitle: 'Av. 9 de Julio y Av. Corrientes, San Nicolás, CABA',
-      badge: 'Monumento',
-      icon: '📍'
+      badge: 'Monumento', icon: '📍'
     },
     {
       keywords: ['retiro', 'terminal retiro', 'estacion retiro'],
-      lat: -34.5888,
-      lon: -58.3750,
+      lat: -34.5888, lon: -58.3750,
       mainTitle: 'Terminal de Ómnibus / Estación Retiro',
       subTitle: 'Av. Antártida Argentina y Ramos Mejía, Retiro, CABA',
-      badge: 'Terminal',
-      icon: '🚉'
+      badge: 'Terminal', icon: '🚉'
     },
     {
       keywords: ['buquebus', 'terminal buquebus', 'puerto madero buquebus'],
-      lat: -34.5975,
-      lon: -58.3685,
+      lat: -34.5975, lon: -58.3685,
       mainTitle: 'Terminal Buquebus Puerto Madero',
       subTitle: 'Av. Antártida Argentina y Av. Córdoba, CABA',
-      badge: 'Terminal Fluvial',
-      icon: '🚢'
+      badge: 'Terminal Fluvial', icon: '🚢'
     },
     {
-      keywords: ['puerto madero', 'madero'],
-      lat: -34.6111,
-      lon: -58.3639,
-      mainTitle: 'Puerto Madero, CABA',
-      subTitle: 'Diques 1 a 4, Comuna 1, Buenos Aires',
-      badge: 'Zona Ejecutiva',
-      icon: '🏢'
+      keywords: ['puerto madero', 'madero', 'hilton puerto madero'],
+      lat: -34.6025, lon: -58.3645,
+      mainTitle: 'Hotel Hilton Buenos Aires',
+      subTitle: 'Macacha Güemes 351, Puerto Madero, CABA',
+      badge: 'Hotel', icon: '🏨'
+    },
+    {
+      keywords: ['faena', 'faena hotel'],
+      lat: -34.6145, lon: -58.3620,
+      mainTitle: 'Faena Hotel Buenos Aires',
+      subTitle: 'Martha Salotti 445, Puerto Madero, CABA',
+      badge: 'Hotel', icon: '🏨'
+    },
+    {
+      keywords: ['alvear palace', 'alvear hotel'],
+      lat: -34.5875, lon: -58.3890,
+      mainTitle: 'Alvear Palace Hotel',
+      subTitle: 'Av. Alvear 1891, Recoleta, CABA',
+      badge: 'Hotel', icon: '🏨'
+    },
+    {
+      keywords: ['sheraton', 'sheraton retiro'],
+      lat: -34.5930, lon: -58.3740,
+      mainTitle: 'Sheraton Buenos Aires Hotel & Convention Center',
+      subTitle: 'San Martín 1225, Retiro, CABA',
+      badge: 'Hotel', icon: '🏨'
     },
     {
       keywords: ['recoleta', 'cementerio recoleta'],
-      lat: -34.5895,
-      lon: -58.3974,
+      lat: -34.5895, lon: -58.3974,
       mainTitle: 'Recoleta, CABA',
       subTitle: 'Junín y Av. Quintana, Comuna 2, Buenos Aires',
-      badge: 'Barrio CABA',
-      icon: '📍'
+      badge: 'Barrio CABA', icon: '📍'
     },
     {
       keywords: ['palermo', 'palermo soho', 'palermo hollywood'],
-      lat: -34.5880,
-      lon: -58.4280,
+      lat: -34.5880, lon: -58.4280,
       mainTitle: 'Palermo Soho / Hollywood, CABA',
       subTitle: 'Plaza Serrano, Palermo, Buenos Aires',
-      badge: 'Barrio CABA',
-      icon: '📍'
+      badge: 'Barrio CABA', icon: '📍'
     },
     {
       keywords: ['belgrano', 'barrio chino', 'barrancas de belgrano'],
-      lat: -34.5627,
-      lon: -58.4564,
+      lat: -34.5627, lon: -58.4564,
       mainTitle: 'Belgrano, CABA',
       subTitle: 'Barrancas de Belgrano / Av. Cabildo, CABA',
-      badge: 'Barrio CABA',
-      icon: '📍'
+      badge: 'Barrio CABA', icon: '📍'
     },
     {
       keywords: ['nordelta', 'bahia grande nordelta'],
-      lat: -34.4170,
-      lon: -58.6470,
+      lat: -34.4170, lon: -58.6470,
       mainTitle: 'Nordelta, Gran Buenos Aires Norte',
       subTitle: 'Av. de los Lagos / Bahía Grande, Tigre, PBA',
-      badge: 'Zona Residencial',
-      icon: '🏡'
+      badge: 'Zona Residencial', icon: '🏡'
     },
     {
       keywords: ['unicenter', 'unicenter shopping'],
-      lat: -34.5085,
-      lon: -58.5235,
+      lat: -34.5085, lon: -58.5235,
       mainTitle: 'Unicenter Shopping',
       subTitle: 'Paraná 3745, Martínez, San Isidro, PBA',
-      badge: 'Shopping',
-      icon: '🛍️'
+      badge: 'Shopping', icon: '🛍️'
     },
     {
       keywords: ['dot', 'dot baires'],
-      lat: -34.5450,
-      lon: -58.4890,
+      lat: -34.5450, lon: -58.4890,
       mainTitle: 'Dot Baires Shopping',
       subTitle: 'Vedia 3600, Saavedra, CABA',
-      badge: 'Shopping',
-      icon: '🛍️'
+      badge: 'Shopping', icon: '🛍️'
     },
     {
       keywords: ['alto palermo'],
-      lat: -34.5878,
-      lon: -58.4105,
+      lat: -34.5878, lon: -58.4105,
       mainTitle: 'Alto Palermo Shopping',
       subTitle: 'Av. Santa Fe 3253, Palermo, CABA',
-      badge: 'Shopping',
-      icon: '🛍️'
+      badge: 'Shopping', icon: '🛍️'
     },
     {
       keywords: ['abasto', 'abasto shopping'],
-      lat: -34.6035,
-      lon: -58.4110,
+      lat: -34.6035, lon: -58.4110,
       mainTitle: 'Abasto Shopping',
       subTitle: 'Av. Corrientes 3247, Balvanera, CABA',
-      badge: 'Shopping',
-      icon: '🛍️'
+      badge: 'Shopping', icon: '🛍️'
     },
     {
       keywords: ['san isidro', 'catedral san isidro'],
-      lat: -34.4717,
-      lon: -58.5286,
+      lat: -34.4717, lon: -58.5286,
       mainTitle: 'San Isidro Centro, GBA Norte',
       subTitle: 'Av. Centenario y Belgrano, San Isidro, PBA',
-      badge: 'Localidad GBA',
-      icon: '📍'
+      badge: 'Localidad GBA', icon: '📍'
     },
     {
       keywords: ['tigre', 'puerto de frutos'],
-      lat: -34.4251,
-      lon: -58.5796,
+      lat: -34.4251, lon: -58.5796,
       mainTitle: 'Tigre Centro / Puerto de Frutos',
       subTitle: 'Av. Cazón y Sarmiento, Tigre, PBA',
-      badge: 'Localidad GBA',
-      icon: '📍'
+      badge: 'Localidad GBA', icon: '📍'
     },
     {
       keywords: ['pilar', 'pilar centro', 'km 50 pilar'],
-      lat: -34.4587,
-      lon: -58.9142,
+      lat: -34.4587, lon: -58.9142,
       mainTitle: 'Pilar, Gran Buenos Aires Norte',
       subTitle: 'Panamericana Ramal Pilar Km 50, PBA',
-      badge: 'Localidad GBA',
-      icon: '📍'
+      badge: 'Localidad GBA', icon: '📍'
     }
   ];
 
@@ -4880,13 +4494,17 @@ function getInstantLocalSuggestions(rawQuery) {
     }
   });
 
-  // 2. Coincidencias de Avenidas y Calles con Altura en CABA / GBA
+  // 2. Base Exhaustiva de Avenidas y Calles de CABA y Gran Buenos Aires
   const matchNumber = queryNorm.match(/\b\d{1,5}\b/);
   const numberVal = matchNumber ? parseInt(matchNumber[0], 10) : 0;
   const numberStr = matchNumber ? matchNumber[0] : '';
-  const streetOnly = queryNorm.replace(/\b\d{1,5}\b/, '').replace(/^av\.?\s+/i, '').trim();
+  const streetOnly = queryNorm
+    .replace(/\b\d{1,5}\b/, '')
+    .replace(/^(av\.?|avenida|calle|pje\.?|pasaje)\s+/i, '')
+    .trim();
 
   const POPULAR_STREETS = [
+    { name: 'Av. Luis María Campos', norm: 'luis maria campos', startLat: -34.5770, startLon: -58.4280, endLat: -34.5620, endLon: -58.4440, maxNum: 1700, sub: 'Palermo / Belgrano, CABA' },
     { name: 'Av. Córdoba', norm: 'cordoba', startLat: -34.5990, startLon: -58.3720, endLat: -34.5870, endLon: -58.4440, maxNum: 6000, sub: 'Palermo / Recoleta / Balvanera, CABA' },
     { name: 'Av. Santa Fe', norm: 'santa fe', startLat: -34.5950, startLon: -58.3780, endLat: -34.5750, endLon: -58.4280, maxNum: 5400, sub: 'Palermo / Recoleta, CABA' },
     { name: 'Av. Corrientes', norm: 'corrientes', startLat: -34.6030, startLon: -58.3700, endLat: -34.5860, endLon: -58.4550, maxNum: 6900, sub: 'Balvanera / Almagro / Chacarita, CABA' },
@@ -4904,7 +4522,11 @@ function getInstantLocalSuggestions(rawQuery) {
     { name: 'Av. Paseo Colón', norm: 'paseo colon', startLat: -34.6100, startLon: -58.3680, endLat: -34.6280, endLon: -58.3680, maxNum: 1600, sub: 'San Telmo / Puerto Madero, CABA' },
     { name: 'Av. Monroe', norm: 'monroe', startLat: -34.5500, startLon: -58.4480, endLat: -34.5750, endLon: -58.5050, maxNum: 6000, sub: 'Belgrano / Villa Urquiza, CABA' },
     { name: 'Av. Juramento', norm: 'juramento', startLat: -34.5550, startLon: -58.4450, endLat: -34.5780, endLon: -58.4900, maxNum: 5500, sub: 'Belgrano / Villa Urquiza, CABA' },
+    { name: 'Av. Congreso', norm: 'congreso', startLat: -34.5450, startLon: -58.4500, endLat: -34.5750, endLon: -58.5150, maxNum: 6000, sub: 'Núñez / Belgrano / Villa Urquiza' },
     { name: 'Av. Triunvirato', norm: 'triunvirato', startLat: -34.5900, startLon: -58.4600, endLat: -34.5650, endLon: -58.4980, maxNum: 6000, sub: 'Chacarita / Villa Urquiza, CABA' },
+    { name: 'Av. Álvarez Thomas', norm: 'alvarez thomas', startLat: -34.5850, startLon: -58.4450, endLat: -34.5650, endLon: -58.4850, maxNum: 3500, sub: 'Colegiales / Villa Urquiza, CABA' },
+    { name: 'Av. Elcano', norm: 'elcano', startLat: -34.5700, startLon: -58.4500, endLat: -34.5850, endLon: -58.4750, maxNum: 5000, sub: 'Colegiales / Belgrano, CABA' },
+    { name: 'Av. Cramer', norm: 'cramer', startLat: -34.5750, startLon: -58.4550, endLat: -34.5400, endLon: -58.4750, maxNum: 4000, sub: 'Belgrano / Núñez / Saavedra, CABA' },
     { name: 'Av. Maipú', norm: 'maipu', startLat: -34.5360, startLon: -58.4680, endLat: -34.4850, endLon: -58.5080, maxNum: 4000, sub: 'Vicente López / Olivos / La Lucila' },
     { name: 'Av. Centenario', norm: 'centenario', startLat: -34.4850, startLon: -58.5080, endLat: -34.4450, endLon: -58.5600, maxNum: 3000, sub: 'San Isidro / Béccar / Victoria' },
     { name: 'Av. Cazón', norm: 'cazon', startLat: -34.4350, startLon: -58.5700, endLat: -34.4200, endLon: -58.5850, maxNum: 1600, sub: 'Tigre Centro, PBA' },
@@ -4914,6 +4536,9 @@ function getInstantLocalSuggestions(rawQuery) {
     { name: 'Av. Federico Lacroze', norm: 'lacroze', startLat: -34.5650, startLon: -58.4350, endLat: -34.5900, endLon: -58.4600, maxNum: 4200, sub: 'Belgrano / Colegiales / Chacarita, CABA' },
     { name: 'Av. Dorrego', norm: 'dorrego', startLat: -34.5700, startLon: -58.4200, endLat: -34.5950, endLon: -58.4550, maxNum: 3500, sub: 'Palermo / Villa Crespo, CABA' },
     { name: 'Av. Montes de Oca', norm: 'montes de oca', startLat: -34.6280, startLon: -58.3750, endLat: -34.6550, endLon: -58.3750, maxNum: 2200, sub: 'Barracas, CABA' },
+    { name: 'Av. Independencia', norm: 'independencia', startLat: -34.6150, startLon: -58.3750, endLat: -34.6250, endLon: -58.4200, maxNum: 4400, sub: 'San Telmo / Boedo / Almagro, CABA' },
+    { name: 'Av. San Juan', norm: 'san juan', startLat: -34.6200, startLon: -58.3750, endLat: -34.6300, endLon: -58.4300, maxNum: 4500, sub: 'San Telmo / Constitución / Boedo' },
+    { name: 'Av. Gaona', norm: 'gaona', startLat: -34.6080, startLon: -58.4450, endLat: -34.6350, endLon: -58.5500, maxNum: 5000, sub: 'Caballito / Flores / Ramos Mejía' },
     { name: 'Av. Hipólito Yrigoyen', norm: 'yrigoyen', startLat: -34.6700, startLon: -58.3750, endLat: -34.7800, endLon: -58.4000, maxNum: 15000, sub: 'Avellaneda / Lanús / Lomas de Zamora' },
     { name: 'Av. Mitre', norm: 'mitre', startLat: -34.6600, startLon: -58.3600, endLat: -34.7200, endLon: -58.2600, maxNum: 7000, sub: 'Avellaneda / Sarandí / Quilmes' }
   ];
@@ -4970,66 +4595,50 @@ async function searchLocations(rawQuery, signal) {
     }
   }
 
-  // 1. Agregar resultados instantáneos locales (0ms)
+  // 1. Agregar resultados instantáneos locales (0ms de latencia)
   const instant = getInstantLocalSuggestions(query);
   instant.forEach(addResult);
 
-  // 2. Ejecutar proveedores en PARALELO con timeout estricto de 1.8s
-  const { cleanedAddress, neighborhood } = prepareAddressForUsig(query);
-  const usigUrl = `https://servicios.usig.buenosaires.gob.ar/normalizar/?direccion=${encodeURIComponent(cleanedAddress)}&geocodificar=TRUE`;
-  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=-34.6037&lon=-58.3816&limit=6`;
-  const nomQuery = isCorner ? `${cleanedAddress}, Buenos Aires` : `${query}, Argentina`;
+  // 2. Mapbox Places Geocoding API (Ultra-rápido, oficial y 100% compatible con CORS)
+  const cleanQ = cleanAddressQuery(query);
+  const mapboxToken = (state.config && state.config.mapboxToken) || 'pk.eyJ1IjoicnVoYS1wcmk2ZWRhIiwiYSI6ImNtdGxwZXNscjAwY2EydGZ2dms5cXg3d28ifQ._YkMD-GgSIhtkpUcdo_pdg';
+  
+  const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?access_token=${mapboxToken}&country=ar&proximity=-58.3816,-34.6037&language=es&types=address,poi,neighborhood,locality,place&limit=6`;
+  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
+  const nomQuery = isCorner ? `${cleanQ}, Buenos Aires` : `${cleanQ}, Buenos Aires, Argentina`;
   const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nomQuery)}&countrycodes=ar&limit=5&addressdetails=1`;
 
   const fetchTasks = [
-    // Task A: USIG Buenos Aires
+    // Task A: Mapbox Geocoding API
     (async () => {
       try {
-        const res = await fetchWithTimeout(usigUrl, {}, 1800, signal);
+        const res = await fetchWithTimeout(mapboxUrl, {}, 2000, signal);
         if (res.ok) {
           const data = await res.json();
-          if (data && Array.isArray(data.direccionesNormalizadas)) {
-            data.direccionesNormalizadas.forEach(dir => {
-              const coords = dir.coordenadas;
-              if (coords && (coords.x || coords.lon) && (coords.y || coords.lat)) {
-                const lon = String(coords.x || coords.lon);
-                const lat = String(coords.y || coords.lat);
-                const isUsigCorner = dir.tipo === 'cruce' || Boolean(dir.nombre_calle_cruce);
-                const street1 = capitalizeWords(dir.nombre_calle || '');
-                const street2 = capitalizeWords(dir.nombre_calle_cruce || '');
-                const partido = dir.nombre_partido === 'caba' || dir.nombre_partido === 'CABA' ? 'CABA' : capitalizeWords(dir.nombre_partido || 'CABA');
-                const locName = dir.nombre_localidad ? capitalizeWords(dir.nombre_localidad) : '';
+          if (data && Array.isArray(data.features)) {
+            data.features.forEach(f => {
+              if (f.center && f.center.length >= 2) {
+                const [lon, lat] = f.center;
+                const placeName = f.place_name || f.text || cleanQ;
+                const mainTitle = f.text || placeName.split(',')[0];
+                const subParts = placeName.split(',').slice(1).map(s => s.trim()).filter(Boolean);
+                const subTitle = subParts.length > 0 ? subParts.join(', ') : 'Buenos Aires, Argentina';
 
-                let mainTitle = '';
-                let subTitle = '';
-                let fullDisplay = '';
-
-                if (isUsigCorner && street1 && street2) {
-                  mainTitle = `Esquina: ${street1} y ${street2}`;
-                  const subParts = [neighborhood || locName, partido, 'Buenos Aires'].filter(Boolean);
-                  subTitle = subParts.join(', ');
-                  fullDisplay = `${street1} y ${street2}, ${subTitle}`;
-                } else if (dir.altura) {
-                  mainTitle = `${street1} ${dir.altura}`;
-                  const subParts = [neighborhood || locName, partido, 'Buenos Aires'].filter(Boolean);
-                  subTitle = subParts.join(', ');
-                  fullDisplay = `${street1} ${dir.altura}, ${subTitle}`;
-                } else {
-                  mainTitle = street1 || dir.direccion || cleanedAddress;
-                  const subParts = [neighborhood || locName, partido, 'Buenos Aires'].filter(Boolean);
-                  subTitle = subParts.join(', ');
-                  fullDisplay = `${mainTitle}, ${subTitle}`;
+                let icon = '📍';
+                let poiBadge = 'Dirección Exacta';
+                if (f.place_type && f.place_type.includes('poi')) {
+                  icon = '🏢';
+                  poiBadge = 'Lugar de Interés';
                 }
 
                 addResult({
-                  lat: lat,
-                  lon: lon,
-                  display_name: fullDisplay,
-                  _isIntersection: isUsigCorner || isCorner,
-                  _isPoi: false,
-                  _poiBadge: isUsigCorner ? 'Esquina Oficial' : 'Dirección Oficial',
-                  _icon: isUsigCorner ? '🚦' : '📍',
-                  _cornerTitle: isUsigCorner ? `${street1} y ${street2}` : null,
+                  lat: String(lat),
+                  lon: String(lon),
+                  display_name: placeName,
+                  _isIntersection: isCorner,
+                  _isPoi: f.place_type && f.place_type.includes('poi'),
+                  _poiBadge: poiBadge,
+                  _icon: icon,
                   _mainTitle: mainTitle,
                   _subTitle: subTitle
                 });
@@ -5043,14 +4652,14 @@ async function searchLocations(rawQuery, signal) {
     // Task B: Photon OSM Geocoder
     (async () => {
       try {
-        const res = await fetchWithTimeout(photonUrl, {}, 1800, signal);
+        const res = await fetchWithTimeout(photonUrl, {}, 2000, signal);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.features)) {
             data.features.forEach(f => {
               const [lon, lat] = f.geometry.coordinates;
               const p = f.properties || {};
-              const textToScan = `${p.name || ''} ${p.street || ''} ${p.osm_value || ''} ${p.osm_key || ''} ${query}`.toLowerCase();
+              const textToScan = `${p.name || ''} ${p.street || ''} ${p.osm_value || ''} ${p.osm_key || ''} ${cleanQ}`.toLowerCase();
               let icon = '📍';
               let poiBadge = '';
               let isPoi = false;
@@ -5085,7 +4694,7 @@ async function searchLocations(rawQuery, signal) {
                 ].filter(Boolean);
                 subTitle = addressParts.join(', ');
               } else {
-                mainTitle = p.name || query;
+                mainTitle = p.name || cleanQ;
                 subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires'].filter(Boolean).join(', ');
               }
 
@@ -5096,9 +4705,8 @@ async function searchLocations(rawQuery, signal) {
                 display_name: fullDisplay,
                 _isIntersection: isCorner,
                 _isPoi: isPoi,
-                _poiBadge: poiBadge,
+                _poiBadge: poiBadge || 'Dirección Encontrada',
                 _icon: icon,
-                _cornerTitle: null,
                 _mainTitle: mainTitle,
                 _subTitle: subTitle
               });
@@ -5111,16 +4719,17 @@ async function searchLocations(rawQuery, signal) {
     // Task C: Nominatim
     (async () => {
       try {
-        const res = await fetchWithTimeout(nomUrl, {}, 1800, signal);
+        const res = await fetchWithTimeout(nomUrl, {}, 2000, signal);
         if (res.ok) {
           const nomData = await res.json();
           if (Array.isArray(nomData)) {
             nomData.forEach(it => {
-              const rawName = it.name || (it.display_name ? it.display_name.split(',')[0] : query);
+              const rawName = it.name || (it.display_name ? it.display_name.split(',')[0] : cleanQ);
               it._mainTitle = isCorner ? `Esquina: ${capitalizeWords(rawName)}` : capitalizeWords(rawName);
               it._subTitle = cleanAddressDisplay(it.display_name);
               it._icon = isCorner ? '🚦' : '📍';
               it._isIntersection = isCorner;
+              it._poiBadge = isCorner ? 'Esquina' : 'Ubicación';
               addResult(it);
             });
           }
@@ -5287,7 +4896,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     // 2. Refinar con geocodificación en segundo plano
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 200);
+    }, 180);
   });
 
   input.addEventListener('focus', () => {
@@ -8818,7 +8427,9 @@ if (btnRecenterPassengerMap) {
 
     function getPassengerSession() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY_SESSION) || localStorage.getItem(STORAGE_KEY_LEGACY);
+        const raw = localStorage.getItem(STORAGE_KEY_SESSION) || 
+                    localStorage.getItem(STORAGE_KEY_LEGACY) || 
+                    localStorage.getItem('rutaprivada_user_session');
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
@@ -8838,6 +8449,7 @@ if (btnRecenterPassengerMap) {
       try {
         localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(user));
         localStorage.setItem(STORAGE_KEY_LEGACY, JSON.stringify(user));
+        localStorage.setItem('rutaprivada_user_session', JSON.stringify(user));
       } catch(e) {}
 
       saveRegisteredPassenger(user);
@@ -8900,7 +8512,7 @@ if (btnRecenterPassengerMap) {
     window.savePassengerSession = savePassengerSession;
 
     function renderPassengerProfileUI(user) {
-      if (!user) {
+      if (!user || (!user.nombre && !user.email && !user.telefono)) {
         if (headerPassengerName) headerPassengerName.textContent = 'Iniciar Sesión';
         return;
       }
@@ -8951,15 +8563,15 @@ if (btnRecenterPassengerMap) {
       }
 
       // Autofill automático de inputs del flujo de cotización y reserva para que el usuario no deba reescribirlos
-      const inputName = document.getElementById('user-name') || document.getElementById('client-name');
-      const inputPhone = document.getElementById('user-phone') || document.getElementById('client-phone');
+      const inputName = document.getElementById('user-name') || document.getElementById('client-name') || document.getElementById('passenger-name-input');
+      const inputPhone = document.getElementById('user-phone') || document.getElementById('client-phone') || document.getElementById('passenger-phone-input');
       const inputEmail = document.getElementById('user-email') || document.getElementById('client-email');
       if (inputName && user.nombre) inputName.value = user.nombre;
       if (inputPhone && user.telefono) inputPhone.value = user.telefono;
       if (inputEmail && user.email) inputEmail.value = user.email;
     }
 
-    function openPassengerAuthModal(defaultTab = 'register') {
+    function openPassengerAuthModal(defaultTab = 'login') {
       const modal = modalPassengerAuth || document.getElementById('modalPassengerAuth');
       if (modal) {
         modal.classList.remove('hidden');
@@ -8980,9 +8592,9 @@ if (btnRecenterPassengerMap) {
 
     function openPassengerProfileModal() {
       const session = getPassengerSession();
-      // Si no tiene perfil registrado, abrir modal de Registro de Pasajero obligatoriamente
+      // Si no tiene perfil registrado o sesión activa, abrir modal en INICIAR SESIÓN
       if (!session || (!session.nombre && !session.email && !session.telefono)) {
-        openPassengerAuthModal('register');
+        openPassengerAuthModal('login');
         return;
       }
       renderPassengerProfileUI(session);
@@ -9034,6 +8646,7 @@ if (btnRecenterPassengerMap) {
         if (formPassengerRegister) formPassengerRegister.style.display = 'none';
       }
     }
+    window.switchPassengerAuthTab = switchAuthTab;
 
     // Tab buttons
     if (tabBtnPassengerLogin) {
