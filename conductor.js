@@ -95,7 +95,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (parsed && (parsed.nombre || parsed.dni || parsed.email)) {
-                    if (drvId === 'default' || !parsed.id || parsed.id === drvId) {
+                    let sessionInfo = {};
+                    try {
+                        const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
+                        if (rawAuth) sessionInfo = JSON.parse(rawAuth);
+                    } catch(e) {}
+                    const matchesId = (drvId === 'default' && !sessionInfo.id) || (parsed.id && parsed.id === drvId) || (sessionInfo.id && parsed.id === sessionInfo.id);
+                    const matchesDni = sessionInfo.dni && parsed.dni && sessionInfo.dni.replace(/\D/g, '') === parsed.dni.replace(/\D/g, '');
+                    if (matchesId || matchesDni) {
                         return parsed;
                     }
                 }
@@ -522,30 +529,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 3. PERSISTENCIA DE FINANZAS & ESTADÍSTICAS
+    // 3. PERSISTENCIA DE FINANZAS & ESTADÍSTICAS (PRIVADAS POR CONDUCTOR)
     // ==========================================
     function getTodayKey() {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
+    function getDriverStatsKey() {
+        const drvId = getActiveDriverId();
+        return 'rutaprivada_driver_stats_' + drvId;
+    }
+
     function loadSavedStats() {
+        driverState.stats = {
+            gananciasHoy: 0,
+            viajesCompletados: 0,
+            historial: []
+        };
+
         try {
-            const saved = localStorage.getItem('rutaprivada_driver_stats');
+            const key = getDriverStatsKey();
+            const saved = localStorage.getItem(key);
             if (saved) {
-                driverState.stats = JSON.parse(saved);
+                const parsed = JSON.parse(saved);
+                if (parsed) {
+                    driverState.stats.historial = Array.isArray(parsed.historial) ? parsed.historial : [];
+                    driverState.stats.gananciasHoy = Number(parsed.gananciasHoy) || 0;
+                    driverState.stats.viajesCompletados = Number(parsed.viajesCompletados) || 0;
+                }
             }
         } catch (e) {}
 
-        // Asegurar estructura
+        // Asegurar estructura limpia sin viajes ficticios
         if (!driverState.stats.historial) driverState.stats.historial = [];
         if (!driverState.stats.gananciasHoy) driverState.stats.gananciasHoy = 0;
         if (!driverState.stats.viajesCompletados) driverState.stats.viajesCompletados = 0;
-
-        // Si el historial está vacío, cargar algunos ejemplos realistas para enriquecer la experiencia
-        if (driverState.stats.historial.length === 0) {
-            seedSampleTrips();
-        }
 
         recalculateStats();
         updateEarningsUI();
@@ -553,56 +572,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function saveStats() {
         try {
-            localStorage.setItem('rutaprivada_driver_stats', JSON.stringify(driverState.stats));
+            const key = getDriverStatsKey();
+            localStorage.setItem(key, JSON.stringify(driverState.stats));
         } catch (e) {}
         updateEarningsUI();
     }
 
-    function seedSampleTrips() {
-        const today = new Date();
-        const sampleTrips = [
-            {
-                id: 'trip_seed_1',
-                fecha: getTodayKey(),
-                hora: '08:30',
-                origen: 'Recoleta (Av. Alvear 1800)',
-                destino: 'Aeroparque Jorge Newbery (AEP)',
-                monto: 16500,
-                distancia: '8.4 km',
-                metodoPago: 'Transferencia',
-                categoria: 'Sedán Ejecutivo',
-                estado: 'completado'
-            },
-            {
-                id: 'trip_seed_2',
-                fecha: getTodayKey(),
-                hora: '11:15',
-                origen: 'Palermo Soho (Honduras 4800)',
-                destino: 'Aeropuerto Internacional de Ezeiza (EZE)',
-                monto: 38500,
-                distancia: '33.8 km',
-                metodoPago: 'Efectivo',
-                categoria: 'Sedán Ejecutivo',
-                estado: 'completado'
-            }
-        ];
-
-        driverState.stats.historial = sampleTrips;
-        saveStats();
-    }
-
     function recalculateStats() {
         const todayKey = getTodayKey();
-        const tripsHoy = driverState.stats.historial.filter(t => t.fecha === todayKey && t.estado === 'completado');
+        const tripsHoy = (driverState.stats.historial || []).filter(t => t.fecha === todayKey && (t.estado === 'completado' || t.status === 'completado'));
         
-        driverState.stats.gananciasHoy = tripsHoy.reduce((sum, t) => sum + (Number(t.monto) || 0), 0);
+        driverState.stats.gananciasHoy = tripsHoy.reduce((sum, t) => sum + (Number(t.monto || t.precio || 0)), 0);
         driverState.stats.viajesCompletados = tripsHoy.length;
     }
 
     function updateEarningsUI() {
-        const formattedHoy = '$' + driverState.stats.gananciasHoy.toLocaleString('es-AR');
-        headerGananciasHoy.textContent = formattedHoy;
-        statViajesHoy.textContent = driverState.stats.viajesCompletados;
+        const formattedHoy = '$' + (driverState.stats.gananciasHoy || 0).toLocaleString('es-AR');
+        if (headerGananciasHoy) headerGananciasHoy.textContent = formattedHoy;
+        if (statViajesHoy) statViajesHoy.textContent = driverState.stats.viajesCompletados || 0;
         
         if (driverState.currentTab === 'viewGanancias') {
             updateFinancialView();
@@ -5932,15 +5919,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Verificar si ya existe el correo o DNI
+            // 1. Validar duplicados en almacenamiento local
             const list = getRegisteredDriversList();
-            const alreadyExists = list.some(d => (d.email && d.email.toLowerCase() === email) || (d.dni && d.dni === dni));
+            const cleanDni = dni.replace(/\D/g, '');
+            const alreadyExists = list.some(d => (d.email && d.email.toLowerCase() === email) || (d.dni && d.dni.replace(/\D/g, '') === cleanDni));
             if (alreadyExists) {
-                showDriverToast('⚠️ Ya existe una cuenta de chofer registrada con este correo o DNI.');
+                showDriverToast(`⚠️ Ya existe una cuenta de chofer registrada con este correo o DNI (${dni}). Por favor inicia sesión.`);
                 switchDriverAuthTab('login');
                 const loginEmail = document.getElementById('loginDriverEmail');
                 if (loginEmail) loginEmail.value = email;
                 return;
+            }
+
+            // 2. Validar duplicados en Firestore Cloud en tiempo real
+            if (typeof firebase !== 'undefined' && firebase.firestore) {
+                try {
+                    const db = firebase.firestore();
+                    const docId = 'drv_' + cleanDni;
+                    const snap = await db.collection('drivers').doc(docId).get();
+                    if (snap.exists) {
+                        showDriverToast(`⚠️ El DNI ${dni} ya se encuentra registrado en el sistema. Por favor inicia sesión.`);
+                        switchDriverAuthTab('login');
+                        const loginEmail = document.getElementById('loginDriverEmail');
+                        if (loginEmail) loginEmail.value = email;
+                        return;
+                    }
+                } catch(e) {}
             }
 
             // Generar código de verificación de 6 dígitos
