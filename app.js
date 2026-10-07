@@ -171,45 +171,47 @@ window.closePassengerProfileModal = function() {
   }
 };
 
-window.switchPassengerAuthTab = function(tab) {
+window.switchAuthTab = function(tab) {
   const tabBtnRegister = document.getElementById('tabBtnPassengerRegister');
   const tabBtnLogin = document.getElementById('tabBtnPassengerLogin');
   const formLogin = document.getElementById('formPassengerLogin');
   const formRegister = document.getElementById('formPassengerRegister');
 
-  if (tab === 'login') {
-    if (tabBtnLogin) {
-      tabBtnLogin.classList.add('active');
-      tabBtnLogin.style.background = '#38bdf8';
-      tabBtnLogin.style.color = '#0f172a';
-    }
+  if (tab === 'register') {
     if (tabBtnRegister) {
-      tabBtnRegister.classList.remove('active');
-      tabBtnRegister.style.background = 'transparent';
-      tabBtnRegister.style.color = '#94a3b8';
-    }
-    if (formLogin) {
-      formLogin.style.display = 'flex';
-    }
-    if (formRegister) {
-      formRegister.style.display = 'none';
-    }
-  } else {
-    if (tabBtnRegister) {
-      tabBtnRegister.classList.add('active');
       tabBtnRegister.style.background = '#10b981';
       tabBtnRegister.style.color = '#fff';
+      tabBtnRegister.classList.add('active');
     }
     if (tabBtnLogin) {
-      tabBtnLogin.classList.remove('active');
       tabBtnLogin.style.background = 'transparent';
       tabBtnLogin.style.color = '#94a3b8';
+      tabBtnLogin.classList.remove('active');
     }
     if (formLogin) {
       formLogin.style.display = 'none';
     }
     if (formRegister) {
       formRegister.style.display = 'flex';
+      formRegister.style.flexDirection = 'column';
+    }
+  } else {
+    if (tabBtnLogin) {
+      tabBtnLogin.style.background = '#38bdf8';
+      tabBtnLogin.style.color = '#0f172a';
+      tabBtnLogin.classList.add('active');
+    }
+    if (tabBtnRegister) {
+      tabBtnRegister.style.background = 'transparent';
+      tabBtnRegister.style.color = '#94a3b8';
+      tabBtnRegister.classList.remove('active');
+    }
+    if (formLogin) {
+      formLogin.style.display = 'flex';
+      formLogin.style.flexDirection = 'column';
+    }
+    if (formRegister) {
+      formRegister.style.display = 'none';
     }
   }
 };
@@ -219,12 +221,35 @@ window.openPassengerAuthModal = function(defaultTab = 'register') {
   if (modal) {
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
-    window.switchPassengerAuthTab(defaultTab);
+    window.switchAuthTab(defaultTab);
   }
 };
 
 window.closePassengerAuthModal = function() {
   const modal = document.getElementById('modalPassengerAuth');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+};
+
+window.openPassengerEmailVerifyModal = function(email) {
+  const modal = document.getElementById('modalPassengerEmailVerify');
+  const targetEl = document.getElementById('verifyPassengerEmailTarget');
+  const codeInp = document.getElementById('inputPassengerVerifyCode');
+  if (targetEl && email) targetEl.textContent = email;
+  if (codeInp) {
+    codeInp.value = '';
+    setTimeout(() => codeInp.focus(), 250);
+  }
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
+};
+
+window.closePassengerEmailVerifyModal = function() {
+  const modal = document.getElementById('modalPassengerEmailVerify');
   if (modal) {
     modal.classList.add('hidden');
     modal.style.display = 'none';
@@ -4311,47 +4336,7 @@ function escapeHtml(str) {
 // Destinos y puntos de interés estratégicos en Argentina con resolución instantánea (0 ms)
 const STRATEGIC_LANDMARKS = [
   {
-    regex: /(luis mar[ií]a campos.*teodoro garc[ií]a|teodoro garc[ií]a.*luis mar[ií]a campos|campos y garc[ií]a|garc[ií]a y campos)/i,
-    lat: '-34.5684',
-    lon: '-58.4373',
-    mainTitle: 'Av. Luis María Campos y Teodoro García',
-    subTitle: 'Palermo / Belgrano / Las Cañitas, CABA',
-    icon: '🚦',
-    badge: 'Esquina Verificada',
-    isPoi: true
-  },
-  {
-    regex: /(abasto|shopping.*abasto|abasto.*shopping)/i,
-    lat: '-34.6035',
-    lon: '-58.4108',
-    mainTitle: 'Abasto Shopping',
-    subTitle: 'Av. Corrientes 3247, Balvanera, CABA',
-    icon: '🛍️',
-    badge: 'Centro Comercial',
-    isPoi: true
-  },
-  {
-    regex: /(alto.*palermo|shopping.*alto.*palermo)/i,
-    lat: '-34.5878',
-    lon: '-58.4103',
-    mainTitle: 'Alto Palermo Shopping',
-    subTitle: 'Av. Santa Fe 3253, Palermo, CABA',
-    icon: '🛍️',
-    badge: 'Centro Comercial',
-    isPoi: true
-  },
-  {
-    regex: /(ezeiza|aeropuerto.*ezeiza|pistarini|ministro.*pistarini|eze\b)/i,
-    lat: '-34.8222',
-    lon: '-58.5358',
-    mainTitle: 'Aeropuerto Internacional Ministro Pistarini (Ezeiza - EZE)',
-    subTitle: 'Autopista Riccheri km 33.5, Ezeiza, Gran Buenos Aires',
-    icon: '✈️',
-    badge: 'Aeropuerto Internacional',
-    isPoi: true
-  },
-  {
-    regex: /(aeroparque|jorge newbery|aep\b)/i,
+    regex: /(aeroparque|jorge\s*newbery|aep\b|costanera\s*rafael\s*obligado)/i,
     lat: '-34.5588',
     lon: '-58.4168',
     mainTitle: 'Aeroparque Internacional Jorge Newbery (AEP)',
@@ -4361,7 +4346,37 @@ const STRATEGIC_LANDMARKS = [
     isPoi: true
   },
   {
-    regex: /(buquebus|terminal.*buquebus)/i,
+    regex: /(ezeiza|aeropuerto.*ezeiza|pistarini|ministro.*pistarini|eze\b|riccheri)/i,
+    lat: '-34.8222',
+    lon: '-58.5358',
+    mainTitle: 'Aeropuerto Internacional Ministro Pistarini (Ezeiza - EZE)',
+    subTitle: 'Autopista Riccheri km 33.5, Ezeiza, Gran Buenos Aires',
+    icon: '✈️',
+    badge: 'Aeropuerto Internacional',
+    isPoi: true
+  },
+  {
+    regex: /(palomar|aeropuerto.*palomar|epa\b)/i,
+    lat: '-34.6094',
+    lon: '-58.6025',
+    mainTitle: 'Aeropuerto El Palomar (EPA)',
+    subTitle: 'Morón / El Palomar, Gran Buenos Aires',
+    icon: '✈️',
+    badge: 'Aeropuerto',
+    isPoi: true
+  },
+  {
+    regex: /(obelisco|plaza.*de\s*la\s*republica|9\s*de\s*julio\s*y\s*corrientes)/i,
+    lat: '-34.6037',
+    lon: '-58.3816',
+    mainTitle: 'Obelisco de Buenos Aires',
+    subTitle: 'Av. 9 de Julio y Av. Corrientes, San Nicolás, CABA',
+    icon: '📍',
+    badge: 'Punto Emblemático',
+    isPoi: true
+  },
+  {
+    regex: /(buquebus|terminal.*buquebus|darsena\s*norte)/i,
     lat: '-34.5971',
     lon: '-58.3688',
     mainTitle: 'Terminal Buquebus (Puerto Madero)',
@@ -4381,7 +4396,37 @@ const STRATEGIC_LANDMARKS = [
     isPoi: true
   },
   {
-    regex: /(unicenter|unicenter.*shopping)/i,
+    regex: /(estaci[oó]n.*retiro|tren.*retiro|retiro\s*mitre)/i,
+    lat: '-34.5912',
+    lon: '-58.3750',
+    mainTitle: 'Estación Retiro (Trenes Mitre / San Martín)',
+    subTitle: 'Av. Dr. José María Ramos Mejía 1302, Retiro, CABA',
+    icon: '🚆',
+    badge: 'Estación Ferroviaria',
+    isPoi: true
+  },
+  {
+    regex: /(estaci[oó]n.*constitucion|tren.*constitucion|constitucion)/i,
+    lat: '-34.6278',
+    lon: '-58.3812',
+    mainTitle: 'Estación Constitución (Tren Roca)',
+    subTitle: 'Av. Brasil 1128, Constitución, CABA',
+    icon: '🚆',
+    badge: 'Estación Ferroviaria',
+    isPoi: true
+  },
+  {
+    regex: /(estaci[oó]n.*once|plaza\s*miserere|once\s*de\s*septiembre)/i,
+    lat: '-34.6095',
+    lon: '-58.4072',
+    mainTitle: 'Estación Once / Plaza Miserere (Tren Sarmiento)',
+    subTitle: 'Av. Rivadavia 2800, Balvanera, CABA',
+    icon: '🚆',
+    badge: 'Estación Ferroviaria',
+    isPoi: true
+  },
+  {
+    regex: /(unicenter|shopping.*unicenter)/i,
     lat: '-34.5085',
     lon: '-58.5235',
     mainTitle: 'Unicenter Shopping',
@@ -4391,13 +4436,43 @@ const STRATEGIC_LANDMARKS = [
     isPoi: true
   },
   {
-    regex: /(obelisco|obelisco.*buenos aires)/i,
-    lat: '-34.6037',
-    lon: '-58.3816',
-    mainTitle: 'Obelisco de Buenos Aires',
-    subTitle: 'Av. 9 de Julio y Av. Corrientes, San Nicolás, CABA',
-    icon: '📍',
-    badge: 'Punto de Interés',
+    regex: /(dot\s*baires|dot.*shopping|shopping.*dot)/i,
+    lat: '-34.5456',
+    lon: '-58.4886',
+    mainTitle: 'DOT Baires Shopping',
+    subTitle: 'Vedia 3600, Saavedra, CABA',
+    icon: '🛍️',
+    badge: 'Centro Comercial',
+    isPoi: true
+  },
+  {
+    regex: /(alto.*palermo|shopping.*alto.*palermo)/i,
+    lat: '-34.5878',
+    lon: '-58.4103',
+    mainTitle: 'Alto Palermo Shopping',
+    subTitle: 'Av. Santa Fe 3253, Palermo, CABA',
+    icon: '🛍️',
+    badge: 'Centro Comercial',
+    isPoi: true
+  },
+  {
+    regex: /(abasto|shopping.*abasto|abasto.*shopping)/i,
+    lat: '-34.6035',
+    lon: '-58.4108',
+    mainTitle: 'Abasto Shopping',
+    subTitle: 'Av. Corrientes 3247, Balvanera, CABA',
+    icon: '🛍️',
+    badge: 'Centro Comercial',
+    isPoi: true
+  },
+  {
+    regex: /(galer[ií]as\s*pac[ií]fico|galerias\s*pacifico)/i,
+    lat: '-34.5997',
+    lon: '-58.3742',
+    mainTitle: 'Galerías Pacífico',
+    subTitle: 'Av. Córdoba 550 y Florida, San Nicolás, CABA',
+    icon: '🛍️',
+    badge: 'Centro Comercial Histórico',
     isPoi: true
   },
   {
@@ -4406,6 +4481,46 @@ const STRATEGIC_LANDMARKS = [
     lon: '-58.3644',
     mainTitle: 'Hotel Hilton Buenos Aires',
     subTitle: 'Macacha Güemes 351, Puerto Madero, CABA',
+    icon: '🏨',
+    badge: 'Hotel 5 Estrellas',
+    isPoi: true
+  },
+  {
+    regex: /(hotel.*sheraton|sheraton.*retiro|sheraton.*buenos aires)/i,
+    lat: '-34.5925',
+    lon: '-58.3744',
+    mainTitle: 'Sheraton Buenos Aires Hotel & Convention Center',
+    subTitle: 'San Martín 1225, Retiro, CABA',
+    icon: '🏨',
+    badge: 'Hotel 5 Estrellas',
+    isPoi: true
+  },
+  {
+    regex: /(hotel.*faena|faena.*hotel|faena.*puerto madero)/i,
+    lat: '-34.6167',
+    lon: '-58.3619',
+    mainTitle: 'Faena Hotel Buenos Aires',
+    subTitle: 'Martha Salotti 445, Puerto Madero, CABA',
+    icon: '🏨',
+    badge: 'Hotel 5 Estrellas',
+    isPoi: true
+  },
+  {
+    regex: /(hotel.*alvear|alvear\s*palace|alvear.*recoleta)/i,
+    lat: '-34.5886',
+    lon: '-58.3883',
+    mainTitle: 'Alvear Palace Hotel',
+    subTitle: 'Av. Alvear 1891, Recoleta, CABA',
+    icon: '🏨',
+    badge: 'Hotel 5 Estrellas',
+    isPoi: true
+  },
+  {
+    regex: /(hotel.*four\s*seasons|four\s*seasons.*buenos aires)/i,
+    lat: '-34.5910',
+    lon: '-58.3817',
+    mainTitle: 'Four Seasons Hotel Buenos Aires',
+    subTitle: 'Posadas 1086, Retiro / Recoleta, CABA',
     icon: '🏨',
     badge: 'Hotel 5 Estrellas',
     isPoi: true
@@ -4421,7 +4536,107 @@ const STRATEGIC_LANDMARKS = [
     isPoi: true
   },
   {
-    regex: /^(palermo|barrio palermo|palermo soho|palermo hollywood)/i,
+    regex: /(plaza\s*serrano|palermo\s*soho|plaza\s*cortazar)/i,
+    lat: '-34.5885',
+    lon: '-58.4300',
+    mainTitle: 'Plaza Serrano / Palermo Soho (Plaza Cortázar)',
+    subTitle: 'Jorge Luis Borges y Honduras, Palermo, CABA',
+    icon: '🍸',
+    badge: 'Polo Gastronómico',
+    isPoi: true
+  },
+  {
+    regex: /(teatro\s*col[oó]n|teatro\s*colon)/i,
+    lat: '-34.6011',
+    lon: '-58.3831',
+    mainTitle: 'Teatro Colón',
+    subTitle: 'Cerrito 628, San Nicolás, CABA',
+    icon: '🎭',
+    badge: 'Punto Cultural',
+    isPoi: true
+  },
+  {
+    regex: /(cementerio.*recoleta|plaza\s*francia)/i,
+    lat: '-34.5875',
+    lon: '-58.3930',
+    mainTitle: 'Cementerio de la Recoleta / Plaza Francia',
+    subTitle: 'Junín 1760, Recoleta, CABA',
+    icon: '🏛️',
+    badge: 'Atracción Turística',
+    isPoi: true
+  },
+  {
+    regex: /(casa\s*rosada|plaza\s*de\s*mayo)/i,
+    lat: '-34.6083',
+    lon: '-58.3702',
+    mainTitle: 'Casa Rosada / Plaza de Mayo',
+    subTitle: 'Balcarce 50, Monserrat, CABA',
+    icon: '🏛️',
+    badge: 'Sede de Gobierno',
+    isPoi: true
+  },
+  {
+    regex: /(congreso.*naci[oó]n|plaza\s*congreso)/i,
+    lat: '-34.6097',
+    lon: '-58.3926',
+    mainTitle: 'Congreso de la Nación Argentina',
+    subTitle: 'Av. Rivadavia y Av. Callao, Balvanera, CABA',
+    icon: '🏛️',
+    badge: 'Edificio Histórico',
+    isPoi: true
+  },
+  {
+    regex: /(puerto\s*madero|puente\s*de\s*la\s*mujer)/i,
+    lat: '-34.6083',
+    lon: '-58.3644',
+    mainTitle: 'Puerto Madero (Puente de la Mujer)',
+    subTitle: 'Dique 3, Puerto Madero, CABA',
+    icon: '🏢',
+    badge: 'Zona Ejecutiva',
+    isPoi: true
+  },
+  {
+    regex: /(estadio\s*monumental|river\s*plate|cancha\s*de\s*river)/i,
+    lat: '-34.5453',
+    lon: '-58.4498',
+    mainTitle: 'Estadio Mâs Monumental (River Plate)',
+    subTitle: 'Av. Pres. Figueroa Alcorta 7597, Núñez, CABA',
+    icon: '⚽',
+    badge: 'Estadio de Fútbol',
+    isPoi: true
+  },
+  {
+    regex: /(la\s*bombonera|boca\s*juniors|cancha\s*de\s*boca)/i,
+    lat: '-34.6356',
+    lon: '-58.3648',
+    mainTitle: 'Estadio Alberto J. Armando (La Bombonera)',
+    subTitle: 'Brandsen 805, La Boca, CABA',
+    icon: '⚽',
+    badge: 'Estadio de Fútbol',
+    isPoi: true
+  },
+  {
+    regex: /(movistar\s*arena|villa\s*crespo\s*arena)/i,
+    lat: '-34.5958',
+    lon: '-58.4486',
+    mainTitle: 'Movistar Arena Buenos Aires',
+    subTitle: 'Humboldt 450, Villa Crespo, CABA',
+    icon: '🎤',
+    badge: 'Estadio / Conciertos',
+    isPoi: true
+  },
+  {
+    regex: /(caminito|barrio\s*la\s*boca)/i,
+    lat: '-34.6394',
+    lon: '-58.3629',
+    mainTitle: 'Caminito / La Boca',
+    subTitle: 'Valle Iberlucea y Magallanes, La Boca, CABA',
+    icon: '🎨',
+    badge: 'Paseo Turístico',
+    isPoi: true
+  },
+  {
+    regex: /^(palermo|barrio\s*palermo|palermo\s*hollywood)/i,
     lat: '-34.5889',
     lon: '-58.4306',
     mainTitle: 'Palermo, CABA',
@@ -4431,7 +4646,7 @@ const STRATEGIC_LANDMARKS = [
     isPoi: true
   },
   {
-    regex: /^(belgrano|barrio belgrano|belgrano r|belgrano c)/i,
+    regex: /^(belgrano|barrio\s*belgrano|belgrano\s*r|belgrano\s*c)/i,
     lat: '-34.5627',
     lon: '-58.4564',
     mainTitle: 'Belgrano, CABA',
@@ -4441,17 +4656,7 @@ const STRATEGIC_LANDMARKS = [
     isPoi: true
   },
   {
-    regex: /^(puerto madero)/i,
-    lat: '-34.6111',
-    lon: '-58.3639',
-    mainTitle: 'Puerto Madero, CABA',
-    subTitle: 'Comuna 1, Buenos Aires',
-    icon: '🏢',
-    badge: 'Zona Ejecutiva',
-    isPoi: true
-  },
-  {
-    regex: /^(recoleta|barrio recoleta)/i,
+    regex: /^(recoleta|barrio\s*recoleta)/i,
     lat: '-34.5895',
     lon: '-58.3974',
     mainTitle: 'Recoleta, CABA',
@@ -4461,36 +4666,228 @@ const STRATEGIC_LANDMARKS = [
     isPoi: true
   },
   {
-    regex: /^(pilar|centro.*pilar|pilar centro)/i,
-    lat: '-34.4587',
-    lon: '-58.9142',
-    mainTitle: 'Pilar, Gran Buenos Aires Norte',
-    subTitle: 'Acceso Norte Ramal Pilar, Buenos Aires',
+    regex: /^(caballito|parque\s*rivadavia|parque\s*centenario)/i,
+    lat: '-34.6186',
+    lon: '-58.4428',
+    mainTitle: 'Caballito, CABA',
+    subTitle: 'Comuna 6, Buenos Aires',
     icon: '📍',
-    badge: 'Localidad GBA',
+    badge: 'Barrio CABA',
     isPoi: true
   },
   {
-    regex: /^(san isidro|centro.*san isidro)/i,
+    regex: /^(san\s*telmo|plaza\s*dorrego)/i,
+    lat: '-34.6214',
+    lon: '-58.3731',
+    mainTitle: 'San Telmo, CABA',
+    subTitle: 'Comuna 1, Buenos Aires',
+    icon: '📍',
+    badge: 'Barrio CABA',
+    isPoi: true
+  },
+  {
+    regex: /^(villa\s*urquiza)/i,
+    lat: '-34.5739',
+    lon: '-58.4878',
+    mainTitle: 'Villa Urquiza, CABA',
+    subTitle: 'Comuna 12, Buenos Aires',
+    icon: '📍',
+    badge: 'Barrio CABA',
+    isPoi: true
+  },
+  {
+    regex: /^(villa\s*crespo)/i,
+    lat: '-34.5980',
+    lon: '-58.4439',
+    mainTitle: 'Villa Crespo, CABA',
+    subTitle: 'Comuna 15, Buenos Aires',
+    icon: '📍',
+    badge: 'Barrio CABA',
+    isPoi: true
+  },
+  {
+    regex: /^(nuñez|barrio\s*nuñez)/i,
+    lat: '-34.5456',
+    lon: '-58.4628',
+    mainTitle: 'Núñez, CABA',
+    subTitle: 'Comuna 13, Buenos Aires',
+    icon: '📍',
+    badge: 'Barrio CABA',
+    isPoi: true
+  },
+  {
+    regex: /^(almagro)/i,
+    lat: '-34.6111',
+    lon: '-58.4214',
+    mainTitle: 'Almagro, CABA',
+    subTitle: 'Comuna 5, Buenos Aires',
+    icon: '📍',
+    badge: 'Barrio CABA',
+    isPoi: true
+  },
+  {
+    regex: /^(san\s*isidro|catedral.*san\s*isidro)/i,
     lat: '-34.4717',
     lon: '-58.5286',
     mainTitle: 'San Isidro, Gran Buenos Aires Norte',
     subTitle: 'Zona Norte, Buenos Aires',
     icon: '📍',
-    badge: 'Localidad GBA',
+    badge: 'Localidad GBA Norte',
     isPoi: true
   },
   {
-    regex: /^(tigre|estaci[oó]n.*tigre|puerto de frutos)/i,
+    regex: /^(vicente\s*l[oó]pez|olivos|puerto\s*de\s*olivos)/i,
+    lat: '-34.5106',
+    lon: '-58.4872',
+    mainTitle: 'Vicente López / Olivos, GBA Norte',
+    subTitle: 'Zona Norte, Buenos Aires',
+    icon: '📍',
+    badge: 'Localidad GBA Norte',
+    isPoi: true
+  },
+  {
+    regex: /^(mart[ií]nez|martinez)/i,
+    lat: '-34.4939',
+    lon: '-58.5083',
+    mainTitle: 'Martínez, San Isidro, GBA Norte',
+    subTitle: 'Zona Norte, Buenos Aires',
+    icon: '📍',
+    badge: 'Localidad GBA Norte',
+    isPoi: true
+  },
+  {
+    regex: /^(tigre|puerto\s*de\s*frutos)/i,
     lat: '-34.4251',
     lon: '-58.5796',
-    mainTitle: 'Tigre, Gran Buenos Aires Norte',
+    mainTitle: 'Tigre (Puerto de Frutos & Estación)',
     subTitle: 'Municipio de Tigre, Buenos Aires',
     icon: '📍',
-    badge: 'Localidad GBA',
+    badge: 'Localidad GBA Norte',
+    isPoi: true
+  },
+  {
+    regex: /^(pilar|centro.*pilar|pilar\s*centro|panamericana\s*km\s*50)/i,
+    lat: '-34.4587',
+    lon: '-58.9142',
+    mainTitle: 'Pilar, Gran Buenos Aires Norte',
+    subTitle: 'Acceso Norte Ramal Pilar, Buenos Aires',
+    icon: '📍',
+    badge: 'Localidad GBA Norte',
+    isPoi: true
+  },
+  {
+    regex: /^(la\s*plata|plaza\s*moreno|catedral.*la\s*plata)/i,
+    lat: '-34.9214',
+    lon: '-57.9545',
+    mainTitle: 'La Plata, Buenos Aires',
+    subTitle: 'Capital de la Provincia de Buenos Aires',
+    icon: '📍',
+    badge: 'Ciudad Capital',
+    isPoi: true
+  },
+  {
+    regex: /^(quilmes|bernal)/i,
+    lat: '-34.7242',
+    lon: '-58.2527',
+    mainTitle: 'Quilmes, Gran Buenos Aires Sur',
+    subTitle: 'Zona Sur, Buenos Aires',
+    icon: '📍',
+    badge: 'Localidad GBA Sur',
+    isPoi: true
+  },
+  {
+    regex: /^(lan[uú]s|lanus)/i,
+    lat: '-34.7071',
+    lon: '-58.3934',
+    mainTitle: 'Lanús, Gran Buenos Aires Sur',
+    subTitle: 'Zona Sur, Buenos Aires',
+    icon: '📍',
+    badge: 'Localidad GBA Sur',
+    isPoi: true
+  },
+  {
+    regex: /^(avellaneda)/i,
+    lat: '-34.6625',
+    lon: '-58.3653',
+    mainTitle: 'Avellaneda, Gran Buenos Aires Sur',
+    subTitle: 'Zona Sur, Buenos Aires',
+    icon: '📍',
+    badge: 'Localidad GBA Sur',
+    isPoi: true
+  },
+  {
+    regex: /^(ramos\s*mej[ií]a|mor[oó]n|castelar)/i,
+    lat: '-34.6534',
+    lon: '-58.5636',
+    mainTitle: 'Ramos Mejía / Morón, GBA Oeste',
+    subTitle: 'Zona Oeste, Buenos Aires',
+    icon: '📍',
+    badge: 'Localidad GBA Oeste',
     isPoi: true
   }
 ];
+
+// Base de Avenidas y Calles Principales de CABA y Gran Buenos Aires
+const POPULAR_STREETS = [
+  { name: 'Av. Córdoba', aliases: ['cordoba', 'av cordoba', 'avenida cordoba'], lat: -34.5975, lon: -58.4230, sub: 'Palermo / Recoleta / Balvanera, CABA' },
+  { name: 'Av. Santa Fe', aliases: ['santa fe', 'av santa fe', 'avenida santa fe'], lat: -34.5878, lon: -58.4115, sub: 'Palermo / Recoleta / Retiro, CABA' },
+  { name: 'Av. Corrientes', aliases: ['corrientes', 'av corrientes', 'avenida corrientes'], lat: -34.6038, lon: -58.3980, sub: 'Balvanera / San Nicolás / Almagro, CABA' },
+  { name: 'Av. 9 de Julio', aliases: ['9 de julio', 'av 9 de julio', 'nueve de julio'], lat: -34.6037, lon: -58.3816, sub: 'Centro / Retiro / San Nicolás, CABA' },
+  { name: 'Av. del Libertador', aliases: ['libertador', 'av libertador', 'av del libertador'], lat: -34.5720, lon: -58.4200, sub: 'Palermo / Belgrano / Núñez / Vicente López' },
+  { name: 'Av. Cabildo', aliases: ['cabildo', 'av cabildo', 'avenida cabildo'], lat: -34.5620, lon: -58.4560, sub: 'Belgrano / Colegiales / Núñez, CABA' },
+  { name: 'Av. Rivadavia', aliases: ['rivadavia', 'av rivadavia', 'avenida rivadavia'], lat: -34.6150, lon: -58.4300, sub: 'Caballito / Almagro / Flores / Balvanera' },
+  { name: 'Av. Callao', aliases: ['callao', 'av callao', 'avenida callao'], lat: -34.6000, lon: -58.3920, sub: 'Recoleta / Balvanera / San Nicolás, CABA' },
+  { name: 'Av. Pueyrredón', aliases: ['pueyrredon', 'av pueyrredon', 'avenida pueyrredon'], lat: -34.5950, lon: -58.4000, sub: 'Recoleta / Once / Balvanera, CABA' },
+  { name: 'Av. Belgrano', aliases: ['belgrano', 'av belgrano', 'avenida belgrano'], lat: -34.6120, lon: -58.3880, sub: 'Monserrat / Balvanera / San Telmo, CABA' },
+  { name: 'Av. San Martín', aliases: ['san martin', 'av san martin', 'avenida san martin'], lat: -34.5980, lon: -58.4650, sub: 'Villa Crespo / Agronomía / Paternal, CABA' },
+  { name: 'Av. Juan B. Justo', aliases: ['juan b justo', 'av juan b justo', 'juan b. justo'], lat: -34.5920, lon: -58.4380, sub: 'Palermo / Villa Crespo / Liniers, CABA' },
+  { name: 'Av. Las Heras', aliases: ['las heras', 'av las heras', 'general las heras'], lat: -34.5860, lon: -58.3980, sub: 'Recoleta / Palermo, CABA' },
+  { name: 'Av. Leandro N. Alem', aliases: ['leandro n alem', 'alem', 'av alem', 'leandro alem'], lat: -34.6010, lon: -58.3710, sub: 'San Nicolás / Retiro / Puerto Madero, CABA' },
+  { name: 'Av. Paseo Colón', aliases: ['paseo colon', 'av paseo colon', 'avenida paseo colon'], lat: -34.6150, lon: -58.3680, sub: 'San Telmo / Monserrat / Puerto Madero, CABA' },
+  { name: 'Av. Monroe', aliases: ['monroe', 'av monroe', 'avenida monroe'], lat: -34.5630, lon: -58.4600, sub: 'Belgrano / Villa Urquiza / Coghlan, CABA' },
+  { name: 'Av. Juramento', aliases: ['juramento', 'av juramento', 'avenida juramento'], lat: -34.5620, lon: -58.4550, sub: 'Belgrano / Villa Urquiza, CABA' },
+  { name: 'Av. Triunvirato', aliases: ['triunvirato', 'av triunvirato', 'avenida triunvirato'], lat: -34.5800, lon: -58.4750, sub: 'Villa Urquiza / Villa Ortúzar, CABA' },
+  { name: 'Av. Scalabrini Ortiz', aliases: ['scalabrini ortiz', 'av scalabrini ortiz', 'scalabrini'], lat: -34.5910, lon: -58.4230, sub: 'Palermo / Villa Crespo, CABA' },
+  { name: 'Av. Coronel Díaz', aliases: ['coronel diaz', 'av coronel diaz', 'cnel diaz'], lat: -34.5890, lon: -58.4110, sub: 'Palermo / Recoleta, CABA' },
+  { name: 'Av. Pres. Figueroa Alcorta', aliases: ['figueroa alcorta', 'alcorta', 'av figueroa alcorta'], lat: -34.5750, lon: -58.4080, sub: 'Recoleta / Palermo / Núñez, CABA' },
+  { name: 'Av. Alvear', aliases: ['alvear', 'av alvear', 'avenida alvear'], lat: -34.5890, lon: -58.3880, sub: 'Recoleta, CABA' },
+  { name: 'Av. Quintana', aliases: ['quintana', 'av quintana', 'manuel quintana'], lat: -34.5900, lon: -58.3890, sub: 'Recoleta, CABA' },
+  { name: 'Av. Bullrich', aliases: ['bullrich', 'av bullrich', 'intendente bullrich'], lat: -34.5780, lon: -58.4270, sub: 'Palermo, CABA' },
+  { name: 'Av. Dorrego', aliases: ['dorrego', 'av dorrego', 'manuel dorrego'], lat: -34.5820, lon: -58.4380, sub: 'Palermo / Colegiales / Chacarita, CABA' },
+  { name: 'Av. Federico Lacroze', aliases: ['federico lacroze', 'lacroze', 'av lacroze'], lat: -34.5750, lon: -58.4480, sub: 'Colegiales / Chacarita / Belgrano, CABA' },
+  { name: 'Av. Elcano', aliases: ['elcano', 'av elcano', 'sebastian elcano'], lat: -34.5720, lon: -58.4610, sub: 'Belgrano / Colegiales, CABA' },
+  { name: 'Av. Cramer', aliases: ['cramer', 'av cramer', 'avenida cramer'], lat: -34.5650, lon: -58.4680, sub: 'Belgrano / Núñez / Saavedra, CABA' },
+  { name: 'Av. Congreso', aliases: ['congreso', 'av congreso', 'avenida congreso'], lat: -34.5580, lon: -58.4670, sub: 'Belgrano / Coghlan / Villa Urquiza, CABA' },
+  { name: 'Av. General Paz', aliases: ['general paz', 'gral paz', 'av general paz', 'gral. paz'], lat: -34.5360, lon: -58.4680, sub: 'Límite CABA y Gran Buenos Aires' },
+  { name: 'Av. Montes de Oca', aliases: ['montes de oca', 'av montes de oca'], lat: -34.6340, lon: -58.3760, sub: 'Barracas, CABA' },
+  { name: 'Av. Entre Ríos', aliases: ['entre rios', 'av entre rios', 'avenida entre rios'], lat: -34.6180, lon: -58.3910, sub: 'Balvanera / San Cristóbal, CABA' },
+  { name: 'Av. Directorio', aliases: ['directorio', 'av directorio', 'avenida directorio'], lat: -34.6300, lon: -58.4550, sub: 'Caballito / Flores / Mataderos, CABA' },
+  { name: 'Av. Eva Perón', aliases: ['eva peron', 'av eva peron', 'del trabajo'], lat: -34.6360, lon: -58.4570, sub: 'Parque Chacabuco / Flores, CABA' },
+  { name: 'Av. Caseros', aliases: ['caseros', 'av caseros', 'avenida caseros'], lat: -34.6320, lon: -58.3910, sub: 'San Telmo / Parque Patricios, CABA' },
+  { name: 'Av. Gaona', aliases: ['gaona', 'av gaona', 'avenida gaona'], lat: -34.6120, lon: -58.4580, sub: 'Caballito / Flores / Villa General Mitre, CABA' },
+  { name: 'Av. Alvarez Jonte', aliases: ['alvarez jonte', 'jonte', 'av jonte'], lat: -34.6180, lon: -58.4900, sub: 'Villa Santa Rita / Monte Castro / Villa del Parque' },
+  { name: 'Av. Nazca', aliases: ['nazca', 'av nazca', 'avenida nazca'], lat: -34.6050, lon: -58.4870, sub: 'Villa del Parque / Flores / Villa Pueyrredón' },
+  { name: 'Av. San Juan', aliases: ['san juan', 'av san juan', 'avenida san juan'], lat: -34.6230, lon: -58.3900, sub: 'San Telmo / Boedo / San Cristóbal, CABA' },
+  { name: 'Av. Independencia', aliases: ['independencia', 'av independencia'], lat: -34.6200, lon: -58.3860, sub: 'San Telmo / Boedo / Monserrat, CABA' },
+  { name: 'Av. Maipú', aliases: ['maipu', 'av maipu', 'avenida maipu'], lat: -34.5290, lon: -58.4790, sub: 'Vicente López / Olivos, GBA Norte' },
+  { name: 'Av. Centenario', aliases: ['centenario', 'av centenario'], lat: -34.4720, lon: -58.5300, sub: 'San Isidro / Béccar, GBA Norte' },
+  { name: 'Av. Santa Fe (Martínez)', aliases: ['santa fe martinez', 'av santa fe martinez'], lat: -34.4980, lon: -58.5020, sub: 'Martínez / Acassuso, San Isidro, GBA Norte' },
+  { name: 'Av. Fondo de la Legua', aliases: ['fondo de la legua', 'av fondo de la legua'], lat: -34.4980, lon: -58.5350, sub: 'San Isidro / Villa Adelina / Martínez, GBA' },
+  { name: 'Av. Alicia Moreau de Justo', aliases: ['alicia moreau de justo', 'moreau de justo', 'diques'], lat: -34.6060, lon: -58.3660, sub: 'Puerto Madero / Diques, CABA' },
+  { name: 'Av. Costanera Rafael Obligado', aliases: ['costanera', 'costanera norte', 'av costanera'], lat: -34.5600, lon: -58.4150, sub: 'Costanera Norte / Aeroparque, CABA' }
+];
+
+// Helper para normalizar texto de búsqueda (sin acentos, minúsculas, espacios limpios)
+function normalizeSearchText(str) {
+  if (!str) return '';
+  return String(str)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Quita tildes: córdoba -> cordoba, nuñez -> nunez
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 // Helper para capitalizar palabras
 function capitalizeWords(str) {
@@ -4508,6 +4905,11 @@ function cleanAddressDisplay(raw) {
     .replace(/,\s*CABA,\s*CABA/gi, ', CABA')
     .replace(/,\s*,/g, ',')
     .trim();
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // Helper con timeout para evitar demoras en redes móviles
@@ -4529,232 +4931,12 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 2000, parentSigna
   }
 }
 
-// Normalizador y extractor de barrios/localidades para consulta precisa a USIG
-function prepareAddressForUsig(rawQuery) {
-  let text = (rawQuery || '').trim();
-  
-  // Extraer mención de barrio o localidad si fue escrita por el usuario
-  const neighborhoodMatch = text.match(/\b(palermo|recoleta|belgrano|caballito|villa\s+urquiza|nuñez|almagro|san\s+telmo|puerto\s+madero|monserrat|balvanera|villa\s+crespo|chacarita|colegiales|barracas|flores|floresta|liniers|villa\s+devoto|saavedra|caba|buenos\s+aires|capital\s+federal|san\s+isidro|vicente\s+lopez|olivos|martinez|tigre|pilar|san\s+martin|moron|avellaneda|lanus|quilmes|ramos\s+mejia)\b/i);
-  const neighborhood = neighborhoodMatch ? capitalizeWords(neighborhoodMatch[0]) : '';
-
-  // Limpiar prefijos comunes como "esquina", "esq.", "cruce"
-  let cleaned = text
-    .replace(/^(esquina|esq\.?|cruce\s+de|cruce|intersecci[oó]n\s+de)\s+/i, '')
-    .trim();
-
-  // Limpiar sufijos de barrio o ciudad para que la API de USIG no falle en el cruce de calles
-  if (neighborhoodMatch) {
-    cleaned = cleaned
-      .replace(new RegExp(`[,\\s]+${neighborhoodMatch[0]}\\b.*$`, 'i'), '')
-      .replace(new RegExp(`^${neighborhoodMatch[0]}[,\\s]+`, 'i'), '')
-      .trim();
-  }
-
-  // Normalizar conectores de esquinas (&, /, con, e, cruce con -> y)
-  cleaned = cleaned.replace(/\s+(?:y|e|con|cruce(?:\s+con)?|e\/|\/|&)\s+/i, ' y ');
-
-  return {
-    cleanedAddress: cleaned.trim() || text,
-    neighborhood: neighborhood
-  };
-}
-
-// Helper para remover acentos/tildes y normalizar texto
-function stripAccents(str) {
-  if (!str) return '';
-  return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-}
-
-// Destinos y puntos de interés estratégicos en Argentina con resolución instantánea (0 ms)
-const STRATEGIC_LANDMARKS = [
-  {
-    regex: /(ezeiza|aeropuerto.*ezeiza|pistarini|ministro.*pistarini|eze\b)/i,
-    lat: '-34.8222',
-    lon: '-58.5358',
-    mainTitle: 'Aeropuerto Internacional Ezeiza (EZE)',
-    subTitle: 'Autopista Riccheri km 33.5, Ezeiza, Gran Buenos Aires',
-    icon: '✈️',
-    badge: 'Aeropuerto Internacional'
-  },
-  {
-    regex: /(aeroparque|jorge newbery|aep\b)/i,
-    lat: '-34.5588',
-    lon: '-58.4168',
-    mainTitle: 'Aeroparque Jorge Newbery (AEP)',
-    subTitle: 'Av. Costanera Rafael Obligado s/n, Palermo, CABA',
-    icon: '✈️',
-    badge: 'Aeropuerto Nacional/Regional'
-  },
-  {
-    regex: /(buquebus|terminal.*buquebus)/i,
-    lat: '-34.5971',
-    lon: '-58.3688',
-    mainTitle: 'Terminal Buquebus (Puerto Madero)',
-    subTitle: 'Av. Antártida Argentina 821, Dársena Norte, CABA',
-    icon: '⛴️',
-    badge: 'Terminal Fluvial'
-  },
-  {
-    regex: /(terminal.*retiro|retiro.*terminal|omnibus.*retiro)/i,
-    lat: '-34.5878',
-    lon: '-58.3753',
-    mainTitle: 'Terminal de Ómnibus de Retiro',
-    subTitle: 'Av. Antártida Argentina y Calle 10, Retiro, CABA',
-    icon: '🚉',
-    badge: 'Terminal de Ómnibus'
-  },
-  {
-    regex: /(obelisco|obelisco.*buenos aires)/i,
-    lat: '-34.6037',
-    lon: '-58.3816',
-    mainTitle: 'Obelisco de Buenos Aires',
-    subTitle: 'Av. 9 de Julio y Av. Corrientes, San Nicolás, CABA',
-    icon: '📍',
-    badge: 'Punto de Interés'
-  },
-  {
-    regex: /(abasto|shopping.*abasto|abasto.*shopping)/i,
-    lat: '-34.6035',
-    lon: '-58.4108',
-    mainTitle: 'Abasto Shopping',
-    subTitle: 'Av. Corrientes 3247, Balvanera, CABA',
-    icon: '🛍️',
-    badge: 'Centro Comercial'
-  },
-  {
-    regex: /(alto.*palermo|shopping.*alto.*palermo)/i,
-    lat: '-34.5878',
-    lon: '-58.4103',
-    mainTitle: 'Alto Palermo Shopping',
-    subTitle: 'Av. Santa Fe 3253, Palermo, CABA',
-    icon: '🛍️',
-    badge: 'Centro Comercial'
-  },
-  {
-    regex: /(unicenter|unicenter.*shopping)/i,
-    lat: '-34.5085',
-    lon: '-58.5235',
-    mainTitle: 'Unicenter Shopping',
-    subTitle: 'Paraná 3745, Martínez, San Isidro, GBA Norte',
-    icon: '🛍️',
-    badge: 'Centro Comercial'
-  },
-  {
-    regex: /(dot.*baires|shopping.*dot)/i,
-    lat: '-34.5452',
-    lon: '-58.4891',
-    mainTitle: 'DOT Baires Shopping',
-    subTitle: 'Vedia 3600, Saavedra, CABA',
-    icon: '🛍️',
-    badge: 'Centro Comercial'
-  },
-  {
-    regex: /(hotel.*hilton|hilton.*puerto madero|hilton.*buenos aires)/i,
-    lat: '-34.6050',
-    lon: '-58.3644',
-    mainTitle: 'Hotel Hilton Buenos Aires',
-    subTitle: 'Macacha Güemes 351, Puerto Madero, CABA',
-    icon: '🏨',
-    badge: 'Hotel 5 Estrellas'
-  },
-  {
-    regex: /(sheraton|hotel.*sheraton)/i,
-    lat: '-34.5925',
-    lon: '-58.3736',
-    mainTitle: 'Sheraton Buenos Aires Hotel',
-    subTitle: 'San Martín 1225, Retiro, CABA',
-    icon: '🏨',
-    badge: 'Hotel 5 Estrellas'
-  },
-  {
-    regex: /(faena|hotel.*faena)/i,
-    lat: '-34.6178',
-    lon: '-58.3622',
-    mainTitle: 'Faena Hotel Buenos Aires',
-    subTitle: 'Martha Salotti 445, Puerto Madero, CABA',
-    icon: '🏨',
-    badge: 'Hotel 5 Estrellas'
-  },
-  {
-    regex: /(nordelta|centro.*nordelta)/i,
-    lat: '-34.4172',
-    lon: '-58.6436',
-    mainTitle: 'Nordelta (Centro Comercial & Accesos)',
-    subTitle: 'Av. de los Lagos, Tigre, Gran Buenos Aires Norte',
-    icon: '🏡',
-    badge: 'Zona Residencial'
-  },
-  {
-    regex: /^(palermo|palermo soho|palermo hollywood)/i,
-    lat: '-34.5889',
-    lon: '-58.4306',
-    mainTitle: 'Palermo, CABA',
-    subTitle: 'Comuna 14, Buenos Aires',
-    icon: '📍',
-    badge: 'Barrio CABA'
-  },
-  {
-    regex: /^(belgrano|belgrano r|belgrano c)/i,
-    lat: '-34.5627',
-    lon: '-58.4564',
-    mainTitle: 'Belgrano, CABA',
-    subTitle: 'Comuna 13, Buenos Aires',
-    icon: '📍',
-    badge: 'Barrio CABA'
-  },
-  {
-    regex: /^(puerto madero)/i,
-    lat: '-34.6111',
-    lon: '-58.3639',
-    mainTitle: 'Puerto Madero, CABA',
-    subTitle: 'Comuna 1, Buenos Aires',
-    icon: '🏢',
-    badge: 'Zona Ejecutiva'
-  },
-  {
-    regex: /^(recoleta)/i,
-    lat: '-34.5895',
-    lon: '-58.3974',
-    mainTitle: 'Recoleta, CABA',
-    subTitle: 'Comuna 2, Buenos Aires',
-    icon: '📍',
-    badge: 'Barrio CABA'
-  },
-  {
-    regex: /^(pilar|pilar centro)/i,
-    lat: '-34.4587',
-    lon: '-58.9142',
-    mainTitle: 'Pilar, Gran Buenos Aires Norte',
-    subTitle: 'Acceso Norte Ramal Pilar, Buenos Aires',
-    icon: '📍',
-    badge: 'Localidad GBA'
-  },
-  {
-    regex: /^(san isidro)/i,
-    lat: '-34.4717',
-    lon: '-58.5286',
-    mainTitle: 'San Isidro, Gran Buenos Aires Norte',
-    subTitle: 'Zona Norte, Buenos Aires',
-    icon: '📍',
-    badge: 'Localidad GBA'
-  },
-  {
-    regex: /^(tigre)/i,
-    lat: '-34.4251',
-    lon: '-58.5796',
-    mainTitle: 'Tigre, Gran Buenos Aires Norte',
-    subTitle: 'Municipio de Tigre, Buenos Aires',
-    icon: '📍',
-    badge: 'Localidad GBA'
-  }
-];
-
 // Generador de sugerencias inmediatas (0ms) en memoria para CABA y GBA
 function getInstantLocalSuggestions(rawQuery) {
   const query = (rawQuery || '').trim();
   if (query.length < 2) return [];
 
-  const queryNormalized = stripAccents(query);
+  const normQuery = normalizeSearchText(query);
   const results = [];
   const seen = new Set();
 
@@ -4767,13 +4949,18 @@ function getInstantLocalSuggestions(rawQuery) {
     }
   }
 
-  // 1. Coincidencias en puntos de interés y aeropuertos
+  // 1. Coincidencias exactas en puntos de interés y aeropuertos
   if (Array.isArray(STRATEGIC_LANDMARKS)) {
     STRATEGIC_LANDMARKS.forEach(l => {
-      if (l.regex && (l.regex.test(query) || l.regex.test(queryNormalized))) {
+      const matchRegex = l.regex && (l.regex.test(query) || l.regex.test(normQuery));
+      const normTitle = normalizeSearchText(l.mainTitle);
+      const normSub = normalizeSearchText(l.subTitle);
+      const matchText = normTitle.includes(normQuery) || normSub.includes(normQuery);
+
+      if (matchRegex || matchText) {
         pushItem({
-          lat: l.lat,
-          lon: l.lon,
+          lat: String(l.lat),
+          lon: String(l.lon),
           display_name: `${l.mainTitle}, ${l.subTitle}`,
           _isIntersection: false,
           _isPoi: true,
@@ -4789,68 +4976,42 @@ function getInstantLocalSuggestions(rawQuery) {
   // 2. Coincidencias de Avenidas y Calles con Altura en CABA / GBA
   const matchNumber = query.match(/\b\d{1,5}\b/);
   const numberStr = matchNumber ? matchNumber[0] : '';
-  const streetOnlyClean = stripAccents(query.replace(/\b\d{1,5}\b/, '').replace(/^(av|av\.|avenida|calle|calle\.)\s+/i, '').trim());
+  const streetOnlyNorm = normQuery.replace(/\b\d{1,5}\b/, '').replace(/^(av|av\.|avenida|calle)\s+/i, '').trim();
 
-  const POPULAR_STREETS = [
-    { name: 'Av. Córdoba', lat: -34.5975, lon: -58.4230, sub: 'Palermo / Recoleta, CABA' },
-    { name: 'Av. Santa Fe', lat: -34.5878, lon: -58.4115, sub: 'Palermo / Recoleta, CABA' },
-    { name: 'Av. Corrientes', lat: -34.6038, lon: -58.3980, sub: 'Balvanera / San Nicolás, CABA' },
-    { name: 'Av. 9 de Julio', lat: -34.6037, lon: -58.3816, sub: 'Centro / Retiro, CABA' },
-    { name: 'Av. del Libertador', lat: -34.5720, lon: -58.4200, sub: 'Palermo / Núñez / Vicente López' },
-    { name: 'Av. Cabildo', lat: -34.5620, lon: -58.4560, sub: 'Belgrano / Colegiales, CABA' },
-    { name: 'Av. Rivadavia', lat: -34.6150, lon: -58.4300, sub: 'Caballito / Almagro / Flores, CABA' },
-    { name: 'Av. Callao', lat: -34.6000, lon: -58.3920, sub: 'Recoleta / Balvanera, CABA' },
-    { name: 'Av. Pueyrredón', lat: -34.5950, lon: -58.4000, sub: 'Recoleta / Once, CABA' },
-    { name: 'Av. Belgrano', lat: -34.6120, lon: -58.3880, sub: 'Monserrat / Balvanera, CABA' },
-    { name: 'Av. San Martín', lat: -34.5980, lon: -58.4650, sub: 'Villa Crespo / Agronomía, CABA' },
-    { name: 'Av. Juan B. Justo', lat: -34.5920, lon: -58.4380, sub: 'Palermo / Villa Crespo, CABA' },
-    { name: 'Av. Las Heras', lat: -34.5860, lon: -58.3980, sub: 'Recoleta / Palermo, CABA' },
-    { name: 'Av. Leandro N. Alem', lat: -34.6010, lon: -58.3710, sub: 'San Nicolás / Puerto Madero, CABA' },
-    { name: 'Av. Paseo Colón', lat: -34.6150, lon: -58.3680, sub: 'San Telmo / Puerto Madero, CABA' },
-    { name: 'Av. Monroe', lat: -34.5630, lon: -58.4600, sub: 'Belgrano / Villa Urquiza, CABA' },
-    { name: 'Av. Juramento', lat: -34.5620, lon: -58.4550, sub: 'Belgrano, CABA' },
-    { name: 'Av. Triunvirato', lat: -34.5800, lon: -58.4750, sub: 'Villa Urquiza, CABA' },
-    { name: 'Av. Scalabrini Ortiz', lat: -34.5880, lon: -58.4230, sub: 'Palermo / Villa Crespo, CABA' },
-    { name: 'Av. Dorrego', lat: -34.5800, lon: -58.4400, sub: 'Chacarita / Palermo, CABA' },
-    { name: 'Av. Cramer', lat: -34.5680, lon: -58.4600, sub: 'Belgrano / Núñez, CABA' },
-    { name: 'Av. Federico Lacroze', lat: -34.5760, lon: -58.4480, sub: 'Colegiales / Chacarita, CABA' },
-    { name: 'Av. Alvarez Thomas', lat: -34.5770, lon: -58.4650, sub: 'Villa Urquiza / Colegiales, CABA' },
-    { name: 'Av. Warnes', lat: -34.5980, lon: -58.4450, sub: 'Villa Crespo / Paternal, CABA' },
-    { name: 'Av. General Paz', lat: -34.5450, lon: -58.4700, sub: 'Límite CABA / Vicente López' }
-  ];
-
-  if (streetOnlyClean.length >= 2) {
-    POPULAR_STREETS.forEach(s => {
-      const cleanStreetNorm = stripAccents(s.name.replace(/^(av|av\.|avenida)\s+/i, ''));
-      if (cleanStreetNorm.includes(streetOnlyClean) || streetOnlyClean.includes(cleanStreetNorm)) {
-        const fullTitle = numberStr ? `${s.name} ${numberStr}` : s.name;
-        pushItem({
-          lat: String(s.lat),
-          lon: String(s.lon),
-          display_name: `${fullTitle}, ${s.sub}`,
-          _isIntersection: false,
-          _isPoi: false,
-          _poiBadge: 'Dirección CABA',
-          _icon: '📍',
-          _mainTitle: fullTitle,
-          _subTitle: s.sub
-        });
-      }
+  POPULAR_STREETS.forEach(s => {
+    const normName = normalizeSearchText(s.name).replace(/^(av|av\.|avenida|calle)\s+/i, '').trim();
+    const hasAliasMatch = s.aliases && s.aliases.some(a => {
+      const normA = normalizeSearchText(a);
+      return normA.includes(streetOnlyNorm) || streetOnlyNorm.includes(normA);
     });
-  }
 
-  // 3. Fallback inteligente con el texto ingresado para asegurar siempre sugerencia disponible
-  if (query.length >= 3) {
-    const formattedQuery = capitalizeWords(query);
+    if ((streetOnlyNorm.length >= 2 && normName.includes(streetOnlyNorm)) || hasAliasMatch) {
+      const fullTitle = numberStr ? `${s.name} ${numberStr}` : s.name;
+      pushItem({
+        lat: String(s.lat),
+        lon: String(s.lon),
+        display_name: `${fullTitle}, ${s.sub}`,
+        _isIntersection: false,
+        _isPoi: false,
+        _poiBadge: numberStr ? 'Altura Exacta' : 'Avenida Principal',
+        _icon: '📍',
+        _mainTitle: fullTitle,
+        _subTitle: s.sub
+      });
+    }
+  });
+
+  // 3. Fallback genérico del término exacto escrito si no hubo coincidencia
+  if (results.length === 0 && query.length >= 3) {
     pushItem({
       lat: '-34.6037',
       lon: '-58.3816',
-      display_name: `${formattedQuery}, Buenos Aires, Argentina`,
+      display_name: `${capitalizeWords(query)}, Buenos Aires, Argentina`,
       _isIntersection: false,
       _isPoi: false,
-      _poiBadge: 'Confirmar Dirección',
+      _poiBadge: 'Búsqueda por calle',
       _icon: '📍',
-      _mainTitle: formattedQuery,
+      _mainTitle: capitalizeWords(query),
       _subTitle: 'Buenos Aires, Argentina'
     });
   }
@@ -4863,6 +5024,7 @@ async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
   if (query.length < 2) return [];
 
+  const normQuery = normalizeSearchText(query);
   const cornerPattern = /^(.+?)\s+(?:y|e|esquina|esq\.?|con|cruce(?:\s+con)?|e\/|\/|&)\s+(.+)$/i;
   const isCorner = cornerPattern.test(query) || /^(esquina|esq\.?|cruce)\s+/i.test(query);
 
@@ -4881,146 +5043,104 @@ async function searchLocations(rawQuery, signal) {
     }
   }
 
-  // 1. Agregar resultados instantáneos
+  // 1. Agregar resultados instantáneos (0ms)
   const instant = getInstantLocalSuggestions(query);
   instant.forEach(addResult);
 
-  // 2. Ejecutar proveedores en PARALELO con timeout
-  const { cleanedAddress, neighborhood } = prepareAddressForUsig(query);
-  const mbToken = (state.config.mapboxToken || '').trim();
-  const mbUrl = mbToken ? `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=ar&proximity=-58.3816,-34.6037&language=es&limit=6&access_token=${encodeURIComponent(mbToken)}` : '';
-  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=-34.6037&lon=-58.3816&limit=6`;
-  const nomQuery = isCorner ? `${cleanedAddress}, Buenos Aires` : `${query}, Argentina`;
-  const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nomQuery)}&countrycodes=ar&limit=5&addressdetails=1`;
+  // 2. Ejecutar proveedores online con timeout seguro (1800ms)
+  const cleanSearchQuery = isCorner ? `${query}, Buenos Aires` : `${query}, Buenos Aires, Argentina`;
+  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=-34.6037&lon=-58.3816&limit=8`;
+  const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanSearchQuery)}&countrycodes=ar&limit=6&addressdetails=1`;
 
-  const fetchTasks = [];
-
-  // Task 0: Mapbox Geocoding (Rápido, oficial)
-  if (mbUrl) {
-    fetchTasks.push((async () => {
+  const fetchTasks = [
+    // Task A: Photon OSM Geocoder (Soporte CORS 100% confiable y ultrarrápido)
+    (async () => {
       try {
-        const res = await fetchWithTimeout(mbUrl, {}, 1200, signal);
+        const res = await fetchWithTimeout(photonUrl, {}, 1800, signal);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.features)) {
             data.features.forEach(f => {
-              const [lon, lat] = f.center || (f.geometry ? f.geometry.coordinates : []);
-              if (!lon || !lat) return;
-              const placeName = f.place_name || f.text || '';
-              const text = f.text || '';
-              const sub = cleanAddressDisplay(placeName.replace(text, '').replace(/^,\s*/, ''));
+              const [lon, lat] = f.geometry.coordinates;
+              const p = f.properties || {};
+              const textToScan = `${p.name || ''} ${p.street || ''} ${p.osm_value || ''} ${p.osm_key || ''} ${query}`.toLowerCase();
               let icon = '📍';
-              let badge = 'Ubicación';
-              if (f.place_type && f.place_type.includes('poi')) {
-                icon = '🏢'; badge = 'Punto de Interés';
-              } else if (f.place_type && f.place_type.includes('address')) {
-                icon = '📍'; badge = 'Dirección';
+              let poiBadge = '';
+              let isPoi = false;
+
+              if (/aeropuerto|ezeiza|pistarini|aeroparque|newbery/i.test(textToScan)) {
+                icon = '✈️'; poiBadge = 'Aeropuerto'; isPoi = true;
+              } else if (/hotel|resort|hostel|hilton|sheraton|faena|alvear/i.test(textToScan)) {
+                icon = '🏨'; poiBadge = 'Hotel'; isPoi = true;
+              } else if (/shopping|mall|unicenter|dot baires|alto palermo|abasto/i.test(textToScan)) {
+                icon = '🛍️'; poiBadge = 'Centro Comercial'; isPoi = true;
+              } else if (/terminal|retiro|buquebus|estaci[oó]n/i.test(textToScan)) {
+                icon = '🚉'; poiBadge = 'Terminal'; isPoi = true;
               }
+
+              let mainTitle = '';
+              let subTitle = '';
+              const hasDistinctPoiName = p.name && p.street && (p.name.trim().toLowerCase() !== p.street.trim().toLowerCase());
+
+              if (hasDistinctPoiName) {
+                mainTitle = p.name;
+                const addressParts = [
+                  p.street ? `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}` : '',
+                  p.district || p.locality || p.city || '',
+                  p.state || 'Buenos Aires'
+                ].filter(Boolean);
+                subTitle = addressParts.join(', ');
+              } else if (p.street) {
+                mainTitle = `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}`;
+                const addressParts = [
+                  p.district || p.locality || p.city || '',
+                  p.state || 'Buenos Aires'
+                ].filter(Boolean);
+                subTitle = addressParts.join(', ');
+              } else {
+                mainTitle = p.name || query;
+                subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires'].filter(Boolean).join(', ');
+              }
+
+              const fullDisplay = `${mainTitle}, ${subTitle}`.replace(/,\s*,/g, ',').trim();
               addResult({
                 lat: String(lat),
                 lon: String(lon),
-                display_name: cleanAddressDisplay(placeName),
+                display_name: fullDisplay,
                 _isIntersection: isCorner,
-                _isPoi: badge === 'Punto de Interés',
-                _poiBadge: badge,
+                _isPoi: isPoi,
+                _poiBadge: poiBadge,
                 _icon: icon,
-                _mainTitle: text || placeName.split(',')[0],
-                _subTitle: sub || 'Buenos Aires, Argentina'
+                _cornerTitle: null,
+                _mainTitle: mainTitle,
+                _subTitle: subTitle
               });
             });
           }
         }
       } catch(e) {}
-    })());
-  }
+    })(),
 
-  // Task 1: Photon OSM Geocoder
-  fetchTasks.push((async () => {
-    try {
-      const res = await fetchWithTimeout(photonUrl, {}, 1000, signal);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.features)) {
-          data.features.forEach(f => {
-            const [lon, lat] = f.geometry.coordinates;
-            const p = f.properties || {};
-            const textToScan = `${p.name || ''} ${p.street || ''} ${p.osm_value || ''} ${p.osm_key || ''} ${query}`.toLowerCase();
-            let icon = '📍';
-            let poiBadge = '';
-            let isPoi = false;
-
-            if (/aeropuerto|ezeiza|pistarini|aeroparque|newbery/i.test(textToScan)) {
-              icon = '✈️'; poiBadge = 'Aeropuerto'; isPoi = true;
-            } else if (/hotel|resort|hostel|hilton|sheraton|faena|alvear/i.test(textToScan)) {
-              icon = '🏨'; poiBadge = 'Hotel'; isPoi = true;
-            } else if (/shopping|mall|unicenter|dot baires|alto palermo|abasto/i.test(textToScan)) {
-              icon = '🛍️'; poiBadge = 'Centro Comercial'; isPoi = true;
-            } else if (/terminal|retiro|buquebus|estaci[oó]n/i.test(textToScan)) {
-              icon = '🚉'; poiBadge = 'Terminal'; isPoi = true;
-            }
-
-            let mainTitle = '';
-            let subTitle = '';
-            const hasDistinctPoiName = p.name && p.street && (p.name.trim().toLowerCase() !== p.street.trim().toLowerCase());
-
-            if (hasDistinctPoiName) {
-              mainTitle = p.name;
-              const addressParts = [
-                p.street ? `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}` : '',
-                p.district || p.locality || p.city || '',
-                p.state || 'Buenos Aires'
-              ].filter(Boolean);
-              subTitle = addressParts.join(', ');
-            } else if (p.street) {
-              mainTitle = `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}`;
-              const addressParts = [
-                p.district || p.locality || p.city || '',
-                p.state || 'Buenos Aires'
-              ].filter(Boolean);
-              subTitle = addressParts.join(', ');
-            } else {
-              mainTitle = p.name || query;
-              subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires'].filter(Boolean).join(', ');
-            }
-
-            const fullDisplay = cleanAddressDisplay(`${mainTitle}, ${subTitle}`.replace(/,\s*,/g, ','));
-            addResult({
-              lat: String(lat),
-              lon: String(lon),
-              display_name: fullDisplay,
-              _isIntersection: isCorner,
-              _isPoi: isPoi,
-              _poiBadge: poiBadge,
-              _icon: icon,
-              _cornerTitle: null,
-              _mainTitle: mainTitle,
-              _subTitle: subTitle
+    // Task B: Nominatim OpenStreetMap
+    (async () => {
+      try {
+        const res = await fetchWithTimeout(nomUrl, {}, 1800, signal);
+        if (res.ok) {
+          const nomData = await res.json();
+          if (Array.isArray(nomData)) {
+            nomData.forEach(it => {
+              const rawName = it.name || (it.display_name ? it.display_name.split(',')[0] : query);
+              it._mainTitle = isCorner ? `Esquina: ${capitalizeWords(rawName)}` : capitalizeWords(rawName);
+              it._subTitle = cleanAddressDisplay(it.display_name);
+              it._icon = isCorner ? '🚦' : '📍';
+              it._isIntersection = isCorner;
+              addResult(it);
             });
-          });
+          }
         }
-      }
-    } catch(e) {}
-  })());
-
-  // Task 2: Nominatim
-  fetchTasks.push((async () => {
-    try {
-      const res = await fetchWithTimeout(nomUrl, {}, 1000, signal);
-      if (res.ok) {
-        const nomData = await res.json();
-        if (Array.isArray(nomData)) {
-          nomData.forEach(it => {
-            const rawName = it.name || (it.display_name ? it.display_name.split(',')[0] : query);
-            it._mainTitle = isCorner ? `Esquina: ${capitalizeWords(rawName)}` : capitalizeWords(rawName);
-            it._subTitle = cleanAddressDisplay(it.display_name);
-            it._icon = isCorner ? '🚦' : '📍';
-            it._isIntersection = isCorner;
-            addResult(it);
-          });
-        }
-      }
-    } catch(e) {}
-  })());
+      } catch(e) {}
+    })()
+  ];
 
   await Promise.allSettled(fetchTasks);
   return results;
@@ -5059,16 +5179,16 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       const isCorner = place._isIntersection;
       const icon = place._icon || (isCorner ? '🚦' : '📍');
       const mainTitle = place._mainTitle || (isCorner ? (place._cornerTitle || 'Esquina') : (place.name || (place.display_name ? place.display_name.split(',')[0] : 'Ubicación')));
-      const subAddress = place._subTitle || cleanAddressDisplay(place.display_name);
+      const subAddress = place._subTitle || cleanAddressDisplay(place.display_name || '');
       const poiBadge = place._poiBadge || '';
 
       item.innerHTML = `
-        <span style="font-size:1.2rem; flex-shrink:0;">${icon}</span>
+        <span style="font-size:1.25rem; flex-shrink:0; line-height: 1.2;">${icon}</span>
         <div class="suggestion-content" style="flex: 1; min-width: 0;">
-          ${poiBadge ? `<span class="suggestion-badge-poi">${escapeHtml(poiBadge)}</span>` : ''}
-          ${isCorner && !poiBadge ? `<span class="suggestion-badge-intersection">🚦 Esquina / Cruce</span>` : ''}
-          <span class="suggestion-title" style="display: block; font-weight: 700; color: #fff;">${escapeHtml(mainTitle)}</span>
-          <span class="suggestion-sub" style="display: block; font-size: 0.76rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(subAddress)}</span>
+          ${poiBadge ? `<span class="suggestion-badge-poi" style="display:inline-block; font-size:0.68rem; font-weight:700; background:rgba(56,189,248,0.2); color:#38bdf8; padding:2px 6px; border-radius:4px; margin-bottom:2px;">${escapeHtml(poiBadge)}</span>` : ''}
+          ${isCorner && !poiBadge ? `<span class="suggestion-badge-intersection" style="display:inline-block; font-size:0.68rem; font-weight:700; background:rgba(245,158,11,0.2); color:#fbbf24; padding:2px 6px; border-radius:4px; margin-bottom:2px;">🚦 Esquina / Cruce</span>` : ''}
+          <span class="suggestion-title" style="display: block; font-weight: 700; color: #fff; font-size:0.88rem; line-height: 1.3;">${escapeHtml(mainTitle)}</span>
+          <span class="suggestion-sub" style="display: block; font-size: 0.74rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px;">${escapeHtml(subAddress)}</span>
         </div>
       `;
 
@@ -5088,7 +5208,8 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
   }
 
   function selectItem(place) {
-    const cleanSub = place._subTitle || cleanAddressDisplay(place.display_name);
+    const isCorner = place._isIntersection;
+    const cleanSub = place._subTitle || cleanAddressDisplay(place.display_name || '');
     const mainTitle = place._mainTitle || (place.display_name ? place.display_name.split(',')[0] : '');
     
     let cleanName = place.display_name || mainTitle;
@@ -5114,11 +5235,13 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     const pLat = parseFloat(place.lat || place.latitude);
     const pLon = parseFloat(place.lon || place.lng || place.longitude);
 
-    onSelect({
-      lat: pLat,
-      lon: pLon,
-      display_name: cleanName
-    });
+    if (typeof onSelect === 'function') {
+      onSelect({
+        lat: pLat,
+        lon: pLon,
+        display_name: cleanName
+      });
+    }
   }
 
   async function executeSearch(query) {
@@ -5163,7 +5286,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     // 2. Refinar con geocodificación en segundo plano
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 150);
+    }, 180);
   });
 
   input.addEventListener('focus', () => {
@@ -5205,7 +5328,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     }
   });
 
-  document.addEventListener('click', (e) => {
+  document.addEventListener('pointerdown', (e) => {
     if (!input.contains(e.target) && !list.contains(e.target)) {
       list.classList.add('hidden');
       list.style.display = 'none';
@@ -8626,9 +8749,34 @@ if (btnRecenterPassengerMap) {
     }
     window.closePassengerAuthModal = closePassengerAuthModal;
 
+    function openPassengerEmailVerifyModal(email) {
+      const modal = modalPassengerEmailVerify || document.getElementById('modalPassengerEmailVerify');
+      const targetEl = verifyPassengerEmailTarget || document.getElementById('verifyPassengerEmailTarget');
+      const codeInp = inputPassengerVerifyCode || document.getElementById('inputPassengerVerifyCode');
+      if (targetEl && email) targetEl.textContent = email;
+      if (codeInp) {
+        codeInp.value = '';
+        setTimeout(() => codeInp.focus(), 250);
+      }
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+      }
+    }
+    window.openPassengerEmailVerifyModal = openPassengerEmailVerifyModal;
+
+    function closePassengerEmailVerifyModal() {
+      const modal = modalPassengerEmailVerify || document.getElementById('modalPassengerEmailVerify');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+      }
+    }
+    window.closePassengerEmailVerifyModal = closePassengerEmailVerifyModal;
+
     function openPassengerProfileModal() {
       const session = getPassengerSession();
-      // Si no tiene perfil registrado, abrir modal de Registro de Pasajero obligatoriamente
+      // Si no tiene perfil registrado, abrir modal de Autenticación de Pasajero
       if (!session || (!session.nombre && !session.email && !session.telefono)) {
         openPassengerAuthModal('register');
         return;
@@ -8658,10 +8806,46 @@ if (btnRecenterPassengerMap) {
     }
 
     function switchAuthTab(tab) {
-      if (typeof window.switchPassengerAuthTab === 'function') {
-        window.switchPassengerAuthTab(tab);
+      const btnReg = tabBtnPassengerRegister || document.getElementById('tabBtnPassengerRegister');
+      const btnLog = tabBtnPassengerLogin || document.getElementById('tabBtnPassengerLogin');
+      const formLog = formPassengerLogin || document.getElementById('formPassengerLogin');
+      const formReg = formPassengerRegister || document.getElementById('formPassengerRegister');
+
+      if (tab === 'register') {
+        if (btnReg) {
+          btnReg.style.background = '#10b981';
+          btnReg.style.color = '#fff';
+          btnReg.classList.add('active');
+        }
+        if (btnLog) {
+          btnLog.style.background = 'transparent';
+          btnLog.style.color = '#94a3b8';
+          btnLog.classList.remove('active');
+        }
+        if (formLog) formLog.style.display = 'none';
+        if (formReg) {
+          formReg.style.display = 'flex';
+          formReg.style.flexDirection = 'column';
+        }
+      } else {
+        if (btnLog) {
+          btnLog.style.background = '#38bdf8';
+          btnLog.style.color = '#0f172a';
+          btnLog.classList.add('active');
+        }
+        if (btnReg) {
+          btnReg.style.background = 'transparent';
+          btnReg.style.color = '#94a3b8';
+          btnReg.classList.remove('active');
+        }
+        if (formLog) {
+          formLog.style.display = 'flex';
+          formLog.style.flexDirection = 'column';
+        }
+        if (formReg) formReg.style.display = 'none';
       }
     }
+    window.switchAuthTab = switchAuthTab;
 
     // Tab buttons
     if (tabBtnPassengerLogin) {
@@ -8894,15 +9078,7 @@ if (btnRecenterPassengerMap) {
 
         // Mostrar modal de verificación de correo
         closePassengerAuthModal();
-        if (verifyPassengerEmailTarget) verifyPassengerEmailTarget.textContent = email;
-        if (inputPassengerVerifyCode) {
-          inputPassengerVerifyCode.value = '';
-          setTimeout(() => inputPassengerVerifyCode.focus(), 300);
-        }
-        if (modalPassengerEmailVerify) {
-          modalPassengerEmailVerify.classList.remove('hidden');
-          modalPassengerEmailVerify.style.display = 'flex';
-        }
+        openPassengerEmailVerifyModal(email);
 
         if (typeof showToast === 'function') {
           showToast(`⏳ Enviando código de activación a ${email}...`);
@@ -8968,7 +9144,7 @@ if (btnRecenterPassengerMap) {
 
         if (!pending) {
           if (typeof showToast === 'function') showToast('⚠️ No hay registro pendiente. Inicia el proceso de nuevo.');
-          if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.add('hidden');
+          closePassengerEmailVerifyModal();
           openPassengerAuthModal('register');
           return;
         }
@@ -8996,10 +9172,7 @@ if (btnRecenterPassengerMap) {
           localStorage.removeItem('rutaprivada_pending_passenger_reg');
         } catch(e) {}
 
-        if (modalPassengerEmailVerify) {
-          modalPassengerEmailVerify.classList.add('hidden');
-          modalPassengerEmailVerify.style.display = 'none';
-        }
+        closePassengerEmailVerifyModal();
         if (typeof showToast === 'function') {
           showToast(`🎉 ¡Correo validado y cuenta activada con éxito! Bienvenido ${finalUser.nombre}.`);
         }

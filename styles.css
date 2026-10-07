@@ -396,14 +396,11 @@ body {
   padding: 8px 14px;
   gap: 12px;
   transition: var(--transition);
-  overflow: visible !important;
-  z-index: 20;
 }
 
 .input-field-wrap:focus-within {
   border-color: var(--accent-blue);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-  z-index: 9999 !important;
 }
 
 .input-icon-pin {
