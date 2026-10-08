@@ -4905,7 +4905,7 @@ async function searchLocations(rawQuery, signal) {
   instant.forEach(addResult);
 
   const cleanQ = cleanAddressQuery(query);
-  const mapboxToken = (state.config && state.config.mapboxToken) || DEFAULT_CONFIG.mapboxToken || 'pk.eyJ1IjoicnVoYS1wcmk2ZWRhIiwiYSI6ImNtdGxwejNscjAwY2EydkZ2dms5cXg3d28ifQ._YkMD-GgSIhtkpUcdo_pdg';
+  const mapboxToken = (state.config && state.config.mapboxToken) || DEFAULT_CONFIG.mapboxToken;
   
   const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?access_token=${encodeURIComponent(mapboxToken)}&country=ar&proximity=-58.3816,-34.6037&language=es&types=address,poi,neighborhood,locality,place&limit=6`;
   const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
