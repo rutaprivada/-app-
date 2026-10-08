@@ -129,11 +129,122 @@ window.openPassengerAuthModal = function(defaultTab = 'login') {
   }
 };
 
-window.closePassengerAuthModal = function() {
-  const modal = document.getElementById('modalPassengerAuth');
+window.openPassengerProfileModal = function() {
+  const modal = document.getElementById('modalPassengerProfile');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    window.switchPassengerProfileTab('tabProfileData');
+  }
+};
+
+window.closePassengerProfileModal = function() {
+  const modal = document.getElementById('modalPassengerProfile');
   if (modal) {
     modal.classList.add('hidden');
     modal.style.display = 'none';
+  }
+};
+
+window.switchPassengerProfileTab = function(targetId) {
+  if (!targetId) return;
+  document.querySelectorAll('.p-tab-btn').forEach(b => {
+    const bTab = b.getAttribute('data-tab');
+    if (bTab === targetId || b.id === targetId || (targetId === 'tabProfileData' && b.id === 'btnTabProfileData') || (targetId === 'tabProfilePayments' && b.id === 'btnTabProfilePayments') || (targetId === 'tabProfileHistory' && b.id === 'btnTabProfileHistory')) {
+      b.classList.add('active');
+    } else {
+      b.classList.remove('active');
+    }
+  });
+
+  const tabData = document.getElementById('tabProfileData');
+  const tabPayments = document.getElementById('tabProfilePayments');
+  const tabHistory = document.getElementById('tabProfileHistory');
+
+  if (tabData) {
+    if (targetId === 'tabProfileData') {
+      tabData.classList.remove('hidden');
+      tabData.classList.add('active');
+      tabData.style.display = 'block';
+    } else {
+      tabData.classList.add('hidden');
+      tabData.classList.remove('active');
+      tabData.style.display = 'none';
+    }
+  }
+
+  if (tabPayments) {
+    if (targetId === 'tabProfilePayments') {
+      tabPayments.classList.remove('hidden');
+      tabPayments.classList.add('active');
+      tabPayments.style.display = 'block';
+      if (typeof window.renderSavedCardsUI === 'function') {
+        try { window.renderSavedCardsUI(); } catch(e){}
+      }
+    } else {
+      tabPayments.classList.add('hidden');
+      tabPayments.classList.remove('active');
+      tabPayments.style.display = 'none';
+    }
+  }
+
+  if (tabHistory) {
+    if (targetId === 'tabProfileHistory') {
+      tabHistory.classList.remove('hidden');
+      tabHistory.classList.add('active');
+      tabHistory.style.display = 'block';
+      if (typeof window.renderPassengerHistoryUI === 'function') {
+        try { window.renderPassengerHistoryUI(); } catch(e){}
+      }
+    } else {
+      tabHistory.classList.add('hidden');
+      tabHistory.classList.remove('active');
+      tabHistory.style.display = 'none';
+    }
+  }
+};
+
+window.handlePassengerLogout = function() {
+  if (!confirm('¿Seguro que deseas cerrar tu sesión de pasajero en este dispositivo?')) return;
+  try {
+    localStorage.removeItem('rutaprivada_passenger_session_v1');
+    localStorage.removeItem('rutaprivada_passenger_session');
+    localStorage.removeItem('rutaprivada_passenger_profile');
+  } catch(e) {}
+
+  const headerName = document.getElementById('headerPassengerName');
+  const headerAvatar = document.getElementById('headerPassengerAvatar');
+  const modalHeaderImg = document.getElementById('profileModalHeaderAvatarImg');
+  const modalAvatarImg = document.getElementById('profileModalAvatarImg');
+  const avatarPlaceholder = document.getElementById('profileModalAvatarPlaceholder');
+  const btnRemovePhoto = document.getElementById('btnRemoveProfilePhoto');
+  const profName = document.getElementById('profPassengerName');
+  const profPhone = document.getElementById('profPassengerPhone');
+  const profEmail = document.getElementById('profPassengerEmail');
+  const modalTitle = document.getElementById('profileModalNameTitle');
+
+  if (headerName) headerName.textContent = 'Iniciar Sesión';
+  if (headerAvatar) headerAvatar.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+  if (modalHeaderImg) modalHeaderImg.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+  if (modalAvatarImg) { modalAvatarImg.src = ''; modalAvatarImg.style.display = 'none'; }
+  if (avatarPlaceholder) avatarPlaceholder.style.display = 'block';
+  if (btnRemovePhoto) btnRemovePhoto.classList.add('hidden');
+  if (profName) profName.value = '';
+  if (profPhone) profPhone.value = '';
+  if (profEmail) profEmail.value = '';
+  if (modalTitle) modalTitle.textContent = 'Mi Perfil de Pasajero';
+
+  if (window.state) {
+    window.state.passengerName = '';
+    window.state.passengerPhone = '';
+    window.state.passengerEmail = '';
+    window.state.passengerAvatar = '';
+  }
+
+  window.closePassengerProfileModal();
+  window.openPassengerAuthModal('login');
+  if (typeof window.showToast === 'function') {
+    window.showToast('🚪 Has cerrado sesión de pasajero correctamente.');
   }
 };
 
@@ -4877,164 +4988,104 @@ function cleanAddressDisplay(str) {
     .trim();
 }
 
-// Motor inteligente de geocodificación de alta precisión en paralelo
+// Motor inteligente de geocodificación de alta precisión en paralelo (Nominatim OSM + Photon)
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
   if (query.length < 2) return getDefaultPopularDestinations();
 
-  const cornerPattern = /^(.+?)\s+(?:y|e|esquina|esq\.?|con|cruce(?:\s+con)?|e\/|\/|&)\s+(.+)$/i;
-  const isCorner = cornerPattern.test(query) || /^(esquina|esq\.?|cruce)\s+/i.test(query);
-
   const results = [];
   const seenCoords = new Set();
 
-  function addResult(item) {
+  function addResult(item, prepend = false) {
     if (!item || !item.lat || !item.lon) return;
     const latF = parseFloat(item.lat);
     const lonF = parseFloat(item.lon);
     if (isNaN(latF) || isNaN(lonF)) return;
-    const key = `${latF.toFixed(3)},${lonF.toFixed(3)}`;
+    const key = `${latF.toFixed(4)},${lonF.toFixed(4)}`;
     if (!seenCoords.has(key)) {
       seenCoords.add(key);
-      results.push(item);
+      if (prepend) {
+        results.unshift(item);
+      } else {
+        results.push(item);
+      }
     }
   }
 
-  // 1. Agregar resultados instantáneos locales (0ms de latencia)
-  const instant = getInstantLocalSuggestions(query);
-  instant.forEach(addResult);
+  // 1. Puntos de interés locales conocidos (Aeropuertos, Shoppings, etc.)
+  try {
+    const instant = getInstantLocalSuggestions(query);
+    instant.filter(it => it._isPoi).forEach(it => addResult(it, false));
+  } catch(e) {}
 
   const cleanQ = cleanAddressQuery(query);
-  const mapboxToken = (state.config && state.config.mapboxToken) || DEFAULT_CONFIG.mapboxToken;
-  
-  const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?access_token=${encodeURIComponent(mapboxToken)}&country=ar&proximity=-58.3816,-34.6037&language=es&types=address,poi,neighborhood,locality,place&limit=6`;
+  const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ)}&countrycodes=ar&limit=7&addressdetails=1`;
   const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
-  const nomQuery = isCorner ? `${cleanQ}, Buenos Aires` : `${cleanQ}, Buenos Aires, Argentina`;
-  const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nomQuery)}&countrycodes=ar&limit=5&addressdetails=1`;
 
   const fetchTasks = [
-    // Task A: Mapbox Geocoding API
+    // Task 1: OpenStreetMap Nominatim (Direcciones oficiales, calles y alturas exactas en Argentina)
     (async () => {
       try {
-        const res = await fetchWithTimeout(mapboxUrl, {}, 2500, signal);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data.features)) {
-            data.features.forEach(f => {
-              if (f.center && f.center.length >= 2) {
-                const [lon, lat] = f.center;
-                const placeName = f.place_name || f.text || cleanQ;
-                const mainTitle = f.text || placeName.split(',')[0];
-                const subParts = placeName.split(',').slice(1).map(s => s.trim()).filter(Boolean);
-                const subTitle = subParts.length > 0 ? subParts.join(', ') : 'Buenos Aires, Argentina';
-
-                let icon = '📍';
-                let poiBadge = 'Dirección Exacta';
-                if (f.place_type && f.place_type.includes('poi')) {
-                  icon = '🏢';
-                  poiBadge = 'Lugar de Interés';
-                }
-
-                addResult({
-                  lat: String(lat),
-                  lon: String(lon),
-                  display_name: placeName,
-                  _isIntersection: isCorner,
-                  _isPoi: f.place_type && f.place_type.includes('poi'),
-                  _poiBadge: poiBadge,
-                  _icon: icon,
-                  _mainTitle: mainTitle,
-                  _subTitle: subTitle
-                });
-              }
-            });
-          }
-        }
-      } catch(e) {}
-    })(),
-
-    // Task B: Photon OSM Geocoder
-    (async () => {
-      try {
-        const res = await fetchWithTimeout(photonUrl, {}, 2000, signal);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data.features)) {
-            data.features.forEach(f => {
-              const [lon, lat] = f.geometry.coordinates;
-              const p = f.properties || {};
-              const textToScan = `${p.name || ''} ${p.street || ''} ${p.osm_value || ''} ${p.osm_key || ''} ${cleanQ}`.toLowerCase();
-              let icon = '📍';
-              let poiBadge = '';
-              let isPoi = false;
-
-              if (/aeropuerto|ezeiza|pistarini|aeroparque|newbery/i.test(textToScan)) {
-                icon = '✈️'; poiBadge = 'Aeropuerto'; isPoi = true;
-              } else if (/hotel|resort|hostel|hilton|sheraton|faena|alvear/i.test(textToScan)) {
-                icon = '🏨'; poiBadge = 'Hotel'; isPoi = true;
-              } else if (/shopping|mall|unicenter|dot baires|alto palermo|abasto/i.test(textToScan)) {
-                icon = '🛍️'; poiBadge = 'Centro Comercial'; isPoi = true;
-              } else if (/terminal|retiro|buquebus|estaci[oó]n/i.test(textToScan)) {
-                icon = '🚉'; poiBadge = 'Terminal'; isPoi = true;
-              }
-
-              let mainTitle = '';
-              let subTitle = '';
-              const hasDistinctPoiName = p.name && p.street && (p.name.trim().toLowerCase() !== p.street.trim().toLowerCase());
-
-              if (hasDistinctPoiName) {
-                mainTitle = p.name;
-                const addressParts = [
-                  p.street ? `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}` : '',
-                  p.district || p.locality || p.city || '',
-                  p.state || 'Buenos Aires'
-                ].filter(Boolean);
-                subTitle = addressParts.join(', ');
-              } else if (p.street) {
-                mainTitle = `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}`;
-                const addressParts = [
-                  p.district || p.locality || p.city || '',
-                  p.state || 'Buenos Aires'
-                ].filter(Boolean);
-                subTitle = addressParts.join(', ');
-              } else {
-                mainTitle = p.name || cleanQ;
-                subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires'].filter(Boolean).join(', ');
-              }
-
-              const fullDisplay = `${mainTitle}, ${subTitle}`.replace(/,\s*,/g, ',').trim();
-              addResult({
-                lat: String(lat),
-                lon: String(lon),
-                display_name: fullDisplay,
-                _isIntersection: isCorner,
-                _isPoi: isPoi,
-                _poiBadge: poiBadge || 'Dirección Encontrada',
-                _icon: icon,
-                _mainTitle: mainTitle,
-                _subTitle: subTitle
-              });
-            });
-          }
-        }
-      } catch(e) {}
-    })(),
-
-    // Task C: Nominatim
-    (async () => {
-      try {
-        const res = await fetchWithTimeout(nomUrl, {}, 2000, signal);
+        const res = await fetchWithTimeout(nomUrl, {}, 2800, signal);
         if (res.ok) {
           const nomData = await res.json();
           if (Array.isArray(nomData)) {
             nomData.forEach(it => {
-              const rawName = it.name || (it.display_name ? it.display_name.split(',')[0] : cleanQ);
-              it._mainTitle = isCorner ? `Esquina: ${capitalizeWords(rawName)}` : capitalizeWords(rawName);
-              it._subTitle = cleanAddressDisplay(it.display_name);
-              it._icon = isCorner ? '🚦' : '📍';
-              it._isIntersection = isCorner;
-              it._poiBadge = isCorner ? 'Esquina' : 'Ubicación';
-              addResult(it);
+              const fullDisp = it.display_name || cleanQ;
+              const parts = fullDisp.split(',').map(s => s.trim()).filter(Boolean);
+              const mainTitle = parts.length > 0 ? parts.slice(0, 2).join(', ') : fullDisp;
+              const subTitle = parts.length > 2 ? parts.slice(2).join(', ') : 'Argentina';
+
+              it._mainTitle = mainTitle;
+              it._subTitle = fullDisp;
+              it._icon = '📍';
+              it._isIntersection = false;
+              it._poiBadge = '';
+              addResult(it, true);
+            });
+          }
+        }
+      } catch(e) {}
+    })(),
+
+    // Task 2: Photon OSM Geocoder (Respaldo ultrarrápido)
+    (async () => {
+      try {
+        const res = await fetchWithTimeout(photonUrl, {}, 2200, signal);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.features)) {
+            data.features.forEach(f => {
+              if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
+                const [lon, lat] = f.geometry.coordinates;
+                const p = f.properties || {};
+                
+                let mainTitle = '';
+                let subTitle = '';
+                if (p.street) {
+                  mainTitle = `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}`;
+                  subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires', 'Argentina'].filter(Boolean).join(', ');
+                } else if (p.name) {
+                  mainTitle = p.name;
+                  subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires', 'Argentina'].filter(Boolean).join(', ');
+                } else {
+                  mainTitle = cleanQ;
+                  subTitle = 'Buenos Aires, Argentina';
+                }
+
+                const fullDisplay = `${mainTitle}, ${subTitle}`;
+                addResult({
+                  lat: String(lat),
+                  lon: String(lon),
+                  display_name: fullDisplay,
+                  _isIntersection: false,
+                  _isPoi: false,
+                  _poiBadge: '',
+                  _icon: '📍',
+                  _mainTitle: mainTitle,
+                  _subTitle: fullDisplay
+                }, false);
+              }
             });
           }
         }
@@ -5044,18 +5095,18 @@ async function searchLocations(rawQuery, signal) {
 
   await Promise.allSettled(fetchTasks);
 
-  // Fallback suave sólo si ningún servicio devolvió coordenadas
+  // Fallback suave sólo si ningún servicio devolvió resultados
   if (results.length === 0 && query.length >= 3) {
     addResult({
       lat: '-34.6037',
       lon: '-58.3816',
-      display_name: `${capitalizeWords(query)}, Buenos Aires`,
+      display_name: `${capitalizeWords(query)}, Buenos Aires, Argentina`,
       _isIntersection: false,
       _isPoi: false,
-      _poiBadge: 'Dirección manual',
+      _poiBadge: '',
       _icon: '📍',
       _mainTitle: capitalizeWords(query),
-      _subTitle: 'Buenos Aires, Argentina'
+      _subTitle: `${capitalizeWords(query)}, Ciudad Autónoma de Buenos Aires, Argentina`
     });
   }
 
@@ -5089,22 +5140,17 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     items.slice(0, 8).forEach((place) => {
       const item = document.createElement('div');
       item.className = 'suggestion-item';
-      if (place._isIntersection) item.classList.add('is-intersection');
-      if (place._isPoi) item.classList.add('is-poi');
 
-      const isCorner = place._isIntersection;
-      const icon = place._icon || (isCorner ? '🚦' : '📍');
-      const mainTitle = place._mainTitle || (isCorner ? (place._cornerTitle || 'Esquina') : (place.name || place.display_name.split(',')[0]));
-      const subAddress = place._subTitle || cleanAddressDisplay(place.display_name);
-      const poiBadge = place._poiBadge || '';
+      const icon = place._icon || '📍';
+      const fullDisplay = place.display_name || place._subTitle || place._mainTitle || '';
+      const parts = fullDisplay.split(',').map(s => s.trim()).filter(Boolean);
+      const streetPart = parts.length > 0 ? parts.slice(0, 2).join(', ') : fullDisplay;
+      const restPart = parts.length > 2 ? parts.slice(2).join(', ') : '';
 
       item.innerHTML = `
-        <span style="font-size:1.2rem; flex-shrink:0;">${icon}</span>
-        <div class="suggestion-content" style="flex: 1; min-width: 0;">
-          ${poiBadge ? `<span class="suggestion-badge-poi">${escapeHtml(poiBadge)}</span>` : ''}
-          ${isCorner && !poiBadge ? `<span class="suggestion-badge-intersection">🚦 Esquina / Cruce</span>` : ''}
-          <span class="suggestion-title" style="display: block; font-weight: 700; color: #fff;">${escapeHtml(mainTitle)}</span>
-          <span class="suggestion-sub" style="display: block; font-size: 0.74rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(subAddress)}</span>
+        <span style="font-size:1.15rem; flex-shrink:0; margin-top:2px;">${icon}</span>
+        <div class="suggestion-content" style="flex: 1; min-width: 0; text-align: left;">
+          <span class="suggestion-title" style="display: block; font-weight: 700; color: #fff; font-size: 0.88rem; line-height: 1.3;">${escapeHtml(fullDisplay)}</span>
         </div>
       `;
 
@@ -5124,16 +5170,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
   }
 
   function selectItem(place) {
-    const isCorner = place._isIntersection;
-    const cleanSub = place._subTitle || cleanAddressDisplay(place.display_name);
-    const mainTitle = place._mainTitle || (place.display_name ? place.display_name.split(',')[0] : '');
-    
-    let cleanName = place.display_name || mainTitle;
-    if (mainTitle && cleanSub && !mainTitle.toLowerCase().includes(cleanSub.toLowerCase())) {
-      cleanName = `${mainTitle}, ${cleanSub}`;
-    } else if (mainTitle) {
-      cleanName = mainTitle;
-    }
+    const cleanName = place.display_name || place._mainTitle || input.value;
 
     input.value = cleanName;
     list.innerHTML = '';
@@ -5180,22 +5217,59 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
     if (query.length < 2) {
       if (abortController) abortController.abort();
-      const shortcuts = getDefaultPopularDestinations();
-      renderList(shortcuts, '');
+      list.classList.add('hidden');
+      list.style.display = 'none';
       return;
     }
 
-    // 1. Mostrar sugerencias instantáneas con ejemplos de altura (0ms)
-    const instantItems = getInstantLocalSuggestions(query);
-    if (instantItems.length > 0) {
-      renderList(instantItems, query);
-    }
-
-    // 2. Refinar con geocodificación en segundo plano
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 150);
+    }, 180);
   });
+
+  input.addEventListener('focus', () => {
+    const query = input.value.trim();
+    if (query.length >= 2) {
+      executeSearch(query);
+    }
+  });
+
+  input.addEventListener('keydown', async (e) => {
+    const items = list.querySelectorAll('.suggestion-item');
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (items.length > 0) {
+        activeIndex = (activeIndex + 1) % items.length;
+        items.forEach((it, i) => it.classList.toggle('active', i === activeIndex));
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (items.length > 0) {
+        activeIndex = (activeIndex - 1 + items.length) % items.length;
+        items.forEach((it, i) => it.classList.toggle('active', i === activeIndex));
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(debounceTimeout);
+
+      if (currentResults.length > 0) {
+        const target = activeIndex >= 0 ? currentResults[activeIndex] : currentResults[0];
+        selectItem(target);
+      }
+    } else if (e.key === 'Escape') {
+      list.classList.add('hidden');
+      list.style.display = 'none';
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!input.contains(e.target) && !list.contains(e.target)) {
+      list.classList.add('hidden');
+      list.style.display = 'none';
+    }
+  });
+}
 
   input.addEventListener('focus', () => {
     const query = input.value.trim();

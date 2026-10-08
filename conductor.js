@@ -433,6 +433,63 @@ document.addEventListener('DOMContentLoaded', () => {
             updateWalletUI();
         }
     }
+    window.switchTab = switchTab;
+
+    window.openDriverProfileModal = function() {
+        const modal = document.getElementById('modalDriverProfile');
+        if (modal) {
+            modal.classList.add('active');
+            modal.style.display = 'flex';
+        }
+    };
+
+    window.closeDriverProfileModal = function() {
+        const modal = document.getElementById('modalDriverProfile');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+        }
+    };
+
+    window.openDriverHelpModal = function() {
+        const modal = document.getElementById('modalDriverHelp');
+        if (modal) {
+            modal.classList.add('active');
+            modal.style.display = 'flex';
+        }
+    };
+
+    window.closeDriverHelpModal = function() {
+        const modal = document.getElementById('modalDriverHelp');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+        }
+    };
+
+    window.openDriverDocsModal = function() {
+        const modal = document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
+        if (modal) {
+            modal.classList.add('active');
+            modal.style.display = 'flex';
+        }
+    };
+
+    window.closeDriverDocsModal = function() {
+        const modal = document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+        }
+    };
+
+    window.closeDriverReportTicketModal = function() {
+        const modal = document.getElementById('modalDriverReportTicket');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+        }
+    };
 
     bottomNavBtns.forEach(btn => {
         btn.addEventListener('click', () => {

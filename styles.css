@@ -6010,6 +6010,63 @@ html, body {
   white-space: nowrap;
 }
 
+/* =========================================================
+   PESTAÑAS Y MODAL DE PERFIL DEL PASAJERO
+   ========================================================= */
+.profile-nav-tabs {
+  display: flex;
+  background: rgba(15, 23, 42, 0.85);
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 10px 0;
+  gap: 8px;
+}
 
+.p-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  color: #94a3b8;
+  padding: 11px 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  border-radius: 8px 8px 0 0;
+}
 
+.p-tab-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.04);
+}
 
+.p-tab-btn.active {
+  color: #38bdf8 !important;
+  border-bottom-color: #38bdf8 !important;
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.p-tab-content {
+  display: block;
+  animation: tabFadeIn 0.22s ease-out;
+}
+
+.p-tab-content.hidden {
+  display: none !important;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
