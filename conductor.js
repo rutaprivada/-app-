@@ -5,6 +5,79 @@
  * y centro financiero multi-período (diario, semanal, mensual e historial de viajes).
  */
 
+// ==========================================
+// EARLY GLOBAL HANDLERS (TABS & MODALS)
+// ==========================================
+window.switchTab = function(tabId) {
+    try {
+        localStorage.setItem('rutaprivada_driver_active_tab', tabId);
+    } catch(e) {}
+    document.querySelectorAll('.driver-tab-view').forEach(v => {
+        if (v.id === tabId) v.classList.add('active');
+        else v.classList.remove('active');
+    });
+    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
+        if (b.getAttribute('data-target') === tabId) b.classList.add('active');
+        else b.classList.remove('active');
+    });
+};
+
+window.openDriverProfileModal = function() {
+    const modal = document.getElementById('modalDriverProfile');
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
+};
+
+window.closeDriverProfileModal = function() {
+    const modal = document.getElementById('modalDriverProfile');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+};
+
+window.openDriverHelpModal = function() {
+    const modal = document.getElementById('modalDriverHelp');
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
+};
+
+window.closeDriverHelpModal = function() {
+    const modal = document.getElementById('modalDriverHelp');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+};
+
+window.openDriverDocsModal = function() {
+    const modal = document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
+};
+
+window.closeDriverDocsModal = function() {
+    const modal = document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+};
+
+window.closeDriverReportTicketModal = function() {
+    const modal = document.getElementById('modalDriverReportTicket');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const FIREBASE_CONFIG_CONDUCTOR = {
         apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",

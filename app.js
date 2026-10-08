@@ -129,9 +129,62 @@ window.openPassengerAuthModal = function(defaultTab = 'login') {
   }
 };
 
+window.loadPassengerProfileIntoForm = function() {
+  let session = null;
+  try {
+    const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
+                localStorage.getItem('rutaprivada_passenger_session') || 
+                localStorage.getItem('rutaprivada_passenger_profile') || 
+                localStorage.getItem('rutaprivada_user_session');
+    if (raw) session = JSON.parse(raw);
+  } catch(e) {}
+
+  if (!session && window.state && (window.state.passengerName || window.state.passengerPhone || window.state.passengerEmail)) {
+    session = {
+      nombre: window.state.passengerName,
+      telefono: window.state.passengerPhone,
+      email: window.state.passengerEmail,
+      avatar: window.state.passengerAvatar
+    };
+  }
+
+  if (session) {
+    const profName = document.getElementById('profPassengerName');
+    const profPhone = document.getElementById('profPassengerPhone');
+    const profEmail = document.getElementById('profPassengerEmail');
+    const modalTitle = document.getElementById('profileModalNameTitle');
+    const headerName = document.getElementById('headerPassengerName');
+    const headerAvatar = document.getElementById('headerPassengerAvatar');
+    const modalHeaderImg = document.getElementById('profileModalHeaderAvatarImg');
+    const modalAvatarImg = document.getElementById('profileModalAvatarImg');
+    const avatarPlaceholder = document.getElementById('profileModalAvatarPlaceholder');
+    const btnRemovePhoto = document.getElementById('btnRemoveProfilePhoto');
+
+    if (profName && session.nombre) profName.value = session.nombre;
+    if (profPhone && session.telefono) profPhone.value = session.telefono;
+    if (profEmail && session.email) profEmail.value = session.email;
+    if (modalTitle && session.nombre) modalTitle.textContent = session.nombre;
+    if (headerName && session.nombre) headerName.textContent = session.nombre.split(' ')[0];
+    
+    if (session.avatar && session.avatar.length > 10) {
+      if (headerAvatar) headerAvatar.src = session.avatar;
+      if (modalHeaderImg) modalHeaderImg.src = session.avatar;
+      if (modalAvatarImg) {
+        modalAvatarImg.src = session.avatar;
+        modalAvatarImg.style.display = 'block';
+      }
+      if (avatarPlaceholder) avatarPlaceholder.style.display = 'none';
+      if (btnRemovePhoto) btnRemovePhoto.classList.remove('hidden');
+    }
+  }
+};
+
 window.openPassengerProfileModal = function() {
   const modal = document.getElementById('modalPassengerProfile');
   if (modal) {
+    if (typeof window.loadPassengerProfileIntoForm === 'function') {
+      window.loadPassengerProfileIntoForm();
+    }
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
     window.switchPassengerProfileTab('tabProfileData');
@@ -5222,9 +5275,18 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       return;
     }
 
+    // 1. Mostrar sugerencias locales inmediatas (0ms)
+    try {
+      const instantItems = getInstantLocalSuggestions(query);
+      if (instantItems && instantItems.length > 0) {
+        renderList(instantItems, query);
+      }
+    } catch(e) {}
+
+    // 2. Refinar con geocodificación OSM / Photon
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 180);
+    }, 150);
   });
 
   input.addEventListener('focus', () => {
