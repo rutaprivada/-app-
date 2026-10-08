@@ -7431,11 +7431,310 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 12000);
 
+    // =========================================================
+    // CENTRO DE AYUDA CHOFER & TICKETS DE SOPORTE IN-APP (24/7)
+    // =========================================================
+    const modalDriverHelp = document.getElementById('modalDriverHelp');
+    const btnOpenDriverHelpHeader = document.getElementById('btnOpenDriverHelpHeader');
+    const btnOpenDriverHelp = document.getElementById('btnOpenDriverHelp');
+    const btnCloseDriverHelp = document.getElementById('btnCloseDriverHelp');
+    const btnCerrarAyudaSheet = document.getElementById('btnCerrarAyudaSheet');
+
+    const modalDriverReportTicket = document.getElementById('modalDriverReportTicket');
+    const btnHelpOpenTicketForm = document.getElementById('btnHelpOpenTicketForm');
+    const btnCloseDriverReportTicket = document.getElementById('btnCloseDriverReportTicket');
+    const btnCancelTicket = document.getElementById('btnCancelTicket');
+    const formDriverReportTicket = document.getElementById('formDriverReportTicket');
+    const btnSubmitDriverTicket = document.getElementById('btnSubmitDriverTicket');
+    const txtBtnSubmitTicket = document.getElementById('txtBtnSubmitTicket');
+
+    function getDriverContactInfo() {
+        const nameEl = document.getElementById('profDriverName') || document.getElementById('driverName') || document.getElementById('regDriverName');
+        const phoneEl = document.getElementById('profDriverPhone') || document.getElementById('regDriverPhone');
+        const emailEl = document.getElementById('profDriverEmail') || document.getElementById('regDriverEmail') || document.getElementById('loginDriverEmail');
+
+        const driverName = (nameEl ? (nameEl.value || nameEl.textContent) : '').replace('👑', '').trim() || 'Conductor RutaPrivada';
+        const driverPhone = (phoneEl ? phoneEl.value : '').trim() || localStorage.getItem('rutaprivada_driver_phone') || '';
+        const driverEmail = (emailEl ? emailEl.value : '').trim() || localStorage.getItem('rutaprivada_driver_email') || '';
+
+        return { driverName, driverPhone, driverEmail };
+    }
+
+    function openDriverHelpModal() {
+        if (modalDriverHelp) {
+            modalDriverHelp.classList.add('active');
+            if (typeof window.pushDriverNavState === 'function') {
+                window.pushDriverNavState('driverHelpModal');
+            }
+        }
+    }
+
+    function closeDriverHelpModal() {
+        if (modalDriverHelp) {
+            modalDriverHelp.classList.remove('active');
+        }
+    }
+
+    function openDriverTicketModal(preselectedCategory, defaultDescription) {
+        if (modalDriverReportTicket) {
+            const { driverName, driverPhone, driverEmail } = getDriverContactInfo();
+            const inputName = document.getElementById('ticketDriverName');
+            const inputPhone = document.getElementById('ticketDriverPhone');
+            const inputEmail = document.getElementById('ticketDriverEmail');
+            const selectCat = document.getElementById('ticketCategory');
+            const inputDesc = document.getElementById('ticketDescription');
+            const inputTripId = document.getElementById('ticketTripId');
+
+            if (inputName && !inputName.value) inputName.value = driverName !== 'Conductor RutaPrivada' ? driverName : '';
+            if (inputPhone && !inputPhone.value) inputPhone.value = driverPhone;
+            if (inputEmail && !inputEmail.value) inputEmail.value = driverEmail;
+            if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
+            if (inputDesc && defaultDescription && !inputDesc.value) inputDesc.value = defaultDescription;
+
+            // Auto-completar ID de viaje activo si lo hay
+            const activeTripObj = window.currentActiveTrip || null;
+            if (inputTripId && activeTripObj && !inputTripId.value) {
+                inputTripId.value = 'Viaje #' + (activeTripObj.id || activeTripObj.reservaId || 'En Curso');
+            }
+
+            modalDriverReportTicket.classList.add('active');
+            if (typeof window.pushDriverNavState === 'function') {
+                window.pushDriverNavState('driverReportTicket');
+            }
+            if (inputDesc) {
+                setTimeout(() => inputDesc.focus(), 250);
+            }
+        }
+    }
+
+    function closeDriverTicketModal() {
+        if (modalDriverReportTicket) {
+            modalDriverReportTicket.classList.remove('active');
+        }
+    }
+
+    // Toggle Acordeón de Categorías de Ayuda
+    window.toggleDriverHelpAccordion = function(headerEl) {
+        if (!headerEl) return;
+        const card = headerEl.closest('.driver-help-card');
+        if (!card) return;
+        const body = card.querySelector('.driver-help-body');
+        const icon = headerEl.querySelector('.toggle-icon');
+
+        const isVisible = body && body.style.display === 'block';
+        if (body) {
+            body.style.display = isVisible ? 'none' : 'block';
+        }
+        if (icon) {
+            icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+    };
+
+    // Lanzar reclamo in-app con categoría preseleccionada
+    window.openDriverTicketCategory = function(catKey) {
+        closeDriverHelpModal();
+        openDriverTicketModal(catKey);
+    };
+
+    // Prueba de sonido de alarma de viaje
+    window.testDriverHelpSound = function() {
+        try {
+            if (typeof window.playIncomingTripSound === 'function') {
+                window.playIncomingTripSound();
+            } else {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            }
+            if (typeof showDriverToast === 'function') {
+                showDriverToast('🔊 Alarma sonora reproducida correctamente', 'success');
+            } else {
+                alert('🔊 Alarma sonora reproducida correctamente');
+            }
+        } catch(e) {
+            console.warn('Audio test error:', e);
+        }
+    };
+
+    // Listeners de apertura/cierre de Ayuda
+    if (btnOpenDriverHelpHeader) btnOpenDriverHelpHeader.addEventListener('click', openDriverHelpModal);
+    if (btnOpenDriverHelp) btnOpenDriverHelp.addEventListener('click', () => {
+        const sheet = document.getElementById('driverProfileSheet');
+        if (sheet) sheet.classList.remove('active', 'open');
+        openDriverHelpModal();
+    });
+    if (btnCloseDriverHelp) btnCloseDriverHelp.addEventListener('click', closeDriverHelpModal);
+    if (btnCerrarAyudaSheet) btnCerrarAyudaSheet.addEventListener('click', closeDriverHelpModal);
+
+    if (btnHelpOpenTicketForm) btnHelpOpenTicketForm.addEventListener('click', () => {
+        closeDriverHelpModal();
+        openDriverTicketModal();
+    });
+    if (btnCloseDriverReportTicket) btnCloseDriverReportTicket.addEventListener('click', closeDriverTicketModal);
+    if (btnCancelTicket) btnCancelTicket.addEventListener('click', closeDriverTicketModal);
+
+    // Botones internos de acciones rápidas dentro de las tarjetas
+    const btnHelpOpenDocs = document.getElementById('btnHelpOpenDocsUploadFromCard');
+    if (btnHelpOpenDocs) {
+        btnHelpOpenDocs.addEventListener('click', () => {
+            closeDriverHelpModal();
+            const modalDocs = document.getElementById('modalDocsUpload');
+            if (modalDocs) modalDocs.classList.add('active');
+        });
+    }
+
+    const btnHelpGoWallet = document.getElementById('btnHelpGoToWalletTab');
+    if (btnHelpGoWallet) {
+        btnHelpGoWallet.addEventListener('click', () => {
+            closeDriverHelpModal();
+            const btnBilletera = document.querySelector('[data-target="viewWallet"]') || document.getElementById('navBtnWallet');
+            if (btnBilletera) btnBilletera.click();
+        });
+    }
+
+    // Envío del Formulario de Reclamo / Ticket In-App con Redirección al Correo
+    if (formDriverReportTicket) {
+        formDriverReportTicket.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const categorySelect = document.getElementById('ticketCategory');
+            const categoryText = categorySelect ? categorySelect.options[categorySelect.selectedIndex]?.text || categorySelect.value : 'Consulta General';
+            const driverName = (document.getElementById('ticketDriverName')?.value || '').trim();
+            const driverPhone = (document.getElementById('ticketDriverPhone')?.value || '').trim();
+            const driverEmail = (document.getElementById('ticketDriverEmail')?.value || '').trim();
+            const tripId = (document.getElementById('ticketTripId')?.value || '').trim();
+            const description = (document.getElementById('ticketDescription')?.value || '').trim();
+
+            if (!driverName || !driverPhone || !driverEmail || !description) {
+                alert('Por favor completa tu nombre, teléfono, correo electrónico y la descripción del reclamo.');
+                return;
+            }
+
+            const ticketId = 'TCK-' + Date.now().toString().slice(-6);
+            const timeStr = new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+
+            // Bloquear botón con spinner
+            if (btnSubmitDriverTicket) {
+                btnSubmitDriverTicket.disabled = true;
+                btnSubmitDriverTicket.style.opacity = '0.7';
+            }
+            if (txtBtnSubmitTicket) {
+                txtBtnSubmitTicket.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando Reclamo a Soporte...';
+            }
+
+            const ticketPayload = {
+                ticketId,
+                driverName,
+                driverPhone,
+                driverEmail,
+                category: categoryText,
+                tripId: tripId || 'N/A',
+                description,
+                status: 'pendiente',
+                createdAt: new Date().toISOString(),
+                timeStr
+            };
+
+            // 1. Guardar localmente
+            try {
+                const storedTickets = JSON.parse(localStorage.getItem('rutaprivada_driver_tickets_v1') || '[]');
+                storedTickets.unshift(ticketPayload);
+                localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(storedTickets));
+                localStorage.setItem('rutaprivada_driver_email', driverEmail);
+                localStorage.setItem('rutaprivada_driver_phone', driverPhone);
+            } catch(err) {
+                console.warn('Local ticket storage error:', err);
+            }
+
+            // 2. Guardar en Firestore
+            try {
+                if (typeof db !== 'undefined' && db.collection) {
+                    await db.collection('tickets_soporte').doc(ticketId).set(ticketPayload);
+                }
+            } catch(err) {
+                console.warn('Firestore ticket error:', err);
+            }
+
+            // 3. Envío al Correo Electrónico de Soporte vía EmailJS con Reply-To al Chofer
+            try {
+                const emailParams = {
+                    service_id: 'service_rutaprivada',
+                    template_id: 'template_y849ceg',
+                    user_id: 'ai6WOsUzJaXx1st1E',
+                    template_params: {
+                        subject: `[Reclamo Conductor #${ticketId}] ${categoryText} - ${driverName}`,
+                        to_email: 'soporte@rutaprivada.com',
+                        reply_to: driverEmail,
+                        driver_name: driverName,
+                        driver_phone: driverPhone,
+                        driver_email: driverEmail,
+                        ticket_id: ticketId,
+                        category: categoryText,
+                        trip_id: tripId || 'N/A',
+                        message: description,
+                        email: driverEmail,
+                        passcode: `Ticket #${ticketId}`,
+                        time: timeStr
+                    }
+                };
+
+                await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(emailParams)
+                }).catch(() => {});
+            } catch(err) {
+                console.warn('Email redirect error:', err);
+            }
+
+            // Restaurar estado del botón
+            if (btnSubmitDriverTicket) {
+                btnSubmitDriverTicket.disabled = false;
+                btnSubmitDriverTicket.style.opacity = '1';
+            }
+            if (txtBtnSubmitTicket) {
+                txtBtnSubmitTicket.textContent = 'Enviar Reclamo a Soporte';
+            }
+
+            // Cerrar modal y limpiar formulario
+            closeDriverTicketModal();
+            formDriverReportTicket.reset();
+
+            // Mensaje de éxito al chofer
+            if (typeof showDriverToast === 'function') {
+                showDriverToast(`✅ Reclamo #${ticketId} enviado con éxito. La resolución te llegará a ${driverEmail}`, 'success');
+            } else {
+                alert(`✅ Reclamo #${ticketId} registrado con éxito.\n\nEl equipo de soporte revisará el caso y responderá directamente a tu correo electrónico:\n${driverEmail}`);
+            }
+        });
+    }
+
     // ==========================================
     // ANDROID NATIVE BACK BUTTON & MODAL/TAB HISTORY HANDLER (CONDUCTOR)
     // ==========================================
     function setupAndroidDriverBackButtonHandler() {
         function handleDriverBackAction() {
+            // 0. Modal de Tickets de Soporte
+            if (modalDriverReportTicket && modalDriverReportTicket.classList.contains('active')) {
+                modalDriverReportTicket.classList.remove('active');
+                return true;
+            }
+
+            // 0.1 Modal de Centro de Ayuda
+            if (modalDriverHelp && modalDriverHelp.classList.contains('active')) {
+                modalDriverHelp.classList.remove('active');
+                return true;
+            }
+
             // 1. Modal zoom de fotos o documentos
             const imgZoom = document.getElementById('imgZoomModalOverlay');
             if (imgZoom && imgZoom.classList.contains('active')) {
@@ -7552,3 +7851,4 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
