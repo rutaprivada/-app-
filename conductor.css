@@ -2548,6 +2548,34 @@ body.is-app-mode .web-only {
     color: #ffffff;
 }
 
+/* =========================================================
+   CENTRO DE AYUDA Y SOPORTE CHOFER (24/7)
+   ========================================================= */
+.btn-driver-help-header {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-driver-help-header:hover {
+    background: rgba(56, 189, 248, 0.25) !important;
+    border-color: #38bdf8 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+}
+.btn-driver-help-header:active {
+    transform: scale(0.96);
+}
+
+.driver-help-card {
+    transition: all 0.2s ease;
+}
+.driver-help-card:hover {
+    border-color: rgba(56, 189, 248, 0.3) !important;
+}
+
+.driver-help-header-toggle:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+
 
 
 

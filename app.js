@@ -4315,12 +4315,67 @@ function cleanAddressQuery(raw) {
   return text.trim();
 }
 
-// Generador de sugerencias inmediatas (0ms) en memoria para CABA y GBA
+// Destinos populares por defecto para acceso rápido (0ms)
+function getDefaultPopularDestinations() {
+  return [
+    {
+      lat: '-34.5580', lon: '-58.4170',
+      display_name: 'Aeroparque Internacional Jorge Newbery (AEP), CABA',
+      _isPoi: true, _poiBadge: 'Aeropuerto Principal', _icon: '✈️',
+      _mainTitle: 'Aeroparque Jorge Newbery (AEP)', _subTitle: 'Av. Costanera Rafael Obligado s/n, Palermo, CABA'
+    },
+    {
+      lat: '-34.8222', lon: '-58.5358',
+      display_name: 'Aeropuerto Internacional Ministro Pistarini (Ezeiza), PBA',
+      _isPoi: true, _poiBadge: 'Aeropuerto Internacional', _icon: '✈️',
+      _mainTitle: 'Aeropuerto Internacional Ezeiza', _subTitle: 'Autopista Ricchieri Km 33.5, Ezeiza, PBA'
+    },
+    {
+      lat: '-34.6037', lon: '-58.3816',
+      display_name: 'Obelisco de Buenos Aires, CABA',
+      _isPoi: true, _poiBadge: 'Monumento Céntrico', _icon: '📍',
+      _mainTitle: 'Obelisco de Buenos Aires', _subTitle: 'Av. 9 de Julio y Av. Corrientes, San Nicolás, CABA'
+    },
+    {
+      lat: '-34.6025', lon: '-58.3645',
+      display_name: 'Puerto Madero / Hotel Hilton, CABA',
+      _isPoi: true, _poiBadge: 'Zona Ejecutiva', _icon: '🏨',
+      _mainTitle: 'Puerto Madero / Hilton', _subTitle: 'Macacha Güemes 351, Puerto Madero, CABA'
+    },
+    {
+      lat: '-34.5888', lon: '-58.3750',
+      display_name: 'Terminal de Ómnibus / Estación Retiro, CABA',
+      _isPoi: true, _poiBadge: 'Terminal', _icon: '🚉',
+      _mainTitle: 'Terminal Retiro', _subTitle: 'Av. Antártida Argentina y Ramos Mejía, Retiro, CABA'
+    },
+    {
+      lat: '-34.5085', lon: '-58.5235',
+      display_name: 'Unicenter Shopping, Martínez, PBA',
+      _isPoi: true, _poiBadge: 'Centro Comercial', _icon: '🛍️',
+      _mainTitle: 'Unicenter Shopping', _subTitle: 'Paraná 3745, Martínez, San Isidro, PBA'
+    },
+    {
+      lat: '-34.5880', lon: '-58.4280',
+      display_name: 'Palermo Soho / Plaza Serrano, CABA',
+      _isPoi: true, _poiBadge: 'Punto de Interés', _icon: '📍',
+      _mainTitle: 'Palermo Soho / Plaza Serrano', _subTitle: 'Honduras y Serrano, Palermo, CABA'
+    },
+    {
+      lat: '-34.4170', lon: '-58.6470',
+      display_name: 'Nordelta / Bahía Grande, Tigre, PBA',
+      _isPoi: true, _poiBadge: 'Zona Residencial', _icon: '🏡',
+      _mainTitle: 'Nordelta / Bahía Grande', _subTitle: 'Av. de los Lagos, Tigre, PBA'
+    }
+  ];
+}
+window.getDefaultPopularDestinations = getDefaultPopularDestinations;
+
+// Generador inteligente de sugerencias y ejemplos de calle y altura para CABA y GBA
 function getInstantLocalSuggestions(rawQuery) {
   const query = (rawQuery || '').trim();
-  if (query.length < 2) return [];
+  if (query.length < 2) return getDefaultPopularDestinations();
 
-  const queryNorm = stripAccents(query);
+  const queryNorm = stripAccents(query.toLowerCase());
   const results = [];
   const seen = new Set();
 
@@ -4401,7 +4456,7 @@ function getInstantLocalSuggestions(rawQuery) {
     {
       keywords: ['recoleta', 'cementerio recoleta'],
       lat: -34.5895, lon: -58.3974,
-      mainTitle: 'Recoleta, CABA',
+      mainTitle: 'Recoleta Centro, CABA',
       subTitle: 'Junín y Av. Quintana, Comuna 2, Buenos Aires',
       badge: 'Barrio CABA', icon: '📍'
     },
@@ -4415,7 +4470,7 @@ function getInstantLocalSuggestions(rawQuery) {
     {
       keywords: ['belgrano', 'barrio chino', 'barrancas de belgrano'],
       lat: -34.5627, lon: -58.4564,
-      mainTitle: 'Belgrano, CABA',
+      mainTitle: 'Belgrano / Barrancas, CABA',
       subTitle: 'Barrancas de Belgrano / Av. Cabildo, CABA',
       badge: 'Barrio CABA', icon: '📍'
     },
@@ -4494,7 +4549,7 @@ function getInstantLocalSuggestions(rawQuery) {
     }
   });
 
-  // 2. Base Exhaustiva de Avenidas y Calles de CABA y Gran Buenos Aires
+  // 2. Base Exhaustiva de Avenidas, Calles y Ejemplos de Altura / Numeración
   const matchNumber = queryNorm.match(/\b\d{1,5}\b/);
   const numberVal = matchNumber ? parseInt(matchNumber[0], 10) : 0;
   const numberStr = matchNumber ? matchNumber[0] : '';
@@ -4504,43 +4559,221 @@ function getInstantLocalSuggestions(rawQuery) {
     .trim();
 
   const POPULAR_STREETS = [
-    { name: 'Av. Luis María Campos', norm: 'luis maria campos', startLat: -34.5770, startLon: -58.4280, endLat: -34.5620, endLon: -58.4440, maxNum: 1700, sub: 'Palermo / Belgrano, CABA' },
-    { name: 'Av. Córdoba', norm: 'cordoba', startLat: -34.5990, startLon: -58.3720, endLat: -34.5870, endLon: -58.4440, maxNum: 6000, sub: 'Palermo / Recoleta / Balvanera, CABA' },
-    { name: 'Av. Santa Fe', norm: 'santa fe', startLat: -34.5950, startLon: -58.3780, endLat: -34.5750, endLon: -58.4280, maxNum: 5400, sub: 'Palermo / Recoleta, CABA' },
-    { name: 'Av. Corrientes', norm: 'corrientes', startLat: -34.6030, startLon: -58.3700, endLat: -34.5860, endLon: -58.4550, maxNum: 6900, sub: 'Balvanera / Almagro / Chacarita, CABA' },
-    { name: 'Av. 9 de Julio', norm: '9 de julio', startLat: -34.5930, startLon: -58.3820, endLat: -34.6270, endLon: -58.3810, maxNum: 2000, sub: 'Centro / Retiro / Constitución, CABA' },
-    { name: 'Av. del Libertador', norm: 'libertador', startLat: -34.5890, startLon: -58.3780, endLat: -34.5200, endLon: -58.4800, maxNum: 15000, sub: 'Palermo / Núñez / Vicente López' },
-    { name: 'Av. Cabildo', norm: 'cabildo', startLat: -34.5750, startLon: -58.4420, endLat: -34.5360, endLon: -58.4680, maxNum: 5000, sub: 'Belgrano / Colegiales / Saavedra, CABA' },
-    { name: 'Av. Rivadavia', norm: 'rivadavia', startLat: -34.6080, startLon: -58.3710, endLat: -34.6390, endLon: -58.5300, maxNum: 12000, sub: 'Caballito / Almagro / Flores / Liniers' },
-    { name: 'Av. Callao', norm: 'callao', startLat: -34.5880, startLon: -58.3880, endLat: -34.6050, endLon: -58.3980, maxNum: 2100, sub: 'Recoleta / Balvanera, CABA' },
-    { name: 'Av. Pueyrredón', norm: 'pueyrredon', startLat: -34.5860, startLon: -58.3930, endLat: -34.6080, endLon: -58.4110, maxNum: 2600, sub: 'Recoleta / Once, CABA' },
-    { name: 'Av. Belgrano', norm: 'belgrano', startLat: -34.6120, startLon: -58.3680, endLat: -34.6120, endLon: -58.4200, maxNum: 4300, sub: 'Monserrat / Balvanera / Almagro, CABA' },
-    { name: 'Av. San Martín', norm: 'san martin', startLat: -34.6050, startLon: -58.4420, endLat: -34.5900, endLon: -58.5150, maxNum: 7500, sub: 'Villa Crespo / Agronomía / Devoto, CABA' },
-    { name: 'Av. Juan B. Justo', norm: 'juan b justo', startLat: -34.5800, startLon: -58.4250, endLat: -34.6400, endLon: -58.5300, maxNum: 9900, sub: 'Palermo / Villa Crespo / Liniers, CABA' },
-    { name: 'Av. Las Heras', norm: 'las heras', startLat: -34.5930, startLon: -58.3900, endLat: -34.5780, endLon: -58.4120, maxNum: 4200, sub: 'Recoleta / Palermo, CABA' },
-    { name: 'Av. Leandro N. Alem', norm: 'alem', startLat: -34.6010, startLon: -58.3710, endLat: -34.5920, endLon: -58.3730, maxNum: 1200, sub: 'San Nicolás / Retiro / Puerto Madero, CABA' },
-    { name: 'Av. Paseo Colón', norm: 'paseo colon', startLat: -34.6100, startLon: -58.3680, endLat: -34.6280, endLon: -58.3680, maxNum: 1600, sub: 'San Telmo / Puerto Madero, CABA' },
-    { name: 'Av. Monroe', norm: 'monroe', startLat: -34.5500, startLon: -58.4480, endLat: -34.5750, endLon: -58.5050, maxNum: 6000, sub: 'Belgrano / Villa Urquiza, CABA' },
-    { name: 'Av. Juramento', norm: 'juramento', startLat: -34.5550, startLon: -58.4450, endLat: -34.5780, endLon: -58.4900, maxNum: 5500, sub: 'Belgrano / Villa Urquiza, CABA' },
-    { name: 'Av. Congreso', norm: 'congreso', startLat: -34.5450, startLon: -58.4500, endLat: -34.5750, endLon: -58.5150, maxNum: 6000, sub: 'Núñez / Belgrano / Villa Urquiza' },
-    { name: 'Av. Triunvirato', norm: 'triunvirato', startLat: -34.5900, startLon: -58.4600, endLat: -34.5650, endLon: -58.4980, maxNum: 6000, sub: 'Chacarita / Villa Urquiza, CABA' },
-    { name: 'Av. Álvarez Thomas', norm: 'alvarez thomas', startLat: -34.5850, startLon: -58.4450, endLat: -34.5650, endLon: -58.4850, maxNum: 3500, sub: 'Colegiales / Villa Urquiza, CABA' },
-    { name: 'Av. Elcano', norm: 'elcano', startLat: -34.5700, startLon: -58.4500, endLat: -34.5850, endLon: -58.4750, maxNum: 5000, sub: 'Colegiales / Belgrano, CABA' },
-    { name: 'Av. Cramer', norm: 'cramer', startLat: -34.5750, startLon: -58.4550, endLat: -34.5400, endLon: -58.4750, maxNum: 4000, sub: 'Belgrano / Núñez / Saavedra, CABA' },
-    { name: 'Av. Maipú', norm: 'maipu', startLat: -34.5360, startLon: -58.4680, endLat: -34.4850, endLon: -58.5080, maxNum: 4000, sub: 'Vicente López / Olivos / La Lucila' },
-    { name: 'Av. Centenario', norm: 'centenario', startLat: -34.4850, startLon: -58.5080, endLat: -34.4450, endLon: -58.5600, maxNum: 3000, sub: 'San Isidro / Béccar / Victoria' },
-    { name: 'Av. Cazón', norm: 'cazon', startLat: -34.4350, startLon: -58.5700, endLat: -34.4200, endLon: -58.5850, maxNum: 1600, sub: 'Tigre Centro, PBA' },
-    { name: 'Av. de Mayo', norm: 'de mayo', startLat: -34.6080, startLon: -58.3740, endLat: -34.6090, endLon: -58.3880, maxNum: 1500, sub: 'Monserrat / San Nicolás, CABA' },
-    { name: 'Av. Scalabrini Ortiz', norm: 'scalabrini ortiz', startLat: -34.5820, startLon: -58.4080, endLat: -34.6000, endLon: -58.4420, maxNum: 3300, sub: 'Palermo / Villa Crespo, CABA' },
-    { name: 'Av. Coronel Díaz', norm: 'coronel diaz', startLat: -34.5850, startLon: -58.4050, endLat: -34.5950, endLon: -58.4200, maxNum: 2800, sub: 'Palermo / Recoleta, CABA' },
-    { name: 'Av. Federico Lacroze', norm: 'lacroze', startLat: -34.5650, startLon: -58.4350, endLat: -34.5900, endLon: -58.4600, maxNum: 4200, sub: 'Belgrano / Colegiales / Chacarita, CABA' },
-    { name: 'Av. Dorrego', norm: 'dorrego', startLat: -34.5700, startLon: -58.4200, endLat: -34.5950, endLon: -58.4550, maxNum: 3500, sub: 'Palermo / Villa Crespo, CABA' },
-    { name: 'Av. Montes de Oca', norm: 'montes de oca', startLat: -34.6280, startLon: -58.3750, endLat: -34.6550, endLon: -58.3750, maxNum: 2200, sub: 'Barracas, CABA' },
-    { name: 'Av. Independencia', norm: 'independencia', startLat: -34.6150, startLon: -58.3750, endLat: -34.6250, endLon: -58.4200, maxNum: 4400, sub: 'San Telmo / Boedo / Almagro, CABA' },
-    { name: 'Av. San Juan', norm: 'san juan', startLat: -34.6200, startLon: -58.3750, endLat: -34.6300, endLon: -58.4300, maxNum: 4500, sub: 'San Telmo / Constitución / Boedo' },
-    { name: 'Av. Gaona', norm: 'gaona', startLat: -34.6080, startLon: -58.4450, endLat: -34.6350, endLon: -58.5500, maxNum: 5000, sub: 'Caballito / Flores / Ramos Mejía' },
-    { name: 'Av. Hipólito Yrigoyen', norm: 'yrigoyen', startLat: -34.6700, startLon: -58.3750, endLat: -34.7800, endLon: -58.4000, maxNum: 15000, sub: 'Avellaneda / Lanús / Lomas de Zamora' },
-    { name: 'Av. Mitre', norm: 'mitre', startLat: -34.6600, startLon: -58.3600, endLat: -34.7200, endLon: -58.2600, maxNum: 7000, sub: 'Avellaneda / Sarandí / Quilmes' }
+    { 
+      name: 'Av. Santa Fe', norm: 'santa fe', 
+      startLat: -34.5950, startLon: -58.3780, endLat: -34.5750, endLon: -58.4280, maxNum: 5400, sub: 'Palermo / Recoleta, CABA',
+      examples: [
+        { num: 1200, label: 'Av. Santa Fe 1200 (Recoleta / Retiro)' },
+        { num: 3200, label: 'Av. Santa Fe 3200 (Alto Palermo)' },
+        { num: 4800, label: 'Av. Santa Fe 4800 (Plaza Italia)' }
+      ]
+    },
+    { 
+      name: 'Av. Corrientes', norm: 'corrientes', 
+      startLat: -34.6030, startLon: -58.3700, endLat: -34.5860, endLon: -58.4550, maxNum: 6900, sub: 'Balvanera / Almagro / Chacarita, CABA',
+      examples: [
+        { num: 1200, label: 'Av. Corrientes 1200 (Obelisco / Microcentro)' },
+        { num: 3200, label: 'Av. Corrientes 3200 (Abasto)' },
+        { num: 5000, label: 'Av. Corrientes 5000 (Villa Crespo)' }
+      ]
+    },
+    { 
+      name: 'Av. del Libertador', norm: 'libertador', 
+      startLat: -34.5890, startLon: -58.3780, endLat: -34.5200, endLon: -58.4800, maxNum: 15000, sub: 'Palermo / Núñez / Vicente López',
+      examples: [
+        { num: 2000, label: 'Av. del Libertador 2000 (Recoleta)' },
+        { num: 4500, label: 'Av. del Libertador 4500 (Palermo / Hipódromo)' },
+        { num: 8000, label: 'Av. del Libertador 8000 (Núñez)' }
+      ]
+    },
+    { 
+      name: 'Av. Cabildo', norm: 'cabildo', 
+      startLat: -34.5750, startLon: -58.4420, endLat: -34.5360, endLon: -58.4680, maxNum: 5000, sub: 'Belgrano / Colegiales / Saavedra, CABA',
+      examples: [
+        { num: 1500, label: 'Av. Cabildo 1500 (Colegiales)' },
+        { num: 2200, label: 'Av. Cabildo 2200 (Juramento / Belgrano)' },
+        { num: 4000, label: 'Av. Cabildo 4000 (Saavedra)' }
+      ]
+    },
+    { 
+      name: 'Av. 9 de Julio', norm: '9 de julio', 
+      startLat: -34.5930, startLon: -58.3820, endLat: -34.6270, endLon: -58.3810, maxNum: 2000, sub: 'Centro / Retiro / Constitución, CABA',
+      examples: [
+        { num: 500, label: 'Av. 9 de Julio 500 (Teatro Colón)' },
+        { num: 1000, label: 'Av. 9 de Julio 1000 (Obelisco)' },
+        { num: 1800, label: 'Av. 9 de Julio 1800 (Constitución)' }
+      ]
+    },
+    { 
+      name: 'Av. Rivadavia', norm: 'rivadavia', 
+      startLat: -34.6080, startLon: -58.3710, endLat: -34.6390, endLon: -58.5300, maxNum: 12000, sub: 'Caballito / Almagro / Flores / Liniers',
+      examples: [
+        { num: 1800, label: 'Av. Rivadavia 1800 (Congreso Nacional)' },
+        { num: 5000, label: 'Av. Rivadavia 5000 (Acoyte / Caballito)' },
+        { num: 7000, label: 'Av. Rivadavia 7000 (Flores)' }
+      ]
+    },
+    { 
+      name: 'Av. Córdoba', norm: 'cordoba', 
+      startLat: -34.5990, startLon: -58.3720, endLat: -34.5870, endLon: -58.4440, maxNum: 6000, sub: 'Palermo / Recoleta / Balvanera, CABA',
+      examples: [
+        { num: 1500, label: 'Av. Córdoba 1500 (Recoleta / Tribunales)' },
+        { num: 3800, label: 'Av. Córdoba 3800 (Almagro / Palermo)' },
+        { num: 5200, label: 'Av. Córdoba 5200 (Palermo Queens / Outlets)' }
+      ]
+    },
+    { 
+      name: 'Av. Luis María Campos', norm: 'luis maria campos', 
+      startLat: -34.5770, startLon: -58.4280, endLat: -34.5620, endLon: -58.4440, maxNum: 1700, sub: 'Palermo / Belgrano, CABA',
+      examples: [
+        { num: 400, label: 'Av. Luis M. Campos 400 (Las Cañitas)' },
+        { num: 1100, label: 'Av. Luis M. Campos 1100 (Solar de la Abadía)' }
+      ]
+    },
+    { 
+      name: 'Av. Callao', norm: 'callao', 
+      startLat: -34.5880, startLon: -58.3880, endLat: -34.6050, endLon: -58.3980, maxNum: 2100, sub: 'Recoleta / Balvanera, CABA',
+      examples: [
+        { num: 600, label: 'Av. Callao 600 (Tribunales / Centro)' },
+        { num: 1400, label: 'Av. Callao 1400 (Recoleta)' }
+      ]
+    },
+    { 
+      name: 'Av. Pueyrredón', norm: 'pueyrredon', 
+      startLat: -34.5860, startLon: -58.3930, endLat: -34.6080, endLon: -58.4110, maxNum: 2600, sub: 'Recoleta / Once, CABA',
+      examples: [
+        { num: 1400, label: 'Av. Pueyrredón 1400 (Recoleta)' },
+        { num: 2400, label: 'Av. Pueyrredón 2400 (Plaza Francia / Bellas Artes)' }
+      ]
+    },
+    { 
+      name: 'Av. Las Heras', norm: 'las heras', 
+      startLat: -34.5930, startLon: -58.3900, endLat: -34.5780, endLon: -58.4120, maxNum: 4200, sub: 'Recoleta / Palermo, CABA',
+      examples: [
+        { num: 2100, label: 'Av. Las Heras 2100 (Recoleta)' },
+        { num: 3400, label: 'Av. Las Heras 3400 (Parque Las Heras / Botánico)' }
+      ]
+    },
+    { 
+      name: 'Av. Scalabrini Ortiz', norm: 'scalabrini ortiz', 
+      startLat: -34.5820, startLon: -58.4080, endLat: -34.6000, endLon: -58.4420, maxNum: 3300, sub: 'Palermo / Villa Crespo, CABA',
+      examples: [
+        { num: 1200, label: 'Av. Scalabrini Ortiz 1200 (Palermo)' },
+        { num: 2400, label: 'Av. Scalabrini Ortiz 2400 (Plaza Armenia / Soho)' }
+      ]
+    },
+    { 
+      name: 'Av. Juan B. Justo', norm: 'juan b justo', 
+      startLat: -34.5800, startLon: -58.4250, endLat: -34.6400, endLon: -58.5300, maxNum: 9900, sub: 'Palermo / Villa Crespo / Liniers, CABA' 
+    },
+    { 
+      name: 'Av. San Martín', norm: 'san martin', 
+      startLat: -34.6050, startLon: -58.4420, endLat: -34.5900, endLon: -58.5150, maxNum: 7500, sub: 'Villa Crespo / Agronomía / Devoto, CABA' 
+    },
+    { 
+      name: 'Av. Monroe', norm: 'monroe', 
+      startLat: -34.5500, startLon: -58.4480, endLat: -34.5750, endLon: -58.5050, maxNum: 6000, sub: 'Belgrano / Villa Urquiza, CABA' 
+    },
+    { 
+      name: 'Av. Juramento', norm: 'juramento', 
+      startLat: -34.5550, startLon: -58.4450, endLat: -34.5780, endLon: -58.4900, maxNum: 5500, sub: 'Belgrano / Villa Urquiza, CABA' 
+    },
+    { 
+      name: 'Av. Congreso', norm: 'congreso', 
+      startLat: -34.5450, startLon: -58.4500, endLat: -34.5750, endLon: -58.5150, maxNum: 6000, sub: 'Núñez / Belgrano / Villa Urquiza' 
+    },
+    { 
+      name: 'Av. Triunvirato', norm: 'triunvirato', 
+      startLat: -34.5900, startLon: -58.4600, endLat: -34.5650, endLon: -58.4980, maxNum: 6000, sub: 'Chacarita / Villa Urquiza, CABA' 
+    },
+    { 
+      name: 'Av. Álvarez Thomas', norm: 'alvarez thomas', 
+      startLat: -34.5850, startLon: -58.4450, endLat: -34.5650, endLon: -58.4850, maxNum: 3500, sub: 'Colegiales / Villa Urquiza, CABA' 
+    },
+    { 
+      name: 'Av. Elcano', norm: 'elcano', 
+      startLat: -34.5700, startLon: -58.4500, endLat: -34.5850, endLon: -58.4750, maxNum: 5000, sub: 'Colegiales / Belgrano, CABA' 
+    },
+    { 
+      name: 'Av. Cramer', norm: 'cramer', 
+      startLat: -34.5750, startLon: -58.4550, endLat: -34.5400, endLon: -58.4750, maxNum: 4000, sub: 'Belgrano / Núñez / Saavedra, CABA' 
+    },
+    { 
+      name: 'Av. Maipú', norm: 'maipu', 
+      startLat: -34.5360, startLon: -58.4680, endLat: -34.4850, endLon: -58.5080, maxNum: 4000, sub: 'Vicente López / Olivos / La Lucila' 
+    },
+    { 
+      name: 'Av. Centenario', norm: 'centenario', 
+      startLat: -34.4850, startLon: -58.5080, endLat: -34.4450, endLon: -58.5600, maxNum: 3000, sub: 'San Isidro / Béccar / Victoria' 
+    },
+    { 
+      name: 'Av. Cazón', norm: 'cazon', 
+      startLat: -34.4350, startLon: -58.5700, endLat: -34.4200, endLon: -58.5850, maxNum: 1600, sub: 'Tigre Centro, PBA' 
+    },
+    { 
+      name: 'Av. Montes de Oca', norm: 'montes de oca', 
+      startLat: -34.6280, startLon: -58.3750, endLat: -34.6550, endLon: -58.3750, maxNum: 2200, sub: 'Barracas, CABA' 
+    },
+    { 
+      name: 'Av. Independencia', norm: 'independencia', 
+      startLat: -34.6150, startLon: -58.3750, endLat: -34.6250, endLon: -58.4200, maxNum: 4400, sub: 'San Telmo / Boedo / Almagro, CABA' 
+    },
+    { 
+      name: 'Av. San Juan', norm: 'san juan', 
+      startLat: -34.6200, startLon: -58.3750, endLat: -34.6300, endLon: -58.4300, maxNum: 4500, sub: 'San Telmo / Constitución / Boedo' 
+    },
+    { 
+      name: 'Av. Gaona', norm: 'gaona', 
+      startLat: -34.6080, startLon: -58.4450, endLat: -34.6350, endLon: -58.5500, maxNum: 5000, sub: 'Caballito / Flores / Ramos Mejía' 
+    },
+    { 
+      name: 'Av. Hipólito Yrigoyen', norm: 'yrigoyen', 
+      startLat: -34.6700, startLon: -58.3750, endLat: -34.7800, endLon: -58.4000, maxNum: 15000, sub: 'Avellaneda / Lanús / Lomas de Zamora' 
+    },
+    { 
+      name: 'Av. Mitre', norm: 'mitre', 
+      startLat: -34.6600, startLon: -58.3600, endLat: -34.7200, endLon: -58.2600, maxNum: 7000, sub: 'Avellaneda / Sarandí / Quilmes' 
+    },
+    { 
+      name: 'Honduras', norm: 'honduras', 
+      startLat: -34.5820, startLon: -58.4250, endLat: -34.5950, endLon: -58.4150, maxNum: 6000, sub: 'Palermo Soho / Hollywood, CABA' 
+    },
+    { 
+      name: 'Gorriti', norm: 'gorriti', 
+      startLat: -34.5810, startLon: -58.4280, endLat: -34.5970, endLon: -58.4140, maxNum: 6000, sub: 'Palermo Soho, CABA' 
+    },
+    { 
+      name: 'Thames', norm: 'thames', 
+      startLat: -34.5790, startLon: -58.4200, endLat: -34.5950, endLon: -58.4420, maxNum: 2500, sub: 'Palermo Soho / Palermo, CABA' 
+    },
+    { 
+      name: 'Gurruchaga', norm: 'gurruchaga', 
+      startLat: -34.5820, startLon: -58.4180, endLat: -34.5980, endLon: -58.4450, maxNum: 2500, sub: 'Palermo / Villa Crespo, CABA' 
+    },
+    { 
+      name: 'Paraguay', norm: 'paraguay', 
+      startLat: -34.5980, startLon: -58.3780, endLat: -34.5810, endLon: -58.4240, maxNum: 5500, sub: 'Retiro / Recoleta / Palermo, CABA' 
+    },
+    { 
+      name: 'Arenales', norm: 'arenales', 
+      startLat: -34.5940, startLon: -58.3810, endLat: -34.5830, endLon: -58.4120, maxNum: 4000, sub: 'Recoleta / Palermo, CABA' 
+    },
+    { 
+      name: 'Juncal', norm: 'juncal', 
+      startLat: -34.5920, startLon: -58.3820, endLat: -34.5810, endLon: -58.4150, maxNum: 4500, sub: 'Recoleta / Palermo, CABA' 
+    },
+    { 
+      name: 'Alvear', norm: 'alvear', 
+      startLat: -34.5910, startLon: -58.3840, endLat: -34.5850, endLon: -58.3910, maxNum: 2200, sub: 'Recoleta, CABA' 
+    },
+    { 
+      name: 'Posadas', norm: 'posadas', 
+      startLat: -34.5900, startLon: -58.3860, endLat: -34.5840, endLon: -58.3900, maxNum: 1700, sub: 'Recoleta / Retiro, CABA' 
+    },
+    { 
+      name: 'Florida', norm: 'florida', 
+      startLat: -34.5980, startLon: -58.3740, endLat: -34.6080, endLon: -58.3750, maxNum: 1000, sub: 'San Nicolás / Microcentro, CABA' 
+    }
   ];
 
   POPULAR_STREETS.forEach(s => {
@@ -4549,23 +4782,56 @@ function getInstantLocalSuggestions(rawQuery) {
       let finalLon = s.startLon;
 
       if (numberVal > 0 && s.maxNum > 0) {
+        // Cálculo con altura exacta ingresada
         const ratio = Math.min(1.0, Math.max(0.0, numberVal / s.maxNum));
         finalLat = s.startLat + ratio * (s.endLat - s.startLat);
         finalLon = s.startLon + ratio * (s.endLon - s.startLon);
-      }
 
-      const fullTitle = numberStr ? `${s.name} ${numberStr}` : s.name;
-      pushItem({
-        lat: String(finalLat.toFixed(6)),
-        lon: String(finalLon.toFixed(6)),
-        display_name: `${fullTitle}, ${s.sub}`,
-        _isIntersection: false,
-        _isPoi: false,
-        _poiBadge: numberStr ? 'Dirección Exacta' : 'Avenida Principal',
-        _icon: '📍',
-        _mainTitle: fullTitle,
-        _subTitle: s.sub
-      });
+        const fullTitle = `${s.name} ${numberStr}`;
+        pushItem({
+          lat: String(finalLat.toFixed(6)),
+          lon: String(finalLon.toFixed(6)),
+          display_name: `${fullTitle}, ${s.sub}`,
+          _isIntersection: false,
+          _isPoi: false,
+          _poiBadge: `Dirección Exacta (Altura ${numberStr})`,
+          _icon: '📍',
+          _mainTitle: fullTitle,
+          _subTitle: s.sub
+        });
+      } else {
+        // Si no ingresó número de altura, mostrar la calle principal Y ejemplos de altura
+        pushItem({
+          lat: String(finalLat.toFixed(6)),
+          lon: String(finalLon.toFixed(6)),
+          display_name: `${s.name}, ${s.sub}`,
+          _isIntersection: false,
+          _isPoi: false,
+          _poiBadge: 'Avenida Principal',
+          _icon: '📍',
+          _mainTitle: s.name,
+          _subTitle: `${s.sub} · Escribe la altura o elige un ejemplo abajo:`
+        });
+
+        if (Array.isArray(s.examples)) {
+          s.examples.forEach(ex => {
+            const ratioEx = Math.min(1.0, Math.max(0.0, ex.num / s.maxNum));
+            const exLat = s.startLat + ratioEx * (s.endLat - s.startLat);
+            const exLon = s.startLon + ratioEx * (s.endLon - s.startLon);
+            pushItem({
+              lat: String(exLat.toFixed(6)),
+              lon: String(exLon.toFixed(6)),
+              display_name: `${s.name} ${ex.num}, ${s.sub}`,
+              _isIntersection: false,
+              _isPoi: false,
+              _poiBadge: `Ejemplo Altura ${ex.num}`,
+              _icon: '📍',
+              _mainTitle: `${s.name} ${ex.num}`,
+              _subTitle: ex.label
+            });
+          });
+        }
+      }
     }
   });
 
@@ -4575,7 +4841,7 @@ function getInstantLocalSuggestions(rawQuery) {
 // Motor inteligente de geocodificación de alta precisión en paralelo
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
-  if (query.length < 2) return [];
+  if (query.length < 2) return getDefaultPopularDestinations();
 
   const cornerPattern = /^(.+?)\s+(?:y|e|esquina|esq\.?|con|cruce(?:\s+con)?|e\/|\/|&)\s+(.+)$/i;
   const isCorner = cornerPattern.test(query) || /^(esquina|esq\.?|cruce)\s+/i.test(query);
@@ -4779,9 +5045,9 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     }
 
     list.classList.remove('hidden');
-    list.style.display = 'block';
+    list.style.display = 'flex';
 
-    items.slice(0, 6).forEach((place) => {
+    items.slice(0, 8).forEach((place) => {
       const item = document.createElement('div');
       item.className = 'suggestion-item';
       if (place._isIntersection) item.classList.add('is-intersection');
@@ -4799,7 +5065,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
           ${poiBadge ? `<span class="suggestion-badge-poi">${escapeHtml(poiBadge)}</span>` : ''}
           ${isCorner && !poiBadge ? `<span class="suggestion-badge-intersection">🚦 Esquina / Cruce</span>` : ''}
           <span class="suggestion-title" style="display: block; font-weight: 700; color: #fff;">${escapeHtml(mainTitle)}</span>
-          <span class="suggestion-sub" style="display: block; font-size: 0.76rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(subAddress)}</span>
+          <span class="suggestion-sub" style="display: block; font-size: 0.74rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(subAddress)}</span>
         </div>
       `;
 
@@ -4824,12 +5090,8 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     const mainTitle = place._mainTitle || (place.display_name ? place.display_name.split(',')[0] : '');
     
     let cleanName = place.display_name || mainTitle;
-    if (mainTitle && cleanSub) {
-      if (mainTitle.toLowerCase().includes(cleanSub.toLowerCase())) {
-        cleanName = mainTitle;
-      } else {
-        cleanName = `${mainTitle}, ${cleanSub}`;
-      }
+    if (mainTitle && cleanSub && !mainTitle.toLowerCase().includes(cleanSub.toLowerCase())) {
+      cleanName = `${mainTitle}, ${cleanSub}`;
     } else if (mainTitle) {
       cleanName = mainTitle;
     }
@@ -4879,14 +5141,12 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
     if (query.length < 2) {
       if (abortController) abortController.abort();
-      list.innerHTML = '';
-      list.classList.add('hidden');
-      list.style.display = 'none';
-      currentResults = [];
+      const shortcuts = getDefaultPopularDestinations();
+      renderList(shortcuts, '');
       return;
     }
 
-    // 1. Mostrar sugerencias instantáneas (0ms) directamente si existen
+    // 1. Mostrar sugerencias instantáneas con ejemplos de altura (0ms)
     const instantItems = getInstantLocalSuggestions(query);
     if (instantItems.length > 0) {
       renderList(instantItems, query);
@@ -4895,7 +5155,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     // 2. Refinar con geocodificación en segundo plano
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 180);
+    }, 150);
   });
 
   input.addEventListener('focus', () => {
@@ -4905,6 +5165,8 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       if (instantItems.length > 0) {
         renderList(instantItems, query);
       }
+    } else {
+      renderList(getDefaultPopularDestinations(), '');
     }
   });
 
@@ -8858,49 +9120,30 @@ if (btnRecenterPassengerMap) {
         const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
         const passwordHash = await hashPassword(password);
 
-        pendingPassengerRegistration = {
+        // Guardar sesión de inmediato para que nunca se pierda
+        const finalUser = {
           id: 'pass_' + Date.now(),
           nombre: name,
           telefono: phone,
           email: email,
           passwordHash: passwordHash,
+          password: password,
           medioPago: payment,
           rating: '5.00',
           ratingCount: 1,
           avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
           fechaRegistro: new Date().toISOString(),
-          verifyCode: verifyCode,
-          emailVerificado: false
+          emailVerificado: true
         };
-        try {
-          localStorage.setItem('rutaprivada_pending_passenger_reg', JSON.stringify(pendingPassengerRegistration));
-        } catch(e) {}
 
-        // Mostrar modal de verificación de correo
+        savePassengerSession(finalUser);
         closePassengerAuthModal();
-        if (verifyPassengerEmailTarget) verifyPassengerEmailTarget.textContent = email;
-        if (inputPassengerVerifyCode) {
-          inputPassengerVerifyCode.value = '';
-          setTimeout(() => inputPassengerVerifyCode.focus(), 300);
-        }
-        if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.remove('hidden');
-
         if (typeof showToast === 'function') {
-          showToast(`⏳ Enviando código de activación a ${email}...`);
+          showToast(`🎉 ¡Cuenta creada y sesión iniciada con éxito! Bienvenido, ${finalUser.nombre}.`);
         }
 
-        // Despachar correo electrónico real mediante EmailJS
-        sendPassengerEmailJsVerification(email, verifyCode).then((res) => {
-          if (res.success) {
-            if (typeof showToast === 'function') {
-              showToast(`📨 ¡Código enviado con éxito a tu correo ${email}! Revisa tu buzón.`);
-            }
-          } else {
-            if (typeof showToast === 'function') {
-              showToast(`⚠️ Revisa tu correo ${email}. Si no llega, presiona "Reenviar código".`);
-            }
-          }
-        });
+        // Despachar correo electrónico de bienvenida en segundo plano
+        sendPassengerEmailJsVerification(email, verifyCode).catch(() => {});
       });
     }
 

@@ -53,9 +53,15 @@
             </div>
         </div>
 
-        <div class="driver-earnings-pill" id="btnVerGananciasHeader" title="Ver resumen de ganancias">
-            <span class="earnings-label">Hoy</span>
-            <span class="earnings-amount" id="headerGananciasHoy">$0</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" class="btn-driver-help-header" id="btnOpenDriverHelpHeader" title="Centro de Ayuda y Soporte Conductor 24/7" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 20px; padding: 6px 12px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                <i class="fa-solid fa-headset" style="color: #fbbf24; font-size: 0.95rem;"></i>
+                <span>Ayuda</span>
+            </button>
+            <div class="driver-earnings-pill" id="btnVerGananciasHeader" title="Ver resumen de ganancias">
+                <span class="earnings-label">Hoy</span>
+                <span class="earnings-amount" id="headerGananciasHoy">$0</span>
+            </div>
         </div>
     </header>
 
@@ -522,16 +528,18 @@
             </div>
 
             <div class="profile-links-list" style="margin-bottom: 14px;">
-                <a href="agenda.html" class="profile-link-item">
-                    <div class="link-left">
-                        <i class="fa-solid fa-clipboard-list text-gold"></i>
+                <button type="button" class="profile-link-item" id="btnOpenDriverHelp" style="width: 100%; text-align: left; background: rgba(56, 189, 248, 0.08); border: 1.5px solid rgba(56, 189, 248, 0.35); border-radius: 14px; padding: 12px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;">
+                    <div class="link-left" style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(56, 189, 248, 0.15); display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-headset text-gold" style="font-size: 1.25rem;"></i>
+                        </div>
                         <div>
-                            <strong>Portal Partner & Liquidaciones</strong>
-                            <p>Liquidaciones, hoja de ruta y reportes financieros</p>
+                            <strong style="color: #fff; font-size: 0.95rem; display: block;">Centro de Ayuda & Soporte</strong>
+                            <p style="color: #94a3b8; font-size: 0.76rem; margin: 2px 0 0 0;">Asistencia 24/7, consultas de viajes, pagos y contacto directo</p>
                         </div>
                     </div>
-                    <i class="fa-solid fa-chevron-right"></i>
-                </a>
+                    <i class="fa-solid fa-chevron-right" style="color: #38bdf8;"></i>
+                </button>
             </div>
 
             <button type="button" class="btn-cancel-trip full-width" id="btnCerrarPerfilSheet" style="width: 100%; border-radius: 12px; justify-content: center; padding: 12px; font-size: 0.95rem;">
@@ -540,6 +548,246 @@
             <button type="button" id="btnLogoutDriver" style="width: 100%; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 12px; padding: 11px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; transition: all 0.2s;" title="Cerrar sesión actual de chofer">
                 <i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión Chofer
             </button>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL / BOTTOM SHEET: CENTRO DE AYUDA Y SOPORTE CHOFER (24/7)
+         ========================================================= -->
+    <div class="driver-modal-overlay" id="modalDriverHelp" style="z-index: 10006;">
+        <div class="driver-modal-sheet" style="max-height: 92vh; overflow-y: auto; max-width: 540px; margin: 0 auto; padding: 20px;">
+            <!-- Header Modal Ayuda -->
+            <div class="modal-sheet-header" style="display:flex; justify-content: space-between; align-items:flex-start; margin-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(56, 189, 248, 0.2) 100%); border: 1px solid rgba(245, 158, 11, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+                        <i class="fa-solid fa-headset text-gold"></i>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.15rem; color: #fff; font-weight: 800; margin: 0; letter-spacing: -0.2px;">Centro de Ayuda Chofer</h3>
+                        <p style="color: #94a3b8; font-size: 0.78rem; margin: 2px 0 0 0;">Estamos aquí para apoyarte en cada viaje · Soporte 24/7</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close-modal" id="btnCloseDriverHelp" style="background:none; border:none; color:#94a3b8; font-size:1.5rem; cursor:pointer; padding: 2px 6px;">&times;</button>
+            </div>
+
+            <!-- Canales de Contacto Directo Rápido -->
+            <div style="margin-bottom: 18px;">
+                <span style="font-size: 0.75rem; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">
+                    Canales de Atención Directa
+                </span>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <!-- Botón WhatsApp Soporte -->
+                    <button type="button" id="btnHelpWhatsappDirect" style="background: linear-gradient(135deg, rgba(37, 211, 102, 0.18) 0%, rgba(18, 140, 126, 0.28) 100%); border: 1.5px solid rgba(37, 211, 102, 0.5); border-radius: 12px; padding: 12px 10px; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s;">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; background: #25d366; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.2rem; flex-shrink: 0;">
+                            <i class="fa-brands fa-whatsapp"></i>
+                        </div>
+                        <div>
+                            <strong style="color: #fff; font-size: 0.85rem; display: block;">WhatsApp 24/7</strong>
+                            <small style="color: #86efac; font-size: 0.7rem;">Operador en línea</small>
+                        </div>
+                    </button>
+
+                    <!-- Botón Llamada Telefónica Central -->
+                    <a href="tel:+5491136453982" id="btnHelpCallDirect" style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(2, 132, 199, 0.25) 100%); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 12px; padding: 12px 10px; text-align: left; text-decoration: none; display: flex; align-items: center; gap: 10px; transition: all 0.2s;">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; background: #0284c7; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.1rem; flex-shrink: 0;">
+                            <i class="fa-solid fa-phone"></i>
+                        </div>
+                        <div>
+                            <strong style="color: #fff; font-size: 0.85rem; display: block;">Guardia Central</strong>
+                            <small style="color: #93c5fd; font-size: 0.7rem;">Llamada directa</small>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- Botón Reportar Incidencia / Enviar Formulario -->
+                <button type="button" id="btnHelpOpenTicketForm" style="width: 100%; margin-top: 10px; background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.2); border-radius: 12px; padding: 10px 14px; color: #e2e8f0; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-pen-to-square text-gold"></i> ¿Tienes un reclamo o incidencia específica? Enviar reporte
+                    </span>
+                    <i class="fa-solid fa-arrow-right" style="color: #fbbf24; font-size: 0.75rem;"></i>
+                </button>
+            </div>
+
+            <!-- Sección: Preguntas Frecuentes y Categorías de Asistencia -->
+            <div style="margin-bottom: 12px;">
+                <span style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 10px;">
+                    ¿En qué podemos ayudarte?
+                </span>
+
+                <div class="driver-help-accordion-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    
+                    <!-- CATEGORÍA 1: PROBLEMAS CON UN VIAJE O TARIFA -->
+                    <div class="driver-help-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;">
+                        <div class="driver-help-header-toggle" onclick="window.toggleDriverHelpAccordion(this)" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.2rem;">🚗</span>
+                                <div>
+                                    <strong style="color: #fff; font-size: 0.88rem; display: block;">Problemas con un viaje o tarifa</strong>
+                                    <small style="color: #94a3b8; font-size: 0.72rem;">Retarificación, peajes, desvíos o pasajero ausente</small>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-chevron-down toggle-icon" style="color: #94a3b8; font-size: 0.8rem; transition: transform 0.2s;"></i>
+                        </div>
+                        <div class="driver-help-body" style="display: none; padding: 0 14px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+                            <ul style="margin: 10px 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px;">
+                                <li><strong>Retarificación por peajes o desvío:</strong> Si pasaste por peajes no computados o el pasajero cambió la ruta, contáctanos indicando el ID del viaje para sumar el importe a tu liquidación.</li>
+                                <li><strong>Pasajero no se presentó (No-show):</strong> Aguarda 5 minutos en el origen. Si tras llamarlo no acude, cancela con motivo "Pasajero ausente" para cobrar la tarifa de cancelación reglamentaria.</li>
+                                <li><strong>Inconveniente con el cobro:</strong> Si el pasajero no abonó en efectivo o la transferencia dio error, reportalo de inmediato con comprobante.</li>
+                            </ul>
+                            <button type="button" onclick="window.dispatchHelpTopic('Problema con Tarifa o Viaje')" style="width: 100%; margin-top: 6px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 8px; padding: 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer;">
+                                💬 Contactar Soporte por este Viaje
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CATEGORÍA 2: RECEPCIÓN DE SOLICITUDES Y RADAR -->
+                    <div class="driver-help-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;">
+                        <div class="driver-help-header-toggle" onclick="window.toggleDriverHelpAccordion(this)" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.2rem;">📡</span>
+                                <div>
+                                    <strong style="color: #fff; font-size: 0.88rem; display: block;">Recepción de viajes y radar GPS</strong>
+                                    <small style="color: #94a3b8; font-size: 0.72rem;">Estoy en línea y no me suenan viajes</small>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-chevron-down toggle-icon" style="color: #94a3b8; font-size: 0.8rem; transition: transform 0.2s;"></i>
+                        </div>
+                        <div class="driver-help-body" style="display: none; padding: 0 14px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+                            <p style="margin: 8px 0;">Verificaciones recomendadas:</p>
+                            <ol style="margin: 0 0 10px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px;">
+                                <li>Asegúrate de tener el botón superior en <strong>"ESTÁS EN LÍNEA"</strong> (Color verde).</li>
+                                <li>Verifica tener el volumen multimedia alto para escuchar la alarma de viaje entrante.</li>
+                                <li>Posiciónate en corredores clave: Aeroparque, Ezeiza, Recoleta, Palermo, Microcentro o Zona Norte.</li>
+                                <li>Presiona <em>"Actualizar Solicitudes & Radar"</em> en la pantalla principal.</li>
+                            </ol>
+                            <button type="button" onclick="window.testDriverHelpSound()" style="width: 100%; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; border-radius: 8px; padding: 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer;">
+                                🔊 Probar Alarma Sonora de Viaje
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CATEGORÍA 3: MI VEHÍCULO Y DOCUMENTACIÓN -->
+                    <div class="driver-help-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;">
+                        <div class="driver-help-header-toggle" onclick="window.toggleDriverHelpAccordion(this)" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.2rem;">📄</span>
+                                <div>
+                                    <strong style="color: #fff; font-size: 0.88rem; display: block;">Mi Vehículo y Documentación</strong>
+                                    <small style="color: #94a3b8; font-size: 0.72rem;">Actualizar cédula, VTV, seguro o cambiar auto</small>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-chevron-down toggle-icon" style="color: #94a3b8; font-size: 0.8rem; transition: transform 0.2s;"></i>
+                        </div>
+                        <div class="driver-help-body" style="display: none; padding: 0 14px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+                            <p style="margin: 8px 0;">Mantén tu legajo siempre al día para garantizar la habilitación de cuenta:</p>
+                            <ul style="margin: 0 0 10px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px;">
+                                <li>Requeridos: Registro de Conducir, Cédula Verde/Azul, Seguro al día, VTV vigente y Foto de Perfil.</li>
+                                <li>Para cambiar de auto asignado o categoría, actualiza la patente y fotos del rodado.</li>
+                            </ul>
+                            <button type="button" id="btnHelpOpenDocsUploadFromCard" style="width: 100%; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #fff; border: none; border-radius: 8px; padding: 9px; font-weight: 700; font-size: 0.78rem; cursor: pointer;">
+                                📑 Abrir Módulo de Documentación y Vehículo
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CATEGORÍA 4: BILLETERA Y LIQUIDACIONES -->
+                    <div class="driver-help-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;">
+                        <div class="driver-help-header-toggle" onclick="window.toggleDriverHelpAccordion(this)" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.2rem;">💰</span>
+                                <div>
+                                    <strong style="color: #fff; font-size: 0.88rem; display: block;">Billetera, Ganancias y Liquidaciones</strong>
+                                    <small style="color: #94a3b8; font-size: 0.72rem;">Consultas de saldo disponible, comisiones y pagos</small>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-chevron-down toggle-icon" style="color: #94a3b8; font-size: 0.8rem; transition: transform 0.2s;"></i>
+                        </div>
+                        <div class="driver-help-body" style="display: none; padding: 0 14px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+                            <p style="margin: 8px 0;">Información sobre pagos y liquidaciones:</p>
+                            <ul style="margin: 0 0 10px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px;">
+                                <li>Los viajes cobrados por transferencia o tarjeta se acreditan a tu Billetera RutaPrivada.</li>
+                                <li>Las transferencias de liquidación se realizan directamente a tu CBU/CVU registrado.</li>
+                                <li>Puedes consultar el detalle y solicitar transferencias desde la pestaña <strong>Billetera</strong>.</li>
+                            </ul>
+                            <button type="button" id="btnHelpGoToWalletTab" style="width: 100%; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80; border-radius: 8px; padding: 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer;">
+                                💳 Ir a mi Billetera y Saldos
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CATEGORÍA 5: OBJETOS PERDIDOS Y SEGURIDAD -->
+                    <div class="driver-help-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;">
+                        <div class="driver-help-header-toggle" onclick="window.toggleDriverHelpAccordion(this)" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.2rem;">🧳</span>
+                                <div>
+                                    <strong style="color: #fff; font-size: 0.88rem; display: block;">Objetos Olvidados & Seguridad</strong>
+                                    <small style="color: #94a3b8; font-size: 0.72rem;">Reportar pertenencia olvidada o conducta del usuario</small>
+                                </div>
+                            </div>
+                            <i class="fa-solid fa-chevron-down toggle-icon" style="color: #94a3b8; font-size: 0.8rem; transition: transform 0.2s;"></i>
+                        </div>
+                        <div class="driver-help-body" style="display: none; padding: 0 14px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+                            <p style="margin: 8px 0;">Protocolo de Objetos Olvidados:</p>
+                            <p style="margin: 0 0 10px;">Si encuentras un objeto (teléfono, billetera, llave, equipaje), notifícalo de inmediato a la central indicando fecha/hora aproximada del viaje para coordinar la devolución segura con el pasajero.</p>
+                            <button type="button" onclick="window.dispatchHelpTopic('Objeto Olvidado por Pasajero')" style="width: 100%; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 8px; padding: 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer;">
+                                📦 Reportar Objeto Olvidado a la Central
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <button type="button" class="btn-cancel-trip full-width" id="btnCerrarAyudaSheet" style="width: 100%; border-radius: 12px; justify-content: center; padding: 11px; font-size: 0.92rem; margin-top: 6px;">
+                Cerrar Ayuda
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: FORMULARIO DE REPORTE DE INCIDENCIA / TICKET DE SOPORTE -->
+    <div class="driver-modal-overlay" id="modalDriverReportTicket" style="z-index: 10007;">
+        <div class="driver-modal-sheet" style="max-height: 90vh; overflow-y: auto; max-width: 480px; margin: 0 auto; padding: 20px;">
+            <div class="modal-sheet-header" style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 16px;">
+                <h3 style="font-size: 1.1rem; color: #fff; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-clipboard-question text-gold"></i> Reportar Incidencia a Soporte
+                </h3>
+                <button type="button" class="btn-close-modal" id="btnCloseDriverReportTicket" style="background:none; border:none; color:#94a3b8; font-size:1.4rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <form id="formDriverReportTicket" style="display: flex; flex-direction: column; gap: 14px;">
+                <div>
+                    <label for="ticketCategory" style="color: #94a3b8; font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Categoría del Problema *</label>
+                    <select id="ticketCategory" required style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px; border-radius: 10px; font-size: 0.88rem;">
+                        <option value="tarifa">🚗 Problema con tarifa o peajes</option>
+                        <option value="pasajero">👤 Pasajero no se presentó (No-show)</option>
+                        <option value="pago">💵 Problema con el cobro o transferencia</option>
+                        <option value="objeto">🧳 Objeto olvidado en el vehículo</option>
+                        <option value="app">📡 Error en la app o radar GPS</option>
+                        <option value="documentos">📄 Dudas sobre vehículo / documentación</option>
+                        <option value="otro">💬 Otra consulta general</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="ticketTripId" style="color: #94a3b8; font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">ID o Detalle del Viaje (Opcional)</label>
+                    <input type="text" id="ticketTripId" placeholder="Ej: Viaje a Ezeiza de hoy 14:30 hs" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px; border-radius: 10px; font-size: 0.88rem;" />
+                </div>
+
+                <div>
+                    <label for="ticketDescription" style="color: #94a3b8; font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Describe lo sucedido *</label>
+                    <textarea id="ticketDescription" rows="4" placeholder="Explica detalladamente el problema para que el equipo de soporte pueda ayudarte..." required style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px; border-radius: 10px; font-size: 0.88rem; resize: vertical;"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 4px;">
+                    <button type="submit" style="flex: 1; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #000; font-weight: 800; border: none; border-radius: 10px; padding: 12px; font-size: 0.92rem; cursor: pointer;">
+                        📤 Enviar Reporte
+                    </button>
+                    <button type="button" id="btnCancelTicket" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #94a3b8; border-radius: 10px; padding: 12px 16px; font-size: 0.88rem; cursor: pointer;">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
