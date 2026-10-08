@@ -5271,55 +5271,6 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
   });
 }
 
-  input.addEventListener('focus', () => {
-    const query = input.value.trim();
-    if (query.length >= 2) {
-      const instantItems = getInstantLocalSuggestions(query);
-      if (instantItems.length > 0) {
-        renderList(instantItems, query);
-      }
-    } else {
-      renderList(getDefaultPopularDestinations(), '');
-    }
-  });
-
-  input.addEventListener('keydown', async (e) => {
-    const items = list.querySelectorAll('.suggestion-item');
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (items.length > 0) {
-        activeIndex = (activeIndex + 1) % items.length;
-        items.forEach((it, i) => it.classList.toggle('active', i === activeIndex));
-      }
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (items.length > 0) {
-        activeIndex = (activeIndex - 1 + items.length) % items.length;
-        items.forEach((it, i) => it.classList.toggle('active', i === activeIndex));
-      }
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      clearTimeout(debounceTimeout);
-
-      if (currentResults.length > 0) {
-        const target = activeIndex >= 0 ? currentResults[activeIndex] : currentResults[0];
-        selectItem(target);
-      }
-    } else if (e.key === 'Escape') {
-      list.classList.add('hidden');
-      list.style.display = 'none';
-    }
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!input.contains(e.target) && !list.contains(e.target)) {
-      list.classList.add('hidden');
-      list.style.display = 'none';
-    }
-  });
-}
-
 window.setupAddressAutocomplete = setupAddressAutocomplete;
 window.searchLocations = searchLocations;
 
