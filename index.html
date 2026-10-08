@@ -1235,13 +1235,13 @@
 
       <!-- Navigation Tabs: Perfil | Medios de Pago | Historial de Viajes -->
       <div class="profile-nav-tabs">
-        <button type="button" class="p-tab-btn active" data-tab="tabProfileData">
+        <button type="button" class="p-tab-btn active" id="btnTabProfileData" data-tab="tabProfileData" onclick="switchPassengerProfileTab('tabProfileData')">
           👤 Mis Datos
         </button>
-        <button type="button" class="p-tab-btn" data-tab="tabProfilePayments">
+        <button type="button" class="p-tab-btn" id="btnTabProfilePayments" data-tab="tabProfilePayments" onclick="switchPassengerProfileTab('tabProfilePayments')">
           💳 Pagos
         </button>
-        <button type="button" class="p-tab-btn" data-tab="tabProfileHistory">
+        <button type="button" class="p-tab-btn" id="btnTabProfileHistory" data-tab="tabProfileHistory" onclick="switchPassengerProfileTab('tabProfileHistory')">
           📜 Historial de Viajes
         </button>
       </div>

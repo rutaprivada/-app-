@@ -2325,7 +2325,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    btnToggleStatus.addEventListener('click', () => {
+    function handleDriverToggleStatus() {
         if (driverState.activeTrip) {
             alert('Tienes un viaje activo en curso. Debes finalizarlo antes de desconectarte.');
             return;
@@ -2378,7 +2378,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             setOnlineStatus(false);
         }
-    });
+    }
+    window.handleDriverToggleStatus = handleDriverToggleStatus;
+
+    if (btnToggleStatus) {
+        btnToggleStatus.addEventListener('click', handleDriverToggleStatus);
+    }
 
     // ==========================================
     // 7. RADAR, LISTA DE VIAJES DISPONIBLES Y VIAJE ENTRANTE
@@ -4740,17 +4745,24 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        function openDriverDocsModal() {
+            if (typeof closeDriverProfileModal === 'function') closeDriverProfileModal();
+            populateDocsForm();
+            if (modalDocsUpload) modalDocsUpload.classList.add('active');
+        }
+        window.openDriverDocsModal = openDriverDocsModal;
+
+        function closeDriverDocsModal() {
+            if (modalDocsUpload) modalDocsUpload.classList.remove('active');
+        }
+        window.closeDriverDocsModal = closeDriverDocsModal;
+
         if (btnOpenDocsUpload) {
-            btnOpenDocsUpload.addEventListener('click', () => {
-                populateDocsForm();
-                if (modalDocsUpload) modalDocsUpload.classList.add('active');
-            });
+            btnOpenDocsUpload.addEventListener('click', openDriverDocsModal);
         }
 
         if (btnCloseDocsUpload) {
-            btnCloseDocsUpload.addEventListener('click', () => {
-                if (modalDocsUpload) modalDocsUpload.classList.remove('active');
-            });
+            btnCloseDocsUpload.addEventListener('click', closeDriverDocsModal);
         }
 
         if (fileFotoPerfil) {
@@ -5424,10 +5436,12 @@ document.addEventListener('DOMContentLoaded', () => {
         modalDriverProfile.classList.add('active');
         playAlertSound('success');
     }
+    window.openDriverProfileModal = openDriverProfileModal;
 
     function closeDriverProfileModal() {
         if (modalDriverProfile) modalDriverProfile.classList.remove('active');
     }
+    window.closeDriverProfileModal = closeDriverProfileModal;
 
     // Modal de Ayuda y Soporte Conductor
     const btnOpenDriverHelp = document.getElementById('btnOpenDriverHelp');
@@ -5471,6 +5485,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modalDriverReportTicket) modalDriverReportTicket.classList.remove('active');
     }
     window.closeDriverTicketModal = closeDriverTicketModal;
+    window.closeDriverReportTicketModal = closeDriverTicketModal;
 
     window.toggleDriverHelpAccordion = function(headerEl) {
         if (!headerEl) return;

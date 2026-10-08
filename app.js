@@ -9596,25 +9596,41 @@ if (btnRecenterPassengerMap) {
     }
 
     // Pestañas del Modal de Perfil (Mis Datos | Medios de Pago | Historial de Viajes)
-    document.querySelectorAll('.p-tab-btn').forEach(tabBtn => {
-      tabBtn.addEventListener('click', () => {
-        document.querySelectorAll('.p-tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.p-tab-content').forEach(c => {
+    window.switchPassengerProfileTab = function(targetId) {
+      if (!targetId) return;
+      document.querySelectorAll('.p-tab-btn').forEach(b => {
+        if (b.getAttribute('data-tab') === targetId) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+
+      document.querySelectorAll('.p-tab-content').forEach(c => {
+        if (c.id === targetId) {
+          c.classList.remove('hidden');
+          c.classList.add('active');
+          c.style.display = 'block';
+        } else {
           c.classList.add('hidden');
           c.classList.remove('active');
-        });
-
-        tabBtn.classList.add('active');
-        const targetId = tabBtn.getAttribute('data-tab');
-        const targetContent = document.getElementById(targetId);
-        if (targetContent) {
-          targetContent.classList.remove('hidden');
-          targetContent.classList.add('active');
+          c.style.display = 'none';
         }
-        if (targetId === 'tabProfileHistory') {
-          renderPassengerHistoryUI();
-        } else if (targetId === 'tabProfilePayments') {
-          renderSavedCardsUI();
+      });
+
+      if (targetId === 'tabProfileHistory') {
+        try { renderPassengerHistoryUI(); } catch(e){}
+      } else if (targetId === 'tabProfilePayments') {
+        try { renderSavedCardsUI(); } catch(e){}
+      }
+    };
+
+    document.querySelectorAll('.p-tab-btn').forEach(tabBtn => {
+      tabBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const targetId = tabBtn.getAttribute('data-tab');
+        if (window.switchPassengerProfileTab) {
+          window.switchPassengerProfileTab(targetId);
         }
       });
     });

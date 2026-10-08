@@ -5521,6 +5521,18 @@ html, body {
   background: rgba(56, 189, 248, 0.08);
 }
 
+.p-tab-content {
+  display: none;
+}
+
+.p-tab-content.active {
+  display: block !important;
+}
+
+.p-tab-content.hidden {
+  display: none !important;
+}
+
 .passenger-profile-body {
   padding: 18px !important;
   max-height: 75vh;
