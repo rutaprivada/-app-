@@ -288,12 +288,32 @@ window.getPassengerSession = function() {
   try {
     const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
                 localStorage.getItem('rutaprivada_passenger_profile') || 
-                localStorage.getItem('rutaprivada_user_session');
+                localStorage.getItem('rutaprivada_user_session') ||
+                localStorage.getItem('rutaprivada_profile') ||
+                localStorage.getItem('rutaprivada_passenger') ||
+                localStorage.getItem('passenger_profile');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
     }
   } catch(e) {}
+
+  const pName = document.getElementById('profPassengerName')?.value?.trim() || document.getElementById('passenger-name-input')?.value?.trim() || document.getElementById('user-name')?.value?.trim() || '';
+  const pPhone = document.getElementById('profPassengerPhone')?.value?.trim() || document.getElementById('passenger-phone-input')?.value?.trim() || document.getElementById('user-phone')?.value?.trim() || '';
+  const pEmail = document.getElementById('profPassengerEmail')?.value?.trim() || document.getElementById('user-email')?.value?.trim() || '';
+
+  if (pName || pPhone || pEmail) {
+    return {
+      id: 'pass_' + Date.now(),
+      nombre: pName || 'Pasajero RutaPrivada',
+      telefono: pPhone,
+      email: pEmail,
+      rating: '5.00',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+      medioPago: 'efectivo'
+    };
+  }
+
   return null;
 };
 
@@ -317,12 +337,14 @@ window.switchPassengerAuthTab = function(tab) {
 };
 
 window.openPassengerProfileModal = function() {
-  const session = window.getPassengerSession();
-  if (!session || (!session.nombre && !session.email && !session.telefono)) {
-    // Si no hay sesión iniciada, abrir directamente la pestaña de INICIAR SESIÓN
-    window.openPassengerAuthModal('login');
-    return;
-  }
+  const session = window.getPassengerSession() || {
+    nombre: document.getElementById('user-name')?.value || document.getElementById('passenger-name-input')?.value || '',
+    telefono: document.getElementById('user-phone')?.value || document.getElementById('passenger-phone-input')?.value || '',
+    email: document.getElementById('user-email')?.value || '',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+    medioPago: 'efectivo'
+  };
+
   if (typeof renderPassengerProfileUI === 'function') renderPassengerProfileUI(session);
   if (typeof renderPassengerHistoryUI === 'function') renderPassengerHistoryUI();
   if (typeof renderSavedCardsUI === 'function') renderSavedCardsUI();
@@ -4838,6 +4860,23 @@ function getInstantLocalSuggestions(rawQuery) {
   return results;
 }
 
+// Helpers para limpieza de direcciones
+function cleanAddressQuery(str) {
+  if (!str) return '';
+  return str
+    .replace(/[^\w\s\u00C0-\u017F,\.\-\/]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function cleanAddressDisplay(str) {
+  if (!str) return '';
+  return str
+    .replace(/,?\s*(?:Argentina|Ciudad Autónoma de Buenos Aires|CABA|Comuna\s*\d+|Provincia de Buenos Aires)/gi, '')
+    .replace(/\s+,/g, ',')
+    .trim();
+}
+
 // Motor inteligente de geocodificación de alta precisión en paralelo
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
@@ -4866,9 +4905,9 @@ async function searchLocations(rawQuery, signal) {
   instant.forEach(addResult);
 
   const cleanQ = cleanAddressQuery(query);
-  const mapboxToken = (state.config && state.config.mapboxToken) || ['pk', 'eyJ1IjoicnVoYS1wcmk2ZWRhIiwiYSI6ImNtdGxwZXNscjAwY2EydGZ2dms5cXg3d28ifQ', '_YkMD-GgSIhtkpUcdo_pdg'].join('.');
+  const mapboxToken = (state.config && state.config.mapboxToken) || DEFAULT_CONFIG.mapboxToken || 'pk.eyJ1IjoicnVoYS1wcmk2ZWRhIiwiYSI6ImNtdGxwejNscjAwY2EydkZ2dms5cXg3d28ifQ._YkMD-GgSIhtkpUcdo_pdg';
   
-  const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?access_token=${mapboxToken}&country=ar&proximity=-58.3816,-34.6037&language=es&types=address,poi,neighborhood,locality,place&limit=6`;
+  const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?access_token=${encodeURIComponent(mapboxToken)}&country=ar&proximity=-58.3816,-34.6037&language=es&types=address,poi,neighborhood,locality,place&limit=6`;
   const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
   const nomQuery = isCorner ? `${cleanQ}, Buenos Aires` : `${cleanQ}, Buenos Aires, Argentina`;
   const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nomQuery)}&countrycodes=ar&limit=5&addressdetails=1`;
@@ -4877,7 +4916,7 @@ async function searchLocations(rawQuery, signal) {
     // Task A: Mapbox Geocoding API
     (async () => {
       try {
-        const res = await fetchWithTimeout(mapboxUrl, {}, 2000, signal);
+        const res = await fetchWithTimeout(mapboxUrl, {}, 2500, signal);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.features)) {
@@ -8690,12 +8729,35 @@ if (btnRecenterPassengerMap) {
       try {
         const raw = localStorage.getItem(STORAGE_KEY_SESSION) || 
                     localStorage.getItem(STORAGE_KEY_LEGACY) || 
-                    localStorage.getItem('rutaprivada_user_session');
+                    localStorage.getItem('rutaprivada_passenger_session_v1') ||
+                    localStorage.getItem('rutaprivada_passenger_profile') ||
+                    localStorage.getItem('rutaprivada_user_session') ||
+                    localStorage.getItem('rutaprivada_profile') ||
+                    localStorage.getItem('rutaprivada_passenger') ||
+                    localStorage.getItem('passenger_profile');
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
         }
       } catch(e) {}
+
+      // Fallback a inputs del DOM si el usuario ya los completó
+      const pName = document.getElementById('profPassengerName')?.value?.trim() || document.getElementById('passenger-name-input')?.value?.trim() || document.getElementById('user-name')?.value?.trim() || '';
+      const pPhone = document.getElementById('profPassengerPhone')?.value?.trim() || document.getElementById('passenger-phone-input')?.value?.trim() || document.getElementById('user-phone')?.value?.trim() || '';
+      const pEmail = document.getElementById('profPassengerEmail')?.value?.trim() || document.getElementById('user-email')?.value?.trim() || '';
+
+      if (pName || pPhone || pEmail) {
+        return {
+          id: 'pass_' + Date.now(),
+          nombre: pName || 'Pasajero RutaPrivada',
+          telefono: pPhone,
+          email: pEmail,
+          rating: '5.00',
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+          medioPago: 'efectivo'
+        };
+      }
+
       return null;
     }
     window.getPassengerSession = getPassengerSession;
@@ -8710,7 +8772,10 @@ if (btnRecenterPassengerMap) {
       try {
         localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(user));
         localStorage.setItem(STORAGE_KEY_LEGACY, JSON.stringify(user));
+        localStorage.setItem('rutaprivada_passenger_session_v1', JSON.stringify(user));
+        localStorage.setItem('rutaprivada_passenger_profile', JSON.stringify(user));
         localStorage.setItem('rutaprivada_user_session', JSON.stringify(user));
+        localStorage.setItem('rutaprivada_profile', JSON.stringify(user));
       } catch(e) {}
 
       saveRegisteredPassenger(user);
@@ -8774,7 +8839,7 @@ if (btnRecenterPassengerMap) {
 
     function renderPassengerProfileUI(user) {
       if (!user || (!user.nombre && !user.email && !user.telefono)) {
-        if (headerPassengerName) headerPassengerName.textContent = 'Iniciar Sesión';
+        if (headerPassengerName) headerPassengerName.textContent = 'Mi Perfil';
         return;
       }
 
@@ -8852,12 +8917,14 @@ if (btnRecenterPassengerMap) {
     window.closePassengerAuthModal = closePassengerAuthModal;
 
     function openPassengerProfileModal() {
-      const session = getPassengerSession();
-      // Si no tiene perfil registrado o sesión activa, abrir modal en INICIAR SESIÓN
-      if (!session || (!session.nombre && !session.email && !session.telefono)) {
-        openPassengerAuthModal('login');
-        return;
-      }
+      const session = getPassengerSession() || {
+        nombre: document.getElementById('user-name')?.value || document.getElementById('passenger-name-input')?.value || '',
+        telefono: document.getElementById('user-phone')?.value || document.getElementById('passenger-phone-input')?.value || '',
+        email: document.getElementById('user-email')?.value || '',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+        medioPago: 'efectivo'
+      };
+
       renderPassengerProfileUI(session);
       renderPassengerHistoryUI();
       renderSavedCardsUI();

@@ -6330,6 +6330,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const btnCloseDriverAuth = document.getElementById('btnCloseDriverAuth');
+    if (btnCloseDriverAuth) {
+        btnCloseDriverAuth.addEventListener('click', () => {
+            hideDriverAuthModal();
+        });
+    }
+
     if (btnOpenDriverProfile) btnOpenDriverProfile.addEventListener('click', openDriverProfileModal);
     if (btnCloseDriverProfile) btnCloseDriverProfile.addEventListener('click', closeDriverProfileModal);
     if (btnCerrarPerfilSheet) btnCerrarPerfilSheet.addEventListener('click', closeDriverProfileModal);
@@ -6346,15 +6353,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    if (modalDriverAuth) {
+        modalDriverAuth.addEventListener('click', (e) => {
+            if (e.target === modalDriverAuth) {
+                hideDriverAuthModal();
+            }
+        });
+    }
 
     // Verificación de autenticación al inicializar app de chofer
     const activeDriverSession = getDriverSession();
     if (activeDriverSession) {
         hideDriverAuthModal();
         renderDriverProfileInfo();
-    } else {
-        // Mostrar modal inicial de chofer
-        showDriverAuthModal('login');
     }
 
     // Escucha en tiempo real de Firestore para aprobación/rechazo instantáneo
