@@ -5357,40 +5357,12 @@ async function searchLocations(rawQuery, signal) {
                   (typeof DEFAULT_CONFIG !== 'undefined' && DEFAULT_CONFIG.mapboxToken) || 
                   atob('cGsuZXlKMWlqb2ljblYwWVMxd2NtbDJaV1JoSWl3aVlTSTZJbU50ZEd4d2VqTnNjakF3WTJFeWRrWjJkbXM1Y1hnM2QyOGlmUS5fWWtNRC1HZ1NJaHRrcFVjZG9fcGRn');
 
-  const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ + ', Argentina')}&countrycodes=ar&limit=6&addressdetails=1`;
+  const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?access_token=${encodeURIComponent(mbToken)}&country=ar&proximity=-58.3816,-34.6037&types=address,poi,neighborhood,locality,place&language=es&limit=7`;
+  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
+  const openMeteoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanQ)}&country=AR&language=es&count=6`;
 
   const fetchTasks = [
-    // Task 1: OpenStreetMap Nominatim Geocoder (Directo y de alta cobertura en Argentina)
-    (async () => {
-      try {
-        const res = await fetchWithTimeout(nominatimUrl, { headers: { 'Accept-Language': 'es' } }, 2500, signal);
-        if (res.ok) {
-          const nomData = await res.json();
-          if (Array.isArray(nomData)) {
-            nomData.forEach(item => {
-              if (item.lat && item.lon) {
-                const fullText = item.display_name || cleanQ;
-                const parts = fullText.split(',');
-                const mainName = parts.length > 0 ? parts.slice(0, 2).join(',') : cleanQ;
-                addResult({
-                  lat: String(item.lat),
-                  lon: String(item.lon),
-                  display_name: fullText,
-                  _isIntersection: false,
-                  _isPoi: item.type === 'aerodrome' || item.type === 'station',
-                  _poiBadge: item.type === 'aerodrome' ? 'Aeropuerto' : '',
-                  _icon: item.type === 'aerodrome' ? '✈️' : '📍',
-                  _mainTitle: mainName.trim(),
-                  _subTitle: fullText
-                }, true);
-              }
-            });
-          }
-        }
-      } catch(e) {}
-    })(),
-
-    // Task 2: Mapbox Geocoding (Líder en precisión para direcciones argentinas)
+    // Task 1: Mapbox Geocoding (Líder mundial en precisión para direcciones argentinas, CORS nativo)
     (async () => {
       try {
         const res = await fetchWithTimeout(mapboxUrl, {}, 2500, signal);
@@ -5420,7 +5392,7 @@ async function searchLocations(rawQuery, signal) {
       } catch(e) {}
     })(),
 
-    // Task 3: Photon OSM Geocoder (Respaldo ultrarrápido sin API key)
+    // Task 2: Photon OSM Geocoder (Respaldo ultrarrápido sin API key)
     (async () => {
       try {
         const res = await fetchWithTimeout(photonUrl, {}, 2200, signal);
@@ -5464,7 +5436,7 @@ async function searchLocations(rawQuery, signal) {
       } catch(e) {}
     })(),
 
-    // Task 4: Open-Meteo Geocoding (Respaldo para ciudades, localidades y municipios de Argentina)
+    // Task 3: Open-Meteo Geocoding (Respaldo para ciudades, localidades y municipios de Argentina)
     (async () => {
       try {
         const res = await fetchWithTimeout(openMeteoUrl, {}, 2200, signal);
@@ -8107,9 +8079,11 @@ if (btnRecenterPassengerMap) {
     const driverNameStr = (viaje.conductor && viaje.conductor.nombre) ? viaje.conductor.nombre : 'Daniel Pabon';
 
     if (pFinalFareTotal) pFinalFareTotal.textContent = '$' + finalFareNum.toLocaleString('es-AR');
+    if (pFinalPaymentMethod) pFinalPaymentMethod.textContent = paymentMethodStr;
     if (pFinalDriverName) pFinalDriverName.textContent = driverNameStr;
 
     // Poblar datos bancarios del chofer asignado para transferencia
+    const transferBox = document.getElementById('driverTransferInfoBox');
     const pTransferHolder = document.getElementById('pTransferHolder');
     const pTransferBank = document.getElementById('pTransferBank');
     const pTransferAlias = document.getElementById('pTransferAlias');
@@ -8128,10 +8102,6 @@ if (btnRecenterPassengerMap) {
     if (pTransferCbu) pTransferCbu.textContent = driverCbu;
     if (pTransferCbuRow) pTransferCbuRow.style.display = driverCbu ? 'flex' : 'none';
 
-    // Por defecto seleccionar efectivo o el método que el usuario tenga
-    const initialChoice = (paymentMethodStr.toLowerCase().includes('transfer')) ? 'transferencia' : 'efectivo';
-    selectCompletedPaymentType(initialChoice);
-
     setPassengerStarRating(5);
     document.querySelectorAll('#passengerComplimentsRow .compliment-tag').forEach(t => t.classList.remove('selected'));
     if (passengerRatingComment) passengerRatingComment.value = '';
@@ -8139,52 +8109,69 @@ if (btnRecenterPassengerMap) {
     modalPassengerTripCompleted.style.display = 'flex';
   }
 
-  window.selectCompletedPaymentType = function(type) {
+  window.selectCompletedPaymentMethod = function(method) {
     const btnCash = document.getElementById('btnPayChoiceCash');
-    const btnTrans = document.getElementById('btnPayChoiceTransfer');
-    const cashBox = document.getElementById('driverCashNoteBox');
-    const transBox = document.getElementById('driverTransferInfoBox');
+    const btnTransfer = document.getElementById('btnPayChoiceTransfer');
+    const cashNotice = document.getElementById('cashPaymentNoticeBox');
+    const transferBox = document.getElementById('driverTransferInfoBox');
 
-    if (type === 'transferencia') {
+    if (method === 'transferencia') {
       if (btnCash) {
-        btnCash.style.borderColor = 'rgba(255,255,255,0.15)';
-        btnCash.style.background = 'rgba(255,255,255,0.04)';
+        btnCash.style.background = 'rgba(30, 41, 59, 0.6)';
+        btnCash.style.border = '1.5px solid rgba(255, 255, 255, 0.12)';
         btnCash.style.color = '#94a3b8';
       }
-      if (btnTrans) {
-        btnTrans.style.borderColor = '#38bdf8';
-        btnTrans.style.background = 'rgba(56,189,248,0.25)';
-        btnTrans.style.color = '#fff';
+      if (btnTransfer) {
+        btnTransfer.style.background = 'rgba(56, 189, 248, 0.15)';
+        btnTransfer.style.border = '2px solid #38bdf8';
+        btnTransfer.style.color = '#fff';
       }
-      if (cashBox) cashBox.style.display = 'none';
-      if (transBox) transBox.style.display = 'block';
+      if (cashNotice) cashNotice.style.display = 'none';
+      if (transferBox) {
+        transferBox.style.display = 'block';
+        transferBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      if (typeof showToast === 'function') showToast('📲 Transfiere al Alias o CBU indicado abajo.');
     } else {
+      // Efectivo
       if (btnCash) {
-        btnCash.style.borderColor = '#10b981';
-        btnCash.style.background = 'rgba(16,185,129,0.25)';
+        btnCash.style.background = 'rgba(16, 185, 129, 0.15)';
+        btnCash.style.border = '2px solid #10b981';
         btnCash.style.color = '#fff';
       }
-      if (btnTrans) {
-        btnTrans.style.borderColor = 'rgba(56,189,248,0.3)';
-        btnTrans.style.background = 'rgba(56,189,248,0.06)';
-        btnTrans.style.color = '#38bdf8';
+      if (btnTransfer) {
+        btnTransfer.style.background = 'rgba(30, 41, 59, 0.6)';
+        btnTransfer.style.border = '1.5px solid rgba(255, 255, 255, 0.12)';
+        btnTransfer.style.color = '#94a3b8';
       }
-      if (cashBox) cashBox.style.display = 'block';
-      if (transBox) transBox.style.display = 'none';
+      if (cashNotice) cashNotice.style.display = 'block';
+      if (transferBox) transferBox.style.display = 'none';
+      if (typeof showToast === 'function') showToast('💵 Pago en Efectivo seleccionado.');
     }
   };
 
-  window.copyTextToClipboard = function(text, label = 'Dato') {
-    if (!text || text === '--') return;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => {
-        if (typeof showToast === 'function') showToast(`📋 ¡${label} copiado al portapapeles!`);
-      }).catch(() => {
-        fallbackCopy(text, label);
-      });
-    } else {
-      fallbackCopy(text, label);
+  window.notifyDriverTransferCompleted = function() {
+    const btn = document.getElementById('btnNotifyDriverTransferred');
+    if (btn) {
+      btn.innerHTML = '<span>⏳ Notificando al conductor...</span>';
+      btn.disabled = true;
     }
+    
+    if (window.RutaSync) {
+      window.RutaSync.emit('TRANSFERENCIA_ENVIADA_PASAJERO', {
+        timestamp: Date.now(),
+        mensaje: 'El pasajero confirmó que realizó la transferencia.'
+      });
+    }
+
+    setTimeout(() => {
+      if (btn) {
+        btn.innerHTML = '<span>✅ ¡Transferencia Informada al Chofer!</span>';
+        btn.style.background = '#10b981';
+      }
+      if (typeof showToast === 'function') showToast('🎉 ¡Aviso enviado al chofer! Verifica la acreditación.');
+      try { playPassengerTone('confirmed'); } catch(e){}
+    }, 600);
   };
 
   function fallbackCopy(text, label) {

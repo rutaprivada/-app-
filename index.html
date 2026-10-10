@@ -892,27 +892,34 @@
 
       <div class="modal-body trip-completed-body">
         <!-- Highlighted Final Amount to Pay -->
-        <!-- Highlighted Final Amount to Pay & Method Selector -->
         <div class="final-fare-box">
-          <span class="final-fare-label">TOTAL DEL TRASLADO</span>
+          <span class="final-fare-label">TOTAL A PAGAR AL CHOFER</span>
           <div class="final-fare-amount" id="pFinalFareTotal">$0</div>
-          
-          <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <button type="button" id="btnPayChoiceCash" onclick="window.selectCompletedPaymentType('efectivo')" style="padding: 10px 8px; border-radius: 10px; border: 1.5px solid #10b981; background: rgba(16,185,129,0.25); color: #fff; font-weight: 800; font-size: 0.82rem; cursor: pointer; transition: all 0.2s;">
-              💵 Pago en Efectivo
+        </div>
+
+        <!-- Selector Interactivo de Método de Pago al Finalizar -->
+        <div class="payment-selection-completed-wrap" style="margin: 14px 0 10px 0;">
+          <label style="font-size: 0.78rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">¿Cómo deseas abonar el viaje?</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <button type="button" id="btnPayChoiceCash" onclick="window.selectCompletedPaymentMethod('efectivo')" class="pay-choice-btn active" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 10px; background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; border-radius: 12px; cursor: pointer; color: #fff; transition: all 0.2s;">
+              <span style="font-size: 1.5rem;">💵</span>
+              <strong style="font-size: 0.85rem;">En Efectivo</strong>
+              <small style="color: #34d399; font-size: 0.7rem;">Pago directo al chofer</small>
             </button>
-            <button type="button" id="btnPayChoiceTransfer" onclick="window.selectCompletedPaymentType('transferencia')" style="padding: 10px 8px; border-radius: 10px; border: 1.5px solid rgba(56,189,248,0.4); background: rgba(56,189,248,0.08); color: #38bdf8; font-weight: 800; font-size: 0.82rem; cursor: pointer; transition: all 0.2s;">
-              📲 Transferencia (0%)
+            <button type="button" id="btnPayChoiceTransfer" onclick="window.selectCompletedPaymentMethod('transferencia')" class="pay-choice-btn" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 10px; background: rgba(30, 41, 59, 0.6); border: 1.5px solid rgba(255, 255, 255, 0.12); border-radius: 12px; cursor: pointer; color: #94a3b8; transition: all 0.2s;">
+              <span style="font-size: 1.5rem;">📲</span>
+              <strong style="font-size: 0.85rem; color: #fff;">Transferencia</strong>
+              <small style="color: #38bdf8; font-size: 0.7rem;">Ver Alias / CBU</small>
             </button>
           </div>
         </div>
 
-        <!-- Opción A: Pago en Efectivo -->
-        <div id="driverCashNoteBox" style="display: block; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 12px; margin: 12px 0; text-align: center;">
-          <p style="margin: 0; color: #34d399; font-size: 0.84rem; font-weight: 600;">💵 Por favor abona el importe en efectivo directamente al chofer al finalizar el viaje.</p>
+        <!-- Mensaje de Pago en Efectivo (Visible por defecto) -->
+        <div id="cashPaymentNoticeBox" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 12px 14px; margin: 10px 0; text-align: center;">
+          <span style="font-size: 0.85rem; color: #34d399; font-weight: 700;">💵 Entrega el monto acordado en efectivo al conductor antes de descender.</span>
         </div>
 
-        <!-- Opción B: Tarjeta de Transferencia Bancaria Inmediata (0% Comisión) -->
+        <!-- Tarjeta de Transferencia Bancaria Inmediata (Oculta por defecto, visible solo si elige Transferencia) -->
         <div id="driverTransferInfoBox" class="driver-transfer-info-box" style="display: none; background: rgba(15, 23, 42, 0.95); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 14px; padding: 14px; margin: 12px 0;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -949,6 +956,11 @@
               </div>
               <button type="button" onclick="window.copyTextToClipboard(document.getElementById('pTransferCbu').textContent, 'CBU')" style="background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">
                 📋 Copiar CBU
+              </button>
+            </div>
+            <div style="margin-top: 6px;">
+              <button type="button" id="btnNotifyDriverTransferred" onclick="window.notifyDriverTransferCompleted()" style="width: 100%; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; border: none; padding: 9px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span>✅ Ya transferí / Notificar al Conductor</span>
               </button>
             </div>
           </div>
