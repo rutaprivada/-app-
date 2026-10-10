@@ -67,7 +67,8 @@ body.driver-body {
     border-bottom: 1px solid var(--bg-card-border);
     position: sticky;
     top: 0;
-    z-index: 50;
+    z-index: 1000;
+    pointer-events: auto;
 }
 
 .driver-profile-info {
