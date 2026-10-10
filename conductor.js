@@ -55,16 +55,15 @@ window.closeDriverHelpModal = function() {
 };
 
 window.openDriverDocsModal = function() {
-    const modal = document.getElementById('modalDocsUpload') || document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
+    const modal = document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
     if (modal) {
-        if (typeof window.populateDocsForm === 'function') window.populateDocsForm();
         modal.classList.add('active');
         modal.style.display = 'flex';
     }
 };
 
 window.closeDriverDocsModal = function() {
-    const modal = document.getElementById('modalDocsUpload') || document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
+    const modal = document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
     if (modal) {
         modal.classList.remove('active');
         modal.style.display = 'none';
@@ -110,7 +109,7 @@ window.handleDriverToggleStatus = function() {
     } catch(e) {}
 };
 
-function startDriverApplication() {
+document.addEventListener('DOMContentLoaded', () => {
     const FIREBASE_CONFIG_CONDUCTOR = {
         apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
         authDomain: "rutaprivada-app.firebaseapp.com",
@@ -5028,15 +5027,6 @@ function startDriverApplication() {
             }
         });
 
-        const FIREBASE_CONFIG_CONDUCTOR = {
-            apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
-            authDomain: "rutaprivada-app.firebaseapp.com",
-            projectId: "rutaprivada-app",
-            storageBucket: "rutaprivada-app.firebasestorage.app",
-            messagingSenderId: "349256222860",
-            appId: "1:349256222860:web:6bdac96975582de57093a9",
-            measurementId: "G-EXXS3VHD14"
-        };
 
         async function uploadToFirebaseStorageIfPossible(docId, docKey, fileOrDataUrl, isPdf = false) {
             if (typeof firebase === 'undefined' || !firebase.storage) return null;
@@ -5646,19 +5636,14 @@ function startDriverApplication() {
         if (!modalDriverProfile) return;
         renderDriverProfileInfo();
         modalDriverProfile.classList.add('active');
-        modalDriverProfile.style.display = 'flex';
         playAlertSound('success');
     }
     window.openDriverProfileModal = openDriverProfileModal;
 
     function closeDriverProfileModal() {
-        if (modalDriverProfile) {
-            modalDriverProfile.classList.remove('active');
-            modalDriverProfile.style.display = 'none';
-        }
+        if (modalDriverProfile) modalDriverProfile.classList.remove('active');
     }
     window.closeDriverProfileModal = closeDriverProfileModal;
-
     // =========================================================
     // SISTEMA DE AUTENTICACIÓN Y SESIÓN PRIVADA DE CHOFER
     // (Autenticación real estricta, Hash seguro de contraseñas y Verificación de Email)
@@ -7927,12 +7912,5 @@ function startDriverApplication() {
                 .catch(() => {});
         });
     }
-}
-
-// Inicializar inmediatamente o al cargar el DOM
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startDriverApplication);
-} else {
-    startDriverApplication();
-}
+});
 

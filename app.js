@@ -9289,6 +9289,7 @@ if (btnRecenterPassengerMap) {
       if (!user.medioPago) user.medioPago = 'efectivo';
       
       try {
+        localStorage.removeItem('rutaprivada_passenger_logged_out');
         localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(user));
         localStorage.setItem(STORAGE_KEY_LEGACY, JSON.stringify(user));
         localStorage.setItem('rutaprivada_passenger_session_v1', JSON.stringify(user));
