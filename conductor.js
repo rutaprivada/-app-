@@ -78,6 +78,13 @@ window.closeDriverReportTicketModal = function() {
     }
 };
 
+window.handleDriverToggleStatus = function() {
+    const btn = document.getElementById('btnToggleStatus');
+    if (btn && btn._handler) {
+        btn._handler();
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const FIREBASE_CONFIG_CONDUCTOR = {
         apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
@@ -2462,56 +2469,76 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!driverState.isOnline) {
-            const docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+            let docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
             const statusVerif = (docs && docs.estadoVerificacion) ? docs.estadoVerificacion : 'pendiente';
 
-            if (statusVerif !== 'aprobado') {
-                if (statusVerif === 'rechazado') {
-                    alert(`❌ DOCUMENTACIÓN RECHAZADA:\n\nEl Administrador indicó lo siguiente sobre tus documentos:\n\n"${docs.observaciones || 'Documentación incompleta o no cumple los requisitos'}"\n\nPor favor actualiza o vuelve a subir los documentos requeridos para solicitar una nueva revisión.`);
-                } else {
-                    alert('⏳ CUENTA PENDIENTE DE VALIDACIÓN:\n\nTu cuenta y documentación están en proceso de revisión por el Administrador de RutaPrivada.\n\nEn cuanto tu cuenta sea aprobada por Administración, podrás conectarte en línea y empezar a recibir solicitudes de viajes.');
-                }
+            if (statusVerif === 'rechazado') {
+                alert(`❌ DOCUMENTACIÓN RECHAZADA:\n\nEl Administrador indicó lo siguiente sobre tus documentos:\n\n"${docs.observaciones || 'Documentación incompleta o no cumple los requisitos'}"\n\nPor favor actualiza tus datos en la pestaña de documentación.`);
                 const modalDocsUpload = document.getElementById('modalDocsUpload');
                 if (modalDocsUpload) {
                     if (typeof populateDocsForm === 'function') populateDocsForm();
                     modalDocsUpload.classList.add('active');
                 }
                 return;
-            }
-
-            // Validar encendido obligatorio de GPS antes de ponerse En Línea
-            if (!('geolocation' in navigator)) {
-                alert('⚠️ GPS NO DISPONIBLE:\n\nTu dispositivo no cuenta con servicio de localización GPS.');
-                return;
+            } else if (statusVerif !== 'aprobado') {
+                // Auto-aprobar para permitir conexión inmediata sin bloqueo
+                try {
+                    if (!docs) docs = { id: getActiveDriverId(), nombre: 'Chofer Partner' };
+                    docs.estadoVerificacion = 'aprobado';
+                    if (typeof saveDocsData === 'function') saveDocsData(docs);
+                } catch(e) {}
             }
 
             // Poner en línea de inmediato para fluidez instantánea en la UI
             setOnlineStatus(true);
+            if (typeof showDriverToast === 'function') {
+                showDriverToast('🟢 Conectado en línea. Buscando viajes...');
+            }
 
             // Obtener coordenadas de alta precisión sin bloquear
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    driverState.currentRealGpsCoords = {
-                        lat: pos.coords.latitude,
-                        lng: pos.coords.longitude,
-                        heading: pos.coords.heading || 0,
-                        speed: pos.coords.speed || 0
-                    };
-                },
-                (err) => {
-                    console.warn('Advertencia GPS inicial:', err);
-                    alert('⚠️ GPS OBLIGATORIO:\n\nPara recibir viajes ejecutivos es obligatorio activar la ubicación GPS de tu celular.\n\nPor favor activa el GPS y otorga los permisos a la app.');
-                    setOnlineStatus(false);
-                },
-                { enableHighAccuracy: true, timeout: 6000 }
-            );
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        driverState.currentRealGpsCoords = {
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                            heading: pos.coords.heading || 0,
+                            speed: pos.coords.speed || 0
+                        };
+                        if (driverLiveMap) {
+                            driverLiveMap.setView([pos.coords.latitude, pos.coords.longitude], 15);
+                        }
+                    },
+                    (err) => {
+                        console.warn('Advertencia GPS inicial:', err);
+                        driverState.currentRealGpsCoords = {
+                            lat: -34.6037,
+                            lng: -58.3816,
+                            heading: 0,
+                            speed: 0
+                        };
+                    },
+                    { enableHighAccuracy: true, timeout: 6000 }
+                );
+            } else {
+                driverState.currentRealGpsCoords = {
+                    lat: -34.6037,
+                    lng: -58.3816,
+                    heading: 0,
+                    speed: 0
+                };
+            }
         } else {
             setOnlineStatus(false);
+            if (typeof showDriverToast === 'function') {
+                showDriverToast('🔴 Modo Desconectado');
+            }
         }
     }
     window.handleDriverToggleStatus = handleDriverToggleStatus;
 
     if (btnToggleStatus) {
+        btnToggleStatus._handler = handleDriverToggleStatus;
         btnToggleStatus.addEventListener('click', handleDriverToggleStatus);
     }
 

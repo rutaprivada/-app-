@@ -1260,12 +1260,12 @@
                   <span id="profileModalAvatarPlaceholder" style="font-size: 2.2rem; color: #94a3b8;">👤</span>
                 </div>
                 <div>
-                  <input type="file" id="passengerPhotoFileInput" accept="image/*" class="hidden" />
+                  <input type="file" id="passengerPhotoFileInput" accept="image/*" class="hidden" onchange="window.handlePassengerPhotoChange(event)" />
                   <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-secondary" id="btnTriggerPhotoUpload" style="font-size: 0.78rem; padding: 6px 12px; border-radius: 8px; background: rgba(56,189,248,0.15); color: #38bdf8; border-color: rgba(56,189,248,0.4);">
+                    <button type="button" class="btn btn-secondary" id="btnTriggerPhotoUpload" onclick="document.getElementById('passengerPhotoFileInput')?.click()" style="font-size: 0.78rem; padding: 6px 12px; border-radius: 8px; background: rgba(56,189,248,0.15); color: #38bdf8; border-color: rgba(56,189,248,0.4); cursor: pointer;">
                       📷 Subir Foto desde Celular
                     </button>
-                    <button type="button" class="btn btn-secondary hidden" id="btnRemoveProfilePhoto" style="font-size: 0.78rem; padding: 6px 10px; border-radius: 8px; background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">
+                    <button type="button" class="btn btn-secondary hidden" id="btnRemoveProfilePhoto" onclick="window.removeProfilePhotoHandler()" style="font-size: 0.78rem; padding: 6px 10px; border-radius: 8px; background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3); cursor: pointer;">
                       ✕ Quitar Foto
                     </button>
                   </div>
@@ -1293,7 +1293,7 @@
               <button type="submit" class="btn btn-primary" style="flex: 1; padding: 11px; font-size: 0.88rem; font-weight: 700; border-radius: 10px;">
                 💾 Guardar Mi Perfil
               </button>
-              <button type="button" id="btnLogoutPassenger" onclick="handlePassengerLogout()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; font-size: 0.8rem; font-weight: 700; padding: 10px 14px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: all 0.2s;" title="Cerrar sesión actual para ingresar con otra cuenta">
+              <button type="button" id="btnLogoutPassenger" onclick="window.handlePassengerLogout()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; font-size: 0.8rem; font-weight: 700; padding: 10px 14px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: all 0.2s;" title="Cerrar sesión actual para ingresar con otra cuenta">
                 <i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión
               </button>
             </div>
@@ -1305,7 +1305,7 @@
           <div class="payment-methods-wrapper">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
               <h4 style="color: #f8fafc; font-size: 0.95rem; margin: 0;">Tus Medios de Pago</h4>
-              <button type="button" class="btn btn-secondary" id="btnToggleAddCard" style="font-size: 0.75rem; padding: 5px 10px; border-radius: 8px; color: #38bdf8; border-color: rgba(56,189,248,0.4);">
+              <button type="button" class="btn btn-secondary" id="btnToggleAddCard" onclick="window.toggleAddCardForm()" style="font-size: 0.75rem; padding: 5px 10px; border-radius: 8px; color: #38bdf8; border-color: rgba(56,189,248,0.4); cursor: pointer;">
                 ➕ Vincular Tarjeta
               </button>
             </div>
@@ -1330,7 +1330,7 @@
             <div id="addCardFormWrap" class="add-card-form-wrap hidden" style="background: rgba(15,23,42,0.95); padding: 14px; border-radius: 12px; border: 1.5px solid rgba(56,189,248,0.3); margin-top: 10px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h5 style="color:#38bdf8; margin: 0; font-size: 0.9rem;">💳 Vincular Nueva Tarjeta</h5>
-                <button type="button" id="btnCancelAddCard" style="background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer;">✕</button>
+                <button type="button" id="btnCancelAddCard" onclick="window.toggleAddCardForm()" style="background: none; border: none; color: #94a3b8; font-size: 1rem; cursor: pointer;">✕</button>
               </div>
               <div style="display:grid; gap:10px;">
                 <input type="text" id="cardHolderName" placeholder="Nombre del Titular (como figura en la tarjeta)" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
@@ -1339,7 +1339,7 @@
                   <input type="text" id="cardExpiry" placeholder="Vencimiento (MM/AA)" maxlength="5" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
                   <input type="password" id="cardCvc" placeholder="CVC / Código" maxlength="4" style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px 10px; border-radius:8px;" />
                 </div>
-                <button type="button" class="btn btn-primary" id="btnSaveCard" style="margin-top: 4px;">Guardar Tarjeta</button>
+                <button type="button" class="btn btn-primary" id="btnSaveCard" onclick="window.saveCardHandler()" style="margin-top: 4px; cursor: pointer;">Guardar Tarjeta</button>
               </div>
             </div>
           </div>

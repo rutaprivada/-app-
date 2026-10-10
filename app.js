@@ -12,6 +12,16 @@
 // ==========================================
 // 0. EARLY GLOBAL HELPERS (AUTH & UI)
 // ==========================================
+window.escapeHtml = function(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
 window.togglePasswordVisibility = function(inputId, btn) {
   try {
     const input = document.getElementById(inputId);
@@ -129,42 +139,282 @@ window.openPassengerAuthModal = function(defaultTab = 'login') {
   }
 };
 
-window.loadPassengerProfileIntoForm = function() {
-  let session = null;
+// Medios de pago / Gestión de Tarjetas
+window.loadSavedCards = function() {
   try {
-    const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
-                localStorage.getItem('rutaprivada_passenger_session') || 
-                localStorage.getItem('rutaprivada_passenger_profile') || 
-                localStorage.getItem('rutaprivada_user_session');
-    if (raw) session = JSON.parse(raw);
-  } catch(e) {}
+    return JSON.parse(localStorage.getItem('rutaprivada_passenger_cards') || '[]');
+  } catch(e) {
+    return [];
+  }
+};
 
-  if (!session && window.state && (window.state.passengerName || window.state.passengerPhone || window.state.passengerEmail)) {
-    session = {
-      nombre: window.state.passengerName,
-      telefono: window.state.passengerPhone,
-      email: window.state.passengerEmail,
-      avatar: window.state.passengerAvatar
+window.saveCardsList = function(cards) {
+  try {
+    localStorage.setItem('rutaprivada_passenger_cards', JSON.stringify(cards));
+  } catch(e) {}
+};
+
+window.renderSavedCardsUI = function() {
+  const container = document.getElementById('savedCardsListContainer');
+  const cards = window.loadSavedCards();
+  const session = window.getPassengerSession() || {};
+  const activeMethod = session.medioPago || 'efectivo';
+
+  const payCash = document.getElementById('payMethodCash');
+  if (payCash) {
+    if (activeMethod === 'efectivo') {
+      payCash.classList.add('active');
+      const badge = payCash.querySelector('.pay-check-badge');
+      if (badge) badge.textContent = '✓ Activo';
+    } else {
+      payCash.classList.remove('active');
+      const badge = payCash.querySelector('.pay-check-badge');
+      if (badge) badge.textContent = 'Seleccionar';
+    }
+    payCash.onclick = () => {
+      const s = window.getPassengerSession() || {};
+      s.medioPago = 'efectivo';
+      if (typeof window.savePassengerSession === 'function') window.savePassengerSession(s);
+      window.renderSavedCardsUI();
+      if (typeof window.showToast === 'function') window.showToast('💵 Pago en Efectivo / Transferencia seleccionado.');
     };
   }
 
-  if (session) {
-    const profName = document.getElementById('profPassengerName');
-    const profPhone = document.getElementById('profPassengerPhone');
-    const profEmail = document.getElementById('profPassengerEmail');
-    const modalTitle = document.getElementById('profileModalNameTitle');
-    const headerName = document.getElementById('headerPassengerName');
-    const headerAvatar = document.getElementById('headerPassengerAvatar');
-    const modalHeaderImg = document.getElementById('profileModalHeaderAvatarImg');
-    const modalAvatarImg = document.getElementById('profileModalAvatarImg');
-    const avatarPlaceholder = document.getElementById('profileModalAvatarPlaceholder');
-    const btnRemovePhoto = document.getElementById('btnRemoveProfilePhoto');
+  if (!container) return;
 
-    if (profName && session.nombre) profName.value = session.nombre;
-    if (profPhone && session.telefono) profPhone.value = session.telefono;
-    if (profEmail && session.email) profEmail.value = session.email;
-    if (modalTitle && session.nombre) modalTitle.textContent = session.nombre;
-    if (headerName && session.nombre) headerName.textContent = session.nombre.split(' ')[0];
+  if (cards.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 14px; color: #94a3b8; font-size: 0.8rem; background: rgba(255,255,255,0.02); border-radius: 10px; border: 1px dashed rgba(255,255,255,0.12);">
+        No tienes tarjetas vinculadas. Toca <strong>➕ Vincular Tarjeta</strong> para agregar una de crédito o débito.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = cards.map((c, idx) => {
+    const isSelected = activeMethod === c.id;
+    const last4 = c.last4 || (c.number ? c.number.slice(-4) : '****');
+    const brand = c.brand || 'Tarjeta';
+    const holder = c.holder || c.titular || 'Titular';
+    const expiry = c.expiry || c.vencimiento || '--/--';
+    return `
+      <div class="payment-option-card ${isSelected ? 'active' : ''}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: rgba(30, 41, 59, 0.75); border: 1.5px solid ${isSelected ? '#38bdf8' : 'rgba(255,255,255,0.12)'}; border-radius: 12px; margin-bottom: 6px;">
+        <div class="pay-option-left" style="display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1;" onclick="window.selectPassengerCard('${c.id}')">
+          <span class="pay-icon" style="font-size: 1.4rem;">💳</span>
+          <div>
+            <strong style="color: #fff; font-size: 0.88rem; display: block;">${window.escapeHtml(brand)} •••• ${window.escapeHtml(last4)}</strong>
+            <small style="color: #94a3b8; font-size: 0.75rem;">${window.escapeHtml(holder)} · Vence: ${window.escapeHtml(expiry)}</small>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="pay-check-badge" onclick="window.selectPassengerCard('${c.id}')" style="font-size: 0.75rem; font-weight: 700; color: ${isSelected ? '#38bdf8' : '#94a3b8'}; cursor: pointer;">
+            ${isSelected ? '✓ Activo' : 'Seleccionar'}
+          </span>
+          <button type="button" onclick="window.deletePassengerCard(${idx})" style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 0.85rem;" title="Eliminar tarjeta">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+window.selectPassengerCard = function(cardId) {
+  const session = window.getPassengerSession() || {};
+  session.medioPago = cardId;
+  if (typeof window.savePassengerSession === 'function') {
+    window.savePassengerSession(session);
+  }
+  window.renderSavedCardsUI();
+  if (typeof window.showToast === 'function') window.showToast('💳 Tarjeta seleccionada como método principal.');
+};
+
+window.deletePassengerCard = function(idx) {
+  if (!confirm('¿Deseas desvincular esta tarjeta?')) return;
+  const cards = window.loadSavedCards();
+  cards.splice(idx, 1);
+  window.saveCardsList(cards);
+  window.renderSavedCardsUI();
+  if (typeof window.showToast === 'function') window.showToast('Tarjeta eliminada correctamente.');
+};
+
+window.toggleAddCardForm = function() {
+  const wrap = document.getElementById('addCardFormWrap');
+  if (wrap) {
+    wrap.classList.toggle('hidden');
+    if (!wrap.classList.contains('hidden')) {
+      const firstInput = document.getElementById('cardHolderName');
+      if (firstInput) firstInput.focus();
+    }
+  }
+};
+
+window.saveCardHandler = function() {
+  const holderInput = document.getElementById('cardHolderName');
+  const numberInput = document.getElementById('cardNumber');
+  const expiryInput = document.getElementById('cardExpiry');
+  const cvcInput = document.getElementById('cardCvc');
+
+  const holder = (holderInput?.value || '').trim();
+  const rawNumber = (numberInput?.value || '').replace(/\D/g, '').trim();
+  const expiry = (expiryInput?.value || '').trim();
+  const cvc = (cvcInput?.value || '').trim();
+
+  if (!holder) {
+    if (typeof window.showToast === 'function') window.showToast('⚠️ Ingresa el nombre del titular como figura en la tarjeta.');
+    if (holderInput) holderInput.focus();
+    return;
+  }
+  if (rawNumber.length < 13 || rawNumber.length > 19) {
+    if (typeof window.showToast === 'function') window.showToast('⚠️ El número de tarjeta debe tener entre 13 y 19 dígitos.');
+    if (numberInput) numberInput.focus();
+    return;
+  }
+  if (!expiry || !expiry.includes('/') || expiry.length < 4) {
+    if (typeof window.showToast === 'function') window.showToast('⚠️ Ingresa el vencimiento en formato MM/AA.');
+    if (expiryInput) expiryInput.focus();
+    return;
+  }
+  if (!cvc || cvc.length < 3) {
+    if (typeof window.showToast === 'function') window.showToast('⚠️ Ingresa el código de seguridad CVC.');
+    if (cvcInput) cvcInput.focus();
+    return;
+  }
+
+  const cards = window.loadSavedCards();
+  const newCard = {
+    id: 'card_' + Date.now(),
+    holder: holder,
+    titular: holder,
+    number: '**** **** **** ' + rawNumber.slice(-4),
+    last4: rawNumber.slice(-4),
+    expiry: expiry,
+    vencimiento: expiry,
+    brand: rawNumber.startsWith('4') ? 'Visa' : (rawNumber.startsWith('5') ? 'Mastercard' : (rawNumber.startsWith('3') ? 'Amex' : 'Tarjeta')),
+    addedAt: Date.now()
+  };
+  cards.push(newCard);
+  window.saveCardsList(cards);
+
+  let session = window.getPassengerSession();
+  if (!session) {
+    session = {
+      id: 'pass_' + Date.now(),
+      nombre: holder,
+      telefono: '',
+      email: '',
+      medioPago: newCard.id
+    };
+  } else {
+    session.medioPago = newCard.id;
+  }
+  if (typeof window.savePassengerSession === 'function') {
+    window.savePassengerSession(session);
+  }
+
+  const wrap = document.getElementById('addCardFormWrap');
+  if (wrap) wrap.classList.add('hidden');
+  if (holderInput) holderInput.value = '';
+  if (numberInput) numberInput.value = '';
+  if (expiryInput) expiryInput.value = '';
+  if (cvcInput) cvcInput.value = '';
+
+  window.renderSavedCardsUI();
+  if (typeof window.showToast === 'function') window.showToast('✅ ¡Tarjeta vinculada exitosamente!');
+};
+
+// Subida de Foto de Perfil
+window.handlePassengerPhotoChange = function(e) {
+  const file = e && e.target && e.target.files ? e.target.files[0] : (document.getElementById('passengerPhotoFileInput')?.files?.[0]);
+  if (!file) return;
+
+  if (file.size > 5 * 1024 * 1024) {
+    if (typeof window.showToast === 'function') window.showToast('⚠️ La imagen no debe superar los 5MB.');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const base64 = event.target.result;
+    let session = window.getPassengerSession();
+    if (!session) {
+      session = {
+        id: 'pass_' + Date.now(),
+        nombre: document.getElementById('profPassengerName')?.value?.trim() || 'Pasajero',
+        telefono: document.getElementById('profPassengerPhone')?.value?.trim() || '',
+        email: document.getElementById('profPassengerEmail')?.value?.trim() || ''
+      };
+    }
+    session.avatar = base64;
+    if (typeof window.savePassengerSession === 'function') {
+      window.savePassengerSession(session);
+    }
+    
+    const modalAvatarImg = document.getElementById('profileModalAvatarImg');
+    const modalHeaderImg = document.getElementById('profileModalHeaderAvatarImg');
+    const headerAvatar = document.getElementById('headerPassengerAvatar');
+    const avatarPlaceholder = document.getElementById('profileModalAvatarPlaceholder');
+    const btnRemove = document.getElementById('btnRemoveProfilePhoto');
+
+    if (modalAvatarImg) { modalAvatarImg.src = base64; modalAvatarImg.style.display = 'block'; }
+    if (modalHeaderImg) { modalHeaderImg.src = base64; }
+    if (headerAvatar) { headerAvatar.src = base64; }
+    if (avatarPlaceholder) { avatarPlaceholder.style.display = 'none'; }
+    if (btnRemove) { btnRemove.classList.remove('hidden'); }
+
+    if (typeof window.showToast === 'function') window.showToast('📸 Foto de perfil guardada con éxito.');
+  };
+  reader.readAsDataURL(file);
+};
+
+window.removeProfilePhotoHandler = function() {
+  let session = window.getPassengerSession();
+  if (session) {
+    session.avatar = '';
+    if (typeof window.savePassengerSession === 'function') {
+      window.savePassengerSession(session);
+    }
+  }
+
+  const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+  const modalAvatarImg = document.getElementById('profileModalAvatarImg');
+  const modalHeaderImg = document.getElementById('profileModalHeaderAvatarImg');
+  const headerAvatar = document.getElementById('headerPassengerAvatar');
+  const avatarPlaceholder = document.getElementById('profileModalAvatarPlaceholder');
+  const btnRemove = document.getElementById('btnRemoveProfilePhoto');
+
+  if (modalAvatarImg) { modalAvatarImg.src = ''; modalAvatarImg.style.display = 'none'; }
+  if (modalHeaderImg) { modalHeaderImg.src = defaultAvatar; }
+  if (headerAvatar) { headerAvatar.src = defaultAvatar; }
+  if (avatarPlaceholder) avatarPlaceholder.style.display = 'block';
+  if (btnRemove) { btnRemove.classList.add('hidden'); }
+
+  const fileInput = document.getElementById('passengerPhotoFileInput');
+  if (fileInput) fileInput.value = '';
+
+  if (typeof window.showToast === 'function') window.showToast('Foto de perfil eliminada.');
+};
+
+window.loadPassengerProfileIntoForm = function() {
+  const session = window.getPassengerSession();
+
+  const profName = document.getElementById('profPassengerName');
+  const profPhone = document.getElementById('profPassengerPhone');
+  const profEmail = document.getElementById('profPassengerEmail');
+  const modalTitle = document.getElementById('profileModalNameTitle');
+  const headerName = document.getElementById('headerPassengerName');
+  const headerAvatar = document.getElementById('headerPassengerAvatar');
+  const modalHeaderImg = document.getElementById('profileModalHeaderAvatarImg');
+  const modalAvatarImg = document.getElementById('profileModalAvatarImg');
+  const avatarPlaceholder = document.getElementById('profileModalAvatarPlaceholder');
+  const btnRemovePhoto = document.getElementById('btnRemoveProfilePhoto');
+
+  if (session) {
+    if (profName) profName.value = session.nombre || '';
+    if (profPhone) profPhone.value = session.telefono || '';
+    if (profEmail) profEmail.value = session.email || '';
+    if (modalTitle) modalTitle.textContent = session.nombre || 'Mi Perfil de Pasajero';
+    if (headerName) headerName.textContent = session.nombre ? session.nombre.split(' ')[0] : 'Mi Perfil';
     
     if (session.avatar && session.avatar.length > 10) {
       if (headerAvatar) headerAvatar.src = session.avatar;
@@ -175,16 +425,44 @@ window.loadPassengerProfileIntoForm = function() {
       }
       if (avatarPlaceholder) avatarPlaceholder.style.display = 'none';
       if (btnRemovePhoto) btnRemovePhoto.classList.remove('hidden');
+    } else {
+      const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+      if (headerAvatar) headerAvatar.src = defaultAvatar;
+      if (modalHeaderImg) modalHeaderImg.src = defaultAvatar;
+      if (modalAvatarImg) { modalAvatarImg.src = ''; modalAvatarImg.style.display = 'none'; }
+      if (avatarPlaceholder) avatarPlaceholder.style.display = 'block';
+      if (btnRemovePhoto) btnRemovePhoto.classList.add('hidden');
     }
+  } else {
+    if (profName) profName.value = '';
+    if (profPhone) profPhone.value = '';
+    if (profEmail) profEmail.value = '';
+    if (modalTitle) modalTitle.textContent = 'Mi Perfil de Pasajero';
+    if (headerName) headerName.textContent = 'Iniciar Sesión';
+    const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+    if (headerAvatar) headerAvatar.src = defaultAvatar;
+    if (modalHeaderImg) modalHeaderImg.src = defaultAvatar;
+    if (modalAvatarImg) { modalAvatarImg.src = ''; modalAvatarImg.style.display = 'none'; }
+    if (avatarPlaceholder) avatarPlaceholder.style.display = 'block';
+    if (btnRemovePhoto) btnRemovePhoto.classList.add('hidden');
   }
 };
 
 window.openPassengerProfileModal = function() {
+  const session = window.getPassengerSession();
+  if (!session) {
+    window.openPassengerAuthModal('login');
+    return;
+  }
+
+  window.loadPassengerProfileIntoForm();
+  window.renderSavedCardsUI();
+  if (typeof window.renderPassengerHistoryUI === 'function') {
+    try { window.renderPassengerHistoryUI(); } catch(e){}
+  }
+
   const modal = document.getElementById('modalPassengerProfile');
   if (modal) {
-    if (typeof window.loadPassengerProfileIntoForm === 'function') {
-      window.loadPassengerProfileIntoForm();
-    }
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
     window.switchPassengerProfileTab('tabProfileData');
@@ -231,9 +509,7 @@ window.switchPassengerProfileTab = function(targetId) {
       tabPayments.classList.remove('hidden');
       tabPayments.classList.add('active');
       tabPayments.style.display = 'block';
-      if (typeof window.renderSavedCardsUI === 'function') {
-        try { window.renderSavedCardsUI(); } catch(e){}
-      }
+      window.renderSavedCardsUI();
     } else {
       tabPayments.classList.add('hidden');
       tabPayments.classList.remove('active');
@@ -260,9 +536,15 @@ window.switchPassengerProfileTab = function(targetId) {
 window.handlePassengerLogout = function() {
   if (!confirm('¿Seguro que deseas cerrar tu sesión de pasajero en este dispositivo?')) return;
   try {
+    localStorage.setItem('rutaprivada_passenger_logged_out', 'true');
     localStorage.removeItem('rutaprivada_passenger_session_v1');
     localStorage.removeItem('rutaprivada_passenger_session');
     localStorage.removeItem('rutaprivada_passenger_profile');
+    localStorage.removeItem('rutaprivada_user_session');
+    localStorage.removeItem('rutaprivada_profile');
+    localStorage.removeItem('rutaprivada_passenger');
+    localStorage.removeItem('passenger_profile');
+    localStorage.removeItem('rutaprivada_pending_passenger_reg');
   } catch(e) {}
 
   const headerName = document.getElementById('headerPassengerName');
@@ -275,16 +557,23 @@ window.handlePassengerLogout = function() {
   const profPhone = document.getElementById('profPassengerPhone');
   const profEmail = document.getElementById('profPassengerEmail');
   const modalTitle = document.getElementById('profileModalNameTitle');
+  const inputName = document.getElementById('user-name') || document.getElementById('passenger-name-input');
+  const inputPhone = document.getElementById('user-phone') || document.getElementById('passenger-phone-input');
+  const inputEmail = document.getElementById('user-email');
 
+  const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
   if (headerName) headerName.textContent = 'Iniciar Sesión';
-  if (headerAvatar) headerAvatar.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
-  if (modalHeaderImg) modalHeaderImg.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+  if (headerAvatar) headerAvatar.src = defaultAvatar;
+  if (modalHeaderImg) modalHeaderImg.src = defaultAvatar;
   if (modalAvatarImg) { modalAvatarImg.src = ''; modalAvatarImg.style.display = 'none'; }
   if (avatarPlaceholder) avatarPlaceholder.style.display = 'block';
   if (btnRemovePhoto) btnRemovePhoto.classList.add('hidden');
   if (profName) profName.value = '';
   if (profPhone) profPhone.value = '';
   if (profEmail) profEmail.value = '';
+  if (inputName) inputName.value = '';
+  if (inputPhone) inputPhone.value = '';
+  if (inputEmail) inputEmail.value = '';
   if (modalTitle) modalTitle.textContent = 'Mi Perfil de Pasajero';
 
   if (window.state) {
@@ -5189,6 +5478,8 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
     list.classList.remove('hidden');
     list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.zIndex = '999999';
 
     items.slice(0, 8).forEach((place) => {
       const item = document.createElement('div');
@@ -5203,7 +5494,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       item.innerHTML = `
         <span style="font-size:1.15rem; flex-shrink:0; margin-top:2px;">${icon}</span>
         <div class="suggestion-content" style="flex: 1; min-width: 0; text-align: left;">
-          <span class="suggestion-title" style="display: block; font-weight: 700; color: #fff; font-size: 0.88rem; line-height: 1.3;">${escapeHtml(fullDisplay)}</span>
+          <span class="suggestion-title" style="display: block; font-weight: 700; color: #fff; font-size: 0.88rem; line-height: 1.3;">${window.escapeHtml(fullDisplay)}</span>
         </div>
       `;
 
@@ -5258,6 +5549,22 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     } catch (err) {}
   }
 
+  input.addEventListener('focus', () => {
+    const query = input.value.trim();
+    if (query.length >= 2) {
+      const instantItems = getInstantLocalSuggestions(query);
+      if (instantItems && instantItems.length > 0) {
+        renderList(instantItems, query);
+      }
+      executeSearch(query);
+    } else if (query.length === 0) {
+      const popular = getDefaultPopularDestinations();
+      if (popular && popular.length > 0) {
+        renderList(popular, '');
+      }
+    }
+  });
+
   input.addEventListener('input', () => {
     clearTimeout(debounceTimeout);
     const query = input.value.trim();
@@ -5270,6 +5577,13 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
     if (query.length < 2) {
       if (abortController) abortController.abort();
+      if (query.length === 0) {
+        const popular = getDefaultPopularDestinations();
+        if (popular && popular.length > 0) {
+          renderList(popular, '');
+          return;
+        }
+      }
       list.classList.add('hidden');
       list.style.display = 'none';
       return;
@@ -8814,6 +9128,9 @@ if (btnRecenterPassengerMap) {
 
     function getPassengerSession() {
       try {
+        if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') {
+          return null;
+        }
         const raw = localStorage.getItem(STORAGE_KEY_SESSION) || 
                     localStorage.getItem(STORAGE_KEY_LEGACY) || 
                     localStorage.getItem('rutaprivada_passenger_session_v1') ||
@@ -8828,29 +9145,15 @@ if (btnRecenterPassengerMap) {
         }
       } catch(e) {}
 
-      // Fallback a inputs del DOM si el usuario ya los completó
-      const pName = document.getElementById('profPassengerName')?.value?.trim() || document.getElementById('passenger-name-input')?.value?.trim() || document.getElementById('user-name')?.value?.trim() || '';
-      const pPhone = document.getElementById('profPassengerPhone')?.value?.trim() || document.getElementById('passenger-phone-input')?.value?.trim() || document.getElementById('user-phone')?.value?.trim() || '';
-      const pEmail = document.getElementById('profPassengerEmail')?.value?.trim() || document.getElementById('user-email')?.value?.trim() || '';
-
-      if (pName || pPhone || pEmail) {
-        return {
-          id: 'pass_' + Date.now(),
-          nombre: pName || 'Pasajero RutaPrivada',
-          telefono: pPhone,
-          email: pEmail,
-          rating: '5.00',
-          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-          medioPago: 'efectivo'
-        };
-      }
-
       return null;
     }
     window.getPassengerSession = getPassengerSession;
 
     function savePassengerSession(user) {
       if (!user) return;
+      try {
+        localStorage.removeItem('rutaprivada_passenger_logged_out');
+      } catch(e) {}
       if (!user.id) user.id = 'pass_' + Date.now();
       if (!user.rating) user.rating = '5.00';
       if (!user.avatar) user.avatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
@@ -9739,80 +10042,57 @@ if (btnRecenterPassengerMap) {
 
     // Logout Handler
     if (btnLogoutPassenger) {
-      btnLogoutPassenger.addEventListener('click', () => {
-        if (!confirm('¿Seguro que deseas cerrar tu sesión de pasajero en este dispositivo?')) return;
-        localStorage.removeItem(STORAGE_KEY_SESSION);
-        localStorage.removeItem(STORAGE_KEY_LEGACY);
-        
-        if (headerPassengerName) headerPassengerName.textContent = 'Iniciar Sesión';
-        if (headerPassengerAvatar) headerPassengerAvatar.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
-        if (profileModalHeaderAvatarImg) profileModalHeaderAvatarImg.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
-        if (profileModalAvatarImg) {
-          profileModalAvatarImg.src = '';
-          profileModalAvatarImg.style.display = 'none';
-        }
-        if (profileModalAvatarPlaceholder) profileModalAvatarPlaceholder.style.display = 'block';
-        if (btnRemoveProfilePhoto) btnRemoveProfilePhoto.classList.add('hidden');
-        if (profPassengerName) profPassengerName.value = '';
-        if (profPassengerPhone) profPassengerPhone.value = '';
-        if (profPassengerEmail) profPassengerEmail.value = '';
-        if (profileModalNameTitle) profileModalNameTitle.textContent = 'Mi Perfil de Pasajero';
-
-        if (window.state) {
-          window.state.passengerName = '';
-          window.state.passengerPhone = '';
-          window.state.passengerEmail = '';
-          window.state.passengerAvatar = '';
-        }
-
-        closePassengerProfileModal();
-        openPassengerAuthModal('login');
-        if (typeof showToast === 'function') showToast('🚪 Has cerrado sesión de pasajero correctamente.');
-      });
+      btnLogoutPassenger.onclick = (e) => {
+        e.preventDefault();
+        window.handlePassengerLogout();
+      };
     }
 
     // Inicializar helpers de medios de pago
-    try { initCardManagementHelpers(); } catch(e) {}
+    try { window.renderSavedCardsUI(); } catch(e) {}
 
     // Open Profile & Modals Listeners
     if (btnOpenPassengerProfile) {
-      btnOpenPassengerProfile.addEventListener('click', openPassengerProfileModal);
+      btnOpenPassengerProfile.addEventListener('click', () => window.openPassengerProfileModal());
     }
     const btnQuickOpenProfile = document.getElementById('btnQuickOpenProfile');
     if (btnQuickOpenProfile) {
-      btnQuickOpenProfile.addEventListener('click', openPassengerProfileModal);
+      btnQuickOpenProfile.addEventListener('click', () => window.openPassengerProfileModal());
     }
     if (btnClosePassengerProfile) {
-      btnClosePassengerProfile.addEventListener('click', closePassengerProfileModal);
+      btnClosePassengerProfile.addEventListener('click', () => window.closePassengerProfileModal());
     }
     if (btnClosePassengerAuthModal) {
-      btnClosePassengerAuthModal.addEventListener('click', closePassengerAuthModal);
+      btnClosePassengerAuthModal.addEventListener('click', () => window.closePassengerAuthModal());
     }
 
     // Click outside dismissals
     if (modalPassengerAuth) {
       modalPassengerAuth.addEventListener('click', (e) => {
-        if (e.target === modalPassengerAuth) closePassengerAuthModal();
+        if (e.target === modalPassengerAuth) window.closePassengerAuthModal();
       });
     }
     if (modalPassengerProfile) {
       modalPassengerProfile.addEventListener('click', (e) => {
-        if (e.target === modalPassengerProfile) closePassengerProfileModal();
+        if (e.target === modalPassengerProfile) window.closePassengerProfileModal();
       });
     }
     if (modalPassengerEmailVerify) {
       modalPassengerEmailVerify.addEventListener('click', (e) => {
         if (e.target === modalPassengerEmailVerify) {
           modalPassengerEmailVerify.classList.add('hidden');
-          openPassengerAuthModal('register');
+          window.openPassengerAuthModal('register');
         }
       });
     }
 
     // Cargar perfil en inicio si existe sesión activa
-    const currentSession = getPassengerSession();
+    const currentSession = window.getPassengerSession();
     if (currentSession) {
       renderPassengerProfileUI(currentSession);
+    } else {
+      const headerName = document.getElementById('headerPassengerName');
+      if (headerName) headerName.textContent = 'Iniciar Sesión';
     }
   }
 
