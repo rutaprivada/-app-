@@ -8082,11 +8082,56 @@ if (btnRecenterPassengerMap) {
     if (pFinalPaymentMethod) pFinalPaymentMethod.textContent = paymentMethodStr;
     if (pFinalDriverName) pFinalDriverName.textContent = driverNameStr;
 
+    // Poblar datos bancarios del chofer asignado para transferencia
+    const transferBox = document.getElementById('driverTransferInfoBox');
+    const pTransferHolder = document.getElementById('pTransferHolder');
+    const pTransferBank = document.getElementById('pTransferBank');
+    const pTransferAlias = document.getElementById('pTransferAlias');
+    const pTransferCbu = document.getElementById('pTransferCbu');
+    const pTransferCbuRow = document.getElementById('pTransferCbuRow');
+
+    const drv = viaje.conductor || {};
+    const driverAlias = drv.alias || 'rutaprivada.viajes.mp';
+    const driverCbu = drv.cbu || '0720123488000012345678';
+    const driverBank = drv.banco || 'Mercado Pago';
+    const driverHolder = drv.titularCuenta || drv.titular || drv.nombre || driverNameStr;
+
+    if (pTransferHolder) pTransferHolder.textContent = driverHolder;
+    if (pTransferBank) pTransferBank.textContent = driverBank;
+    if (pTransferAlias) pTransferAlias.textContent = driverAlias;
+    if (pTransferCbu) pTransferCbu.textContent = driverCbu;
+    if (pTransferCbuRow) pTransferCbuRow.style.display = driverCbu ? 'flex' : 'none';
+
     setPassengerStarRating(5);
     document.querySelectorAll('#passengerComplimentsRow .compliment-tag').forEach(t => t.classList.remove('selected'));
     if (passengerRatingComment) passengerRatingComment.value = '';
     modalPassengerTripCompleted.classList.remove('hidden');
     modalPassengerTripCompleted.style.display = 'flex';
+  }
+
+  window.copyTextToClipboard = function(text, label = 'Dato') {
+    if (!text || text === '--') return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        if (typeof showToast === 'function') showToast(`📋 ¡${label} copiado al portapapeles!`);
+      }).catch(() => {
+        fallbackCopy(text, label);
+      });
+    } else {
+      fallbackCopy(text, label);
+    }
+  };
+
+  function fallbackCopy(text, label) {
+    const input = document.createElement('textarea');
+    input.value = text;
+    document.body.appendChild(input);
+    input.select();
+    try {
+      document.execCommand('copy');
+      if (typeof showToast === 'function') showToast(`📋 ¡${label} copiado al portapapeles!`);
+    } catch(e) {}
+    document.body.removeChild(input);
   }
 
   function setPassengerStarRating(val) {

@@ -164,7 +164,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 email: docs.email || '',
                 fotoPerfil: docs.fotoPerfil || '',
                 categoria: docs.categoria || 'Sedán Estándar',
-                estadoVerificacion: docs.estadoVerificacion || 'pendiente'
+                estadoVerificacion: docs.estadoVerificacion || 'pendiente',
+                banco: docs.banco || '',
+                alias: docs.alias || '',
+                cbu: docs.cbu || '',
+                titularCuenta: docs.titularCuenta || docs.nombre || ''
             };
         }
 
@@ -178,7 +182,11 @@ document.addEventListener('DOMContentLoaded', () => {
             email: '',
             fotoPerfil: '',
             categoria: 'Sedán Estándar',
-            estadoVerificacion: 'pendiente'
+            estadoVerificacion: 'pendiente',
+            banco: '',
+            alias: '',
+            cbu: '',
+            titularCuenta: ''
         };
     }
 
@@ -2740,7 +2748,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 auto: driverState.info.auto,
                 patente: driverState.info.patente,
                 calificacion: driverState.info.calificacion,
-                telefono: driverState.info.telefono
+                telefono: driverState.info.telefono,
+                banco: driverState.info.banco || '',
+                alias: driverState.info.alias || '',
+                cbu: driverState.info.cbu || '',
+                titularCuenta: driverState.info.titularCuenta || driverState.info.nombre || ''
             }
         };
 
@@ -4684,6 +4696,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fileFotoPerfil = document.getElementById('fileFotoPerfil');
         const previewFotoPerfil = document.getElementById('previewFotoPerfil');
         const docInputBankName = document.getElementById('docInputBankName');
+        const docInputAlias = document.getElementById('docInputAlias');
         const docInputCbu = document.getElementById('docInputCbu');
         const docInputBankHolder = document.getElementById('docInputBankHolder');
         const btnTogglePipMode = document.getElementById('btnTogglePipMode');
@@ -4808,6 +4821,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (docInputBankName) docInputBankName.value = data.banco || '';
+            if (docInputAlias) docInputAlias.value = data.alias || '';
             if (docInputCbu) docInputCbu.value = data.cbu || '';
             if (docInputBankHolder) docInputBankHolder.value = data.titularCuenta || data.nombre || '';
 
@@ -5057,6 +5071,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 categoria: docSelectCategory ? docSelectCategory.value : current.categoria,
                 fotoPerfil: photoSrc,
                 banco: docInputBankName ? (docInputBankName.value.trim() || current.banco) : current.banco,
+                alias: docInputAlias ? (docInputAlias.value.trim() || current.alias || '') : (current.alias || ''),
                 cbu: docInputCbu ? (docInputCbu.value.trim() || current.cbu) : current.cbu,
                 titularCuenta: docInputBankHolder ? (docInputBankHolder.value.trim() || current.titularCuenta) : current.titularCuenta,
                 docsImages: mergedDocsImages,

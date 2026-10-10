@@ -99,18 +99,77 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Soporte para Notificaciones del Sistema y Pantalla de Bloqueo en Celulares
+// Soporte Integral para Notificaciones Push en Pantalla Bloqueada y Background
+self.addEventListener('push', (event) => {
+  let data = {
+    title: '🔔 Nueva Alerta - RutaPrivada',
+    body: 'Tienes una actualización importante de viaje.',
+    icon: './icon-192.png',
+    badge: './favicon.svg',
+    tag: 'rutaprivada-notification',
+    data: { url: './index.html' }
+  };
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    } catch (e) {
+      data.body = event.data.text() || data.body;
+    }
+  }
+
+  const isDriverAlert = data.tag && data.tag.includes('conductor');
+  const targetUrl = data.data?.url || (isDriverAlert ? './conductor.html' : './index.html');
+
+  const options = {
+    body: data.body,
+    icon: data.icon || (isDriverAlert ? './icon_chofer.png' : './icon_pasajero.png'),
+    badge: data.badge || './favicon.svg',
+    tag: data.tag || 'rutaprivada-trip',
+    renotify: true,
+    requireInteraction: true, // Se mantiene visible en la pantalla bloqueada hasta interacción
+    vibrate: [400, 150, 400, 150, 600, 200, 800], // Patrón de vibración de alta alerta
+    actions: data.actions || [
+      { action: 'open', title: '🚗 Abrir Solicitud' },
+      { action: 'dismiss', title: 'Cerrar' }
+    ],
+    data: {
+      url: targetUrl,
+      tripId: data.tripId || data.data?.tripId || null,
+      timestamp: Date.now()
+    }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Soporte para Clic en Notificaciones del Sistema y Pantalla de Bloqueo en Celulares
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const notifData = event.notification.data || {};
+  const targetUrl = notifData.url || './conductor.html';
+
+  if (event.action === 'dismiss') {
+    return;
+  }
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url.includes('agenda.html') && 'focus' in client) {
-          return client.focus();
+        if ((client.url.includes('conductor.html') && targetUrl.includes('conductor')) ||
+            (client.url.includes('index.html') && targetUrl.includes('index')) ||
+            (client.url.includes('agenda.html') && targetUrl.includes('agenda'))) {
+          if ('focus' in client) {
+            client.postMessage({ type: 'NOTIFICATION_CLICKED', data: notifData });
+            return client.focus();
+          }
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow('./agenda.html');
+        return clients.openWindow(targetUrl);
       }
     })
   );
