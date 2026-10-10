@@ -79,10 +79,34 @@ window.closeDriverReportTicketModal = function() {
 };
 
 window.handleDriverToggleStatus = function() {
+    if (typeof window._internalDriverToggleStatus === 'function') {
+        window._internalDriverToggleStatus();
+        return;
+    }
     const btn = document.getElementById('btnToggleStatus');
     if (btn && btn._handler) {
         btn._handler();
+        return;
     }
+    // Fallback directo e instantáneo si aún no se enlazó el handler interno
+    const isCurrentlyOnline = btn && btn.classList.contains('online');
+    const newStatus = !isCurrentlyOnline;
+    if (btn) {
+        btn.className = newStatus ? 'driver-status-toggle online' : 'driver-status-toggle offline';
+        const txt = btn.querySelector('#statusText') || document.getElementById('statusText');
+        const sub = btn.querySelector('#statusSubtext') || document.getElementById('statusSubtext');
+        if (txt) txt.textContent = newStatus ? 'ESTÁS EN LÍNEA' : 'ESTÁS DESCONECTADO';
+        if (sub) sub.textContent = newStatus ? 'Recibiendo viajes en tiempo real. Toca para pausar.' : 'Toca para conectarte y recibir viajes';
+    }
+    const dot = document.getElementById('headerStatusDot');
+    if (dot) dot.className = newStatus ? 'status-indicator online' : 'status-indicator';
+    const stateOff = document.getElementById('stateOffline');
+    const stateSearch = document.getElementById('stateSearching');
+    if (stateOff) stateOff.classList.toggle('active', !newStatus);
+    if (stateSearch) stateSearch.classList.toggle('active', newStatus);
+    try {
+        localStorage.setItem('rutaprivada_driver_is_online', newStatus ? 'true' : 'false');
+    } catch(e) {}
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -775,17 +799,17 @@ document.addEventListener('DOMContentLoaded', () => {
         let heroLabel = 'Total Acumulado Hoy';
 
         // Ocultar desgloses por defecto
-        cardDesgloseSemanal.classList.add('hidden');
-        cardDesgloseMensual.classList.add('hidden');
+        if (cardDesgloseSemanal) cardDesgloseSemanal.classList.add('hidden');
+        if (cardDesgloseMensual) cardDesgloseMensual.classList.add('hidden');
 
         if (period === 'custom' && driverState.customDate) {
             heroLabel = `Total del Día (${driverState.customDate})`;
             filteredTrips = allTrips.filter(t => t.fecha === driverState.customDate);
-            tripsListTitle.textContent = `Viajes del ${driverState.customDate}`;
+            if (tripsListTitle) tripsListTitle.textContent = `Viajes del ${driverState.customDate}`;
         } else if (period === 'dia') {
             heroLabel = 'Total Acumulado Hoy';
             filteredTrips = allTrips.filter(t => t.fecha === todayKey);
-            tripsListTitle.textContent = 'Viajes Completados Hoy';
+            if (tripsListTitle) tripsListTitle.textContent = 'Viajes Completados Hoy';
         } else if (period === 'semana') {
             heroLabel = 'Total Esta Semana';
             // Últimos 7 días
@@ -798,9 +822,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return tripDate >= sevenDaysAgo && tripDate <= now;
             });
 
-            cardDesgloseSemanal.classList.remove('hidden');
+            if (cardDesgloseSemanal) cardDesgloseSemanal.classList.remove('hidden');
             renderWeeklyBars(allTrips);
-            tripsListTitle.textContent = 'Viajes de la Semana';
+            if (tripsListTitle) tripsListTitle.textContent = 'Viajes de la Semana';
         } else if (period === 'mes') {
             heroLabel = 'Total Este Mes';
             const currentMonth = now.getMonth();
@@ -811,26 +835,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 return tripDate.getMonth() === currentMonth && tripDate.getFullYear() === currentYear;
             });
 
-            cardDesgloseMensual.classList.remove('hidden');
+            if (cardDesgloseMensual) cardDesgloseMensual.classList.remove('hidden');
             renderMonthlyBreakdown(filteredTrips);
-            tripsListTitle.textContent = 'Viajes de Este Mes';
+            if (tripsListTitle) tripsListTitle.textContent = 'Viajes de Este Mes';
         } else if (period === 'historial') {
             heroLabel = 'Total Histórico Acumulado';
             filteredTrips = allTrips;
-            tripsListTitle.textContent = 'Historial Completo de Viajes';
+            if (tripsListTitle) tripsListTitle.textContent = 'Historial Completo de Viajes';
         }
 
         totalAmount = filteredTrips.reduce((acc, t) => acc + (Number(t.monto) || 0), 0);
         totalCount = filteredTrips.length;
         avgAmount = totalCount > 0 ? Math.round(totalAmount / totalCount) : 0;
 
-        earningsHeroLabel.textContent = heroLabel;
-        earningsHeroAmount.textContent = '$' + totalAmount.toLocaleString('es-AR');
-        earningsHeroTrips.textContent = totalCount;
-        earningsHeroAvg.textContent = '$' + avgAmount.toLocaleString('es-AR');
+        if (earningsHeroLabel) earningsHeroLabel.textContent = heroLabel;
+        if (earningsHeroAmount) earningsHeroAmount.textContent = '$' + totalAmount.toLocaleString('es-AR');
+        if (earningsHeroTrips) earningsHeroTrips.textContent = totalCount;
+        if (earningsHeroAvg) earningsHeroAvg.textContent = '$' + avgAmount.toLocaleString('es-AR');
 
         const hoursOnlineNum = (driverState.onlineSeconds / 3600).toFixed(1);
-        earningsHeroHours.textContent = `${hoursOnlineNum}h`;
+        if (earningsHeroHours) earningsHeroHours.textContent = `${hoursOnlineNum}h`;
 
         renderTripsHistoryList(filteredTrips);
     }
@@ -1354,27 +1378,31 @@ document.addEventListener('DOMContentLoaded', () => {
             return (a.time || a.pickupTime || '').localeCompare(b.time || b.pickupTime || '');
         });
 
-        countDisponibles.textContent = disponibles.length;
-        countTomadas.textContent = tomadas.length;
+        if (countDisponibles) countDisponibles.textContent = disponibles.length;
+        if (countTomadas) countTomadas.textContent = tomadas.length;
 
         // Actualizar badge de navegación inferior
-        if (disponibles.length > 0) {
-            navBadgeReservas.textContent = disponibles.length;
-            navBadgeReservas.classList.add('show');
-        } else {
-            navBadgeReservas.classList.remove('show');
+        if (navBadgeReservas) {
+            if (disponibles.length > 0) {
+                navBadgeReservas.textContent = disponibles.length;
+                navBadgeReservas.classList.add('show');
+            } else {
+                navBadgeReservas.classList.remove('show');
+            }
         }
 
         const filtered = (filter === 'tomadas') ? tomadas : disponibles;
 
         if (filtered.length === 0) {
-            reservasContainer.innerHTML = `
-                <div class="empty-history" style="text-align: center; padding: 36px 20px; background: rgba(18, 24, 38, 0.6); border-radius: 14px; border: 1px dashed rgba(255,255,255,0.1);">
-                    <i class="fa-solid fa-calendar-check" style="font-size: 2.2rem; color: #64748b; margin-bottom: 12px; display: block;"></i>
-                    <h4 style="font-size: 1rem; margin-bottom: 6px; color: #e2e8f0;">No hay reservas ${filter === 'tomadas' ? 'agendadas en tu hoja de ruta' : 'disponibles por el momento'}</h4>
-                    <p style="font-size: 0.82rem; color: #94a3b8; line-height: 1.4;">Las reservas programadas a realizar se actualizarán automáticamente en tiempo real.</p>
-                </div>
-            `;
+            if (reservasContainer) {
+                reservasContainer.innerHTML = `
+                    <div class="empty-history" style="text-align: center; padding: 36px 20px; background: rgba(18, 24, 38, 0.6); border-radius: 14px; border: 1px dashed rgba(255,255,255,0.1);">
+                        <i class="fa-solid fa-calendar-check" style="font-size: 2.2rem; color: #64748b; margin-bottom: 12px; display: block;"></i>
+                        <h4 style="font-size: 1rem; margin-bottom: 6px; color: #e2e8f0;">No hay reservas ${filter === 'tomadas' ? 'agendadas en tu hoja de ruta' : 'disponibles por el momento'}</h4>
+                        <p style="font-size: 0.82rem; color: #94a3b8; line-height: 1.4;">Las reservas programadas a realizar se actualizarán automáticamente en tiempo real.</p>
+                    </div>
+                `;
+            }
             return;
         }
 
@@ -2382,19 +2410,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (online) {
-            btnToggleStatus.className = 'driver-status-toggle online';
-            headerStatusDot.className = 'status-indicator online';
-            statusText.textContent = 'ESTÁS EN LÍNEA';
-            statusSubtext.textContent = 'Recibiendo viajes en tiempo real. Toca para pausar.';
+            if (btnToggleStatus) btnToggleStatus.className = 'driver-status-toggle online';
+            if (headerStatusDot) headerStatusDot.className = 'status-indicator online';
+            if (statusText) statusText.textContent = 'ESTÁS EN LÍNEA';
+            if (statusSubtext) statusSubtext.textContent = 'Recibiendo viajes en tiempo real. Toca para pausar.';
 
-            stateOffline.classList.remove('active');
+            if (stateOffline) stateOffline.classList.remove('active');
             if (driverState.activeTrip) {
-                stateSearching.classList.remove('active');
-                stateActiveTrip.classList.add('active');
+                if (stateSearching) stateSearching.classList.remove('active');
+                if (stateActiveTrip) stateActiveTrip.classList.add('active');
                 toggleDriverStatusBar(false);
             } else {
-                stateActiveTrip.classList.remove('active');
-                stateSearching.classList.add('active');
+                if (stateActiveTrip) stateActiveTrip.classList.remove('active');
+                if (stateSearching) stateSearching.classList.add('active');
                 toggleDriverStatusBar(true);
             }
 
@@ -2409,7 +2437,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 driverState.onlineTimer = setInterval(() => {
                     driverState.onlineSeconds += 1;
                     const hrs = (driverState.onlineSeconds / 3600).toFixed(1);
-                    statHorasOnline.textContent = `${hrs}h`;
+                    if (statHorasOnline) statHorasOnline.textContent = `${hrs}h`;
                 }, 1000);
             }
 
@@ -2421,22 +2449,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 try { Notification.requestPermission(); } catch(e){}
             }
         } else {
-            btnToggleStatus.className = 'driver-status-toggle offline';
-            headerStatusDot.className = 'status-indicator';
-            statusText.textContent = 'ESTÁS DESCONECTADO';
-            statusSubtext.textContent = 'Toca para conectarte y recibir viajes';
+            if (btnToggleStatus) btnToggleStatus.className = 'driver-status-toggle offline';
+            if (headerStatusDot) headerStatusDot.className = 'status-indicator';
+            if (statusText) statusText.textContent = 'ESTÁS DESCONECTADO';
+            if (statusSubtext) statusSubtext.textContent = 'Toca para conectarte y recibir viajes';
 
             const quickWidget = document.getElementById('driverOnlineQuickWidget');
             if (quickWidget) quickWidget.style.display = 'none';
 
             if (driverState.activeTrip) {
-                stateSearching.classList.remove('active');
-                stateActiveTrip.classList.add('active');
+                if (stateSearching) stateSearching.classList.remove('active');
+                if (stateActiveTrip) stateActiveTrip.classList.add('active');
                 toggleDriverStatusBar(false);
             } else {
-                stateSearching.classList.remove('active');
-                stateActiveTrip.classList.remove('active');
-                stateOffline.classList.add('active');
+                if (stateSearching) stateSearching.classList.remove('active');
+                if (stateActiveTrip) stateActiveTrip.classList.remove('active');
+                if (stateOffline) stateOffline.classList.add('active');
                 toggleDriverStatusBar(true);
             }
 
@@ -2536,6 +2564,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     window.handleDriverToggleStatus = handleDriverToggleStatus;
+    window._internalDriverToggleStatus = handleDriverToggleStatus;
 
     if (btnToggleStatus) {
         btnToggleStatus._handler = handleDriverToggleStatus;

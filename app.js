@@ -561,8 +561,10 @@ window.handlePassengerLogout = function() {
   const inputPhone = document.getElementById('user-phone') || document.getElementById('passenger-phone-input');
   const inputEmail = document.getElementById('user-email');
 
-  const defaultAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80';
+  const defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="%2394a3b8"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
   if (headerName) headerName.textContent = 'Iniciar Sesión';
+  const headerSub = document.querySelector('.passenger-status-sub');
+  if (headerSub) headerSub.textContent = 'Toca para ingresar';
   if (headerAvatar) headerAvatar.src = defaultAvatar;
   if (modalHeaderImg) modalHeaderImg.src = defaultAvatar;
   if (modalAvatarImg) { modalAvatarImg.src = ''; modalAvatarImg.style.display = 'none'; }
@@ -739,6 +741,9 @@ let routePolyline = null;
 // ==========================================
 window.getPassengerSession = function() {
   try {
+    if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') {
+      return null;
+    }
     const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
                 localStorage.getItem('rutaprivada_passenger_profile') || 
                 localStorage.getItem('rutaprivada_user_session') ||
@@ -750,22 +755,6 @@ window.getPassengerSession = function() {
       if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
     }
   } catch(e) {}
-
-  const pName = document.getElementById('profPassengerName')?.value?.trim() || document.getElementById('passenger-name-input')?.value?.trim() || document.getElementById('user-name')?.value?.trim() || '';
-  const pPhone = document.getElementById('profPassengerPhone')?.value?.trim() || document.getElementById('passenger-phone-input')?.value?.trim() || document.getElementById('user-phone')?.value?.trim() || '';
-  const pEmail = document.getElementById('profPassengerEmail')?.value?.trim() || document.getElementById('user-email')?.value?.trim() || '';
-
-  if (pName || pPhone || pEmail) {
-    return {
-      id: 'pass_' + Date.now(),
-      nombre: pName || 'Pasajero RutaPrivada',
-      telefono: pPhone,
-      email: pEmail,
-      rating: '5.00',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      medioPago: 'efectivo'
-    };
-  }
 
   return null;
 };
@@ -790,13 +779,11 @@ window.switchPassengerAuthTab = function(tab) {
 };
 
 window.openPassengerProfileModal = function() {
-  const session = window.getPassengerSession() || {
-    nombre: document.getElementById('user-name')?.value || document.getElementById('passenger-name-input')?.value || '',
-    telefono: document.getElementById('user-phone')?.value || document.getElementById('passenger-phone-input')?.value || '',
-    email: document.getElementById('user-email')?.value || '',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-    medioPago: 'efectivo'
-  };
+  const session = window.getPassengerSession();
+  if (!session || (!session.nombre && !session.email)) {
+    window.openPassengerAuthModal('login');
+    return;
+  }
 
   if (typeof renderPassengerProfileUI === 'function') renderPassengerProfileUI(session);
   if (typeof renderPassengerHistoryUI === 'function') renderPassengerHistoryUI();
@@ -1201,6 +1188,9 @@ async function handleStep1Next() {
       state.origin = { lat: -34.6037, lng: -58.3816, address: originVal };
     }
     if (!state.destination || !state.destination.lat) {
+      state.destination = { lat: -34.8127, lng: -58.5372, address: destVal };
+    }
+    if (Math.abs(state.origin.lat - state.destination.lat) < 0.001 && Math.abs(state.origin.lng - state.destination.lng) < 0.001 && originVal.toLowerCase() !== destVal.toLowerCase()) {
       state.destination = { lat: -34.8127, lng: -58.5372, address: destVal };
     }
 
@@ -5330,7 +5320,7 @@ function cleanAddressDisplay(str) {
     .trim();
 }
 
-// Motor inteligente de geocodificación de alta precisión en paralelo (Nominatim OSM + Photon)
+// Motor inteligente de geocodificación de alta precisión en paralelo (Mapbox Places + Photon OSM + Open-Meteo)
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
   if (query.length < 2) return getDefaultPopularDestinations();
@@ -5343,7 +5333,7 @@ async function searchLocations(rawQuery, signal) {
     const latF = parseFloat(item.lat);
     const lonF = parseFloat(item.lon);
     if (isNaN(latF) || isNaN(lonF)) return;
-    const key = `${latF.toFixed(4)},${lonF.toFixed(4)}`;
+    const key = `${latF.toFixed(3)},${lonF.toFixed(3)}`;
     if (!seenCoords.has(key)) {
       seenCoords.add(key);
       if (prepend) {
@@ -5354,43 +5344,55 @@ async function searchLocations(rawQuery, signal) {
     }
   }
 
-  // 1. Puntos de interés locales conocidos (Aeropuertos, Shoppings, etc.)
+  // 1. Puntos de interés locales conocidos (Aeropuertos EZE/AEP, Shoppings, Hoteles, Barrios)
   try {
     const instant = getInstantLocalSuggestions(query);
-    instant.filter(it => it._isPoi).forEach(it => addResult(it, false));
+    if (Array.isArray(instant)) {
+      instant.forEach(it => addResult(it, false));
+    }
   } catch(e) {}
 
   const cleanQ = cleanAddressQuery(query);
-  const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ)}&countrycodes=ar&limit=7&addressdetails=1`;
+  const mbToken = (window.state && window.state.config && window.state.config.mapboxToken) || 
+                  (typeof DEFAULT_CONFIG !== 'undefined' && DEFAULT_CONFIG.mapboxToken) || 
+                  'pk.eyJ1IjoicnV0YXMxdXByaWZhZWRhIiwiaSI6ImNtdGxpweNscjAwY2EydkZ2dms5cXg3d28ifQ._YkMD-GgSIhtkpUcdo_pdg';
+
+  const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?access_token=${encodeURIComponent(mbToken)}&country=ar&proximity=-58.3816,-34.6037&types=address,poi,neighborhood,locality,place&language=es&limit=7`;
   const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
+  const openMeteoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanQ)}&country=AR&language=es&count=6`;
 
   const fetchTasks = [
-    // Task 1: OpenStreetMap Nominatim (Direcciones oficiales, calles y alturas exactas en Argentina)
+    // Task 1: Mapbox Geocoding (Líder mundial en precisión para direcciones argentinas, CORS nativo)
     (async () => {
       try {
-        const res = await fetchWithTimeout(nomUrl, {}, 2800, signal);
+        const res = await fetchWithTimeout(mapboxUrl, {}, 2500, signal);
         if (res.ok) {
-          const nomData = await res.json();
-          if (Array.isArray(nomData)) {
-            nomData.forEach(it => {
-              const fullDisp = it.display_name || cleanQ;
-              const parts = fullDisp.split(',').map(s => s.trim()).filter(Boolean);
-              const mainTitle = parts.length > 0 ? parts.slice(0, 2).join(', ') : fullDisp;
-              const subTitle = parts.length > 2 ? parts.slice(2).join(', ') : 'Argentina';
-
-              it._mainTitle = mainTitle;
-              it._subTitle = fullDisp;
-              it._icon = '📍';
-              it._isIntersection = false;
-              it._poiBadge = '';
-              addResult(it, true);
+          const mbData = await res.json();
+          if (mbData && Array.isArray(mbData.features)) {
+            mbData.features.forEach(f => {
+              if (f.geometry && Array.isArray(f.geometry.coordinates) && f.geometry.coordinates.length >= 2) {
+                const [lon, lat] = f.geometry.coordinates;
+                const fullText = f.place_name || cleanQ;
+                const mainName = f.text || fullText.split(',')[0];
+                addResult({
+                  lat: String(lat),
+                  lon: String(lon),
+                  display_name: fullText,
+                  _isIntersection: false,
+                  _isPoi: (f.place_type || []).includes('poi'),
+                  _poiBadge: (f.place_type || []).includes('poi') ? 'Lugar' : '',
+                  _icon: (f.place_type || []).includes('poi') ? '🏢' : '📍',
+                  _mainTitle: mainName,
+                  _subTitle: fullText
+                }, true);
+              }
             });
           }
         }
       } catch(e) {}
     })(),
 
-    // Task 2: Photon OSM Geocoder (Respaldo ultrarrápido)
+    // Task 2: Photon OSM Geocoder (Respaldo ultrarrápido sin API key)
     (async () => {
       try {
         const res = await fetchWithTimeout(photonUrl, {}, 2200, signal);
@@ -5426,6 +5428,35 @@ async function searchLocations(rawQuery, signal) {
                   _icon: '📍',
                   _mainTitle: mainTitle,
                   _subTitle: fullDisplay
+                }, false);
+              }
+            });
+          }
+        }
+      } catch(e) {}
+    })(),
+
+    // Task 3: Open-Meteo Geocoding (Respaldo para ciudades, localidades y municipios de Argentina)
+    (async () => {
+      try {
+        const res = await fetchWithTimeout(openMeteoUrl, {}, 2200, signal);
+        if (res.ok) {
+          const omData = await res.json();
+          if (omData && Array.isArray(omData.results)) {
+            omData.results.forEach(r => {
+              if (r.latitude && r.longitude) {
+                const parts = [r.name, r.admin2, r.admin1 || 'Buenos Aires', 'Argentina'].filter(Boolean);
+                const fullDisp = parts.join(', ');
+                addResult({
+                  lat: String(r.latitude),
+                  lon: String(r.longitude),
+                  display_name: fullDisp,
+                  _isIntersection: false,
+                  _isPoi: false,
+                  _poiBadge: 'Localidad',
+                  _icon: '📍',
+                  _mainTitle: r.name,
+                  _subTitle: fullDisp
                 }, false);
               }
             });
@@ -10088,11 +10119,17 @@ if (btnRecenterPassengerMap) {
 
     // Cargar perfil en inicio si existe sesión activa
     const currentSession = window.getPassengerSession();
-    if (currentSession) {
+    if (currentSession && (currentSession.nombre || currentSession.email)) {
       renderPassengerProfileUI(currentSession);
     } else {
       const headerName = document.getElementById('headerPassengerName');
       if (headerName) headerName.textContent = 'Iniciar Sesión';
+      const headerSub = document.querySelector('.passenger-status-sub');
+      if (headerSub) headerSub.textContent = 'Toca para ingresar';
+      const headerAvatar = document.getElementById('headerPassengerAvatar');
+      if (headerAvatar) {
+        headerAvatar.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="%2394a3b8"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+      }
     }
   }
 
