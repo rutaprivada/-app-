@@ -839,6 +839,82 @@ window.closePassengerReservationsModal = function() {
   }
 };
 
+window.openPassengerHelpModal = function() {
+  const modal = document.getElementById('modalPassengerHelp');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
+};
+
+window.closePassengerHelpModal = function() {
+  const modal = document.getElementById('modalPassengerHelp');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+};
+
+window.openPassengerTicketModal = function(preselectedCategory, defaultDescription) {
+  const modal = document.getElementById('modalPassengerReportTicket');
+  if (modal) {
+    const session = window.getPassengerSession ? window.getPassengerSession() : null;
+    const inputName = document.getElementById('ticketPassengerName');
+    const inputPhone = document.getElementById('ticketPassengerPhone');
+    const inputEmail = document.getElementById('ticketPassengerEmail');
+    const selectCat = document.getElementById('ticketPassengerCategory');
+    const inputTrip = document.getElementById('ticketPassengerTripId');
+    const inputDesc = document.getElementById('ticketPassengerDescription');
+
+    if (session) {
+      if (inputName && !inputName.value) inputName.value = session.nombre || '';
+      if (inputPhone && !inputPhone.value) inputPhone.value = session.telefono || '';
+      if (inputEmail && !inputEmail.value) inputEmail.value = session.email || '';
+    }
+
+    if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
+    if (inputDesc && defaultDescription && !inputDesc.value) inputDesc.value = defaultDescription;
+
+    const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+    if (inputTrip && activeTrip && !inputTrip.value) {
+      inputTrip.value = 'Viaje #' + (activeTrip.id || 'Activo');
+    }
+
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    if (inputDesc) setTimeout(() => inputDesc.focus(), 250);
+  }
+};
+
+window.closePassengerTicketModal = function() {
+  const modal = document.getElementById('modalPassengerReportTicket');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+};
+
+window.openPassengerTicketCategory = function(catKey) {
+  window.closePassengerHelpModal();
+  window.openPassengerTicketModal(catKey);
+};
+
+window.togglePassengerHelpAccordion = function(headerEl) {
+  if (!headerEl) return;
+  const card = headerEl.closest('.passenger-help-card');
+  if (!card) return;
+  const body = card.querySelector('.passenger-help-body');
+  const icon = headerEl.querySelector('.toggle-icon');
+
+  const isVisible = body && (body.style.display === 'block' || window.getComputedStyle(body).display === 'block');
+  if (body) {
+    body.style.display = isVisible ? 'none' : 'block';
+  }
+  if (icon) {
+    icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+  }
+};
+
 // ==========================================
 // 1.2 MULTI-STEP WIZARD CONTROLLER (PASO A PASO PASAJERO)
 // ==========================================
@@ -10408,6 +10484,154 @@ if (btnRecenterPassengerMap) {
   }
 
   // ==========================================
+  // MÓDULO DE AYUDA Y TICKETS DE RECLAMOS PASAJERO (24/7)
+  // ==========================================
+  function initPassengerHelpModule() {
+    const modalHelp = document.getElementById('modalPassengerHelp');
+    const modalTicket = document.getElementById('modalPassengerReportTicket');
+    const formTicket = document.getElementById('formPassengerReportTicket');
+    const btnSubmit = document.getElementById('btnSubmitPassengerTicket');
+    const txtBtn = document.getElementById('txtBtnSubmitPassengerTicket');
+
+    if (modalHelp) {
+      modalHelp.addEventListener('click', (e) => {
+        if (e.target === modalHelp) window.closePassengerHelpModal();
+      });
+    }
+
+    if (modalTicket) {
+      modalTicket.addEventListener('click', (e) => {
+        if (e.target === modalTicket) window.closePassengerTicketModal();
+      });
+    }
+
+    if (formTicket) {
+      formTicket.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const name = (document.getElementById('ticketPassengerName')?.value || '').trim();
+        const phone = (document.getElementById('ticketPassengerPhone')?.value || '').trim();
+        const email = (document.getElementById('ticketPassengerEmail')?.value || '').trim();
+        const catSelect = document.getElementById('ticketPassengerCategory');
+        const catText = catSelect ? catSelect.options[catSelect.selectedIndex]?.text || catSelect.value : 'Consulta General';
+        const tripId = (document.getElementById('ticketPassengerTripId')?.value || '').trim();
+        const description = (document.getElementById('ticketPassengerDescription')?.value || '').trim();
+
+        if (!name || !phone || !email || !description) {
+          if (typeof showToast === 'function') showToast('⚠️ Por favor completa tu nombre, teléfono, correo y descripción.');
+          return;
+        }
+
+        const ticketId = 'TCK-P-' + Date.now().toString().slice(-6);
+        const timeStr = new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+
+        if (btnSubmit) {
+          btnSubmit.disabled = true;
+          btnSubmit.style.opacity = '0.7';
+        }
+        if (txtBtn) {
+          txtBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando Reclamo...';
+        }
+
+        const payload = {
+          ticketId,
+          passengerName: name,
+          passengerPhone: phone,
+          passengerEmail: email,
+          category: catText,
+          tripId: tripId || 'N/A',
+          description,
+          role: 'pasajero',
+          status: 'pendiente',
+          createdAt: new Date().toISOString(),
+          timeStr
+        };
+
+        // 1. Guardar local
+        try {
+          const list = JSON.parse(localStorage.getItem('rutaprivada_passenger_tickets_v1') || '[]');
+          list.unshift(payload);
+          localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(list));
+        } catch(err) {}
+
+        // 2. Guardar en Firestore
+        try {
+          if (typeof firebase !== 'undefined' && firebase.firestore) {
+            await firebase.firestore().collection('tickets_soporte').doc(ticketId).set(payload);
+          }
+        } catch(err) {
+          console.warn('Firestore ticket err:', err);
+        }
+
+        // 3. Envío EmailJS
+        try {
+          const emailParams = {
+            service_id: 'service_rutaprivada',
+            template_id: 'template_y849ceg',
+            user_id: 'ai6WOsUzJaXx1st1E',
+            template_params: {
+              subject: `[Reclamo Pasajero #${ticketId}] ${catText} - ${name}`,
+              to_email: 'soporte@rutaprivada.com',
+              reply_to: email,
+              passenger_name: name,
+              passenger_phone: phone,
+              passenger_email: email,
+              ticket_id: ticketId,
+              category: catText,
+              trip_id: tripId || 'N/A',
+              message: description,
+              email: email,
+              passcode: `Ticket #${ticketId}`,
+              time: timeStr
+            }
+          };
+          await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(emailParams)
+          }).catch(() => {});
+        } catch(err) {}
+
+        // 4. Redirección directa al cliente de correo con datos pre-cargados
+        try {
+          const mailSubject = encodeURIComponent(`[Reclamo Pasajero #${ticketId}] ${catText} - ${name}`);
+          const mailBody = encodeURIComponent(`CENTRAL DE ASISTENCIA Y RECLAMOS RUTAPRIVADA\n\n` +
+            `==============================\n` +
+            `TICKET ID: #${ticketId}\n` +
+            `PASAJERO: ${name}\n` +
+            `TELÉFONO: ${phone}\n` +
+            `CORREO: ${email}\n` +
+            `CATEGORÍA: ${catText}\n` +
+            `VIAJE RELACIONADO: ${tripId || 'N/A'}\n` +
+            `FECHA Y HORA: ${timeStr}\n` +
+            `==============================\n\n` +
+            `DETALLE DEL RECLAMO / INCONVENIENTE:\n${description}\n\n` +
+            `---\n` +
+            `Enviado desde App Pasajero RutaPrivada (Soporte 24/7)`);
+          window.open(`mailto:soporte@rutaprivada.com?subject=${mailSubject}&body=${mailBody}`, '_blank');
+        } catch(e) {}
+
+        if (btnSubmit) {
+          btnSubmit.disabled = false;
+          btnSubmit.style.opacity = '1';
+        }
+        if (txtBtn) {
+          txtBtn.textContent = '🚀 Enviar Reclamo a Soporte';
+        }
+
+        window.closePassengerTicketModal();
+        formTicket.reset();
+
+        if (typeof showToast === 'function') {
+          showToast(`✅ Reclamo #${ticketId} enviado con éxito. La resolución te llegará a ${email}`);
+        } else {
+          alert(`✅ Reclamo #${ticketId} registrado con éxito.\n\nEl equipo de soporte revisará el caso y responderá directamente a tu correo electrónico:\n${email}`);
+        }
+      });
+    }
+  }
+
+  // ==========================================
   // INICIALIZACIÓN GENERAL COMPLETA DE LA APP DEL PASAJERO
   // ==========================================
   function startPassengerApplication() {
@@ -10420,6 +10644,7 @@ if (btnRecenterPassengerMap) {
     try { loadConfigToModal(); } catch (e) { console.warn('Config modal:', e); }
     try { initPassengerProfileModule(); } catch (e) { console.warn('Passenger profile:', e); }
     try { initPassengerSosModule(); } catch (e) { console.warn('Passenger SOS:', e); }
+    try { initPassengerHelpModule(); } catch (e) { console.warn('Passenger Help:', e); }
     try { setupAndroidBackButtonHandler(); } catch (e) { console.warn('Back button:', e); }
     try { checkAndRestoreActiveTripOnStartup(); } catch (e) { console.warn('Restore active trip:', e); }
     try { fetchRealtimeWeather(); } catch (e) { console.warn('Weather fetch:', e); }

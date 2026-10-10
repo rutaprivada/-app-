@@ -164,6 +164,12 @@
       
       <!-- Contenedor Ejecutivo Unificado de Acciones del Pasajero -->
       <div class="passenger-header-actions">
+        <!-- Botón Centro de Ayuda y Soporte Pasajero -->
+        <button type="button" class="btn-header-reservations clickable-header-profile" id="btnOpenPassengerHelpHeader" onclick="openPassengerHelpModal()" title="Centro de Ayuda y Soporte 24/7" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8;">
+          <i class="fa-solid fa-circle-question" style="font-size: 1.05rem; color: #38bdf8;"></i>
+          <span class="header-reservas-label">Ayuda</span>
+        </button>
+
         <!-- Botón Acceso a Mis Reservas Programadas -->
         <button type="button" class="btn-header-reservations clickable-header-profile" id="btnOpenPassengerReservations" onclick="openPassengerReservationsModal()" title="Ver mis Reservas Programadas">
           <i class="fa-solid fa-calendar-days" style="font-size: 1.05rem; color: #fbbf24;"></i>
@@ -1660,6 +1666,191 @@
           </a>
         </div>
       </div>
+    </div>
+  <!-- =========================================================
+       MODAL: CENTRO DE AYUDA Y SOPORTE PASAJERO (24/7)
+       ========================================================= -->
+  <div id="modalPassengerHelp" class="modal-backdrop hidden" style="z-index: 10006;">
+    <div class="modal-dialog" style="max-width: 520px; background: #0f172a; border: 1.5px solid rgba(56, 189, 248, 0.3); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.85); overflow: hidden;">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(15, 23, 42, 0.95) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.5rem;">🎧</span>
+          <div>
+            <h3 style="color: #fff; margin: 0; font-size: 1.1rem; font-weight: 700;">Centro de Ayuda y Reclamos</h3>
+            <p style="color: #94a3b8; margin: 0; font-size: 0.75rem;">Soporte operativo y asistencia de viajes 24/7</p>
+          </div>
+        </div>
+        <button type="button" onclick="window.closePassengerHelpModal()" class="modal-close" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 18px; max-height: 75vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
+        <!-- Banner WhatsApp Directo -->
+        <div style="background: rgba(37, 211, 102, 0.08); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fa-brands fa-whatsapp" style="font-size: 1.4rem; color: #25d366;"></i>
+            <div>
+              <strong style="color: #fff; font-size: 0.86rem; display: block;">Chat Directo con la Central</strong>
+              <small style="color: #94a3b8; font-size: 0.72rem;">Atención inmediata por WhatsApp</small>
+            </div>
+          </div>
+          <a href="https://wa.me/5491136453982?text=Hola%20Soporte%20RutaPrivada,%20necesito%20asistencia%20con%20un%20viaje/reserva." target="_blank" style="background: #25d366; color: #0f172a; text-decoration: none; padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 0.78rem; display: flex; align-items: center; gap: 5px;">
+            Abrir Chat
+          </a>
+        </div>
+
+        <span style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;">
+          ¿En qué podemos ayudarte?
+        </span>
+
+        <!-- CATEGORÍAS ACORDEÓN PASAJERO -->
+        <!-- 1. Problemas con un viaje o cobro -->
+        <div class="passenger-help-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;">
+          <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.2rem;">🚗</span>
+              <div>
+                <strong style="color: #fff; font-size: 0.88rem; display: block;">Problemas con un viaje o tarifa</strong>
+                <small style="color: #94a3b8; font-size: 0.72rem;">Diferencia de tarifa, peajes, ruta o cobro indebido</small>
+              </div>
+            </div>
+            <i class="fa-solid fa-chevron-down toggle-icon" style="color: #94a3b8; font-size: 0.8rem; transition: transform 0.2s;"></i>
+          </div>
+          <div class="passenger-help-body" style="display: none; padding: 0 14px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+            <p style="margin: 8px 0;">Si la tarifa cobrada no coincide con el trayecto o el chofer tomó una ruta indebida, envía tu reclamo aquí para revisión inmediata de la central.</p>
+            <button type="button" onclick="window.openPassengerTicketCategory('tarifa')" style="width: 100%; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 8px; padding: 9px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fa-solid fa-pen-to-square"></i> Cargar Reclamo de Tarifa / Cobro
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Objetos Olvidados -->
+        <div class="passenger-help-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;">
+          <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.2rem;">🧳</span>
+              <div>
+                <strong style="color: #fff; font-size: 0.88rem; display: block;">Objetos Olvidados en el Auto</strong>
+                <small style="color: #94a3b8; font-size: 0.72rem;">Celular, llaves, billetera o pertenencias</small>
+              </div>
+            </div>
+            <i class="fa-solid fa-chevron-down toggle-icon" style="color: #94a3b8; font-size: 0.8rem; transition: transform 0.2s;"></i>
+          </div>
+          <div class="passenger-help-body" style="display: none; padding: 0 14px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+            <p style="margin: 8px 0;">Te contactaremos de inmediato con el conductor del vehículo para coordinar la devolución segura de tus pertenencias.</p>
+            <button type="button" onclick="window.openPassengerTicketCategory('objeto')" style="width: 100%; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 8px; padding: 9px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fa-solid fa-box-open"></i> Reportar Objeto Olvidado
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Medios de Pago y Facturación -->
+        <div class="passenger-help-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;">
+          <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.2rem;">💳</span>
+              <div>
+                <strong style="color: #fff; font-size: 0.88rem; display: block;">Medios de Pago y Comprobantes</strong>
+                <small style="color: #94a3b8; font-size: 0.72rem;">Facturas A/B, comprobantes de transferencia y tarjetas</small>
+              </div>
+            </div>
+            <i class="fa-solid fa-chevron-down toggle-icon" style="color: #94a3b8; font-size: 0.8rem; transition: transform 0.2s;"></i>
+          </div>
+          <div class="passenger-help-body" style="display: none; padding: 0 14px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+            <p style="margin: 8px 0;">Solicita tu comprobante de viaje o factura electrónica indicando tus datos fiscales.</p>
+            <button type="button" onclick="window.openPassengerTicketCategory('factura')" style="width: 100%; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; border-radius: 8px; padding: 9px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fa-solid fa-file-invoice-dollar"></i> Solicitar Factura o Comprobante
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Seguridad y Conducta -->
+        <div class="passenger-help-card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;">
+          <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.2rem;">🛡️</span>
+              <div>
+                <strong style="color: #fff; font-size: 0.88rem; display: block;">Seguridad y Conductor</strong>
+                <small style="color: #94a3b8; font-size: 0.72rem;">Reportar conducta del chofer o incidente de seguridad</small>
+              </div>
+            </div>
+            <i class="fa-solid fa-chevron-down toggle-icon" style="color: #94a3b8; font-size: 0.8rem; transition: transform 0.2s;"></i>
+          </div>
+          <div class="passenger-help-body" style="display: none; padding: 0 14px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+            <p style="margin: 8px 0;">Tu seguridad es nuestra prioridad. Reporta cualquier inconveniente con la atención del conductor o estado del vehículo.</p>
+            <button type="button" onclick="window.openPassengerTicketCategory('seguridad')" style="width: 100%; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 8px; padding: 9px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fa-solid fa-shield-halved"></i> Reportar Caso de Seguridad
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: FORMULARIO DE RECLAMO / TICKET PASAJERO (REDIRECCIÓN A CORREO)
+       ========================================================= -->
+  <div id="modalPassengerReportTicket" class="modal-backdrop hidden" style="z-index: 10007;">
+    <div class="modal-dialog" style="max-width: 500px; background: #0f172a; border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.9); overflow: hidden;">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.3) 0%, rgba(15, 23, 42, 0.95) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.25); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.4rem;">📝</span>
+          <div>
+            <h3 style="color: #fff; margin: 0; font-size: 1.1rem; font-weight: 700;">Cargar Reclamo a Soporte</h3>
+            <p style="color: #94a3b8; margin: 0; font-size: 0.75rem;">Resolución directa con el equipo central</p>
+          </div>
+        </div>
+        <button type="button" onclick="window.closePassengerTicketModal()" class="modal-close" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
+      </div>
+
+      <form id="formPassengerReportTicket" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Tu Nombre *</label>
+            <input type="text" id="ticketPassengerName" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 9px; font-size: 0.85rem; outline: none;" />
+          </div>
+          <div>
+            <label style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Teléfono *</label>
+            <input type="tel" id="ticketPassengerPhone" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 9px; font-size: 0.85rem; outline: none;" />
+          </div>
+        </div>
+
+        <div>
+          <label style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Correo Electrónico de Contacto *</label>
+          <input type="email" id="ticketPassengerEmail" required style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 9px; font-size: 0.85rem; outline: none;" />
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Motivo / Categoría</label>
+            <select id="ticketPassengerCategory" style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 10px; border-radius: 9px; font-size: 0.82rem; outline: none;">
+              <option value="tarifa">🚗 Problema con Viaje / Tarifa</option>
+              <option value="objeto">🧳 Objeto Olvidado</option>
+              <option value="factura">💳 Facturación / Pago</option>
+              <option value="seguridad">🛡️ Seguridad / Conductor</option>
+              <option value="otro">📝 Consulta General</option>
+            </select>
+          </div>
+          <div>
+            <label style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">ID / Fecha de Viaje</label>
+            <input type="text" id="ticketPassengerTripId" placeholder="Ej: Viaje de Hoy o #1234" style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 9px; font-size: 0.85rem; outline: none;" />
+          </div>
+        </div>
+
+        <div>
+          <label style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Descripción del Inconveniente o Detalle *</label>
+          <textarea id="ticketPassengerDescription" rows="3" required placeholder="Describe lo ocurrido con el mayor detalle posible para brindarte una solución ágil..." style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 9px; font-size: 0.85rem; outline: none; resize: vertical;"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 6px;">
+          <button type="button" onclick="window.closePassengerTicketModal()" style="flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; border-radius: 10px; padding: 11px; font-weight: 700; font-size: 0.88rem; cursor: pointer;">
+            Cancelar
+          </button>
+          <button type="submit" id="btnSubmitPassengerTicket" style="flex: 2; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; border-radius: 10px; padding: 11px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span id="txtBtnSubmitPassengerTicket">🚀 Enviar Reclamo a Soporte</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 

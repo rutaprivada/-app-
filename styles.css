@@ -6060,6 +6060,25 @@ html, body {
   display: none !important;
 }
 
+/* =========================================================
+   Passenger Help & Support Cards
+   ========================================================= */
+.passenger-help-card {
+  transition: all 0.2s ease;
+}
+
+.passenger-help-card:hover {
+  border-color: rgba(56, 189, 248, 0.3) !important;
+}
+
+.passenger-help-header-toggle:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.passenger-help-body {
+  animation: tabFadeIn 0.2s ease;
+}
+
 @keyframes tabFadeIn {
   from {
     opacity: 0;
@@ -6070,3 +6089,4 @@ html, body {
     transform: translateY(0);
   }
 }
+

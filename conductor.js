@@ -78,6 +78,41 @@ window.closeDriverReportTicketModal = function() {
     }
 };
 
+window.openDriverTicketModal = function(preselectedCategory, defaultDescription) {
+    const modal = document.getElementById('modalDriverReportTicket');
+    if (modal) {
+        const selectCat = document.getElementById('ticketCategory');
+        const inputDesc = document.getElementById('ticketDescription');
+        if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
+        if (inputDesc && defaultDescription && !inputDesc.value) inputDesc.value = defaultDescription;
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
+};
+
+window.closeDriverTicketModal = window.closeDriverReportTicketModal;
+
+window.openDriverTicketCategory = function(catKey) {
+    window.closeDriverHelpModal();
+    window.openDriverTicketModal(catKey);
+};
+
+window.toggleDriverHelpAccordion = function(headerEl) {
+    if (!headerEl) return;
+    const card = headerEl.closest('.driver-help-card');
+    if (!card) return;
+    const body = card.querySelector('.driver-help-body');
+    const icon = headerEl.querySelector('.toggle-icon');
+
+    const isVisible = body && (body.style.display === 'block' || window.getComputedStyle(body).display === 'block');
+    if (body) {
+        body.style.display = isVisible ? 'none' : 'block';
+    }
+    if (icon) {
+        icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+    }
+};
+
 window.handleDriverToggleStatus = function() {
     if (typeof window._internalDriverToggleStatus === 'function') {
         window._internalDriverToggleStatus();
@@ -5708,6 +5743,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getDriverSession() {
         try {
+            if (localStorage.getItem('rutaprivada_driver_logged_out') === 'true') {
+                return null;
+            }
             const raw = localStorage.getItem(STORAGE_KEY_DRIVER_AUTH);
             if (raw) {
                 const parsed = JSON.parse(raw);
@@ -5719,6 +5757,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function saveDriverSession(driver, isNew = false) {
         if (!driver) return;
+        try {
+            localStorage.removeItem('rutaprivada_driver_logged_out');
+        } catch(e) {}
         if (!driver.id) {
             const cleanDni = driver.dni ? String(driver.dni).replace(/\D/g, '') : '';
             driver.id = cleanDni ? ('drv_' + cleanDni) : ('drv_' + Date.now());
@@ -6357,6 +6398,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setOnlineStatus(false);
 
             // Eliminar sesión activa y cachés locales
+            localStorage.setItem('rutaprivada_driver_logged_out', 'true');
             localStorage.removeItem(STORAGE_KEY_DRIVER_AUTH);
             localStorage.removeItem('rutaprivada_driver_docs_v1');
             localStorage.removeItem('rutaprivada_driver_wallet_v1');
@@ -6417,6 +6459,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeDriverSession) {
         hideDriverAuthModal();
         renderDriverProfileInfo();
+    } else {
+        showDriverAuthModal('login');
     }
 
     // Escucha en tiempo real de Firestore para aprobación/rechazo instantáneo
@@ -7757,6 +7801,25 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch(err) {
                 console.warn('Email redirect error:', err);
             }
+
+            // 4. Redirección al cliente de correo oficial con datos pre-cargados
+            try {
+                const mailSubject = encodeURIComponent(`[Reclamo Conductor #${ticketId}] ${categoryText} - ${driverName}`);
+                const mailBody = encodeURIComponent(`CENTRAL DE ASISTENCIA Y SOPORTE RUTAPRIVADA\n\n` +
+                    `==============================\n` +
+                    `TICKET ID: #${ticketId}\n` +
+                    `CONDUCTOR: ${driverName}\n` +
+                    `TELÉFONO: ${driverPhone}\n` +
+                    `CORREO: ${driverEmail}\n` +
+                    `CATEGORÍA: ${categoryText}\n` +
+                    `VIAJE RELACIONADO: ${tripId || 'N/A'}\n` +
+                    `FECHA Y HORA: ${timeStr}\n` +
+                    `==============================\n\n` +
+                    `DETALLE DEL RECLAMO / CONSULTA:\n${description}\n\n` +
+                    `---\n` +
+                    `Enviado desde App Conductor RutaPrivada (Soporte Operativo 24/7)`);
+                window.open(`mailto:soporte@rutaprivada.com?subject=${mailSubject}&body=${mailBody}`, '_blank');
+            } catch(e) {}
 
             // Restaurar estado del botón
             if (btnSubmitDriverTicket) {
