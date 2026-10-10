@@ -55,15 +55,16 @@ window.closeDriverHelpModal = function() {
 };
 
 window.openDriverDocsModal = function() {
-    const modal = document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
+    const modal = document.getElementById('modalDocsUpload') || document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
     if (modal) {
+        if (typeof window.populateDocsForm === 'function') window.populateDocsForm();
         modal.classList.add('active');
         modal.style.display = 'flex';
     }
 };
 
 window.closeDriverDocsModal = function() {
-    const modal = document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
+    const modal = document.getElementById('modalDocsUpload') || document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
     if (modal) {
         modal.classList.remove('active');
         modal.style.display = 'none';
@@ -109,7 +110,7 @@ window.handleDriverToggleStatus = function() {
     } catch(e) {}
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+function startDriverApplication() {
     const FIREBASE_CONFIG_CONDUCTOR = {
         apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
         authDomain: "rutaprivada-app.firebaseapp.com",
@@ -5645,179 +5646,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!modalDriverProfile) return;
         renderDriverProfileInfo();
         modalDriverProfile.classList.add('active');
+        modalDriverProfile.style.display = 'flex';
         playAlertSound('success');
     }
     window.openDriverProfileModal = openDriverProfileModal;
 
     function closeDriverProfileModal() {
-        if (modalDriverProfile) modalDriverProfile.classList.remove('active');
+        if (modalDriverProfile) {
+            modalDriverProfile.classList.remove('active');
+            modalDriverProfile.style.display = 'none';
+        }
     }
     window.closeDriverProfileModal = closeDriverProfileModal;
-
-    // Modal de Ayuda y Soporte Conductor
-    const btnOpenDriverHelp = document.getElementById('btnOpenDriverHelp');
-    const btnOpenDriverHelpHeader = document.getElementById('btnOpenDriverHelpHeader');
-    const modalDriverHelp = document.getElementById('modalDriverHelp');
-    const btnCloseDriverHelp = document.getElementById('btnCloseDriverHelp');
-    const btnCerrarAyudaSheet = document.getElementById('btnCerrarAyudaSheet');
-    const btnHelpWhatsappDirect = document.getElementById('btnHelpWhatsappDirect');
-    const btnHelpOpenTicketForm = document.getElementById('btnHelpOpenTicketForm');
-    const modalDriverReportTicket = document.getElementById('modalDriverReportTicket');
-    const btnCloseDriverReportTicket = document.getElementById('btnCloseDriverReportTicket');
-    const btnCancelTicket = document.getElementById('btnCancelTicket');
-    const formDriverReportTicket = document.getElementById('formDriverReportTicket');
-    const btnHelpOpenDocsUploadFromCard = document.getElementById('btnHelpOpenDocsUploadFromCard');
-    const btnHelpGoToWalletTab = document.getElementById('btnHelpGoToWalletTab');
-
-    function openDriverHelpModal() {
-        if (!modalDriverHelp) return;
-        closeDriverProfileModal();
-        modalDriverHelp.classList.add('active');
-        playAlertSound('success');
-    }
-    window.openDriverHelpModal = openDriverHelpModal;
-
-    function closeDriverHelpModal() {
-        if (modalDriverHelp) modalDriverHelp.classList.remove('active');
-    }
-    window.closeDriverHelpModal = closeDriverHelpModal;
-
-    function openDriverTicketModal(defaultCategory = 'otro', defaultTrip = '') {
-        if (!modalDriverReportTicket) return;
-        const catSelect = document.getElementById('ticketCategory');
-        const tripInput = document.getElementById('ticketTripId');
-        if (catSelect && defaultCategory) catSelect.value = defaultCategory;
-        if (tripInput && defaultTrip) tripInput.value = defaultTrip;
-        modalDriverReportTicket.classList.add('active');
-    }
-    window.openDriverTicketModal = openDriverTicketModal;
-
-    function closeDriverTicketModal() {
-        if (modalDriverReportTicket) modalDriverReportTicket.classList.remove('active');
-    }
-    window.closeDriverTicketModal = closeDriverTicketModal;
-    window.closeDriverReportTicketModal = closeDriverTicketModal;
-
-    window.toggleDriverHelpAccordion = function(headerEl) {
-        if (!headerEl) return;
-        const card = headerEl.closest('.driver-help-card');
-        if (!card) return;
-        const body = card.querySelector('.driver-help-body');
-        const icon = headerEl.querySelector('.toggle-icon');
-        if (!body) return;
-
-        const isVisible = body.style.display === 'block';
-        document.querySelectorAll('.driver-help-card .driver-help-body').forEach(b => b.style.display = 'none');
-        document.querySelectorAll('.driver-help-card .toggle-icon').forEach(i => i.style.transform = 'rotate(0deg)');
-
-        if (!isVisible) {
-            body.style.display = 'block';
-            if (icon) icon.style.transform = 'rotate(180deg)';
-        }
-    };
-
-    window.dispatchHelpTopic = function(topicName) {
-        const session = (typeof getDriverSession === 'function') ? getDriverSession() : null;
-        const driverName = session ? (session.nombre || session.name || 'Chofer') : 'Chofer RutaPrivada';
-        const driverPhone = session ? (session.telefono || session.phone || '') : '';
-        const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
-        const tripInfo = activeTrip ? ` (Viaje #${activeTrip.id || 'Activo'} - ${activeTrip.origen || ''} a ${activeTrip.destino || ''})` : '';
-
-        const text = `👋 Hola Soporte Operativo de RutaPrivada,\n\nSoy el chofer *${driverName}* (Tel: ${driverPhone || 'No registrado'}).\n📌 *Motivo de consulta:* ${topicName}${tripInfo}\n\nPor favor requiero asistencia con este tema. Muchas gracias.`;
-        const waUrl = `https://wa.me/5491136453982?text=${encodeURIComponent(text)}`;
-        window.open(waUrl, '_blank');
-    };
-
-    window.testDriverHelpSound = function() {
-        playAlertSound('newTrip');
-        showDriverToast('🔔 Sonido de alerta reproducido correctamente.');
-    };
-
-    if (btnOpenDriverHelp) btnOpenDriverHelp.addEventListener('click', openDriverHelpModal);
-    if (btnOpenDriverHelpHeader) btnOpenDriverHelpHeader.addEventListener('click', openDriverHelpModal);
-    if (btnCloseDriverHelp) btnCloseDriverHelp.addEventListener('click', closeDriverHelpModal);
-    if (btnCerrarAyudaSheet) btnCerrarAyudaSheet.addEventListener('click', closeDriverHelpModal);
-    if (modalDriverHelp) {
-        modalDriverHelp.addEventListener('click', (e) => {
-            if (e.target === modalDriverHelp) closeDriverHelpModal();
-        });
-    }
-
-    if (btnHelpWhatsappDirect) {
-        btnHelpWhatsappDirect.addEventListener('click', () => {
-            window.dispatchHelpTopic('Consulta General Chofer');
-        });
-    }
-
-    if (btnHelpOpenTicketForm) {
-        btnHelpOpenTicketForm.addEventListener('click', () => {
-            closeDriverHelpModal();
-            openDriverTicketModal();
-        });
-    }
-
-    if (btnCloseDriverReportTicket) btnCloseDriverReportTicket.addEventListener('click', closeDriverTicketModal);
-    if (btnCancelTicket) btnCancelTicket.addEventListener('click', closeDriverTicketModal);
-    if (modalDriverReportTicket) {
-        modalDriverReportTicket.addEventListener('click', (e) => {
-            if (e.target === modalDriverReportTicket) closeDriverTicketModal();
-        });
-    }
-
-    if (formDriverReportTicket) {
-        formDriverReportTicket.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const cat = document.getElementById('ticketCategory')?.value || 'otro';
-            const trip = document.getElementById('ticketTripId')?.value || '';
-            const desc = document.getElementById('ticketDescription')?.value || '';
-            const session = (typeof getDriverSession === 'function') ? getDriverSession() : null;
-
-            const ticketData = {
-                id: 'ticket_' + Date.now(),
-                categoria: cat,
-                viaje: trip,
-                descripcion: desc,
-                conductor: session ? (session.nombre || 'Chofer') : 'Chofer',
-                telefono: session ? (session.telefono || '') : '',
-                fecha: new Date().toISOString(),
-                estado: 'abierto'
-            };
-
-            // Guardar local
-            try {
-                const tickets = JSON.parse(localStorage.getItem('rutaprivada_driver_tickets_v1') || '[]');
-                tickets.push(ticketData);
-                localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(tickets));
-            } catch(err) {}
-
-            // Sincronizar Firestore si disponible
-            try {
-                if (typeof firebase !== 'undefined' && firebase.firestore) {
-                    firebase.firestore().collection('tickets_soporte').doc(ticketData.id).set(ticketData).catch(() => {});
-                }
-            } catch(err) {}
-
-            closeDriverTicketModal();
-            showDriverToast('📨 Reporte enviado al equipo de soporte 24/7. Te responderemos a la brevedad.');
-            formDriverReportTicket.reset();
-        });
-    }
-
-    if (btnHelpOpenDocsUploadFromCard) {
-        btnHelpOpenDocsUploadFromCard.addEventListener('click', () => {
-            closeDriverHelpModal();
-            const btnOpenDocs = document.getElementById('btnOpenDocsUpload');
-            if (btnOpenDocs) btnOpenDocs.click();
-        });
-    }
-
-    if (btnHelpGoToWalletTab) {
-        btnHelpGoToWalletTab.addEventListener('click', () => {
-            closeDriverHelpModal();
-            const navBilletera = document.getElementById('navBtnBilletera');
-            if (navBilletera) navBilletera.click();
-        });
-    }
 
     // =========================================================
     // SISTEMA DE AUTENTICACIÓN Y SESIÓN PRIVADA DE CHOFER
@@ -8087,5 +7927,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 .catch(() => {});
         });
     }
-});
+}
+
+// Inicializar inmediatamente o al cargar el DOM
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startDriverApplication);
+} else {
+    startDriverApplication();
+}
 
