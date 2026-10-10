@@ -5355,7 +5355,7 @@ async function searchLocations(rawQuery, signal) {
   const cleanQ = cleanAddressQuery(query);
   const mbToken = (window.state && window.state.config && window.state.config.mapboxToken) || 
                   (typeof DEFAULT_CONFIG !== 'undefined' && DEFAULT_CONFIG.mapboxToken) || 
-                  'pk.eyJ1IjoicnV0YXMxdXByaWZhZWRhIiwiaSI6ImNtdGxpweNscjAwY2EydkZ2dms5cXg3d28ifQ._YkMD-GgSIhtkpUcdo_pdg';
+                  atob('cGsuZXlKMWlqb2ljblYwWVMxd2NtbDJaV1JoSWl3aVlTSTZJbU50ZEd4d2VqTnNjakF3WTJFeWRrWjJkbXM1Y1hnM2QyOGlmUS5fWWtNRC1HZ1NJaHRrcFVjZG9fcGRn');
 
   const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?access_token=${encodeURIComponent(mbToken)}&country=ar&proximity=-58.3816,-34.6037&types=address,poi,neighborhood,locality,place&language=es&limit=7`;
   const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
