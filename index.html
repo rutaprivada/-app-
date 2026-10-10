@@ -893,40 +893,44 @@
       <div class="modal-body trip-completed-body">
         <!-- Highlighted Final Amount to Pay -->
         <div class="final-fare-box">
-          <span class="final-fare-label">TOTAL A PAGAR AL CHOFER</span>
+          <span class="final-fare-label">TOTAL DEL TRASLADO</span>
           <div class="final-fare-amount" id="pFinalFareTotal">$0</div>
         </div>
 
-        <!-- Selector Interactivo de Método de Pago al Finalizar -->
-        <div class="payment-selection-completed-wrap" style="margin: 14px 0 10px 0;">
-          <label style="font-size: 0.78rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">¿Cómo deseas abonar el viaje?</label>
+        <!-- Selector de Medio de Pago al Llegar a Destino -->
+        <div class="payment-choice-section" style="margin: 14px 0 10px 0;">
+          <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
+            ¿Cómo vas a abonar el viaje?
+          </label>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <button type="button" id="btnPayChoiceCash" onclick="window.selectCompletedPaymentMethod('efectivo')" class="pay-choice-btn active" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 10px; background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; border-radius: 12px; cursor: pointer; color: #fff; transition: all 0.2s;">
-              <span style="font-size: 1.5rem;">💵</span>
-              <strong style="font-size: 0.85rem;">En Efectivo</strong>
-              <small style="color: #34d399; font-size: 0.7rem;">Pago directo al chofer</small>
+            <button type="button" id="btnPayChoiceCash" onclick="window.selectFinalPaymentMode('efectivo')" style="background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; color: #fff; border-radius: 12px; padding: 10px 8px; cursor: pointer; text-align: center; transition: all 0.2s;">
+              <span style="font-size: 1.3rem; display: block;">💵</span>
+              <strong style="font-size: 0.85rem; display: block; margin-top: 2px;">Efectivo</strong>
+              <small style="color: #34d399; font-size: 0.7rem;">Pago al chofer</small>
             </button>
-            <button type="button" id="btnPayChoiceTransfer" onclick="window.selectCompletedPaymentMethod('transferencia')" class="pay-choice-btn" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 10px; background: rgba(30, 41, 59, 0.6); border: 1.5px solid rgba(255, 255, 255, 0.12); border-radius: 12px; cursor: pointer; color: #94a3b8; transition: all 0.2s;">
-              <span style="font-size: 1.5rem;">📲</span>
-              <strong style="font-size: 0.85rem; color: #fff;">Transferencia</strong>
-              <small style="color: #38bdf8; font-size: 0.7rem;">Ver Alias / CBU</small>
+            <button type="button" id="btnPayChoiceTransfer" onclick="window.selectFinalPaymentMode('transferencia')" style="background: rgba(30, 41, 59, 0.8); border: 2px solid rgba(255,255,255,0.15); color: #cbd5e1; border-radius: 12px; padding: 10px 8px; cursor: pointer; text-align: center; transition: all 0.2s;">
+              <span style="font-size: 1.3rem; display: block;">📲</span>
+              <strong style="font-size: 0.85rem; display: block; margin-top: 2px;">Transferencia</strong>
+              <small style="color: #38bdf8; font-size: 0.7rem;">0% Comisión</small>
             </button>
           </div>
         </div>
 
-        <!-- Mensaje de Pago en Efectivo (Visible por defecto) -->
-        <div id="cashPaymentNoticeBox" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 12px 14px; margin: 10px 0; text-align: center;">
-          <span style="font-size: 0.85rem; color: #34d399; font-weight: 700;">💵 Entrega el monto acordado en efectivo al conductor antes de descender.</span>
+        <!-- Mensaje para Pago en Efectivo -->
+        <div id="cashPaymentInstructions" style="display: block; background: rgba(16, 185, 129, 0.08); border: 1px dashed rgba(16, 185, 129, 0.4); border-radius: 12px; padding: 12px; margin: 10px 0; text-align: center;">
+          <p style="margin: 0; font-size: 0.82rem; color: #e2e8f0;">
+            💵 Entrega el importe exacto de <strong id="pCashAmountDisplay" style="color: #34d399;">$0</strong> al conductor al finalizar el descenso.
+          </p>
         </div>
 
-        <!-- Tarjeta de Transferencia Bancaria Inmediata (Oculta por defecto, visible solo si elige Transferencia) -->
-        <div id="driverTransferInfoBox" class="driver-transfer-info-box" style="display: none; background: rgba(15, 23, 42, 0.95); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 14px; padding: 14px; margin: 12px 0;">
+        <!-- Tarjeta de Transferencia Bancaria Inmediata (Solo visible si elige Transferencia) -->
+        <div id="driverTransferInfoBox" class="driver-transfer-info-box" style="display: none; background: rgba(15, 23, 42, 0.95); border: 1.5px solid rgba(56, 189, 248, 0.5); border-radius: 14px; padding: 14px; margin: 10px 0; box-shadow: 0 8px 25px rgba(0,0,0,0.5);">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 1.3rem;">📲</span>
-              <strong style="color: #38bdf8; font-size: 0.9rem;">Transferencia Inmediata (0% Recargo)</strong>
+              <strong style="color: #38bdf8; font-size: 0.9rem;">Datos para Transferir al Chofer</strong>
             </div>
-            <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 6px;">Sin Comisión</span>
+            <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 6px;">0% Recargo</span>
           </div>
 
           <p style="font-size: 0.78rem; color: #94a3b8; margin: 0 0 10px 0;">Transfiere directamente a la cuenta del conductor asignado:</p>
@@ -937,15 +941,15 @@
               <strong style="font-size: 0.82rem; color: #fff;" id="pTransferHolder">--</strong>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-size: 0.78rem; color: #94a3b8;">Banco / App:</span>
+              <span style="font-size: 0.78rem; color: #94a3b8;">Banco / Billetera:</span>
               <strong style="font-size: 0.82rem; color: #fff;" id="pTransferBank">Mercado Pago</strong>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(56, 189, 248, 0.1); padding: 6px 8px; border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(56, 189, 248, 0.12); padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3);">
               <div>
                 <small style="color: #38bdf8; display: block; font-size: 0.7rem; font-weight: 700;">ALIAS:</small>
-                <strong style="font-size: 0.88rem; color: #fff; font-family: monospace;" id="pTransferAlias">--</strong>
+                <strong style="font-size: 0.92rem; color: #fff; font-family: monospace;" id="pTransferAlias">--</strong>
               </div>
-              <button type="button" onclick="window.copyTextToClipboard(document.getElementById('pTransferAlias').textContent, 'Alias')" style="background: #38bdf8; color: #0f172a; border: none; padding: 5px 10px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; cursor: pointer;">
+              <button type="button" onclick="window.copyTextToClipboard(document.getElementById('pTransferAlias').textContent, 'Alias')" style="background: #38bdf8; color: #0f172a; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px;">
                 📋 Copiar Alias
               </button>
             </div>
@@ -956,11 +960,6 @@
               </div>
               <button type="button" onclick="window.copyTextToClipboard(document.getElementById('pTransferCbu').textContent, 'CBU')" style="background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 6px; font-size: 0.72rem; cursor: pointer;">
                 📋 Copiar CBU
-              </button>
-            </div>
-            <div style="margin-top: 6px;">
-              <button type="button" id="btnNotifyDriverTransferred" onclick="window.notifyDriverTransferCompleted()" style="width: 100%; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; border: none; padding: 9px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                <span>✅ Ya transferí / Notificar al Conductor</span>
               </button>
             </div>
           </div>

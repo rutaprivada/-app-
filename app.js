@@ -5320,7 +5320,7 @@ function cleanAddressDisplay(str) {
     .trim();
 }
 
-// Motor inteligente de geocodificación de alta precisión en paralelo (Mapbox Places + Photon OSM + Open-Meteo)
+// Motor inteligente de geocodificación de alta precisión en paralelo (USIG GCBA + Nominatim OSM + Mapbox Places + Photon OSM)
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
   if (query.length < 2) return getDefaultPopularDestinations();
@@ -5344,7 +5344,7 @@ async function searchLocations(rawQuery, signal) {
     }
   }
 
-  // 1. Puntos de interés locales conocidos (Aeropuertos EZE/AEP, Shoppings, Hoteles, Barrios)
+  // 1. Puntos de interés locales conocidos y generador local de calles y alturas (0ms)
   try {
     const instant = getInstantLocalSuggestions(query);
     if (Array.isArray(instant)) {
@@ -5353,37 +5353,35 @@ async function searchLocations(rawQuery, signal) {
   } catch(e) {}
 
   const cleanQ = cleanAddressQuery(query);
-  const mbToken = (window.state && window.state.config && window.state.config.mapboxToken) || 
-                  (typeof DEFAULT_CONFIG !== 'undefined' && DEFAULT_CONFIG.mapboxToken) || 
-                  atob('cGsuZXlKMWlqb2ljblYwWVMxd2NtbDJaV1JoSWl3aVlTSTZJbU50ZEd4d2VqTnNjakF3WTJFeWRrWjJkbXM1Y1hnM2QyOGlmUS5fWWtNRC1HZ1NJaHRrcFVjZG9fcGRn');
-
-  const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?access_token=${encodeURIComponent(mbToken)}&country=ar&proximity=-58.3816,-34.6037&types=address,poi,neighborhood,locality,place&language=es&limit=7`;
+  const usigUrl = `https://servicios.usig.buenosaires.gob.ar/normalizar/?direccion=${encodeURIComponent(cleanQ)}&geocodificar=true&limite=8`;
+  const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ)}&countrycodes=ar&limit=8&addressdetails=1`;
   const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
   const openMeteoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanQ)}&country=AR&language=es&count=6`;
 
   const fetchTasks = [
-    // Task 1: Mapbox Geocoding (Líder mundial en precisión para direcciones argentinas, CORS nativo)
+    // Task 1: API Oficial USIG GCBA (Máxima precisión para todas las calles, alturas y esquinas de CABA y GBA)
     (async () => {
       try {
-        const res = await fetchWithTimeout(mapboxUrl, {}, 2500, signal);
+        const res = await fetchWithTimeout(usigUrl, {}, 2200, signal);
         if (res.ok) {
-          const mbData = await res.json();
-          if (mbData && Array.isArray(mbData.features)) {
-            mbData.features.forEach(f => {
-              if (f.geometry && Array.isArray(f.geometry.coordinates) && f.geometry.coordinates.length >= 2) {
-                const [lon, lat] = f.geometry.coordinates;
-                const fullText = f.place_name || cleanQ;
-                const mainName = f.text || fullText.split(',')[0];
+          const usigData = await res.json();
+          const items = usigData && (usigData.direccionesNormalizadas || (Array.isArray(usigData) ? usigData : []));
+          if (Array.isArray(items)) {
+            items.forEach(d => {
+              if (d.coordenadas && (d.coordenadas.y || d.coordenadas.lat) && (d.coordenadas.x || d.coordenadas.lon || d.coordenadas.lng)) {
+                const lat = d.coordenadas.y || d.coordenadas.lat;
+                const lon = d.coordenadas.x || d.coordenadas.lon || d.coordenadas.lng;
+                const name = d.direccion || d.nombre_calle || cleanQ;
                 addResult({
                   lat: String(lat),
                   lon: String(lon),
-                  display_name: fullText,
+                  display_name: `${name}, Buenos Aires, Argentina`,
                   _isIntersection: false,
-                  _isPoi: (f.place_type || []).includes('poi'),
-                  _poiBadge: (f.place_type || []).includes('poi') ? 'Lugar' : '',
-                  _icon: (f.place_type || []).includes('poi') ? '🏢' : '📍',
-                  _mainTitle: mainName,
-                  _subTitle: fullText
+                  _isPoi: false,
+                  _poiBadge: 'Dirección Oficial',
+                  _icon: '📍',
+                  _mainTitle: name,
+                  _subTitle: `${name}, CABA / GBA, Argentina`
                 }, true);
               }
             });
@@ -5392,10 +5390,40 @@ async function searchLocations(rawQuery, signal) {
       } catch(e) {}
     })(),
 
-    // Task 2: Photon OSM Geocoder (Respaldo ultrarrápido sin API key)
+    // Task 2: Nominatim OpenStreetMap (Geocodificador oficial para toda Argentina)
     (async () => {
       try {
-        const res = await fetchWithTimeout(photonUrl, {}, 2200, signal);
+        const res = await fetchWithTimeout(nominatimUrl, {
+          headers: { 'Accept-Language': 'es' }
+        }, 2200, signal);
+        if (res.ok) {
+          const nomData = await res.json();
+          if (Array.isArray(nomData)) {
+            nomData.forEach(p => {
+              if (p.lat && p.lon) {
+                const cleanDisplay = cleanAddressDisplay(p.display_name);
+                addResult({
+                  lat: String(p.lat),
+                  lon: String(p.lon),
+                  display_name: cleanDisplay || p.display_name,
+                  _isIntersection: false,
+                  _isPoi: p.type === 'aerodrome' || p.type === 'station' || p.type === 'mall',
+                  _poiBadge: p.type === 'aerodrome' ? 'Aeropuerto' : '',
+                  _icon: p.type === 'aerodrome' ? '✈️' : '📍',
+                  _mainTitle: p.name || p.display_name.split(',')[0],
+                  _subTitle: cleanDisplay
+                }, false);
+              }
+            });
+          }
+        }
+      } catch(e) {}
+    })(),
+
+    // Task 3: Photon OSM Geocoder
+    (async () => {
+      try {
+        const res = await fetchWithTimeout(photonUrl, {}, 2000, signal);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.features)) {
@@ -5403,20 +5431,8 @@ async function searchLocations(rawQuery, signal) {
               if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
                 const [lon, lat] = f.geometry.coordinates;
                 const p = f.properties || {};
-                
-                let mainTitle = '';
-                let subTitle = '';
-                if (p.street) {
-                  mainTitle = `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}`;
-                  subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires', 'Argentina'].filter(Boolean).join(', ');
-                } else if (p.name) {
-                  mainTitle = p.name;
-                  subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires', 'Argentina'].filter(Boolean).join(', ');
-                } else {
-                  mainTitle = cleanQ;
-                  subTitle = 'Buenos Aires, Argentina';
-                }
-
+                let mainTitle = p.street ? `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}` : (p.name || cleanQ);
+                let subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires', 'Argentina'].filter(Boolean).join(', ');
                 const fullDisplay = `${mainTitle}, ${subTitle}`;
                 addResult({
                   lat: String(lat),
@@ -5436,10 +5452,10 @@ async function searchLocations(rawQuery, signal) {
       } catch(e) {}
     })(),
 
-    // Task 3: Open-Meteo Geocoding (Respaldo para ciudades, localidades y municipios de Argentina)
+    // Task 4: Open-Meteo Geocoding
     (async () => {
       try {
-        const res = await fetchWithTimeout(openMeteoUrl, {}, 2200, signal);
+        const res = await fetchWithTimeout(openMeteoUrl, {}, 1800, signal);
         if (res.ok) {
           const omData = await res.json();
           if (omData && Array.isArray(omData.results)) {
@@ -5468,7 +5484,7 @@ async function searchLocations(rawQuery, signal) {
 
   await Promise.allSettled(fetchTasks);
 
-  // Fallback suave sólo si ningún servicio devolvió resultados
+  // Fallback seguro si ningún servicio devolvió resultados
   if (results.length === 0 && query.length >= 3) {
     addResult({
       lat: '-34.6037',
@@ -8102,6 +8118,12 @@ if (btnRecenterPassengerMap) {
     if (pTransferCbu) pTransferCbu.textContent = driverCbu;
     if (pTransferCbuRow) pTransferCbuRow.style.display = driverCbu ? 'flex' : 'none';
 
+    const pCashAmountDisplay = document.getElementById('pCashAmountDisplay');
+    if (pCashAmountDisplay) pCashAmountDisplay.textContent = '$' + finalFareNum.toLocaleString('es-AR');
+
+    // Inicializar en Efectivo por defecto al abrir
+    window.selectFinalPaymentMode('efectivo');
+
     setPassengerStarRating(5);
     document.querySelectorAll('#passengerComplimentsRow .compliment-tag').forEach(t => t.classList.remove('selected'));
     if (passengerRatingComment) passengerRatingComment.value = '';
@@ -8109,69 +8131,48 @@ if (btnRecenterPassengerMap) {
     modalPassengerTripCompleted.style.display = 'flex';
   }
 
-  window.selectCompletedPaymentMethod = function(method) {
+  window.selectFinalPaymentMode = function(mode) {
     const btnCash = document.getElementById('btnPayChoiceCash');
     const btnTransfer = document.getElementById('btnPayChoiceTransfer');
-    const cashNotice = document.getElementById('cashPaymentNoticeBox');
+    const cashBox = document.getElementById('cashPaymentInstructions');
     const transferBox = document.getElementById('driverTransferInfoBox');
 
-    if (method === 'transferencia') {
+    if (mode === 'transferencia') {
       if (btnCash) {
-        btnCash.style.background = 'rgba(30, 41, 59, 0.6)';
-        btnCash.style.border = '1.5px solid rgba(255, 255, 255, 0.12)';
-        btnCash.style.color = '#94a3b8';
+        btnCash.style.background = 'rgba(30, 41, 59, 0.8)';
+        btnCash.style.borderColor = 'rgba(255,255,255,0.15)';
       }
       if (btnTransfer) {
-        btnTransfer.style.background = 'rgba(56, 189, 248, 0.15)';
-        btnTransfer.style.border = '2px solid #38bdf8';
-        btnTransfer.style.color = '#fff';
+        btnTransfer.style.background = 'rgba(56, 189, 248, 0.18)';
+        btnTransfer.style.borderColor = '#38bdf8';
       }
-      if (cashNotice) cashNotice.style.display = 'none';
-      if (transferBox) {
-        transferBox.style.display = 'block';
-        transferBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-      if (typeof showToast === 'function') showToast('📲 Transfiere al Alias o CBU indicado abajo.');
+      if (cashBox) cashBox.style.display = 'none';
+      if (transferBox) transferBox.style.display = 'block';
     } else {
-      // Efectivo
       if (btnCash) {
         btnCash.style.background = 'rgba(16, 185, 129, 0.15)';
-        btnCash.style.border = '2px solid #10b981';
-        btnCash.style.color = '#fff';
+        btnCash.style.borderColor = '#10b981';
       }
       if (btnTransfer) {
-        btnTransfer.style.background = 'rgba(30, 41, 59, 0.6)';
-        btnTransfer.style.border = '1.5px solid rgba(255, 255, 255, 0.12)';
-        btnTransfer.style.color = '#94a3b8';
+        btnTransfer.style.background = 'rgba(30, 41, 59, 0.8)';
+        btnTransfer.style.borderColor = 'rgba(255,255,255,0.15)';
       }
-      if (cashNotice) cashNotice.style.display = 'block';
+      if (cashBox) cashBox.style.display = 'block';
       if (transferBox) transferBox.style.display = 'none';
-      if (typeof showToast === 'function') showToast('💵 Pago en Efectivo seleccionado.');
     }
   };
 
-  window.notifyDriverTransferCompleted = function() {
-    const btn = document.getElementById('btnNotifyDriverTransferred');
-    if (btn) {
-      btn.innerHTML = '<span>⏳ Notificando al conductor...</span>';
-      btn.disabled = true;
-    }
-    
-    if (window.RutaSync) {
-      window.RutaSync.emit('TRANSFERENCIA_ENVIADA_PASAJERO', {
-        timestamp: Date.now(),
-        mensaje: 'El pasajero confirmó que realizó la transferencia.'
+  window.copyTextToClipboard = function(text, label = 'Dato') {
+    if (!text || text === '--') return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        if (typeof showToast === 'function') showToast(`📋 ¡${label} copiado al portapapeles!`);
+      }).catch(() => {
+        fallbackCopy(text, label);
       });
+    } else {
+      fallbackCopy(text, label);
     }
-
-    setTimeout(() => {
-      if (btn) {
-        btn.innerHTML = '<span>✅ ¡Transferencia Informada al Chofer!</span>';
-        btn.style.background = '#10b981';
-      }
-      if (typeof showToast === 'function') showToast('🎉 ¡Aviso enviado al chofer! Verifica la acreditación.');
-      try { playPassengerTone('confirmed'); } catch(e){}
-    }, 600);
   };
 
   function fallbackCopy(text, label) {
@@ -9366,6 +9367,10 @@ if (btnRecenterPassengerMap) {
         const shortName = user.nombre ? user.nombre.split(' ')[0] : 'Mi Perfil';
         headerPassengerName.textContent = shortName;
       }
+      const headerSub = document.querySelector('.passenger-status-sub');
+      if (headerSub) {
+        headerSub.textContent = '★ 5.00 Pasajero';
+      }
       if (headerPassengerAvatar && user.avatar) {
         headerPassengerAvatar.src = user.avatar;
       }
@@ -9435,13 +9440,11 @@ if (btnRecenterPassengerMap) {
     window.closePassengerAuthModal = closePassengerAuthModal;
 
     function openPassengerProfileModal() {
-      const session = getPassengerSession() || {
-        nombre: document.getElementById('user-name')?.value || document.getElementById('passenger-name-input')?.value || '',
-        telefono: document.getElementById('user-phone')?.value || document.getElementById('passenger-phone-input')?.value || '',
-        email: document.getElementById('user-email')?.value || '',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-        medioPago: 'efectivo'
-      };
+      const session = getPassengerSession();
+      if (!session || (!session.nombre && !session.email && !session.telefono)) {
+        openPassengerAuthModal('login');
+        return;
+      }
 
       renderPassengerProfileUI(session);
       renderPassengerHistoryUI();

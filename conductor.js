@@ -513,13 +513,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. SISTEMA DE NAVEGACIÓN POR PESTAÑAS (BOTTOM NAV)
     // ==========================================
     function switchTab(tabId) {
+        if (!tabId) return;
         driverState.currentTab = tabId;
         try {
             localStorage.setItem('rutaprivada_driver_active_tab', tabId);
         } catch(e) {}
 
-        // Ocultar todas las vistas y remover clase active
-        tabViews.forEach(view => {
+        // Ocultar todas las vistas y activar la seleccionada
+        const allViews = document.querySelectorAll('.driver-tab-view');
+        allViews.forEach(view => {
             if (view.id === tabId) {
                 view.classList.add('active');
             } else {
@@ -528,7 +530,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Actualizar botones de navegación inferior
-        bottomNavBtns.forEach(btn => {
+        const allNavBtns = document.querySelectorAll('.bottom-nav-btn');
+        allNavBtns.forEach(btn => {
             if (btn.getAttribute('data-target') === tabId) {
                 btn.classList.add('active');
             } else {
@@ -536,13 +539,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Si se abre la pestaña de reservas, ganancias o billetera, refrescar datos
-        if (tabId === 'viewReservas') {
-            renderReservas();
-        } else if (tabId === 'viewGanancias') {
-            updateFinancialView();
-        } else if (tabId === 'viewBilletera') {
-            updateWalletUI();
+        // Si se abre la pestaña de reservas, ganancias o billetera, refrescar datos de forma segura
+        try {
+            if (tabId === 'viewReservas' && typeof renderReservas === 'function') {
+                renderReservas();
+            } else if (tabId === 'viewGanancias' && typeof updateFinancialView === 'function') {
+                updateFinancialView();
+            } else if (tabId === 'viewBilletera' && typeof updateWalletUI === 'function') {
+                updateWalletUI();
+            }
+        } catch(err) {
+            console.warn('Tab refresh error:', err);
         }
     }
     window.switchTab = switchTab;
@@ -550,6 +557,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openDriverProfileModal = function() {
         const modal = document.getElementById('modalDriverProfile');
         if (modal) {
+            try {
+                if (typeof renderDriverProfileInfo === 'function') renderDriverProfileInfo();
+            } catch(e) {}
             modal.classList.add('active');
             modal.style.display = 'flex';
         }
