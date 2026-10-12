@@ -5539,7 +5539,7 @@ function cleanAddressQuery(str) {
     .trim();
 }
 
-// Motor inteligente de geocodificación de alta precisión en paralelo (USIG Buenos Aires + Photon OpenStreetMap)
+// Motor inteligente de geocodificación de alta precisión: Base local instantánea (0ms) + Photon OpenStreetMap
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
   if (query.length < 2) return (typeof getDefaultPopularDestinations === 'function') ? getDefaultPopularDestinations() : [];
@@ -5563,104 +5563,95 @@ async function searchLocations(rawQuery, signal) {
     }
   }
 
-  // 1. Aeropuertos y terminales clave si la búsqueda coincide
+  // 1. Incorporar SIEMPRE las sugerencias locales inteligentes instantáneas (Avenidas, calles, alturas CABA/GBA, POIs)
+  if (typeof getInstantLocalSuggestions === 'function') {
+    try {
+      const localItems = getInstantLocalSuggestions(query);
+      if (Array.isArray(localItems)) {
+        localItems.forEach(it => addResult(it, false));
+      }
+    } catch(e) {}
+  }
+
+  // 2. Aeropuertos y terminales clave prioritarias si coinciden
   const queryLower = query.toLowerCase();
   if (/aeroparque|jorge newbery|aep/i.test(queryLower)) {
     addResult({
       lat: '-34.5580', lon: '-58.4170',
       display_name: 'Aeroparque Internacional Jorge Newbery (AEP), Avenida Costanera Rafael Obligado, Buenos Aires, Argentina',
+      _mainTitle: 'Aeroparque Jorge Newbery (AEP)',
+      _subTitle: 'Av. Costanera Rafael Obligado s/n, Palermo, CABA',
       _icon: '✈️'
-    });
+    }, true);
   } else if (/ezeiza|pistarini/i.test(queryLower)) {
     addResult({
       lat: '-34.8222', lon: '-58.5358',
       display_name: 'Aeropuerto Internacional Ministro Pistarini (Ezeiza), Autopista Teniente General Ricchieri, Ezeiza, Provincia de Buenos Aires, Argentina',
+      _mainTitle: 'Aeropuerto Ezeiza (EZE)',
+      _subTitle: 'Autopista Ricchieri Km 33.5, Ezeiza, PBA',
       _icon: '✈️'
-    });
+    }, true);
   } else if (/buquebus/i.test(queryLower)) {
     addResult({
       lat: '-34.5975', lon: '-58.3685',
       display_name: 'Terminal Buquebus Puerto Madero, Avenida Antártida Argentina, Buenos Aires, Argentina',
+      _mainTitle: 'Terminal Buquebus Puerto Madero',
+      _subTitle: 'Av. Antártida Argentina y Av. Córdoba, CABA',
       _icon: '🚢'
-    });
+    }, true);
   } else if (/obelisco/i.test(queryLower)) {
     addResult({
       lat: '-34.6037', lon: '-58.3816',
       display_name: 'Obelisco de Buenos Aires, Avenida 9 de Julio y Avenida Corrientes, San Nicolás, Buenos Aires, Argentina',
+      _mainTitle: 'Obelisco de Buenos Aires',
+      _subTitle: 'Av. 9 de Julio y Av. Corrientes, CABA',
       _icon: '📍'
-    });
+    }, true);
   }
 
+  // 3. Consulta de red en segundo plano para complementar con OpenStreetMap / Photon
   const cleanQ = cleanAddressQuery(query);
-  const fetchTasks = [];
-
-  // Tarea 1: Photon OSM Geocoder (OpenStreetMap de alta velocidad para Argentina)
-  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=8&lang=es`;
-  fetchTasks.push((async () => {
-    try {
-      const res = await fetch(photonUrl, { signal: signal || null });
-      if (res && res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.features)) {
-          data.features.forEach(f => {
-            if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
-              const [lon, lat] = f.geometry.coordinates;
-              const p = f.properties || {};
-              const streetName = p.street || p.name || cleanQ;
-              const houseNum = p.housenumber ? `${p.housenumber}, ` : '';
-              const loc = p.district || p.suburb || p.locality || p.city || '';
-              const state = p.state || (p.countrycode === 'AR' ? 'Buenos Aires' : '');
-              const country = p.country || 'Argentina';
-              const parts = [`${houseNum}${streetName}`.trim(), loc, state, country].filter(Boolean);
-              const fullDisplay = parts.join(', ');
-              addResult({
-                lat: String(lat),
-                lon: String(lon),
-                display_name: fullDisplay,
-                _icon: '📍'
-              }, false);
-            }
-          });
-        }
+  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6&lang=es`;
+  
+  try {
+    const res = await fetch(photonUrl, { signal: signal || null });
+    if (res && res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.features)) {
+        data.features.forEach(f => {
+          if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
+            const [lon, lat] = f.geometry.coordinates;
+            const p = f.properties || {};
+            const streetName = p.street || p.name || cleanQ;
+            const houseNum = p.housenumber ? `${p.housenumber}, ` : '';
+            const loc = p.district || p.suburb || p.locality || p.city || '';
+            const state = p.state || (p.countrycode === 'AR' ? 'Buenos Aires' : '');
+            const country = p.country || 'Argentina';
+            const parts = [`${houseNum}${streetName}`.trim(), loc, state, country].filter(Boolean);
+            const fullDisplay = parts.join(', ');
+            addResult({
+              lat: String(lat),
+              lon: String(lon),
+              display_name: fullDisplay,
+              _mainTitle: `${houseNum}${streetName}`.trim(),
+              _subTitle: [loc, state, country].filter(Boolean).join(', ') || 'Buenos Aires, Argentina',
+              _icon: '📍'
+            }, false);
+          }
+        });
       }
-    } catch(e) {}
-  })());
+    }
+  } catch(e) {}
 
-  // Tarea 2: USIG Gobierno de la Ciudad de Buenos Aires (Normalizador oficial CABA y GBA)
-  const usigUrl = `https://servicios.usig.buenosaires.gob.ar/normalizar/?direccion=${encodeURIComponent(cleanQ)}&geocodificar=true`;
-  fetchTasks.push((async () => {
-    try {
-      const res = await fetch(usigUrl, { signal: signal || null });
-      if (res && res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.direccionesNormalizadas)) {
-          data.direccionesNormalizadas.forEach(item => {
-            if (item.coordenadas && item.coordenadas.x && item.coordenadas.y) {
-              const fullAddr = `${item.direccion}, Argentina`;
-              addResult({
-                lat: String(item.coordenadas.y),
-                lon: String(item.coordenadas.x),
-                display_name: fullAddr,
-                _icon: '📍'
-              }, false);
-            }
-          });
-        }
-      }
-    } catch(e) {}
-  })());
-
-  if (fetchTasks.length > 0) {
-    await Promise.allSettled(fetchTasks);
-  }
-
-  // Fallback garantizado si la red no devolvió nada
+  // Fallback garantizado absoluto
   if (results.length === 0 && query.length >= 2) {
     const capitalized = query.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     addResult({
       lat: '-34.6037',
       lon: '-58.3816',
       display_name: `${capitalized}, Ciudad Autónoma de Buenos Aires, Argentina`,
+      _mainTitle: capitalized,
+      _subTitle: 'Ciudad Autónoma de Buenos Aires, Argentina',
       _icon: '📍'
     });
   }
@@ -5704,20 +5695,32 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       item.style.display = 'flex';
       item.style.alignItems = 'flex-start';
       item.style.gap = '10px';
-      item.style.padding = '11px 14px';
+      item.style.padding = '10px 14px';
       item.style.cursor = 'pointer';
       item.style.borderBottom = '1px solid rgba(255, 255, 255, 0.06)';
       item.style.transition = 'background 0.15s ease';
 
       const icon = place._icon || '📍';
       const displayText = place.display_name || '';
+      const title = place._mainTitle || displayText.split(',')[0] || displayText;
+      const subtitle = place._subTitle || displayText.split(',').slice(1).join(',').trim() || 'Buenos Aires, Argentina';
+
+      const esc = window.escapeHtml || function(s){ return s || ''; };
 
       item.innerHTML = `
-        <span style="font-size: 1.15rem; flex-shrink: 0; margin-top: 1px; line-height: 1;">${icon}</span>
-        <div style="flex: 1; min-width: 0; color: #f1f5f9; font-size: 0.88rem; line-height: 1.35; text-align: left; word-break: break-word;">
-          ${window.escapeHtml(displayText)}
+        <span style="font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; line-height: 1;">${icon}</span>
+        <div style="flex: 1; min-width: 0; text-align: left;">
+          <div style="color: #ffffff; font-weight: 700; font-size: 0.90rem; line-height: 1.25; margin-bottom: 2px;">${esc(title)}</div>
+          <div style="color: #94a3b8; font-size: 0.76rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(subtitle)}</div>
         </div>
       `;
+
+      item.addEventListener('mouseenter', () => {
+        item.style.background = 'rgba(56, 189, 248, 0.15)';
+      });
+      item.addEventListener('mouseleave', () => {
+        item.style.background = 'transparent';
+      });
 
       const handleSelect = (e) => {
         if (e) {
@@ -5762,6 +5765,13 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
   }
 
   async function executeSearch(query) {
+    // 1. MOSTRAR INMEDIATAMENTE A 0ms LAS SUGERENCIAS LOCALES SIN ESPERAR RED
+    const instantItems = (typeof getInstantLocalSuggestions === 'function') ? getInstantLocalSuggestions(query) : [];
+    if (instantItems && instantItems.length > 0) {
+      renderList(instantItems);
+    }
+
+    // 2. ENRIQUECER EN SEGUNDO PLANO VÍA RED
     if (abortController) {
       abortController.abort();
     }
@@ -5772,7 +5782,12 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       if (results && results.length > 0) {
         renderList(results);
       }
-    } catch (err) {}
+    } catch (err) {
+      // Si la red se abortó o falló, mantener en pantalla las opciones instantáneas
+      if (instantItems && instantItems.length > 0) {
+        renderList(instantItems);
+      }
+    }
   }
 
   input.addEventListener('focus', () => {
@@ -5806,9 +5821,16 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       return;
     }
 
+    // Respuesta instantánea en 0ms al presionar cada tecla
+    const instantMatches = (typeof getInstantLocalSuggestions === 'function') ? getInstantLocalSuggestions(query) : [];
+    if (instantMatches && instantMatches.length > 0) {
+      renderList(instantMatches);
+    }
+
+    // Red en segundo plano con debounce breve para no saturar
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 150);
+    }, 180);
   });
 
   input.addEventListener('keydown', async (e) => {
@@ -5819,7 +5841,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       if (items.length > 0) {
         activeIndex = (activeIndex + 1) % items.length;
         items.forEach((it, i) => {
-          it.style.background = (i === activeIndex) ? 'rgba(56, 189, 248, 0.18)' : '';
+          it.style.background = (i === activeIndex) ? 'rgba(56, 189, 248, 0.25)' : 'transparent';
         });
       }
     } else if (e.key === 'ArrowUp') {
@@ -5827,7 +5849,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       if (items.length > 0) {
         activeIndex = (activeIndex - 1 + items.length) % items.length;
         items.forEach((it, i) => {
-          it.style.background = (i === activeIndex) ? 'rgba(56, 189, 248, 0.18)' : '';
+          it.style.background = (i === activeIndex) ? 'rgba(56, 189, 248, 0.25)' : 'transparent';
         });
       }
     } else if (e.key === 'Enter') {
@@ -10518,23 +10540,25 @@ if (btnRecenterPassengerMap) {
       } catch(e) {}
     }
 
-    const wasExplicitlyLoggedOut = (function() {
-      try { return localStorage.getItem('rutaprivada_passenger_logged_out') === 'true'; } catch(e){ return false; }
-    })();
-
-    if (currentSession && (currentSession.nombre || currentSession.email || currentSession.telefono) && !wasExplicitlyLoggedOut) {
+    if (currentSession && (currentSession.nombre || currentSession.email || currentSession.telefono)) {
+      try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(e){}
       renderPassengerProfileUI(currentSession);
       if (typeof window.syncPassengerSessionUI === 'function') {
         window.syncPassengerSessionUI(currentSession);
       }
-    } else if (wasExplicitlyLoggedOut) {
-      const headerName = document.getElementById('headerPassengerName');
-      if (headerName) headerName.textContent = 'Iniciar Sesión';
-      const headerSub = document.querySelector('.passenger-status-sub');
-      if (headerSub) headerSub.textContent = 'Toca para ingresar';
-      const headerAvatar = document.getElementById('headerPassengerAvatar');
-      if (headerAvatar) {
-        headerAvatar.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="%2394a3b8"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+    } else {
+      const wasExplicitlyLoggedOut = (function() {
+        try { return localStorage.getItem('rutaprivada_passenger_logged_out') === 'true'; } catch(e){ return false; }
+      })();
+      if (wasExplicitlyLoggedOut) {
+        const headerName = document.getElementById('headerPassengerName');
+        if (headerName) headerName.textContent = 'Iniciar Sesión';
+        const headerSub = document.querySelector('.passenger-status-sub');
+        if (headerSub) headerSub.textContent = 'Toca para ingresar';
+        const headerAvatar = document.getElementById('headerPassengerAvatar');
+        if (headerAvatar) {
+          headerAvatar.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="%2394a3b8"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+        }
       }
     }
   }

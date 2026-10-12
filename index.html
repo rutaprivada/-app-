@@ -139,7 +139,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=96" />
+  <link rel="stylesheet" href="styles.css?v=97" />
 </head>
 <body>
 
@@ -193,7 +193,6 @@
   <script>
     (function() {
       try {
-        if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') return;
         var keys = ['rutaprivada_passenger_session_v1', 'rutaprivada_passenger_auth_v1', 'rutaprivada_passenger_profile', 'rutaprivada_user_session', 'rutaprivada_profile'];
         var raw = null;
         for (var i = 0; i < keys.length; i++) {
@@ -207,6 +206,7 @@
         if (raw) {
           var u = JSON.parse(raw);
           if (u && (u.email || u.nombre)) {
+            try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(err){}
             var nameEl = document.getElementById('headerPassengerName');
             var subEl = document.querySelector('.passenger-status-sub');
             var avEl = document.getElementById('headerPassengerAvatar');
@@ -1917,9 +1917,20 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=96"></script>
+  <script src="sync.js?v=97"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=96"></script>
+  <script src="app.js?v=97"></script>
+
+  <!-- PWA Service Worker Auto-Update -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        registrations.forEach(function(reg) {
+          reg.update();
+        });
+      });
+    }
+  </script>
 </body>
 </html>
