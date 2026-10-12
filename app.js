@@ -552,16 +552,26 @@ window.syncPassengerSessionUI = function(session) {
   const nameInp = document.getElementById('passenger-name-input') || document.getElementById('user-name') || document.getElementById('client-name');
   const phoneInp = document.getElementById('passenger-phone-input') || document.getElementById('user-phone') || document.getElementById('client-phone');
   const emailInp = document.getElementById('user-email') || document.getElementById('client-email');
+  const statusMsg = document.getElementById('passengerProfileStatusMsg');
 
   if (session && (session.nombre || session.email || session.telefono)) {
-    const firstName = session.nombre ? session.nombre.split(' ')[0] : 'Pasajero';
+    const userEmail = session.email ? session.email.toLowerCase() : '';
+    const firstName = session.nombre ? session.nombre.split(' ')[0] : (userEmail ? userEmail.split('@')[0] : 'Pasajero');
+
     if (headerName) headerName.textContent = firstName;
-    if (headerSub) headerSub.textContent = '★ 5.00 Pasajero';
+    if (headerSub) {
+      if (userEmail) {
+        headerSub.innerHTML = `<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">${window.escapeHtml(userEmail)}</span>`;
+        headerSub.title = `Sesión activa: ${userEmail}`;
+      } else {
+        headerSub.textContent = '★ 5.00 Pasajero';
+      }
+    }
     if (headerAvatar) {
       headerAvatar.src = (session.avatar && session.avatar.length > 10) ? session.avatar : defaultAvatar;
     }
 
-    if (modalTitle) modalTitle.textContent = session.nombre || 'Mi Perfil de Pasajero';
+    if (modalTitle) modalTitle.textContent = session.nombre || (userEmail ? `Pasajero (${userEmail})` : 'Mi Perfil de Pasajero');
     if (modalHeaderImg) {
       modalHeaderImg.src = (session.avatar && session.avatar.length > 10) ? session.avatar : defaultAvatar;
     }
@@ -580,11 +590,17 @@ window.syncPassengerSessionUI = function(session) {
 
     if (profName) profName.value = session.nombre || '';
     if (profPhone) profPhone.value = session.telefono || '';
-    if (profEmail) profEmail.value = session.email || '';
+    if (profEmail) profEmail.value = userEmail;
 
-    if (nameInp && session.nombre && !nameInp.value) nameInp.value = session.nombre;
+    if (nameInp && !nameInp.value) nameInp.value = session.nombre || firstName;
     if (phoneInp && session.telefono && !phoneInp.value) phoneInp.value = session.telefono;
-    if (emailInp && session.email && !emailInp.value) emailInp.value = session.email;
+    if (emailInp && userEmail && !emailInp.value) emailInp.value = userEmail;
+
+    if (statusMsg) {
+      statusMsg.innerHTML = userEmail ? 
+        `✓ Sesión activa como <strong style="color: #38bdf8;">${window.escapeHtml(userEmail)}</strong>` : 
+        `Indica tu nombre y número de celular para que el conductor pueda contactarte`;
+    }
   } else {
     // Sesión cerrada
     if (headerName) headerName.textContent = 'Iniciar Sesión';
@@ -604,13 +620,17 @@ window.syncPassengerSessionUI = function(session) {
     if (nameInp) nameInp.value = '';
     if (phoneInp) phoneInp.value = '';
     if (emailInp) emailInp.value = '';
+
+    if (statusMsg) {
+      statusMsg.textContent = 'Indica tu nombre y número de celular para que el conductor pueda contactarte';
+    }
   }
 };
 
 window.handlePassengerLogout = function() {
   try {
-    localStorage.setItem('rutaprivada_passenger_logged_out', 'true');
     localStorage.removeItem('rutaprivada_passenger_session_v1');
+    sessionStorage.removeItem('rutaprivada_passenger_session_v1');
     localStorage.removeItem('rutaprivada_passenger_session');
     localStorage.removeItem('rutaprivada_passenger_profile');
     localStorage.removeItem('rutaprivada_user_session');
@@ -625,6 +645,7 @@ window.handlePassengerLogout = function() {
     window.state.passengerPhone = '';
     window.state.passengerEmail = '';
     window.state.passengerAvatar = '';
+    window.state.passengerSession = null;
   }
 
   // Actualizar UI completa a estado de sesión cerrada
@@ -792,10 +813,8 @@ let routePolyline = null;
 // ==========================================
 window.getPassengerSession = function() {
   try {
-    if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') {
-      return null;
-    }
     const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
+                sessionStorage.getItem('rutaprivada_passenger_session_v1') ||
                 localStorage.getItem('rutaprivada_passenger_profile') || 
                 localStorage.getItem('rutaprivada_user_session') ||
                 localStorage.getItem('rutaprivada_profile') ||
@@ -803,7 +822,10 @@ window.getPassengerSession = function() {
                 localStorage.getItem('passenger_profile');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
+      if (parsed && (parsed.email || parsed.nombre || parsed.telefono)) {
+        try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(e){}
+        return parsed;
+      }
     }
   } catch(e) {}
 
@@ -9370,10 +9392,8 @@ if (btnRecenterPassengerMap) {
 
     function getPassengerSession() {
       try {
-        if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') {
-          return null;
-        }
         const raw = localStorage.getItem(STORAGE_KEY_SESSION) || 
+                    sessionStorage.getItem(STORAGE_KEY_SESSION) ||
                     localStorage.getItem(STORAGE_KEY_LEGACY) || 
                     localStorage.getItem('rutaprivada_passenger_session_v1') ||
                     localStorage.getItem('rutaprivada_passenger_profile') ||
@@ -9383,7 +9403,10 @@ if (btnRecenterPassengerMap) {
                     localStorage.getItem('passenger_profile');
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed && (parsed.nombre || parsed.email || parsed.telefono)) return parsed;
+          if (parsed && (parsed.email || parsed.nombre || parsed.telefono)) {
+            try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(e){}
+            return parsed;
+          }
         }
       } catch(e) {}
 
@@ -9404,6 +9427,8 @@ if (btnRecenterPassengerMap) {
       try {
         localStorage.removeItem('rutaprivada_passenger_logged_out');
         localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(user));
+        sessionStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(user));
+        sessionStorage.setItem('rutaprivada_passenger_session_v1', JSON.stringify(user));
         localStorage.setItem(STORAGE_KEY_LEGACY, JSON.stringify(user));
         localStorage.setItem('rutaprivada_passenger_session_v1', JSON.stringify(user));
         localStorage.setItem('rutaprivada_passenger_profile', JSON.stringify(user));
@@ -9632,110 +9657,131 @@ if (btnRecenterPassengerMap) {
         e.preventDefault();
         const identifierInput = document.getElementById('loginPassengerIdentifier');
         const passwordInput = document.getElementById('loginPassengerPassword');
-        const identifier = identifierInput ? identifierInput.value.trim() : '';
-        const password = passwordInput ? passwordInput.value.trim() : '';
+        const rawEmail = (identifierInput ? identifierInput.value : '').trim().toLowerCase();
+        const password = (passwordInput ? passwordInput.value : '').trim();
 
-        if (!identifier || !password) {
-          if (typeof showToast === 'function') showToast('⚠️ Por favor ingresa tu correo/teléfono y contraseña.');
+        if (!rawEmail || !password) {
+          if (typeof showToast === 'function') showToast('⚠️ Por favor ingresa tu correo electrónico y contraseña.');
           return;
         }
 
+        // Validación estricta: ÚNICAMENTE correo electrónico (no números de teléfono)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(rawEmail) || /^\+?\d+$/.test(rawEmail.replace(/[\s\-\(\)]/g, ''))) {
+          if (typeof showToast === 'function') {
+            showToast('⚠️ El usuario debe ser tu correo electrónico (ej: usuario@ejemplo.com). No se permite ingresar con número de teléfono.');
+          }
+          if (identifierInput) identifierInput.focus();
+          return;
+        }
+
+        const email = rawEmail;
         const enteredHash = await hashPassword(password);
         const registeredUsers = getRegisteredPassengers();
 
-        // 1. Buscar en usuarios guardados en este dispositivo
-        let user = registeredUsers.find(u => 
-          (u.email && u.email.toLowerCase() === identifier.toLowerCase()) || 
-          (u.telefono && u.telefono.replace(/\D/g, '') === identifier.replace(/\D/g, ''))
-        );
+        // 1. Buscar en usuarios registrados en este dispositivo
+        let user = registeredUsers.find(u => u.email && u.email.toLowerCase() === email);
 
-        // 2. Si no está en este dispositivo, consultar en Firestore Cloud en tiempo real
+        // 2. Si no está en registeredUsers, buscar en sesiones previas o backups locales
+        if (!user) {
+          ['rutaprivada_passenger_session_v1', 'rutaprivada_passenger_profile', 'rutaprivada_user_session', 'rutaprivada_profile'].forEach(k => {
+            if (!user) {
+              try {
+                const item = JSON.parse(localStorage.getItem(k) || '{}');
+                if (item && item.email && item.email.toLowerCase() === email) {
+                  user = item;
+                }
+              } catch(err){}
+            }
+          });
+        }
+
+        // 3. Consultar en Firestore Cloud si está disponible
         if (!user && typeof firebase !== 'undefined' && firebase.firestore) {
           try {
             const db = firebase.firestore();
-            const emailDocId = identifier.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-            const cleanPhone = identifier.replace(/\D/g, '');
-            const phoneDocId = cleanPhone ? ('pass_' + cleanPhone) : '';
-
-            // Intento A: Documento por email normalizado
+            const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
             let snap = await db.collection('pasajeros').doc(emailDocId).get();
             if (snap.exists) {
               user = snap.data();
             }
-
-            // Intento B: Documento por teléfono
-            if (!user && phoneDocId) {
-              snap = await db.collection('pasajeros').doc(phoneDocId).get();
-              if (snap.exists) {
-                user = snap.data();
-              }
-            }
-
-            // Intento C: Query WHERE email
             if (!user) {
-              const qSnap = await db.collection('pasajeros').where('email', '==', identifier.toLowerCase()).limit(1).get();
-              if (!qSnap.empty) {
-                user = qSnap.docs[0].data();
-              }
+              const qSnap = await db.collection('pasajeros').where('email', '==', email).limit(1).get();
+              if (!qSnap.empty) user = qSnap.docs[0].data();
             }
-
-            // Intento D: Query WHERE telefono
-            if (!user && cleanPhone) {
-              const qSnap2 = await db.collection('pasajeros').where('telefono', '==', identifier).limit(1).get();
-              if (!qSnap2.empty) {
-                user = qSnap2.docs[0].data();
-              }
-            }
-          } catch(e) {
-            console.warn('Consulta Firestore pasajero falló, usando REST fallback:', e);
-          }
+          } catch(err) {}
         }
 
-        // 3. Fallback directo mediante Firestore Cloud REST API
+        // 4. Si aún no está, consultar REST de Firestore Cloud
         if (!user) {
           try {
-            const emailDocId = identifier.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
             const restResp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/pasajeros/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`);
             if (restResp.ok) {
               const data = await restResp.json();
               if (data && data.fields) {
                 user = {
                   id: data.fields.id?.stringValue || emailDocId,
-                  nombre: data.fields.nombre?.stringValue || 'Pasajero',
+                  nombre: data.fields.nombre?.stringValue || email.split('@')[0],
                   telefono: data.fields.telefono?.stringValue || '',
-                  email: data.fields.email?.stringValue || identifier,
+                  email: data.fields.email?.stringValue || email,
                   passwordHash: data.fields.passwordHash?.stringValue || '',
                   password: data.fields.password?.stringValue || '',
                   rating: data.fields.rating?.stringValue || '5.00'
                 };
               }
             }
-          } catch(e) {}
+          } catch(err) {}
         }
 
-        // VALIDACIÓN ESTRICTA DE EXISTENCIA DE USUARIO
-        if (!user) {
-          if (typeof showToast === 'function') {
-            showToast('⚠️ No existe ninguna cuenta registrada con este correo o teléfono. Por favor crea una cuenta primero.');
+        // 5. Si el usuario existe: validar contraseña
+        if (user) {
+          const storedHash = user.passwordHash || (user.password ? await hashPassword(user.password) : '');
+          const hasPasswordSet = Boolean(storedHash || user.password);
+
+          if (hasPasswordSet) {
+            const isPasswordCorrect = (storedHash && storedHash === enteredHash) || (user.password && user.password === password);
+            if (!isPasswordCorrect) {
+              if (typeof showToast === 'function') {
+                showToast('❌ Contraseña incorrecta. Por favor verifica tus datos.');
+              }
+              return;
+            }
+          } else {
+            user.password = password;
+            user.passwordHash = enteredHash;
           }
-          return;
+        } else {
+          // 6. Si no existe previamente: AUTO-CREAR CUENTA Y ACTIVAR SESIÓN
+          const defaultName = email.split('@')[0].replace(/[._-]/g, ' ');
+          const capitalizedName = defaultName.charAt(0).toUpperCase() + defaultName.slice(1);
+          user = {
+            id: 'pass_' + Date.now(),
+            nombre: capitalizedName,
+            telefono: '',
+            email: email,
+            password: password,
+            passwordHash: enteredHash,
+            medioPago: 'efectivo',
+            rating: '5.00',
+            ratingCount: 1,
+            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+            fechaRegistro: new Date().toISOString(),
+            emailVerificado: true
+          };
         }
 
-        // VALIDACIÓN ESTRICTA DE CONTRASEÑA
-        const storedHash = user.passwordHash || (user.password ? await hashPassword(user.password) : '');
-        const isPasswordCorrect = (storedHash && storedHash === enteredHash) || (user.password && user.password === password);
-
-        if (!isPasswordCorrect) {
-          if (typeof showToast === 'function') {
-            showToast('❌ Contraseña incorrecta. Por favor verifica tus datos.');
-          }
-          return;
-        }
-
+        // Guardar y activar sesión
+        try {
+          localStorage.removeItem('rutaprivada_passenger_logged_out');
+        } catch(e) {}
         savePassengerSession(user);
         closePassengerAuthModal();
+        if (typeof window.syncPassengerSessionUI === 'function') {
+          window.syncPassengerSessionUI(user);
+        }
         if (typeof showToast === 'function') {
-          showToast(`👋 ¡Bienvenido de nuevo, ${user.nombre}!`);
+          showToast(`👋 ¡Sesión iniciada con éxito! Bienvenido, ${user.nombre || user.email}.`);
         }
       });
     }

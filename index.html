@@ -1484,11 +1484,14 @@
 
         <!-- FORMULARIO 1: INICIAR SESIÓN -->
         <form id="formPassengerLogin" style="display: flex; flex-direction: column; gap: 12px;">
+          <div id="loginPassengerStatusMsg" style="display: none; padding: 10px 14px; border-radius: 10px; font-size: 0.83rem; text-align: center; font-weight: 600;"></div>
+
           <div>
             <label for="loginPassengerIdentifier" style="color: #e2e8f0; font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 5px;">
-              ✉️ Correo Electrónico o Teléfono *
+              ✉️ Correo Electrónico * (Usuario)
             </label>
-            <input type="text" id="loginPassengerIdentifier" placeholder="Ej: usuario@ejemplo.com o 11 0000 0000" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
+            <input type="email" id="loginPassengerIdentifier" placeholder="Ej: tu-correo@ejemplo.com" autocomplete="email" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
+            <small style="color: #94a3b8; font-size: 0.74rem; display: block; margin-top: 4px;">Tu usuario es exclusivamente tu correo electrónico (no número de teléfono).</small>
           </div>
 
           <div>
@@ -1501,9 +1504,14 @@
                 <i class="fa-solid fa-eye"></i>
               </button>
             </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+              <button type="button" id="btnForgotPassengerPassword" onclick="window.handleForgotPassengerPassword()" style="background: none; border: none; color: #38bdf8; font-size: 0.76rem; cursor: pointer; text-decoration: underline; padding: 2px 4px;">
+                ¿Olvidaste o quieres cambiar tu contraseña?
+              </button>
+            </div>
           </div>
 
-          <button type="submit" class="btn btn-primary full-width" style="margin-top: 4px; padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.35); cursor: pointer;">
+          <button type="submit" id="btnSubmitPassengerLogin" class="btn btn-primary full-width" style="margin-top: 4px; padding: 12px; font-size: 0.95rem; font-weight: 800; border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.35); cursor: pointer;">
             🚀 Iniciar Sesión de Pasajero
           </button>
         </form>
@@ -1880,9 +1888,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=92"></script>
+  <script src="sync.js?v=93"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=92"></script>
+  <script src="app.js?v=93"></script>
 </body>
 </html>

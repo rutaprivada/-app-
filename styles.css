@@ -2476,7 +2476,7 @@ body {
   border-radius: var(--radius-md);
   font-size: 0.9rem;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
-  z-index: 10000;
+  z-index: 999999 !important;
   transition: opacity 0.3s, transform 0.3s;
 }
 
