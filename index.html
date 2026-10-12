@@ -193,7 +193,10 @@
   <script>
     (function() {
       try {
-        var keys = ['rutaprivada_passenger_session_v1', 'rutaprivada_passenger_auth_v1', 'rutaprivada_passenger_profile', 'rutaprivada_user_session', 'rutaprivada_profile'];
+        if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') {
+          return;
+        }
+        var keys = ['rutaprivada_passenger_auth_v1', 'rutaprivada_passenger_session_v1', 'rutaprivada_passenger_profile', 'rutaprivada_user_session', 'rutaprivada_profile'];
         var raw = null;
         for (var i = 0; i < keys.length; i++) {
           raw = localStorage.getItem(keys[i]) || sessionStorage.getItem(keys[i]);
@@ -205,14 +208,20 @@
         }
         if (raw) {
           var u = JSON.parse(raw);
-          if (u && (u.email || u.nombre)) {
+          if (u && (u.email || u.nombre || u.usuario || u.telefono)) {
             try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(err){}
             var nameEl = document.getElementById('headerPassengerName');
             var subEl = document.querySelector('.passenger-status-sub');
             var avEl = document.getElementById('headerPassengerAvatar');
-            var shortName = u.nombre ? u.nombre.split(' ')[0] : (u.email ? u.email.split('@')[0] : 'Pasajero');
+            var shortName = u.nombre ? u.nombre.split(' ')[0] : (u.usuario || (u.email ? u.email.split('@')[0] : 'Pasajero'));
             if (nameEl) nameEl.textContent = shortName;
-            if (subEl && u.email) subEl.innerHTML = '<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">' + u.email + '</span>';
+            if (subEl) {
+              if (u.email) {
+                subEl.innerHTML = '<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">' + u.email + '</span>';
+              } else {
+                subEl.innerHTML = '<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">Sesión Activa</span>';
+              }
+            }
             if (avEl && u.avatar) avEl.src = u.avatar;
           }
         }
@@ -1529,10 +1538,10 @@
 
           <div>
             <label for="loginPassengerIdentifier" style="color: #e2e8f0; font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 5px;">
-              ✉️ Correo Electrónico * (Usuario)
+              👤 Usuario, Correo o Celular *
             </label>
-            <input type="email" id="loginPassengerIdentifier" placeholder="Ej: tu-correo@ejemplo.com" autocomplete="email" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
-            <small style="color: #94a3b8; font-size: 0.74rem; display: block; margin-top: 4px;">Tu usuario es exclusivamente tu correo electrónico (no número de teléfono).</small>
+            <input type="text" id="loginPassengerIdentifier" placeholder="Ej: tu usuario, correo o teléfono" autocomplete="username" required style="width: 100%; background: #0b1329; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 14px; border-radius: 11px; font-size: 0.9rem; outline: none;" />
+            <small style="color: #94a3b8; font-size: 0.74rem; display: block; margin-top: 4px;">Ingresa con tu usuario, correo electrónico o número registrado.</small>
           </div>
 
           <div>
@@ -2087,14 +2096,17 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=99"></script>
+  <script src="sync.js?v=105"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=99"></script>
+  <script src="app.js?v=105"></script>
 
   <!-- PWA Service Worker Auto-Update -->
   <script>
     if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js?v=105').then(function(reg) {
+        reg.update();
+      }).catch(function(){});
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
         registrations.forEach(function(reg) {
           reg.update();
