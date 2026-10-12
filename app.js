@@ -9467,6 +9467,9 @@ if (btnRecenterPassengerMap) {
       }
 
       renderPassengerProfileUI(user);
+      if (typeof window.syncPassengerSessionUI === 'function') {
+        window.syncPassengerSessionUI(user);
+      }
     }
     window.savePassengerSession = savePassengerSession;
 
