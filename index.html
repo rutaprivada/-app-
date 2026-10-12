@@ -139,7 +139,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=94" />
+  <link rel="stylesheet" href="styles.css?v=96" />
 </head>
 <body>
 
@@ -190,6 +190,35 @@
       </div>
     </div>
   </header>
+  <script>
+    (function() {
+      try {
+        if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') return;
+        var keys = ['rutaprivada_passenger_session_v1', 'rutaprivada_passenger_auth_v1', 'rutaprivada_passenger_profile', 'rutaprivada_user_session', 'rutaprivada_profile'];
+        var raw = null;
+        for (var i = 0; i < keys.length; i++) {
+          raw = localStorage.getItem(keys[i]) || sessionStorage.getItem(keys[i]);
+          if (raw) break;
+        }
+        if (!raw && document.cookie) {
+          var m = document.cookie.match(/rutaprivada_passenger_session_v1=([^;]+)/);
+          if (m) { try { raw = decodeURIComponent(m[1]); } catch(e){} }
+        }
+        if (raw) {
+          var u = JSON.parse(raw);
+          if (u && (u.email || u.nombre)) {
+            var nameEl = document.getElementById('headerPassengerName');
+            var subEl = document.querySelector('.passenger-status-sub');
+            var avEl = document.getElementById('headerPassengerAvatar');
+            var shortName = u.nombre ? u.nombre.split(' ')[0] : (u.email ? u.email.split('@')[0] : 'Pasajero');
+            if (nameEl) nameEl.textContent = shortName;
+            if (subEl && u.email) subEl.innerHTML = '<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">' + u.email + '</span>';
+            if (avEl && u.avatar) avEl.src = u.avatar;
+          }
+        }
+      } catch(e) {}
+    })();
+  </script>
 
   <!-- Main Hero / Multi-Step Wizard Calculator Section -->
   <main class="container main-layout">
@@ -1888,9 +1917,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=95"></script>
+  <script src="sync.js?v=96"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=95"></script>
+  <script src="app.js?v=96"></script>
 </body>
 </html>

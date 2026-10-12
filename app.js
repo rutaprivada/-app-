@@ -5539,7 +5539,7 @@ function cleanAddressQuery(str) {
     .trim();
 }
 
-// Motor inteligente de geocodificación de alta precisión en paralelo (Nominatim OSM + Photon OSM + Mapbox Places)
+// Motor inteligente de geocodificación de alta precisión en paralelo (USIG Buenos Aires + Photon OpenStreetMap)
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
   if (query.length < 2) return (typeof getDefaultPopularDestinations === 'function') ? getDefaultPopularDestinations() : [];
@@ -5563,7 +5563,7 @@ async function searchLocations(rawQuery, signal) {
     }
   }
 
-  // 1. Aeropuertos y terminales clave si la búsqueda coincide exactamente
+  // 1. Aeropuertos y terminales clave si la búsqueda coincide
   const queryLower = query.toLowerCase();
   if (/aeroparque|jorge newbery|aep/i.test(queryLower)) {
     addResult({
@@ -5583,42 +5583,19 @@ async function searchLocations(rawQuery, signal) {
       display_name: 'Terminal Buquebus Puerto Madero, Avenida Antártida Argentina, Buenos Aires, Argentina',
       _icon: '🚢'
     });
+  } else if (/obelisco/i.test(queryLower)) {
+    addResult({
+      lat: '-34.6037', lon: '-58.3816',
+      display_name: 'Obelisco de Buenos Aires, Avenida 9 de Julio y Avenida Corrientes, San Nicolás, Buenos Aires, Argentina',
+      _icon: '📍'
+    });
   }
 
   const cleanQ = cleanAddressQuery(query);
-  const mapboxToken = (window.state?.config?.mapboxToken) || DEFAULT_CONFIG.mapboxToken;
-  const mapboxUrl = mapboxToken ? `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?country=ar&proximity=-58.3816,-34.6037&autocomplete=true&language=es&limit=6&access_token=${mapboxToken}` : null;
-  const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ + ', Argentina')}&countrycodes=ar&addressdetails=1&limit=6`;
-  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
-
   const fetchTasks = [];
 
-  // Task 1: OpenStreetMap Nominatim Argentina (Fuente oficial de la Imagen 1)
-  fetchTasks.push((async () => {
-    try {
-      const res = await fetch(nominatimUrl, {
-        headers: { 'Accept-Language': 'es' },
-        signal: signal || null
-      });
-      if (res && res.ok) {
-        const nomData = await res.json();
-        if (Array.isArray(nomData)) {
-          nomData.forEach(item => {
-            if (item.lat && item.lon && item.display_name) {
-              addResult({
-                lat: String(item.lat),
-                lon: String(item.lon),
-                display_name: item.display_name,
-                _icon: '📍'
-              }, false);
-            }
-          });
-        }
-      }
-    } catch(e) {}
-  })());
-
-  // Task 2: Photon OSM Geocoder (Rápido y de respaldo)
+  // Tarea 1: Photon OSM Geocoder (OpenStreetMap de alta velocidad para Argentina)
+  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=8&lang=es`;
   fetchTasks.push((async () => {
     try {
       const res = await fetch(photonUrl, { signal: signal || null });
@@ -5629,8 +5606,12 @@ async function searchLocations(rawQuery, signal) {
             if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
               const [lon, lat] = f.geometry.coordinates;
               const p = f.properties || {};
-              const streetNum = p.street ? `${p.housenumber ? p.housenumber + ', ' : ''}${p.street}` : (p.name || cleanQ);
-              const parts = [streetNum, p.district || p.locality || p.city, p.state || 'Buenos Aires', 'Argentina'].filter(Boolean);
+              const streetName = p.street || p.name || cleanQ;
+              const houseNum = p.housenumber ? `${p.housenumber}, ` : '';
+              const loc = p.district || p.suburb || p.locality || p.city || '';
+              const state = p.state || (p.countrycode === 'AR' ? 'Buenos Aires' : '');
+              const country = p.country || 'Argentina';
+              const parts = [`${houseNum}${streetName}`.trim(), loc, state, country].filter(Boolean);
               const fullDisplay = parts.join(', ');
               addResult({
                 lat: String(lat),
@@ -5645,37 +5626,35 @@ async function searchLocations(rawQuery, signal) {
     } catch(e) {}
   })());
 
-  // Task 3: Mapbox Places API
-  if (mapboxUrl) {
-    fetchTasks.push((async () => {
-      try {
-        const res = await fetch(mapboxUrl, { signal: signal || null });
-        if (res && res.ok) {
-          const mbData = await res.json();
-          if (mbData && Array.isArray(mbData.features)) {
-            mbData.features.forEach(f => {
-              if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
-                const [lon, lat] = f.geometry.coordinates;
-                const fullPlace = f.place_name || '';
-                addResult({
-                  lat: String(lat),
-                  lon: String(lon),
-                  display_name: fullPlace,
-                  _icon: '📍'
-                }, false);
-              }
-            });
-          }
+  // Tarea 2: USIG Gobierno de la Ciudad de Buenos Aires (Normalizador oficial CABA y GBA)
+  const usigUrl = `https://servicios.usig.buenosaires.gob.ar/normalizar/?direccion=${encodeURIComponent(cleanQ)}&geocodificar=true`;
+  fetchTasks.push((async () => {
+    try {
+      const res = await fetch(usigUrl, { signal: signal || null });
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.direccionesNormalizadas)) {
+          data.direccionesNormalizadas.forEach(item => {
+            if (item.coordenadas && item.coordenadas.x && item.coordenadas.y) {
+              const fullAddr = `${item.direccion}, Argentina`;
+              addResult({
+                lat: String(item.coordenadas.y),
+                lon: String(item.coordenadas.x),
+                display_name: fullAddr,
+                _icon: '📍'
+              }, false);
+            }
+          });
         }
-      } catch(e) {}
-    })());
-  }
+      }
+    } catch(e) {}
+  })());
 
   if (fetchTasks.length > 0) {
     await Promise.allSettled(fetchTasks);
   }
 
-  // Fallback si no hubo resultados de red: sugerir con Buenos Aires, Argentina
+  // Fallback garantizado si la red no devolvió nada
   if (results.length === 0 && query.length >= 2) {
     const capitalized = query.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     addResult({
@@ -5829,7 +5808,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 250);
+    }, 150);
   });
 
   input.addEventListener('keydown', async (e) => {
@@ -10523,13 +10502,32 @@ if (btnRecenterPassengerMap) {
     }
 
     // Cargar perfil en inicio si existe sesión activa
-    const currentSession = window.getPassengerSession();
-    if (currentSession && (currentSession.nombre || currentSession.email || currentSession.telefono)) {
+    let currentSession = window.getPassengerSession();
+    if (!currentSession) {
+      try {
+        const fallbackRaw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
+                            localStorage.getItem('rutaprivada_passenger_auth_v1') || 
+                            localStorage.getItem('rutaprivada_passenger_profile') ||
+                            sessionStorage.getItem('rutaprivada_passenger_session_v1');
+        if (fallbackRaw) {
+          const parsed = JSON.parse(fallbackRaw);
+          if (parsed && (parsed.email || parsed.nombre)) {
+            currentSession = parsed;
+          }
+        }
+      } catch(e) {}
+    }
+
+    const wasExplicitlyLoggedOut = (function() {
+      try { return localStorage.getItem('rutaprivada_passenger_logged_out') === 'true'; } catch(e){ return false; }
+    })();
+
+    if (currentSession && (currentSession.nombre || currentSession.email || currentSession.telefono) && !wasExplicitlyLoggedOut) {
       renderPassengerProfileUI(currentSession);
       if (typeof window.syncPassengerSessionUI === 'function') {
         window.syncPassengerSessionUI(currentSession);
       }
-    } else {
+    } else if (wasExplicitlyLoggedOut) {
       const headerName = document.getElementById('headerPassengerName');
       if (headerName) headerName.textContent = 'Iniciar Sesión';
       const headerSub = document.querySelector('.passenger-status-sub');
