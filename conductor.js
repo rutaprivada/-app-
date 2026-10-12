@@ -85,15 +85,14 @@ window.openDriverTicketModal = function(preselectedCategory, defaultDescription)
         const inputDesc = document.getElementById('ticketDescription');
         if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
         if (inputDesc && defaultDescription && !inputDesc.value) inputDesc.value = defaultDescription;
-        modal.classList.add('active');
         modal.style.display = 'flex';
+        modal.classList.add('active');
     }
 };
 
 window.closeDriverTicketModal = window.closeDriverReportTicketModal;
 
 window.openDriverTicketCategory = function(catKey) {
-    window.closeDriverHelpModal();
     window.openDriverTicketModal(catKey);
 };
 
@@ -6383,6 +6382,213 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ==========================================
+    // RECUPERACIÓN / CAMBIO DE CONTRASEÑA CHOFER
+    // ==========================================
+    let driverResetState = null;
+
+    window.closeDriverPasswordResetModal = function() {
+        const modal = document.getElementById('modalDriverPasswordReset');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+        }
+        driverResetState = null;
+    };
+
+    window.handleForgotDriverPassword = function() {
+        const modal = document.getElementById('modalDriverPasswordReset');
+        if (!modal) return;
+        const inputLoginEmail = document.getElementById('loginDriverEmail');
+        const inputResetEmail = document.getElementById('resetDriverEmail');
+        const sectionOtp = document.getElementById('sectionDriverResetOtp');
+        const inputCode = document.getElementById('inputDriverResetCode');
+        const inputNewPass = document.getElementById('resetDriverNewPass');
+        const inputNewPassConfirm = document.getElementById('resetDriverNewPassConfirm');
+
+        if (sectionOtp) sectionOtp.style.display = 'none';
+        if (inputCode) inputCode.value = '';
+        if (inputNewPass) inputNewPass.value = '';
+        if (inputNewPassConfirm) inputNewPassConfirm.value = '';
+
+        if (inputResetEmail) {
+            const prefill = (inputLoginEmail ? inputLoginEmail.value : '').trim();
+            if (prefill) inputResetEmail.value = prefill;
+        }
+
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+    };
+
+    const btnSendDriverResetCode = document.getElementById('btnSendDriverResetCode');
+    if (btnSendDriverResetCode) {
+        btnSendDriverResetCode.addEventListener('click', async () => {
+            const inputResetEmail = document.getElementById('resetDriverEmail');
+            const email = (inputResetEmail ? inputResetEmail.value : '').trim().toLowerCase();
+
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                showDriverToast('⚠️ Ingresa un correo electrónico válido.');
+                if (inputResetEmail) inputResetEmail.focus();
+                return;
+            }
+
+            // Verificar si el chofer existe
+            const list = getRegisteredDriversList();
+            let driver = list.find(d => d.email && d.email.toLowerCase() === email);
+
+            // Consultar en Firestore si no está en local
+            if (!driver && typeof firebase !== 'undefined') {
+                try {
+                    const db = firebase.firestore();
+                    const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
+                    let snap = await db.collection('conductores').doc(emailDocId).get();
+                    if (snap.exists) driver = snap.data();
+                    if (!driver) {
+                        snap = await db.collection('drivers').doc(emailDocId).get();
+                        if (snap.exists) driver = snap.data();
+                    }
+                } catch(e) {}
+            }
+
+            // Fallback REST API
+            if (!driver) {
+                try {
+                    const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
+                    const restResp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/conductores/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`);
+                    if (restResp.ok) {
+                        const data = await restResp.json();
+                        if (data && data.fields) {
+                            driver = {
+                                id: data.fields.id?.stringValue || ('drv_' + emailDocId),
+                                nombre: data.fields.nombre?.stringValue || 'Conductor',
+                                email: data.fields.email?.stringValue || email
+                            };
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            // Generar código OTP de 6 dígitos
+            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+            driverResetState = {
+                email,
+                code: otpCode,
+                driverObj: driver || { email, nombre: email.split('@')[0] },
+                expiresAt: Date.now() + 15 * 60 * 1000
+            };
+
+            btnSendDriverResetCode.disabled = true;
+            btnSendDriverResetCode.style.opacity = '0.7';
+            btnSendDriverResetCode.textContent = 'Enviando...';
+
+            showDriverToast(`⏳ Enviando código de seguridad a ${email}...`);
+
+            // Despacho de correo vía EmailJS
+            const sendResult = await sendEmailJsVerification(email, otpCode);
+            btnSendDriverResetCode.disabled = false;
+            btnSendDriverResetCode.style.opacity = '1';
+            btnSendDriverResetCode.textContent = 'Reenviar Código';
+
+            const sectionOtp = document.getElementById('sectionDriverResetOtp');
+            if (sectionOtp) sectionOtp.style.display = 'flex';
+            const inputCode = document.getElementById('inputDriverResetCode');
+            if (inputCode) {
+                inputCode.value = '';
+                setTimeout(() => inputCode.focus(), 250);
+            }
+
+            if (sendResult.success) {
+                showDriverToast(`📨 ¡Código de seguridad enviado con éxito a ${email}! Revisa tu correo.`);
+            } else {
+                showDriverToast(`📨 Código generado. Si no llega a tu correo ${email}, revisa spam o pulsa reenviar.`);
+            }
+        });
+    }
+
+    const formDriverPasswordReset = document.getElementById('formDriverPasswordReset');
+    if (formDriverPasswordReset) {
+        formDriverPasswordReset.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!driverResetState) {
+                showDriverToast('⚠️ Primero debes solicitar el código a tu correo.');
+                return;
+            }
+
+            const inputCode = document.getElementById('inputDriverResetCode');
+            const enteredCode = (inputCode ? inputCode.value : '').replace(/\D/g, '').trim();
+
+            if (enteredCode !== driverResetState.code) {
+                showDriverToast('❌ Código de verificación incorrecto. Revisa el correo recibido.');
+                if (inputCode) inputCode.focus();
+                return;
+            }
+
+            const inputNewPass = document.getElementById('resetDriverNewPass');
+            const inputNewPassConfirm = document.getElementById('resetDriverNewPassConfirm');
+            const newPass = (inputNewPass ? inputNewPass.value : '').trim();
+            const newPassConfirm = (inputNewPassConfirm ? inputNewPassConfirm.value : '').trim();
+
+            if (!newPass || newPass.length < 8 || !/\d/.test(newPass)) {
+                showDriverToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
+                if (inputNewPass) inputNewPass.focus();
+                return;
+            }
+
+            if (newPass !== newPassConfirm) {
+                showDriverToast('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
+                if (inputNewPassConfirm) inputNewPassConfirm.focus();
+                return;
+            }
+
+            const newHash = await hashDriverPassword(newPass);
+            const email = driverResetState.email;
+
+            // Actualizar en localStorage
+            const list = getRegisteredDriversList();
+            let driverIdx = list.findIndex(d => d.email && d.email.toLowerCase() === email);
+            if (driverIdx >= 0) {
+                list[driverIdx].password = newPass;
+                list[driverIdx].passwordHash = newHash;
+                saveRegisteredDriversList(list);
+            } else {
+                const newDriver = {
+                    ...driverResetState.driverObj,
+                    email,
+                    password: newPass,
+                    passwordHash: newHash
+                };
+                list.push(newDriver);
+                saveRegisteredDriversList(list);
+            }
+
+            // Actualizar en Firestore si está disponible
+            try {
+                if (typeof firebase !== 'undefined' && firebase.firestore) {
+                    const db = firebase.firestore();
+                    const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
+                    await db.collection('conductores').doc(emailDocId).set({
+                        email,
+                        password: newPass,
+                        passwordHash: newHash,
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+                }
+            } catch(e) {}
+
+            // Cerrar modal de reseteo
+            window.closeDriverPasswordResetModal();
+
+            // Pre-llenar en el formulario de inicio de sesión
+            const loginEmailInput = document.getElementById('loginDriverEmail');
+            const loginPassInput = document.getElementById('loginDriverPassword');
+            if (loginEmailInput) loginEmailInput.value = email;
+            if (loginPassInput) loginPassInput.value = newPass;
+
+            showDriverToast('✅ ¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
+            playAlertSound('success');
+        });
+    }
+
     // Botón Cerrar Sesión Chofer
     const btnLogoutDriver = document.getElementById('btnLogoutDriver');
     if (btnLogoutDriver) {
@@ -7603,6 +7809,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputTripId.value = 'Viaje #' + (activeTripObj.id || activeTripObj.reservaId || 'En Curso');
             }
 
+            modalDriverReportTicket.style.display = 'flex';
             modalDriverReportTicket.classList.add('active');
             if (typeof window.pushDriverNavState === 'function') {
                 window.pushDriverNavState('driverReportTicket');
@@ -7614,8 +7821,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closeDriverTicketModal() {
-        if (modalDriverReportTicket) {
-            modalDriverReportTicket.classList.remove('active');
+        const modal = modalDriverReportTicket || document.getElementById('modalDriverReportTicket');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
         }
     }
 
@@ -7627,7 +7836,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const body = card.querySelector('.driver-help-body');
         const icon = headerEl.querySelector('.toggle-icon');
 
-        const isVisible = body && body.style.display === 'block';
+        const isVisible = body && (body.style.display === 'block' || window.getComputedStyle(body).display === 'block');
         if (body) {
             body.style.display = isVisible ? 'none' : 'block';
         }
@@ -7638,7 +7847,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Lanzar reclamo in-app con categoría preseleccionada
     window.openDriverTicketCategory = function(catKey) {
-        closeDriverHelpModal();
         openDriverTicketModal(catKey);
     };
 
@@ -7830,8 +8038,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 txtBtnSubmitTicket.textContent = 'Enviar Reclamo a Soporte';
             }
 
-            // Cerrar modal y limpiar formulario
+            // Cerrar modales y limpiar formulario
             closeDriverTicketModal();
+            closeDriverHelpModal();
             formDriverReportTicket.reset();
 
             // Mensaje de éxito al chofer
@@ -7848,15 +8057,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     function setupAndroidDriverBackButtonHandler() {
         function handleDriverBackAction() {
-            // 0. Modal de Tickets de Soporte
-            if (modalDriverReportTicket && modalDriverReportTicket.classList.contains('active')) {
-                modalDriverReportTicket.classList.remove('active');
+            // 0. Modal de Recuperar Contraseña
+            const modalReset = document.getElementById('modalDriverPasswordReset');
+            if (modalReset && (modalReset.classList.contains('active') || modalReset.style.display === 'flex')) {
+                if (typeof window.closeDriverPasswordResetModal === 'function') window.closeDriverPasswordResetModal();
                 return true;
             }
 
-            // 0.1 Modal de Centro de Ayuda
-            if (modalDriverHelp && modalDriverHelp.classList.contains('active')) {
-                modalDriverHelp.classList.remove('active');
+            // 0.1 Modal de Tickets de Soporte
+            if (modalDriverReportTicket && (modalDriverReportTicket.classList.contains('active') || modalDriverReportTicket.style.display === 'flex')) {
+                closeDriverTicketModal();
+                return true;
+            }
+
+            // 0.2 Modal de Centro de Ayuda
+            if (modalDriverHelp && (modalDriverHelp.classList.contains('active') || modalDriverHelp.style.display === 'flex')) {
+                closeDriverHelpModal();
                 return true;
             }
 

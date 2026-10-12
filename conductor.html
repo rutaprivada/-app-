@@ -1233,6 +1233,11 @@
                             <i class="fa-solid fa-eye"></i>
                         </button>
                     </div>
+                    <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+                        <button type="button" id="btnForgotDriverPassword" onclick="window.handleForgotDriverPassword()" style="background: none; border: none; color: #fbbf24; font-size: 0.78rem; cursor: pointer; text-decoration: underline; padding: 2px 4px;">
+                            ¿Olvidaste o quieres cambiar tu contraseña?
+                        </button>
+                    </div>
                 </div>
 
                 <button type="submit" style="width: 100%; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #0f172a; border: none; padding: 13px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35); margin-top: 4px;">
@@ -1331,6 +1336,83 @@
                     </button>
                     <button type="button" id="btnCancelDriverVerify" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer;">
                         Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL: RECUPERACIÓN / CAMBIO DE CONTRASEÑA (CHOFER)
+         ========================================================= -->
+    <div class="driver-modal-overlay" id="modalDriverPasswordReset" style="z-index: 10026; backdrop-filter: blur(14px); background: rgba(5, 10, 20, 0.94); display: none; align-items: center; justify-content: center; padding: 16px;">
+        <div class="driver-modal-sheet" style="max-width: 440px; width: 100%; margin: 0 auto; padding: 22px 20px; border: 1.5px solid rgba(245, 158, 11, 0.4); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(245, 158, 11, 0.2); text-align: center;">
+            <div style="width: 58px; height: 58px; margin: 0 auto 12px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35);">
+                🔑
+            </div>
+            <h3 style="color: #fff; margin: 0 0 6px; font-size: 1.2rem; font-weight: 800;">Recuperar Contraseña Chofer</h3>
+            <p style="color: #94a3b8; margin: 0 0 16px; font-size: 0.82rem; line-height: 1.4;">
+                Te enviaremos un código de seguridad de 6 dígitos a tu correo electrónico para que puedas restablecer tu contraseña de Chofer Partner.
+            </p>
+
+            <form id="formDriverPasswordReset" style="display: flex; flex-direction: column; gap: 12px; text-align: left;">
+                <div>
+                    <label for="resetDriverEmail" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+                        ✉️ Correo Registrado de Chofer *
+                    </label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="email" id="resetDriverEmail" inputmode="email" placeholder="conductor@ejemplo.com" required style="flex: 1; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 10px; font-size: 0.88rem; outline: none;" />
+                        <button type="button" id="btnSendDriverResetCode" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #000; border: none; border-radius: 10px; padding: 0 14px; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap;">
+                            Enviar Código
+                        </button>
+                    </div>
+                </div>
+
+                <div id="sectionDriverResetOtp" style="display: none; flex-direction: column; gap: 12px;">
+                    <div>
+                        <label for="inputDriverResetCode" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+                            🔢 Código de 6 dígitos recibido por correo *
+                        </label>
+                        <input type="tel" id="inputDriverResetCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" style="width: 100%; text-align: center; letter-spacing: 8px; font-size: 1.5rem; font-weight: 800; font-family: monospace; background: #0f172a; border: 2px solid #fbbf24; color: #fff; padding: 8px; border-radius: 12px; outline: none;" />
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label for="resetDriverNewPass" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+                                🔒 Nueva Contraseña *
+                            </label>
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="password" id="resetDriverNewPass" placeholder="Mín. 8 car." minlength="8" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 34px 9px 10px; border-radius: 10px; font-size: 0.85rem; outline: none;" />
+                                <button type="button" onclick="togglePasswordVisibility('resetDriverNewPass', this)" style="position: absolute; right: 6px; background: none; border: none; color: #94a3b8; font-size: 0.95rem; cursor: pointer; padding: 2px;" title="Ver contraseña">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="resetDriverNewPassConfirm" style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">
+                                🔒 Confirmar *
+                            </label>
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="password" id="resetDriverNewPassConfirm" placeholder="Repite contraseña" minlength="8" style="width: 100%; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 34px 9px 10px; border-radius: 10px; font-size: 0.85rem; outline: none;" />
+                                <button type="button" onclick="togglePasswordVisibility('resetDriverNewPassConfirm', this)" style="position: absolute; right: 6px; background: none; border: none; color: #94a3b8; font-size: 0.95rem; cursor: pointer; padding: 2px;" title="Ver contraseña">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(56, 189, 248, 0.08); border: 1px dashed rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 8px 10px; font-size: 0.76rem; color: #38bdf8;">
+                        ℹ️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.
+                    </div>
+
+                    <button type="submit" style="width: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; border: none; padding: 12px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35); margin-top: 4px;">
+                        ✨ Guardar Nueva Contraseña Chofer
+                    </button>
+                </div>
+
+                <div style="display: flex; justify-content: center; margin-top: 6px;">
+                    <button type="button" id="btnCancelDriverReset" onclick="window.closeDriverPasswordResetModal()" style="background: none; border: none; color: #94a3b8; font-size: 0.82rem; cursor: pointer; padding: 4px 10px;">
+                        ✕ Cancelar / Volver
                     </button>
                 </div>
             </form>
@@ -1879,7 +1961,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- SCRIPTS -->
-    <script src="sync.js?v=91"></script>
-    <script src="conductor.js?v=91"></script>
+    <script src="sync.js?v=106"></script>
+    <script src="conductor.js?v=106"></script>
 </body>
 </html>
