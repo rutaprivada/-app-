@@ -47,6 +47,132 @@ window.togglePasswordVisibility = function(inputId, btn) {
   }
 };
 
+// ==========================================
+// CENTRO DE AYUDA Y SOPORTE PASAJERO (24/7)
+// ==========================================
+window.openPassengerHelpModal = function() {
+  const modal = document.getElementById('modalPassengerHelp');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+  }
+};
+window.openHelpModal = window.openPassengerHelpModal;
+
+window.closePassengerHelpModal = function() {
+  const modal = document.getElementById('modalPassengerHelp');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  }
+};
+
+window.togglePassengerHelpAccordion = function(headerEl) {
+  if (!headerEl) return;
+  const card = headerEl.closest('.passenger-help-card');
+  if (!card) return;
+  const body = card.querySelector('.passenger-help-body');
+  const icon = card.querySelector('.toggle-icon');
+  if (!body) return;
+
+  const isVisible = body.style.display === 'block' || (!body.style.display && window.getComputedStyle(body).display === 'block');
+  if (isVisible) {
+    body.style.display = 'none';
+    card.classList.remove('active');
+    card.style.borderColor = 'rgba(255,255,255,0.08)';
+    if (icon) icon.style.transform = 'rotate(0deg)';
+  } else {
+    body.style.display = 'block';
+    card.classList.add('active');
+    card.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+    if (icon) icon.style.transform = 'rotate(180deg)';
+  }
+};
+
+window.filterPassengerHelp = function(term) {
+  const q = (term || '').toLowerCase().trim();
+  const cards = document.querySelectorAll('.passenger-help-card');
+  let matches = 0;
+  cards.forEach(card => {
+    const text = (card.textContent || '').toLowerCase();
+    if (!q || text.includes(q)) {
+      card.style.display = '';
+      matches++;
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  const noRes = document.getElementById('passengerHelpNoResults');
+  if (noRes) noRes.style.display = matches === 0 ? 'block' : 'none';
+};
+
+window.switchPassengerHelpTab = function(category, btnEl) {
+  document.querySelectorAll('.p-help-tab-chip').forEach(b => {
+    b.style.background = 'rgba(255, 255, 255, 0.05)';
+    b.style.color = '#94a3b8';
+    b.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+  });
+  if (btnEl) {
+    btnEl.style.background = '#38bdf8';
+    btnEl.style.color = '#0f172a';
+    btnEl.style.borderColor = '#38bdf8';
+  }
+  const input = document.getElementById('searchPassengerHelpInput');
+  if (input) input.value = '';
+
+  const cards = document.querySelectorAll('.passenger-help-card');
+  let matches = 0;
+  cards.forEach(card => {
+    const cardCat = card.getAttribute('data-help-cat');
+    if (category === 'all' || cardCat === category) {
+      card.style.display = '';
+      matches++;
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  const noRes = document.getElementById('passengerHelpNoResults');
+  if (noRes) noRes.style.display = matches === 0 ? 'block' : 'none';
+};
+
+window.openPassengerTicketModal = function(category) {
+  const modal = document.getElementById('modalPassengerReportTicket');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+  }
+  if (category) {
+    const catSelect = document.getElementById('ticketPassengerCategory');
+    if (catSelect) catSelect.value = category;
+  }
+  const session = typeof window.getPassengerSession === 'function' ? window.getPassengerSession() : null;
+  if (session) {
+    const nameInp = document.getElementById('ticketPassengerName');
+    const phoneInp = document.getElementById('ticketPassengerPhone');
+    const emailInp = document.getElementById('ticketPassengerEmail');
+    if (nameInp && !nameInp.value) nameInp.value = session.nombre || '';
+    if (phoneInp && !phoneInp.value) phoneInp.value = session.telefono || '';
+    if (emailInp && !emailInp.value) emailInp.value = session.email || '';
+  }
+};
+
+window.closePassengerTicketModal = function() {
+  const modal = document.getElementById('modalPassengerReportTicket');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  }
+};
+
+window.openPassengerTicketCategory = function(catKey) {
+  window.closePassengerHelpModal();
+  window.openPassengerTicketModal(catKey);
+};
+
 window.toggleIntermediateStopField = function() {
   const stopFieldWrap = document.getElementById('stop-field-wrap');
   const stopToggleWrapper = document.getElementById('stop-toggle-wrapper');
@@ -1003,20 +1129,78 @@ window.openPassengerTicketCategory = function(catKey) {
   window.openPassengerTicketModal(catKey);
 };
 
-window.togglePassengerHelpAccordion = function(headerEl) {
-  if (!headerEl) return;
-  const card = headerEl.closest('.passenger-help-card');
+window.togglePassengerHelpAccordion = function(el) {
+  if (!el) return;
+  const card = el.closest('.passenger-help-card') || el.parentElement;
   if (!card) return;
   const body = card.querySelector('.passenger-help-body');
-  const icon = headerEl.querySelector('.toggle-icon');
+  const icon = card.querySelector('.toggle-icon');
 
-  const isVisible = body && (body.style.display === 'block' || window.getComputedStyle(body).display === 'block');
-  if (body) {
-    body.style.display = isVisible ? 'none' : 'block';
+  if (!body) return;
+
+  const isCurrentlyOpen = card.classList.contains('active') || body.style.display === 'block';
+
+  if (isCurrentlyOpen) {
+    card.classList.remove('active');
+    body.style.display = 'none';
+    body.classList.add('hidden');
+    if (icon) icon.style.transform = 'rotate(0deg)';
+  } else {
+    card.classList.add('active');
+    body.style.display = 'block';
+    body.classList.remove('hidden');
+    if (icon) icon.style.transform = 'rotate(180deg)';
   }
-  if (icon) {
-    icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+};
+
+window.filterPassengerHelp = function(term) {
+  const query = (term || '').toLowerCase().trim();
+  const cards = document.querySelectorAll('#modalPassengerHelp .passenger-help-card');
+  let matchCount = 0;
+
+  cards.forEach(card => {
+    const text = card.textContent.toLowerCase();
+    const cat = card.getAttribute('data-help-cat') || '';
+    if (!query || text.includes(query) || cat.includes(query)) {
+      card.style.display = 'block';
+      matchCount++;
+    } else {
+      card.style.display = 'none';
+    }
+  });
+
+  const emptyMsg = document.getElementById('passengerHelpNoResults');
+  if (emptyMsg) {
+    emptyMsg.style.display = (matchCount === 0 && query.length > 0) ? 'block' : 'none';
   }
+};
+
+window.switchPassengerHelpTab = function(category, btnEl) {
+  document.querySelectorAll('.p-help-tab-chip').forEach(b => {
+    b.style.background = 'rgba(255, 255, 255, 0.05)';
+    b.style.color = '#94a3b8';
+    b.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+  });
+  if (btnEl) {
+    btnEl.style.background = '#38bdf8';
+    btnEl.style.color = '#0f172a';
+    btnEl.style.borderColor = '#38bdf8';
+  }
+
+  const cards = document.querySelectorAll('#modalPassengerHelp .passenger-help-card');
+  cards.forEach(card => {
+    const cardCat = card.getAttribute('data-help-cat') || '';
+    if (category === 'all' || cardCat === category) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+
+  const searchInput = document.getElementById('searchPassengerHelpInput');
+  if (searchInput) searchInput.value = '';
+  const emptyMsg = document.getElementById('passengerHelpNoResults');
+  if (emptyMsg) emptyMsg.style.display = 'none';
 };
 
 // ==========================================
