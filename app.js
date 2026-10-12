@@ -533,8 +533,81 @@ window.switchPassengerProfileTab = function(targetId) {
   }
 };
 
+window.syncPassengerSessionUI = function(session) {
+  const headerName = document.getElementById('headerPassengerName');
+  const headerSub = document.querySelector('.passenger-status-sub');
+  const headerAvatar = document.getElementById('headerPassengerAvatar');
+  const defaultAvatar = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='%2394a3b8'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
+
+  const modalTitle = document.getElementById('profileModalNameTitle');
+  const modalHeaderImg = document.getElementById('profileModalHeaderAvatarImg');
+  const modalAvatarImg = document.getElementById('profileModalAvatarImg');
+  const avatarPlaceholder = document.getElementById('profileModalAvatarPlaceholder');
+  const btnRemovePhoto = document.getElementById('btnRemoveProfilePhoto');
+
+  const profName = document.getElementById('profPassengerName');
+  const profPhone = document.getElementById('profPassengerPhone');
+  const profEmail = document.getElementById('profPassengerEmail');
+
+  const nameInp = document.getElementById('passenger-name-input') || document.getElementById('user-name') || document.getElementById('client-name');
+  const phoneInp = document.getElementById('passenger-phone-input') || document.getElementById('user-phone') || document.getElementById('client-phone');
+  const emailInp = document.getElementById('user-email') || document.getElementById('client-email');
+
+  if (session && (session.nombre || session.email || session.telefono)) {
+    const firstName = session.nombre ? session.nombre.split(' ')[0] : 'Pasajero';
+    if (headerName) headerName.textContent = firstName;
+    if (headerSub) headerSub.textContent = '★ 5.00 Pasajero';
+    if (headerAvatar) {
+      headerAvatar.src = (session.avatar && session.avatar.length > 10) ? session.avatar : defaultAvatar;
+    }
+
+    if (modalTitle) modalTitle.textContent = session.nombre || 'Mi Perfil de Pasajero';
+    if (modalHeaderImg) {
+      modalHeaderImg.src = (session.avatar && session.avatar.length > 10) ? session.avatar : defaultAvatar;
+    }
+    if (modalAvatarImg && avatarPlaceholder) {
+      if (session.avatar && session.avatar.length > 10) {
+        modalAvatarImg.src = session.avatar;
+        modalAvatarImg.style.display = 'block';
+        avatarPlaceholder.style.display = 'none';
+        if (btnRemovePhoto) btnRemovePhoto.classList.remove('hidden');
+      } else {
+        modalAvatarImg.style.display = 'none';
+        avatarPlaceholder.style.display = 'block';
+        if (btnRemovePhoto) btnRemovePhoto.classList.add('hidden');
+      }
+    }
+
+    if (profName) profName.value = session.nombre || '';
+    if (profPhone) profPhone.value = session.telefono || '';
+    if (profEmail) profEmail.value = session.email || '';
+
+    if (nameInp && session.nombre && !nameInp.value) nameInp.value = session.nombre;
+    if (phoneInp && session.telefono && !phoneInp.value) phoneInp.value = session.telefono;
+    if (emailInp && session.email && !emailInp.value) emailInp.value = session.email;
+  } else {
+    // Sesión cerrada
+    if (headerName) headerName.textContent = 'Iniciar Sesión';
+    if (headerSub) headerSub.textContent = 'Toca para ingresar';
+    if (headerAvatar) headerAvatar.src = defaultAvatar;
+
+    if (modalTitle) modalTitle.textContent = 'Mi Perfil de Pasajero';
+    if (modalHeaderImg) modalHeaderImg.src = defaultAvatar;
+    if (modalAvatarImg) { modalAvatarImg.src = ''; modalAvatarImg.style.display = 'none'; }
+    if (avatarPlaceholder) avatarPlaceholder.style.display = 'block';
+    if (btnRemovePhoto) btnRemovePhoto.classList.add('hidden');
+
+    if (profName) profName.value = '';
+    if (profPhone) profPhone.value = '';
+    if (profEmail) profEmail.value = '';
+
+    if (nameInp) nameInp.value = '';
+    if (phoneInp) phoneInp.value = '';
+    if (emailInp) emailInp.value = '';
+  }
+};
+
 window.handlePassengerLogout = function() {
-  if (!confirm('¿Seguro que deseas cerrar tu sesión de pasajero en este dispositivo?')) return;
   try {
     localStorage.setItem('rutaprivada_passenger_logged_out', 'true');
     localStorage.removeItem('rutaprivada_passenger_session_v1');
@@ -547,37 +620,6 @@ window.handlePassengerLogout = function() {
     localStorage.removeItem('rutaprivada_pending_passenger_reg');
   } catch(e) {}
 
-  const headerName = document.getElementById('headerPassengerName');
-  const headerAvatar = document.getElementById('headerPassengerAvatar');
-  const modalHeaderImg = document.getElementById('profileModalHeaderAvatarImg');
-  const modalAvatarImg = document.getElementById('profileModalAvatarImg');
-  const avatarPlaceholder = document.getElementById('profileModalAvatarPlaceholder');
-  const btnRemovePhoto = document.getElementById('btnRemoveProfilePhoto');
-  const profName = document.getElementById('profPassengerName');
-  const profPhone = document.getElementById('profPassengerPhone');
-  const profEmail = document.getElementById('profPassengerEmail');
-  const modalTitle = document.getElementById('profileModalNameTitle');
-  const inputName = document.getElementById('user-name') || document.getElementById('passenger-name-input');
-  const inputPhone = document.getElementById('user-phone') || document.getElementById('passenger-phone-input');
-  const inputEmail = document.getElementById('user-email');
-
-  const defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="%2394a3b8"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
-  if (headerName) headerName.textContent = 'Iniciar Sesión';
-  const headerSub = document.querySelector('.passenger-status-sub');
-  if (headerSub) headerSub.textContent = 'Toca para ingresar';
-  if (headerAvatar) headerAvatar.src = defaultAvatar;
-  if (modalHeaderImg) modalHeaderImg.src = defaultAvatar;
-  if (modalAvatarImg) { modalAvatarImg.src = ''; modalAvatarImg.style.display = 'none'; }
-  if (avatarPlaceholder) avatarPlaceholder.style.display = 'block';
-  if (btnRemovePhoto) btnRemovePhoto.classList.add('hidden');
-  if (profName) profName.value = '';
-  if (profPhone) profPhone.value = '';
-  if (profEmail) profEmail.value = '';
-  if (inputName) inputName.value = '';
-  if (inputPhone) inputPhone.value = '';
-  if (inputEmail) inputEmail.value = '';
-  if (modalTitle) modalTitle.textContent = 'Mi Perfil de Pasajero';
-
   if (window.state) {
     window.state.passengerName = '';
     window.state.passengerPhone = '';
@@ -585,8 +627,17 @@ window.handlePassengerLogout = function() {
     window.state.passengerAvatar = '';
   }
 
+  // Actualizar UI completa a estado de sesión cerrada
+  window.syncPassengerSessionUI(null);
+
+  // Cerrar modales
   window.closePassengerProfileModal();
-  window.openPassengerAuthModal('login');
+  const authModal = document.getElementById('modalPassengerAuth');
+  if (authModal) {
+    authModal.classList.add('hidden');
+    authModal.style.display = 'none';
+  }
+
   if (typeof window.showToast === 'function') {
     window.showToast('🚪 Has cerrado sesión de pasajero correctamente.');
   }
@@ -5397,6 +5448,7 @@ function cleanAddressDisplay(str) {
 }
 
 // Motor inteligente de geocodificación de alta precisión en paralelo (USIG GCBA + Nominatim OSM + Mapbox Places + Photon OSM)
+// Motor inteligente de geocodificación de alta precisión en paralelo (Mapbox Places + USIG GCBA + Photon OSM + Open-Meteo + DB Local)
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
   if (query.length < 2) return getDefaultPopularDestinations();
@@ -5420,7 +5472,7 @@ async function searchLocations(rawQuery, signal) {
     }
   }
 
-  // 1. Puntos de interés locales conocidos y generador local de calles y alturas (0ms)
+  // 1. Puntos de interés locales conocidos y generador local de calles y alturas (0ms instantáneo)
   try {
     const instant = getInstantLocalSuggestions(query);
     if (Array.isArray(instant)) {
@@ -5429,139 +5481,115 @@ async function searchLocations(rawQuery, signal) {
   } catch(e) {}
 
   const cleanQ = cleanAddressQuery(query);
-  const usigUrl = `https://servicios.usig.buenosaires.gob.ar/normalizar/?direccion=${encodeURIComponent(cleanQ)}&geocodificar=true&limite=8`;
-  const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ)}&countrycodes=ar&limit=8&addressdetails=1`;
+  const mapboxToken = (window.state?.config?.mapboxToken) || DEFAULT_CONFIG.mapboxToken;
+  const mapboxUrl = mapboxToken ? `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?country=ar&proximity=-58.3816,-34.6037&autocomplete=true&language=es&limit=8&access_token=${mapboxToken}` : null;
   const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6`;
   const openMeteoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanQ)}&country=AR&language=es&count=6`;
 
-  const fetchTasks = [
-    // Task 1: API Oficial USIG GCBA (Máxima precisión para todas las calles, alturas y esquinas de CABA y GBA)
-    (async () => {
+  const fetchTasks = [];
+
+  // Task 1: Mapbox Places API (Máxima precisión, soporte total de CORS, todas las direcciones de Argentina)
+  if (mapboxUrl) {
+    fetchTasks.push((async () => {
       try {
-        const res = await fetchWithTimeout(usigUrl, {}, 2200, signal);
+        const res = await fetchWithTimeout(mapboxUrl, {}, 2500, signal);
         if (res.ok) {
-          const usigData = await res.json();
-          const items = usigData && (usigData.direccionesNormalizadas || (Array.isArray(usigData) ? usigData : []));
-          if (Array.isArray(items)) {
-            items.forEach(d => {
-              if (d.coordenadas && (d.coordenadas.y || d.coordenadas.lat) && (d.coordenadas.x || d.coordenadas.lon || d.coordenadas.lng)) {
-                const lat = d.coordenadas.y || d.coordenadas.lat;
-                const lon = d.coordenadas.x || d.coordenadas.lon || d.coordenadas.lng;
-                const name = d.direccion || d.nombre_calle || cleanQ;
+          const mbData = await res.json();
+          if (mbData && Array.isArray(mbData.features)) {
+            mbData.features.forEach(f => {
+              if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
+                const [lon, lat] = f.geometry.coordinates;
+                const fullPlace = f.place_name || '';
+                const mainTitle = f.text ? `${f.text}${f.address ? ' ' + f.address : ''}` : fullPlace.split(',')[0];
+                const cleanDisplay = cleanAddressDisplay(fullPlace) || fullPlace;
+                const isAirport = /aeropuerto|aeroparque|ezeiza|pistarini/i.test(fullPlace);
+                const isStation = /terminal|estacion|buquebus/i.test(fullPlace);
                 addResult({
                   lat: String(lat),
                   lon: String(lon),
-                  display_name: `${name}, Buenos Aires, Argentina`,
+                  display_name: cleanDisplay,
                   _isIntersection: false,
-                  _isPoi: false,
-                  _poiBadge: 'Dirección Oficial',
-                  _icon: '📍',
-                  _mainTitle: name,
-                  _subTitle: `${name}, CABA / GBA, Argentina`
+                  _isPoi: isAirport || isStation,
+                  _poiBadge: isAirport ? 'Aeropuerto' : (isStation ? 'Terminal' : ''),
+                  _icon: isAirport ? '✈️' : (isStation ? '🚉' : '📍'),
+                  _mainTitle: mainTitle,
+                  _subTitle: cleanDisplay
                 }, true);
               }
             });
           }
         }
       } catch(e) {}
-    })(),
+    })());
+  }
 
-    // Task 2: Nominatim OpenStreetMap (Geocodificador oficial para toda Argentina)
-    (async () => {
-      try {
-        const res = await fetchWithTimeout(nominatimUrl, {
-          headers: { 'Accept-Language': 'es' }
-        }, 2200, signal);
-        if (res.ok) {
-          const nomData = await res.json();
-          if (Array.isArray(nomData)) {
-            nomData.forEach(p => {
-              if (p.lat && p.lon) {
-                const cleanDisplay = cleanAddressDisplay(p.display_name);
-                addResult({
-                  lat: String(p.lat),
-                  lon: String(p.lon),
-                  display_name: cleanDisplay || p.display_name,
-                  _isIntersection: false,
-                  _isPoi: p.type === 'aerodrome' || p.type === 'station' || p.type === 'mall',
-                  _poiBadge: p.type === 'aerodrome' ? 'Aeropuerto' : '',
-                  _icon: p.type === 'aerodrome' ? '✈️' : '📍',
-                  _mainTitle: p.name || p.display_name.split(',')[0],
-                  _subTitle: cleanDisplay
-                }, false);
-              }
-            });
-          }
+  // Task 2: Photon OSM Geocoder (Respaldo libre de alta cobertura)
+  fetchTasks.push((async () => {
+    try {
+      const res = await fetchWithTimeout(photonUrl, {}, 2200, signal);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.features)) {
+          data.features.forEach(f => {
+            if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
+              const [lon, lat] = f.geometry.coordinates;
+              const p = f.properties || {};
+              let mainTitle = p.street ? `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}` : (p.name || cleanQ);
+              let subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires', 'Argentina'].filter(Boolean).join(', ');
+              const fullDisplay = `${mainTitle}, ${subTitle}`;
+              addResult({
+                lat: String(lat),
+                lon: String(lon),
+                display_name: fullDisplay,
+                _isIntersection: false,
+                _isPoi: false,
+                _poiBadge: '',
+                _icon: '📍',
+                _mainTitle: mainTitle,
+                _subTitle: fullDisplay
+              }, false);
+            }
+          });
         }
-      } catch(e) {}
-    })(),
+      }
+    } catch(e) {}
+  })());
 
-    // Task 3: Photon OSM Geocoder
-    (async () => {
-      try {
-        const res = await fetchWithTimeout(photonUrl, {}, 2000, signal);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data.features)) {
-            data.features.forEach(f => {
-              if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
-                const [lon, lat] = f.geometry.coordinates;
-                const p = f.properties || {};
-                let mainTitle = p.street ? `${p.street}${p.housenumber ? ' ' + p.housenumber : ''}` : (p.name || cleanQ);
-                let subTitle = [p.district || p.locality || p.city, p.state || 'Buenos Aires', 'Argentina'].filter(Boolean).join(', ');
-                const fullDisplay = `${mainTitle}, ${subTitle}`;
-                addResult({
-                  lat: String(lat),
-                  lon: String(lon),
-                  display_name: fullDisplay,
-                  _isIntersection: false,
-                  _isPoi: false,
-                  _poiBadge: '',
-                  _icon: '📍',
-                  _mainTitle: mainTitle,
-                  _subTitle: fullDisplay
-                }, false);
-              }
-            });
-          }
+  // Task 3: Open-Meteo Geocoding (Respaldo por ciudades y localidades)
+  fetchTasks.push((async () => {
+    try {
+      const res = await fetchWithTimeout(openMeteoUrl, {}, 1800, signal);
+      if (res.ok) {
+        const omData = await res.json();
+        if (omData && Array.isArray(omData.results)) {
+          omData.results.forEach(r => {
+            if (r.latitude && r.longitude) {
+              const parts = [r.name, r.admin2, r.admin1 || 'Buenos Aires', 'Argentina'].filter(Boolean);
+              const fullDisp = parts.join(', ');
+              addResult({
+                lat: String(r.latitude),
+                lon: String(r.longitude),
+                display_name: fullDisp,
+                _isIntersection: false,
+                _isPoi: false,
+                _poiBadge: 'Localidad',
+                _icon: '📍',
+                _mainTitle: r.name,
+                _subTitle: fullDisp
+              }, false);
+            }
+          });
         }
-      } catch(e) {}
-    })(),
+      }
+    } catch(e) {}
+  })());
 
-    // Task 4: Open-Meteo Geocoding
-    (async () => {
-      try {
-        const res = await fetchWithTimeout(openMeteoUrl, {}, 1800, signal);
-        if (res.ok) {
-          const omData = await res.json();
-          if (omData && Array.isArray(omData.results)) {
-            omData.results.forEach(r => {
-              if (r.latitude && r.longitude) {
-                const parts = [r.name, r.admin2, r.admin1 || 'Buenos Aires', 'Argentina'].filter(Boolean);
-                const fullDisp = parts.join(', ');
-                addResult({
-                  lat: String(r.latitude),
-                  lon: String(r.longitude),
-                  display_name: fullDisp,
-                  _isIntersection: false,
-                  _isPoi: false,
-                  _poiBadge: 'Localidad',
-                  _icon: '📍',
-                  _mainTitle: r.name,
-                  _subTitle: fullDisp
-                }, false);
-              }
-            });
-          }
-        }
-      } catch(e) {}
-    })()
-  ];
-
-  await Promise.allSettled(fetchTasks);
+  if (fetchTasks.length > 0) {
+    await Promise.allSettled(fetchTasks);
+  }
 
   // Fallback seguro si ningún servicio devolvió resultados
-  if (results.length === 0 && query.length >= 3) {
+  if (results.length === 0 && query.length >= 2) {
     addResult({
       lat: '-34.6037',
       lon: '-58.3816',
@@ -5593,16 +5621,20 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     currentResults = items || [];
     activeIndex = -1;
 
+    const wrap = input.closest('.input-field-wrap');
+
     if (!items || items.length === 0) {
       list.classList.add('hidden');
       list.style.display = 'none';
+      if (wrap) wrap.classList.remove('has-suggestions');
       return;
     }
 
     list.classList.remove('hidden');
     list.style.display = 'flex';
     list.style.flexDirection = 'column';
-    list.style.zIndex = '999999';
+    list.style.zIndex = '9999999';
+    if (wrap) wrap.classList.add('has-suggestions');
 
     items.slice(0, 8).forEach((place) => {
       const item = document.createElement('div');
@@ -5610,9 +5642,6 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
       const icon = place._icon || '📍';
       const fullDisplay = place.display_name || place._subTitle || place._mainTitle || '';
-      const parts = fullDisplay.split(',').map(s => s.trim()).filter(Boolean);
-      const streetPart = parts.length > 0 ? parts.slice(0, 2).join(', ') : fullDisplay;
-      const restPart = parts.length > 2 ? parts.slice(2).join(', ') : '';
 
       item.innerHTML = `
         <span style="font-size:1.15rem; flex-shrink:0; margin-top:2px;">${icon}</span>
@@ -5644,6 +5673,9 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     list.classList.add('hidden');
     list.style.display = 'none';
     currentResults = [];
+
+    const wrap = input.closest('.input-field-wrap');
+    if (wrap) wrap.classList.remove('has-suggestions');
 
     const clearBtn = input.parentElement ? input.parentElement.querySelector('.btn-clear-address') : null;
     if (clearBtn) clearBtn.classList.remove('hidden');
@@ -5709,6 +5741,8 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       }
       list.classList.add('hidden');
       list.style.display = 'none';
+      const wrap = input.closest('.input-field-wrap');
+      if (wrap) wrap.classList.remove('has-suggestions');
       return;
     }
 
@@ -5720,17 +5754,10 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       }
     } catch(e) {}
 
-    // 2. Refinar con geocodificación OSM / Photon
+    // 2. Refinar con geocodificación Mapbox / Photon
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 150);
-  });
-
-  input.addEventListener('focus', () => {
-    const query = input.value.trim();
-    if (query.length >= 2) {
-      executeSearch(query);
-    }
+    }, 120);
   });
 
   input.addEventListener('keydown', async (e) => {
@@ -5755,10 +5782,18 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       if (currentResults.length > 0) {
         const target = activeIndex >= 0 ? currentResults[activeIndex] : currentResults[0];
         selectItem(target);
+      } else if (input.value.trim().length >= 2) {
+        const fallbackQuery = input.value.trim();
+        const results = await searchLocations(fallbackQuery);
+        if (results && results.length > 0) {
+          selectItem(results[0]);
+        }
       }
     } else if (e.key === 'Escape') {
       list.classList.add('hidden');
       list.style.display = 'none';
+      const wrap = input.closest('.input-field-wrap');
+      if (wrap) wrap.classList.remove('has-suggestions');
     }
   });
 
@@ -5766,6 +5801,8 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     if (!input.contains(e.target) && !list.contains(e.target)) {
       list.classList.add('hidden');
       list.style.display = 'none';
+      const wrap = input.closest('.input-field-wrap');
+      if (wrap) wrap.classList.remove('has-suggestions');
     }
   });
 }
@@ -9434,17 +9471,21 @@ if (btnRecenterPassengerMap) {
     window.savePassengerSession = savePassengerSession;
 
     function renderPassengerProfileUI(user) {
+      const headerSub = document.querySelector('.passenger-status-sub');
+      const defaultAvatar = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='%2394a3b8'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
+
       if (!user || (!user.nombre && !user.email && !user.telefono)) {
-        if (headerPassengerName) headerPassengerName.textContent = 'Mi Perfil';
+        if (headerPassengerName) headerPassengerName.textContent = 'Iniciar Sesión';
+        if (headerSub) headerSub.textContent = 'Toca para ingresar';
+        if (headerPassengerAvatar) headerPassengerAvatar.src = defaultAvatar;
         return;
       }
 
       // Update Header Bar
       if (headerPassengerName) {
-        const shortName = user.nombre ? user.nombre.split(' ')[0] : 'Mi Perfil';
+        const shortName = user.nombre ? user.nombre.split(' ')[0] : 'Pasajero';
         headerPassengerName.textContent = shortName;
       }
-      const headerSub = document.querySelector('.passenger-status-sub');
       if (headerSub) {
         headerSub.textContent = '★ 5.00 Pasajero';
       }
@@ -10635,6 +10676,7 @@ if (btnRecenterPassengerMap) {
   // INICIALIZACIÓN GENERAL COMPLETA DE LA APP DEL PASAJERO
   // ==========================================
   function startPassengerApplication() {
+    try { window.syncPassengerSessionUI(window.getPassengerSession()); } catch (e) { console.warn('Passenger session init:', e); }
     try { initDateTimeControls(); } catch (e) { console.warn('DateTime controls:', e); }
     try { initCustomCalendar(); } catch (e) { console.warn('Custom calendar:', e); }
     try { initMap(); } catch (e) { console.warn('Map init:', e); }
