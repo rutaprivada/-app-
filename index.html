@@ -1397,6 +1397,18 @@
                 <i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión
               </button>
             </div>
+
+            <!-- Acceso a Centro de Ayuda y Soporte 24/7 desde Perfil (Igual que App Chofer) -->
+            <div class="passenger-profile-help-card" onclick="window.closePassengerProfileModal(); window.openPassengerHelpModal();" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 14px; margin-top: 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.3rem;">🎧</span>
+                <div>
+                  <strong style="color: #fff; font-size: 0.88rem; display: block;">Centro de Ayuda y Soporte 24/7</strong>
+                  <small style="color: #94a3b8; font-size: 0.74rem;">Preguntas frecuentes, desgloses y asistencia en viaje</small>
+                </div>
+              </div>
+              <i class="fa-solid fa-chevron-right" style="color: #38bdf8; font-size: 0.85rem;"></i>
+            </div>
           </form>
         </div>
 
@@ -2075,10 +2087,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=98"></script>
+  <script src="sync.js?v=99"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=98"></script>
+  <script src="app.js?v=99"></script>
 
   <!-- PWA Service Worker Auto-Update -->
   <script>

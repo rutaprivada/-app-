@@ -6072,6 +6072,11 @@ html, body {
   transition: all 0.2s ease;
 }
 
+.passenger-profile-help-card:hover {
+  background: rgba(56, 189, 248, 0.16) !important;
+  border-color: rgba(56, 189, 248, 0.5) !important;
+}
+
 .passenger-help-card:hover {
   border-color: rgba(56, 189, 248, 0.3) !important;
 }

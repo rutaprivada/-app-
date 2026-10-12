@@ -16,7 +16,8 @@ const filesToSync = [
   'agenda.js',
   'agenda.css',
   'manifest.json',
-  'manifest-driver.json'
+  'manifest-driver.json',
+  'sw.js'
 ];
 
 if (fs.existsSync(publicDir)) {

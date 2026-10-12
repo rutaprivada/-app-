@@ -71,23 +71,25 @@ window.closePassengerHelpModal = function() {
 
 window.togglePassengerHelpAccordion = function(headerEl) {
   if (!headerEl) return;
-  const card = headerEl.closest('.passenger-help-card');
+  const card = headerEl.closest('.passenger-help-card') || headerEl.parentElement;
   if (!card) return;
   const body = card.querySelector('.passenger-help-body');
-  const icon = card.querySelector('.toggle-icon');
+  const icon = headerEl.querySelector('.toggle-icon') || card.querySelector('.toggle-icon');
   if (!body) return;
 
-  const isVisible = body.style.display === 'block' || (!body.style.display && window.getComputedStyle(body).display === 'block');
+  const isVisible = body && body.style.display === 'block';
+  body.style.display = isVisible ? 'none' : 'block';
+  body.classList.remove('hidden');
+
+  if (icon) {
+    icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+  }
   if (isVisible) {
-    body.style.display = 'none';
     card.classList.remove('active');
-    card.style.borderColor = 'rgba(255,255,255,0.08)';
-    if (icon) icon.style.transform = 'rotate(0deg)';
+    card.style.borderColor = 'rgba(255, 255, 255, 0.08)';
   } else {
-    body.style.display = 'block';
     card.classList.add('active');
     card.style.borderColor = 'rgba(56, 189, 248, 0.4)';
-    if (icon) icon.style.transform = 'rotate(180deg)';
   }
 };
 
@@ -754,9 +756,12 @@ window.syncPassengerSessionUI = function(session) {
 };
 
 window.handlePassengerLogout = function() {
+  if (!confirm('¿Seguro que deseas cerrar la sesión de pasajero en este dispositivo?')) return;
+
   try {
+    localStorage.setItem('rutaprivada_passenger_logged_out', 'true');
+    localStorage.removeItem('rutaprivada_passenger_auth_v1');
     localStorage.removeItem('rutaprivada_passenger_session_v1');
-    sessionStorage.removeItem('rutaprivada_passenger_session_v1');
     localStorage.removeItem('rutaprivada_passenger_session');
     localStorage.removeItem('rutaprivada_passenger_profile');
     localStorage.removeItem('rutaprivada_user_session');
@@ -764,6 +769,11 @@ window.handlePassengerLogout = function() {
     localStorage.removeItem('rutaprivada_passenger');
     localStorage.removeItem('passenger_profile');
     localStorage.removeItem('rutaprivada_pending_passenger_reg');
+    sessionStorage.removeItem('rutaprivada_passenger_auth_v1');
+    sessionStorage.removeItem('rutaprivada_passenger_session_v1');
+    try {
+      document.cookie = "rutaprivada_passenger_session_v1=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    } catch(e){}
   } catch(e) {}
 
   if (window.state) {
@@ -774,8 +784,19 @@ window.handlePassengerLogout = function() {
     window.state.passengerSession = null;
   }
 
+  // Limpiar campos de perfil e inputs de pasajero
+  ['profPassengerName', 'profPassengerPhone', 'profPassengerEmail', 'passenger-name-input', 'passenger-phone-input', 'user-name', 'user-phone', 'user-email'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
   // Actualizar UI completa a estado de sesión cerrada
-  window.syncPassengerSessionUI(null);
+  if (typeof renderPassengerProfileUI === 'function') {
+    renderPassengerProfileUI(null);
+  }
+  if (typeof window.syncPassengerSessionUI === 'function') {
+    window.syncPassengerSessionUI(null);
+  }
 
   // Cerrar modales
   window.closePassengerProfileModal();
@@ -939,34 +960,16 @@ let routePolyline = null;
 // ==========================================
 window.getPassengerSession = function() {
   try {
-    const keys = [
-      'rutaprivada_passenger_session_v1',
-      'rutaprivada_passenger_auth_v1',
-      'rutaprivada_passenger_session',
-      'rutaprivada_passenger_profile',
-      'rutaprivada_user_session',
-      'rutaprivada_profile',
-      'rutaprivada_passenger',
-      'passenger_profile'
-    ];
-    let raw = null;
-    for (const k of keys) {
-      raw = localStorage.getItem(k) || sessionStorage.getItem(k);
-      if (raw) break;
+    if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') {
+      return null;
     }
-    if (!raw && typeof document !== 'undefined' && document.cookie) {
-      const match = document.cookie.match(/rutaprivada_passenger_session_v1=([^;]+)/);
-      if (match) {
-        try { raw = decodeURIComponent(match[1]); } catch(e){}
-      }
-    }
-    if (!raw && window.state && window.state.passengerSession) {
-      return window.state.passengerSession;
-    }
+    const raw = localStorage.getItem('rutaprivada_passenger_auth_v1') || 
+                localStorage.getItem('rutaprivada_passenger_session_v1') ||
+                sessionStorage.getItem('rutaprivada_passenger_auth_v1') ||
+                sessionStorage.getItem('rutaprivada_passenger_session_v1');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && (parsed.email || parsed.nombre || parsed.telefono)) {
-        try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(e){}
+      if (parsed && (parsed.email || parsed.nombre || parsed.telefono || parsed.id)) {
         if (window.state) {
           window.state.passengerSession = parsed;
           if (parsed.nombre) window.state.passengerName = parsed.nombre;
@@ -1129,29 +1132,8 @@ window.openPassengerTicketCategory = function(catKey) {
   window.openPassengerTicketModal(catKey);
 };
 
-window.togglePassengerHelpAccordion = function(el) {
-  if (!el) return;
-  const card = el.closest('.passenger-help-card') || el.parentElement;
-  if (!card) return;
-  const body = card.querySelector('.passenger-help-body');
-  const icon = card.querySelector('.toggle-icon');
+// togglePassengerHelpAccordion ya se encuentra definido globalmente para el centro de ayuda
 
-  if (!body) return;
-
-  const isCurrentlyOpen = card.classList.contains('active') || body.style.display === 'block';
-
-  if (isCurrentlyOpen) {
-    card.classList.remove('active');
-    body.style.display = 'none';
-    body.classList.add('hidden');
-    if (icon) icon.style.transform = 'rotate(0deg)';
-  } else {
-    card.classList.add('active');
-    body.style.display = 'block';
-    body.classList.remove('hidden');
-    if (icon) icon.style.transform = 'rotate(180deg)';
-  }
-};
 
 window.filterPassengerHelp = function(term) {
   const query = (term || '').toLowerCase().trim();
@@ -9630,33 +9612,9 @@ if (btnRecenterPassengerMap) {
     }
 
     function getPassengerSession() {
-      if (typeof window.getPassengerSession === 'function') {
-        const globalSess = window.getPassengerSession();
-        if (globalSess) return globalSess;
-      }
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY_SESSION) || 
-                    sessionStorage.getItem(STORAGE_KEY_SESSION) ||
-                    localStorage.getItem(STORAGE_KEY_LEGACY) || 
-                    localStorage.getItem('rutaprivada_passenger_session_v1') ||
-                    localStorage.getItem('rutaprivada_passenger_auth_v1') ||
-                    localStorage.getItem('rutaprivada_passenger_profile') ||
-                    localStorage.getItem('rutaprivada_user_session') ||
-                    localStorage.getItem('rutaprivada_profile') ||
-                    localStorage.getItem('rutaprivada_passenger') ||
-                    localStorage.getItem('passenger_profile');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && (parsed.email || parsed.nombre || parsed.telefono)) {
-            try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(e){}
-            return parsed;
-          }
-        }
-      } catch(e) {}
-
-      return null;
+      return window.getPassengerSession ? window.getPassengerSession() : null;
     }
-    window.getPassengerSession = getPassengerSession;
+
 
     function savePassengerSession(user) {
       if (!user) return;
@@ -10933,6 +10891,20 @@ if (btnRecenterPassengerMap) {
     if (modalHelp) {
       modalHelp.addEventListener('click', (e) => {
         if (e.target === modalHelp) window.closePassengerHelpModal();
+      });
+    }
+
+    // Delegación y soporte táctil para apertura instantánea del acordeón de ayuda
+    const helpCardsContainer = document.getElementById('passengerHelpCardsContainer');
+    if (helpCardsContainer) {
+      helpCardsContainer.addEventListener('click', (e) => {
+        const toggleHeader = e.target.closest('.passenger-help-header-toggle');
+        if (toggleHeader) {
+          const now = Date.now();
+          if (toggleHeader._lastClickTime && (now - toggleHeader._lastClickTime < 250)) return;
+          toggleHeader._lastClickTime = now;
+          window.togglePassengerHelpAccordion(toggleHeader);
+        }
       });
     }
 
