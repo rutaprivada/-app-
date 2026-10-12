@@ -9510,12 +9510,18 @@ if (btnRecenterPassengerMap) {
       }
 
       // Update Header Bar
+      const userEmail = (user && user.email) ? user.email.toLowerCase() : '';
       if (headerPassengerName) {
-        const shortName = user.nombre ? user.nombre.split(' ')[0] : 'Pasajero';
+        const shortName = user.nombre ? user.nombre.split(' ')[0] : (userEmail ? userEmail.split('@')[0] : 'Pasajero');
         headerPassengerName.textContent = shortName;
       }
       if (headerSub) {
-        headerSub.textContent = '★ 5.00 Pasajero';
+        if (userEmail) {
+          headerSub.innerHTML = `<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">${window.escapeHtml(userEmail)}</span>`;
+          headerSub.title = `Sesión activa: ${userEmail}`;
+        } else {
+          headerSub.textContent = '★ 5.00 Pasajero';
+        }
       }
       if (headerPassengerAvatar && user.avatar) {
         headerPassengerAvatar.src = user.avatar;
@@ -9523,15 +9529,22 @@ if (btnRecenterPassengerMap) {
 
       // Pre-cargar datos en el modal de perfil de forma automática
       if (profileModalNameTitle) {
-        profileModalNameTitle.textContent = user.nombre || 'Mi Perfil de Pasajero';
+        profileModalNameTitle.textContent = user.nombre || (userEmail ? `Pasajero (${userEmail})` : 'Mi Perfil de Pasajero');
       }
       if (profileModalHeaderAvatarImg && user.avatar) {
         profileModalHeaderAvatarImg.src = user.avatar;
       }
 
-      if (profPassengerName) profPassengerName.value = user.nombre || '';
+      if (profPassengerName) profPassengerName.value = user.nombre || (userEmail ? userEmail.split('@')[0] : '');
       if (profPassengerPhone) profPassengerPhone.value = user.telefono || '';
-      if (profPassengerEmail) profPassengerEmail.value = user.email || '';
+      if (profPassengerEmail) profPassengerEmail.value = userEmail;
+
+      const statusMsg = document.getElementById('passengerProfileStatusMsg');
+      if (statusMsg) {
+        statusMsg.innerHTML = userEmail ? 
+          `✓ Sesión activa como <strong style="color: #38bdf8;">${window.escapeHtml(userEmail)}</strong>` : 
+          `Indica tu nombre y número de celular para que el conductor pueda contactarte`;
+      }
 
       // Foto de perfil en tab Mis Datos
       if (user.avatar && user.avatar.length > 5) {
@@ -9651,26 +9664,98 @@ if (btnRecenterPassengerMap) {
       tabBtnPassengerRegister.addEventListener('click', () => switchAuthTab('register'));
     }
 
-    // Form Login Submit (Cross-Device: Valida contra memoria local, Firestore Cloud y REST API)
+    // Helper global para restablecer o cambiar contraseña
+    window.handleForgotPassengerPassword = async function() {
+      const identifierInput = document.getElementById('loginPassengerIdentifier');
+      let email = (identifierInput ? identifierInput.value : '').trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        email = prompt('Por favor ingresa tu correo electrónico para restablecer tu contraseña:');
+        if (!email) return;
+        email = email.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          alert('⚠️ Por favor ingresa un correo electrónico válido.');
+          return;
+        }
+        if (identifierInput) identifierInput.value = email;
+      }
+
+      const newPass = prompt(`Ingresa tu nueva contraseña para ${email} (mínimo 6 caracteres):`);
+      if (!newPass) return;
+      if (newPass.length < 6) {
+        alert('⚠️ La contraseña debe tener al menos 6 caracteres.');
+        return;
+      }
+
+      const newHash = await hashPassword(newPass);
+      const users = getRegisteredPassengers();
+      let user = users.find(u => u.email && u.email.toLowerCase() === email);
+      if (!user) {
+        const s = window.getPassengerSession();
+        if (s && s.email && s.email.toLowerCase() === email) user = s;
+      }
+
+      if (!user) {
+        user = {
+          id: 'pass_' + Date.now(),
+          nombre: email.split('@')[0],
+          telefono: '',
+          email: email,
+          password: newPass,
+          passwordHash: newHash,
+          rating: '5.00',
+          medioPago: 'efectivo',
+          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
+        };
+      } else {
+        user.password = newPass;
+        user.passwordHash = newHash;
+      }
+
+      savePassengerSession(user);
+      const statusMsg = document.getElementById('loginPassengerStatusMsg');
+      if (statusMsg) {
+        statusMsg.style.display = 'block';
+        statusMsg.style.background = 'rgba(16, 185, 129, 0.2)';
+        statusMsg.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+        statusMsg.style.color = '#6ee7b7';
+        statusMsg.textContent = '✅ Contraseña actualizada e inicio de sesión completado.';
+      }
+      closePassengerAuthModal();
+      if (typeof window.syncPassengerSessionUI === 'function') window.syncPassengerSessionUI(user);
+      if (typeof showToast === 'function') showToast('✅ ¡Contraseña actualizada y sesión iniciada!');
+    };
+
+    // Form Login Submit (Validación estricta por correo y activación inmediata)
     if (formPassengerLogin) {
       formPassengerLogin.addEventListener('submit', async (e) => {
         e.preventDefault();
         const identifierInput = document.getElementById('loginPassengerIdentifier');
         const passwordInput = document.getElementById('loginPassengerPassword');
+        const statusMsg = document.getElementById('loginPassengerStatusMsg');
         const rawEmail = (identifierInput ? identifierInput.value : '').trim().toLowerCase();
         const password = (passwordInput ? passwordInput.value : '').trim();
 
+        function showLoginFeedback(msg, isError = true) {
+          if (statusMsg) {
+            statusMsg.style.display = 'block';
+            statusMsg.style.background = isError ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)';
+            statusMsg.style.border = isError ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)';
+            statusMsg.style.color = isError ? '#fca5a5' : '#6ee7b7';
+            statusMsg.textContent = msg;
+          }
+          if (typeof showToast === 'function') showToast(msg);
+        }
+
         if (!rawEmail || !password) {
-          if (typeof showToast === 'function') showToast('⚠️ Por favor ingresa tu correo electrónico y contraseña.');
+          showLoginFeedback('⚠️ Por favor ingresa tu correo electrónico y tu contraseña.');
           return;
         }
 
-        // Validación estricta: ÚNICAMENTE correo electrónico (no números de teléfono)
+        // Validación estricta: ÚNICAMENTE correo electrónico (rechazo tajante a números de teléfono)
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(rawEmail) || /^\+?\d+$/.test(rawEmail.replace(/[\s\-\(\)]/g, ''))) {
-          if (typeof showToast === 'function') {
-            showToast('⚠️ El usuario debe ser tu correo electrónico (ej: usuario@ejemplo.com). No se permite ingresar con número de teléfono.');
-          }
+        const isPhone = /^\+?\d+$/.test(rawEmail.replace(/[\s\-\(\)]/g, ''));
+        if (isPhone || !emailRegex.test(rawEmail)) {
+          showLoginFeedback('⚠️ El usuario debe ser tu correo electrónico (ej: usuario@ejemplo.com). No se permite ingresar con número de teléfono.', true);
           if (identifierInput) identifierInput.focus();
           return;
         }
@@ -9679,7 +9764,7 @@ if (btnRecenterPassengerMap) {
         const enteredHash = await hashPassword(password);
         const registeredUsers = getRegisteredPassengers();
 
-        // 1. Buscar en usuarios registrados en este dispositivo
+        // 1. Buscar en usuarios registrados localmente
         let user = registeredUsers.find(u => u.email && u.email.toLowerCase() === email);
 
         // 2. Si no está en registeredUsers, buscar en sesiones previas o backups locales
@@ -9696,32 +9781,20 @@ if (btnRecenterPassengerMap) {
           });
         }
 
-        // 3. Consultar en Firestore Cloud si está disponible
-        if (!user && typeof firebase !== 'undefined' && firebase.firestore) {
-          try {
-            const db = firebase.firestore();
-            const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
-            let snap = await db.collection('pasajeros').doc(emailDocId).get();
-            if (snap.exists) {
-              user = snap.data();
-            }
-            if (!user) {
-              const qSnap = await db.collection('pasajeros').where('email', '==', email).limit(1).get();
-              if (!qSnap.empty) user = qSnap.docs[0].data();
-            }
-          } catch(err) {}
-        }
-
-        // 4. Si aún no está, consultar REST de Firestore Cloud
+        // 3. Consultar rápidamente Firestore Cloud REST API con timeout para no congelar la UI
         if (!user) {
           try {
             const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
-            const restResp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/pasajeros/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`);
-            if (restResp.ok) {
+            const restResp = await fetchWithTimeout(
+              `https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/pasajeros/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`,
+              {},
+              1200
+            );
+            if (restResp && restResp.ok) {
               const data = await restResp.json();
               if (data && data.fields) {
                 user = {
-                  id: data.fields.id?.stringValue || emailDocId,
+                  id: data.fields.id?.stringValue || ('pass_' + Date.now()),
                   nombre: data.fields.nombre?.stringValue || email.split('@')[0],
                   telefono: data.fields.telefono?.stringValue || '',
                   email: data.fields.email?.stringValue || email,
@@ -9734,7 +9807,7 @@ if (btnRecenterPassengerMap) {
           } catch(err) {}
         }
 
-        // 5. Si el usuario existe: validar contraseña
+        // 4. Si el usuario existe: validar contraseña
         if (user) {
           const storedHash = user.passwordHash || (user.password ? await hashPassword(user.password) : '');
           const hasPasswordSet = Boolean(storedHash || user.password);
@@ -9742,9 +9815,8 @@ if (btnRecenterPassengerMap) {
           if (hasPasswordSet) {
             const isPasswordCorrect = (storedHash && storedHash === enteredHash) || (user.password && user.password === password);
             if (!isPasswordCorrect) {
-              if (typeof showToast === 'function') {
-                showToast('❌ Contraseña incorrecta. Por favor verifica tus datos.');
-              }
+              showLoginFeedback('❌ Contraseña incorrecta para este correo. Usa el enlace inferior para cambiarla si la olvidaste.', true);
+              if (passwordInput) passwordInput.focus();
               return;
             }
           } else {
@@ -9752,7 +9824,7 @@ if (btnRecenterPassengerMap) {
             user.passwordHash = enteredHash;
           }
         } else {
-          // 6. Si no existe previamente: AUTO-CREAR CUENTA Y ACTIVAR SESIÓN
+          // 5. Si no existe previamente: AUTO-CREAR CUENTA Y ACTIVAR SESIÓN DE FORMA TRANSPARENTE
           const defaultName = email.split('@')[0].replace(/[._-]/g, ' ');
           const capitalizedName = defaultName.charAt(0).toUpperCase() + defaultName.slice(1);
           user = {
@@ -9771,7 +9843,7 @@ if (btnRecenterPassengerMap) {
           };
         }
 
-        // Guardar y activar sesión
+        // Guardar y activar sesión permanentemente
         try {
           localStorage.removeItem('rutaprivada_passenger_logged_out');
         } catch(e) {}
