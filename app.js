@@ -9347,124 +9347,7 @@ if (btnRecenterPassengerMap) {
     }
   };
 
-  // Medios de pago y tarjetas (helpers)
-  function initCardManagementHelpers() {
-    const btnToggleCard = document.getElementById('btnToggleAddCard');
-    const formCard = document.getElementById('addCardFormWrap');
-    const btnCancelAddCard = document.getElementById('btnCancelAddCard');
-    const btnSaveCard = document.getElementById('btnSaveCard');
 
-    if (btnToggleCard && formCard) {
-      btnToggleCard.addEventListener('click', () => {
-        formCard.classList.toggle('hidden');
-      });
-    }
-
-    if (btnCancelAddCard && formCard) {
-      btnCancelAddCard.addEventListener('click', () => {
-        formCard.classList.add('hidden');
-      });
-    }
-
-    if (btnSaveCard && formCard) {
-      btnSaveCard.addEventListener('click', () => {
-        const num = (document.getElementById('cardNumber')?.value || '').trim().replace(/\D/g, '');
-        const name = (document.getElementById('cardHolderName')?.value || '').trim();
-        const expiry = (document.getElementById('cardExpiry')?.value || '').trim();
-
-        if (num.length < 15 || !name) {
-          showToast('⚠️ Ingresa un número de tarjeta válido y el nombre del titular.');
-          return;
-        }
-
-        const cards = loadSavedCards();
-        const last4 = num.slice(-4);
-        const newCard = {
-          id: 'card_' + Date.now(),
-          last4: last4,
-          titular: name,
-          vencimiento: expiry || '12/28',
-          brand: num.startsWith('4') ? 'Visa' : (num.startsWith('5') ? 'Mastercard' : 'Tarjeta')
-        };
-
-        cards.push(newCard);
-        saveSavedCards(cards);
-        formCard.classList.add('hidden');
-        
-        // Limpiar campos
-        if (document.getElementById('cardNumber')) document.getElementById('cardNumber').value = '';
-        if (document.getElementById('cardHolderName')) document.getElementById('cardHolderName').value = '';
-        if (document.getElementById('cardExpiry')) document.getElementById('cardExpiry').value = '';
-        if (document.getElementById('cardCvc')) document.getElementById('cardCvc').value = '';
-
-        showToast(`💳 Tarjeta terminada en ${last4} vinculada exitosamente.`);
-      });
-    }
-  }
-
-    // Setup de botones 'X' para borrar direcciones en el Paso 3
-    const origInp = document.getElementById('origin-input');
-    const btnClearOrig = document.getElementById('btn-clear-origin');
-    const destInp = document.getElementById('destination-input');
-    const btnClearDest = document.getElementById('btn-clear-destination');
-    const stopInp = document.getElementById('stop-input');
-    const btnClearStop = document.getElementById('btn-clear-stop');
-
-    function setupClearAddressButton(input, btn, onClear) {
-      if (!input || !btn) return;
-      const toggle = () => {
-        btn.classList.toggle('hidden', !input.value || input.value.trim().length === 0);
-      };
-      input.addEventListener('input', toggle);
-      input.addEventListener('change', toggle);
-      toggle();
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        input.value = '';
-        toggle();
-        input.focus();
-        if (typeof onClear === 'function') onClear();
-      });
-    }
-
-    setupClearAddressButton(origInp, btnClearOrig, () => {
-      state.origin = null;
-      if (typeof originMarker !== 'undefined' && originMarker && typeof map !== 'undefined' && map) {
-        try { map.removeLayer(originMarker); } catch(e){}
-        originMarker = null;
-      }
-      if (typeof routePolyline !== 'undefined' && routePolyline && typeof map !== 'undefined' && map) {
-        try { map.removeLayer(routePolyline); } catch(e){}
-        routePolyline = null;
-      }
-      updateCalculation();
-    });
-
-    setupClearAddressButton(destInp, btnClearDest, () => {
-      state.destination = null;
-      if (typeof destinationMarker !== 'undefined' && destinationMarker && typeof map !== 'undefined' && map) {
-        try { map.removeLayer(destinationMarker); } catch(e){}
-        destinationMarker = null;
-      }
-      if (typeof routePolyline !== 'undefined' && routePolyline && typeof map !== 'undefined' && map) {
-        try { map.removeLayer(routePolyline); } catch(e){}
-        routePolyline = null;
-      }
-      updateCalculation();
-    });
-
-    setupClearAddressButton(stopInp, btnClearStop, () => {
-      state.intermediateStop = null;
-      if (typeof stopMarker !== 'undefined' && stopMarker && typeof map !== 'undefined' && map) {
-        try { map.removeLayer(stopMarker); } catch(e){}
-        stopMarker = null;
-      }
-      if (state.origin && state.destination) {
-        checkAndRoute();
-      } else {
-        updateCalculation();
-      }
-    });
 
   // ==========================================
   // GESTIÓN DE RESERVAS DEL PASAJERO ("MIS RESERVAS")
@@ -9833,7 +9716,22 @@ if (btnRecenterPassengerMap) {
     }
 
     function getPassengerSession() {
-      return window.getPassengerSession ? window.getPassengerSession() : null;
+      try {
+        const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
+                    localStorage.getItem('rutaprivada_passenger_auth_v1') || 
+                    localStorage.getItem('rutaprivada_passenger_profile') ||
+                    localStorage.getItem('rutaprivada_passenger_session') ||
+                    localStorage.getItem('rutaprivada_user_session') ||
+                    sessionStorage.getItem('rutaprivada_passenger_session_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.email || parsed.nombre || parsed.usuario || parsed.telefono || parsed.id)) {
+            try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(e){}
+            return parsed;
+          }
+        }
+      } catch(e) {}
+      return null;
     }
 
 

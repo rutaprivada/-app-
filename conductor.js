@@ -102,6 +102,192 @@ window.closeDriverPasswordResetModal = function() {
     }
 };
 
+window.handleSendDriverResetCode = async function() {
+    const inputResetEmail = document.getElementById('resetDriverEmail');
+    const email = (inputResetEmail ? inputResetEmail.value : '').trim().toLowerCase();
+    const btnSend = document.getElementById('btnSendDriverResetCode');
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        if (typeof showDriverToast === 'function') {
+            showDriverToast('⚠️ Por favor ingresa un correo electrónico válido.');
+        } else {
+            alert('Por favor ingresa un correo electrónico válido.');
+        }
+        if (inputResetEmail) inputResetEmail.focus();
+        return;
+    }
+
+    if (btnSend) {
+        btnSend.disabled = true;
+        btnSend.style.opacity = '0.7';
+        btnSend.textContent = 'Enviando...';
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    window._driverResetState = {
+        email,
+        code: otpCode,
+        expiresAt: Date.now() + 15 * 60 * 1000
+    };
+    try {
+        localStorage.setItem('rutaprivada_pending_driver_reset', JSON.stringify(window._driverResetState));
+    } catch(e) {}
+
+    if (typeof showDriverToast === 'function') {
+        showDriverToast(`⏳ Enviando código de seguridad a ${email}...`);
+    }
+
+    const sectionOtp = document.getElementById('sectionDriverResetOtp');
+    if (sectionOtp) sectionOtp.style.display = 'flex';
+    const inputCode = document.getElementById('inputDriverResetCode');
+    if (inputCode) {
+        inputCode.value = '';
+        setTimeout(() => inputCode.focus(), 250);
+    }
+
+    try {
+        const expDate = new Date(Date.now() + 15 * 60 * 1000);
+        const timeStr = expDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+        const payload = {
+            service_id: 'service_ri00bk4',
+            template_id: 'template_y849ceg',
+            user_id: 'ai6WOsUzJaXx1st1E',
+            template_params: {
+                email: email,
+                to_email: email,
+                passcode: otpCode,
+                time: timeStr
+            }
+        };
+        const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (btnSend) {
+            btnSend.disabled = false;
+            btnSend.style.opacity = '1';
+            btnSend.textContent = 'Reenviar Código';
+        }
+        if (resp && resp.ok) {
+            if (typeof showDriverToast === 'function') showDriverToast(`📨 ¡Código enviado con éxito a ${email}! Revisa tu buzón.`);
+        } else {
+            if (typeof showDriverToast === 'function') showDriverToast(`📨 Código generado para ${email}. Revisa spam si no lo ves.`);
+        }
+    } catch(err) {
+        if (btnSend) {
+            btnSend.disabled = false;
+            btnSend.style.opacity = '1';
+            btnSend.textContent = 'Reenviar Código';
+        }
+        if (typeof showDriverToast === 'function') showDriverToast(`📨 Código generado para ${email}.`);
+    }
+};
+
+window.handleDriverPasswordResetSubmit = async function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    let state = window._driverResetState;
+    if (!state) {
+        try {
+            const saved = localStorage.getItem('rutaprivada_pending_driver_reset');
+            if (saved) state = JSON.parse(saved);
+        } catch(err) {}
+    }
+
+    if (!state || !state.code) {
+        if (typeof showDriverToast === 'function') {
+            showDriverToast('⚠️ Primero debes presionar "Enviar Código".');
+        } else {
+            alert('Primero debes presionar "Enviar Código".');
+        }
+        return false;
+    }
+
+    const inputCode = document.getElementById('inputDriverResetCode');
+    const enteredCode = (inputCode ? inputCode.value : '').replace(/\D/g, '').trim();
+
+    if (enteredCode !== state.code) {
+        if (typeof showDriverToast === 'function') {
+            showDriverToast('❌ Código incorrecto. Revisa el correo recibido.');
+        } else {
+            alert('Código incorrecto. Revisa el correo recibido.');
+        }
+        if (inputCode) inputCode.focus();
+        return false;
+    }
+
+    const inputNewPass = document.getElementById('resetDriverNewPass');
+    const inputNewPassConfirm = document.getElementById('resetDriverNewPassConfirm');
+    const newPass = (inputNewPass ? inputNewPass.value : '').trim();
+    const newPassConfirm = (inputNewPassConfirm ? inputNewPassConfirm.value : '').trim();
+
+    if (!newPass || newPass.length < 8 || !/\d/.test(newPass)) {
+        if (typeof showDriverToast === 'function') {
+            showDriverToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
+        } else {
+            alert('La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
+        }
+        if (inputNewPass) inputNewPass.focus();
+        return false;
+    }
+
+    if (newPass !== newPassConfirm) {
+        if (typeof showDriverToast === 'function') {
+            showDriverToast('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
+        } else {
+            alert('Las contraseñas no coinciden. Por favor verifícalas.');
+        }
+        if (inputNewPassConfirm) inputNewPassConfirm.focus();
+        return false;
+    }
+
+    const email = state.email;
+
+    try {
+        let registered = JSON.parse(localStorage.getItem('rutaprivada_registered_drivers_v1') || '[]');
+        const idx = registered.findIndex(d => d.email && d.email.toLowerCase() === email.toLowerCase());
+        if (idx >= 0) {
+            registered[idx].password = newPass;
+            localStorage.setItem('rutaprivada_registered_drivers_v1', JSON.stringify(registered));
+        }
+
+        let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+        const dIdx = driversList.findIndex(d => d.email && d.email.toLowerCase() === email.toLowerCase());
+        if (dIdx >= 0) {
+            driversList[dIdx].password = newPass;
+            localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
+        }
+    } catch(err) {}
+
+    try {
+        if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+            const db = firebase.firestore();
+            const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
+            db.collection('conductores').doc(emailDocId).set({
+                email,
+                password: newPass,
+                updatedAt: new Date().toISOString()
+            }, { merge: true }).catch(() => {});
+        }
+    } catch(err) {}
+
+    window.closeDriverPasswordResetModal();
+
+    const loginEmailInput = document.getElementById('loginDriverEmail');
+    const loginPassInput = document.getElementById('loginDriverPassword');
+    if (loginEmailInput) loginEmailInput.value = email;
+    if (loginPassInput) loginPassInput.value = newPass;
+
+    if (typeof showDriverToast === 'function') {
+        showDriverToast('✅ ¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
+    } else {
+        alert('¡Contraseña actualizada con éxito! Ya puedes iniciar sesión con tu nueva contraseña.');
+    }
+
+    return false;
+};
+
 window.closeDriverReportTicketModal = function() {
     const modal = document.getElementById('modalDriverReportTicket');
     if (modal) {
@@ -114,12 +300,59 @@ window.closeDriverTicketModal = window.closeDriverReportTicketModal;
 window.openDriverTicketModal = function(preselectedCategory, defaultDescription) {
     const modal = document.getElementById('modalDriverReportTicket');
     if (modal) {
+        let currentName = '';
+        let currentPhone = '';
+        let currentEmail = '';
+
+        try {
+            const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
+            if (rawAuth) {
+                const sess = JSON.parse(rawAuth);
+                if (sess) {
+                    currentName = sess.nombre || '';
+                    currentPhone = sess.telefono || '';
+                    currentEmail = sess.email || '';
+                }
+            }
+        } catch(e) {}
+
+        if (!currentName || !currentPhone || !currentEmail) {
+            try {
+                const rawDocs = localStorage.getItem('rutaprivada_driver_docs_v1');
+                if (rawDocs) {
+                    const docs = JSON.parse(rawDocs);
+                    if (docs) {
+                        if (!currentName) currentName = docs.nombre || '';
+                        if (!currentPhone) currentPhone = docs.telefono || '';
+                        if (!currentEmail) currentEmail = docs.email || '';
+                    }
+                }
+            } catch(e) {}
+        }
+
+        const inputName = document.getElementById('ticketDriverName');
+        const inputPhone = document.getElementById('ticketDriverPhone');
+        const inputEmail = document.getElementById('ticketDriverEmail');
         const selectCat = document.getElementById('ticketCategory');
         const inputDesc = document.getElementById('ticketDescription');
+        const inputTripId = document.getElementById('ticketTripId');
+
+        if (inputName) inputName.value = currentName || '';
+        if (inputPhone) inputPhone.value = currentPhone || '';
+        if (inputEmail) inputEmail.value = currentEmail || '';
         if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
         if (inputDesc && defaultDescription && !inputDesc.value) inputDesc.value = defaultDescription;
+
+        const activeTripObj = window.currentActiveTrip || (typeof driverState !== 'undefined' ? driverState.activeTrip : null);
+        if (inputTripId && activeTripObj && !inputTripId.value) {
+            inputTripId.value = 'Viaje #' + (activeTripObj.id || activeTripObj.reservaId || 'En Curso');
+        }
+
         modal.style.display = 'flex';
         modal.classList.add('active');
+        if (inputDesc) {
+            setTimeout(() => inputDesc.focus(), 250);
+        }
     }
 };
 
@@ -6649,16 +6882,35 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem('rutaprivada_driver_wallet_v1');
             localStorage.removeItem('rutaprivada_driver_recharges_v1');
             localStorage.removeItem('rutaprivada_driver_is_online');
+            localStorage.removeItem('rutaprivada_driver_email');
+            localStorage.removeItem('rutaprivada_driver_phone');
+            localStorage.removeItem('rutaprivada_driver_name');
             
             // Limpiar formulario y foto de documentación
             loadedDocsImages = {};
             const previewFotoPerfil = document.getElementById('previewFotoPerfil');
             if (previewFotoPerfil) previewFotoPerfil.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
             
-            ['docInputDriverName', 'docInputDniNum', 'docInputPhone', 'docInputEmail', 'docInputVehicleModel', 'docInputPlate', 'docInputBankName', 'docInputCbu', 'docInputBankHolder'].forEach(id => {
+            ['docInputDriverName', 'docInputDniNum', 'docInputPhone', 'docInputEmail', 'docInputVehicleModel', 'docInputPlate', 'docInputBankName', 'docInputCbu', 'docInputBankHolder',
+             'ticketDriverName', 'ticketDriverPhone', 'ticketDriverEmail', 'ticketTripId', 'ticketDescription',
+             'loginDriverEmail', 'loginDriverPassword', 'regDriverName', 'regDriverDni', 'regDriverPhone', 'regDriverEmail', 'regDriverPassword', 'regDriverPasswordConfirm'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
             });
+
+            // Restablecer vista de perfil por defecto
+            const profFullName = document.getElementById('profileFullName');
+            if (profFullName) profFullName.textContent = 'Nuevo Chofer Partner';
+            const profPhone = document.getElementById('profilePhoneVal');
+            if (profPhone) profPhone.textContent = '---';
+            const profVeh = document.getElementById('profileVehicleVal');
+            if (profVeh) profVeh.textContent = 'Sin Registrar';
+            const profCat = document.getElementById('profileCategoryVal');
+            if (profCat) profCat.textContent = 'Sedán Estándar';
+            const profStat = document.getElementById('profileStatusVal');
+            if (profStat) profStat.innerHTML = '<i class="fa-solid fa-clock"></i> Documentación Sin Cargar';
+
+            driverState.info = getFleetDriverInfo();
 
             closeDriverProfileModal();
             showDriverToast('🚪 Sesión de chofer cerrada correctamente.');
@@ -7787,13 +8039,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const txtBtnSubmitTicket = document.getElementById('txtBtnSubmitTicket');
 
     function getDriverContactInfo() {
-        const nameEl = document.getElementById('profDriverName') || document.getElementById('driverName') || document.getElementById('regDriverName');
-        const phoneEl = document.getElementById('profDriverPhone') || document.getElementById('regDriverPhone');
-        const emailEl = document.getElementById('profDriverEmail') || document.getElementById('regDriverEmail') || document.getElementById('loginDriverEmail');
+        let sess = null;
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY_DRIVER_AUTH);
+            if (raw) sess = JSON.parse(raw);
+        } catch(e) {}
 
-        const driverName = (nameEl ? (nameEl.value || nameEl.textContent) : '').replace('👑', '').trim() || 'Conductor RutaPrivada';
-        const driverPhone = (phoneEl ? phoneEl.value : '').trim() || localStorage.getItem('rutaprivada_driver_phone') || '';
-        const driverEmail = (emailEl ? emailEl.value : '').trim() || localStorage.getItem('rutaprivada_driver_email') || '';
+        const docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+        const info = (typeof driverState !== 'undefined' && driverState.info) ? driverState.info : null;
+
+        let driverName = (sess && sess.nombre ? sess.nombre : (docs && docs.nombre ? docs.nombre : (info && info.nombre ? info.nombre : ''))).replace('👑', '').trim();
+        if (driverName === 'Nuevo Chofer Partner' || driverName === 'Conductor RutaPrivada') driverName = '';
+
+        const driverPhone = (sess && sess.telefono ? sess.telefono : (docs && docs.telefono ? docs.telefono : (info && info.telefono !== 'Sin teléfono' ? info.telefono : ''))).trim();
+        const driverEmail = (sess && sess.email ? sess.email : (docs && docs.email ? docs.email : (info && info.email ? info.email : ''))).trim();
 
         return { driverName, driverPhone, driverEmail };
     }
@@ -7823,9 +8082,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const inputDesc = document.getElementById('ticketDescription');
             const inputTripId = document.getElementById('ticketTripId');
 
-            if (inputName) inputName.value = (driverName !== 'Conductor RutaPrivada' ? driverName : '') || (inputName.value || '');
-            if (inputPhone) inputPhone.value = driverPhone || (inputPhone.value || '');
-            if (inputEmail) inputEmail.value = driverEmail || (inputEmail.value || '');
+            if (inputName) inputName.value = driverName || '';
+            if (inputPhone) inputPhone.value = driverPhone || '';
+            if (inputEmail) inputEmail.value = driverEmail || '';
             if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
             if (inputDesc) {
                 if (defaultDescription) inputDesc.value = defaultDescription;
