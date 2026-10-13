@@ -9865,7 +9865,13 @@ if (btnRecenterPassengerMap) {
     }
     window.openPassengerAuthModal = openPassengerAuthModal;
 
-    function closePassengerAuthModal() {
+    function closePassengerAuthModal(force = false) {
+      if (!force) {
+        const session = getPassengerSession();
+        if (!session || (!session.nombre && !session.email && !session.usuario && !session.id)) {
+          return; // No cerrar sin sesión activa
+        }
+      }
       const modal = modalPassengerAuth || document.getElementById('modalPassengerAuth');
       if (modal) {
         modal.classList.add('hidden');
