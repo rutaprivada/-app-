@@ -1511,7 +1511,6 @@
        ========================================================= -->
   <div id="modalPassengerAuth" class="modal-backdrop hidden" style="z-index: 10010; backdrop-filter: blur(14px); background: rgba(5, 10, 20, 0.92);">
     <div class="modal-dialog" style="max-width: 480px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 22px; box-shadow: 0 25px 60px rgba(0,0,0,0.9), 0 0 35px rgba(56, 189, 248, 0.25); overflow: hidden; padding: 0; position: relative;">
-      <button type="button" id="btnClosePassengerAuthModal" onclick="closePassengerAuthModal()" style="position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; z-index: 10;">&times;</button>
       
       <div class="modal-header" style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 20px 20px 14px; text-align: center; display: block;">
         <div style="width: 56px; height: 56px; margin: 0 auto 10px; background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(56, 189, 248, 0.35);">
@@ -1627,7 +1626,7 @@
             </div>
           </div>
 
-          <div style="background: rgba(56, 189, 248, 0.08); border: 1px dashed rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 10px; font-size: 0.78rem; color: #38bdf8; margin-top: 2px;">
+          <div style="background: rgba(56, 189, 248, 0.12); border: 1.5px dashed rgba(56, 189, 248, 0.45); border-radius: 11px; padding: 11px 13px; font-size: 0.8rem; color: #38bdf8; font-weight: 600; margin-top: 2px; line-height: 1.45;">
             ℹ️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.
           </div>
 
@@ -1663,7 +1662,7 @@
           <button type="button" id="btnResendPassengerVerifyCode" style="background: none; border: none; color: #38bdf8; font-size: 0.8rem; cursor: pointer; text-decoration: underline;">
             Reenviar código / enlace
           </button>
-          <button type="button" id="btnCancelPassengerVerify" onclick="document.getElementById('modalPassengerEmailVerify').classList.add('hidden')" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer;">
+          <button type="button" id="btnCancelPassengerVerify" onclick="window.cancelPassengerEmailVerify()" style="background: none; border: none; color: #94a3b8; font-size: 0.8rem; cursor: pointer;">
             Cancelar
           </button>
         </div>

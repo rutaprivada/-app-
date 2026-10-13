@@ -70,6 +70,38 @@ window.closeDriverDocsModal = function() {
     }
 };
 
+window.handleForgotDriverPassword = function() {
+    const modal = document.getElementById('modalDriverPasswordReset');
+    if (!modal) return;
+    const inputLoginEmail = document.getElementById('loginDriverEmail');
+    const inputResetEmail = document.getElementById('resetDriverEmail');
+    const sectionOtp = document.getElementById('sectionDriverResetOtp');
+    const inputCode = document.getElementById('inputDriverResetCode');
+    const inputNewPass = document.getElementById('resetDriverNewPass');
+    const inputNewPassConfirm = document.getElementById('resetDriverNewPassConfirm');
+
+    if (sectionOtp) sectionOtp.style.display = 'none';
+    if (inputCode) inputCode.value = '';
+    if (inputNewPass) inputNewPass.value = '';
+    if (inputNewPassConfirm) inputNewPassConfirm.value = '';
+
+    if (inputResetEmail) {
+        const prefill = (inputLoginEmail ? inputLoginEmail.value : '').trim();
+        if (prefill) inputResetEmail.value = prefill;
+    }
+
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+};
+
+window.closeDriverPasswordResetModal = function() {
+    const modal = document.getElementById('modalDriverPasswordReset');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+};
+
 window.closeDriverReportTicketModal = function() {
     const modal = document.getElementById('modalDriverReportTicket');
     if (modal) {
@@ -77,6 +109,7 @@ window.closeDriverReportTicketModal = function() {
         modal.style.display = 'none';
     }
 };
+window.closeDriverTicketModal = window.closeDriverReportTicketModal;
 
 window.openDriverTicketModal = function(preselectedCategory, defaultDescription) {
     const modal = document.getElementById('modalDriverReportTicket');
@@ -90,8 +123,6 @@ window.openDriverTicketModal = function(preselectedCategory, defaultDescription)
     }
 };
 
-window.closeDriverTicketModal = window.closeDriverReportTicketModal;
-
 window.openDriverTicketCategory = function(catKey) {
     window.openDriverTicketModal(catKey);
 };
@@ -102,13 +133,17 @@ window.toggleDriverHelpAccordion = function(headerEl) {
     if (!card) return;
     const body = card.querySelector('.driver-help-body');
     const icon = headerEl.querySelector('.toggle-icon');
+    if (!body) return;
 
-    const isVisible = body && (body.style.display === 'block' || window.getComputedStyle(body).display === 'block');
-    if (body) {
-        body.style.display = isVisible ? 'none' : 'block';
-    }
+    const isVisible = (body.style.display === 'block') || (window.getComputedStyle(body).display === 'block');
+    body.style.display = isVisible ? 'none' : 'block';
     if (icon) {
         icon.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+    }
+    if (isVisible) {
+        card.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+    } else {
+        card.style.borderColor = 'rgba(56, 189, 248, 0.4)';
     }
 };
 
@@ -5996,7 +6031,11 @@ document.addEventListener('DOMContentLoaded', () => {
         switchDriverAuthTab(defaultTab);
     }
 
-    function hideDriverAuthModal() {
+    function hideDriverAuthModal(force = false) {
+        if (!force) {
+            const activeDriverSession = getDriverSession();
+            if (!activeDriverSession) return;
+        }
         if (modalDriverAuth) modalDriverAuth.style.display = 'none';
     }
 
@@ -6629,13 +6668,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const btnCloseDriverAuth = document.getElementById('btnCloseDriverAuth');
-    if (btnCloseDriverAuth) {
-        btnCloseDriverAuth.addEventListener('click', () => {
-            hideDriverAuthModal();
-        });
-    }
-
     if (btnOpenDriverProfile) btnOpenDriverProfile.addEventListener('click', openDriverProfileModal);
     if (btnCloseDriverProfile) btnCloseDriverProfile.addEventListener('click', closeDriverProfileModal);
     if (btnCerrarPerfilSheet) btnCerrarPerfilSheet.addEventListener('click', closeDriverProfileModal);
@@ -6652,18 +6684,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    if (modalDriverAuth) {
-        modalDriverAuth.addEventListener('click', (e) => {
-            if (e.target === modalDriverAuth) {
-                hideDriverAuthModal();
-            }
-        });
-    }
 
-    // Verificación de autenticación al inicializar app de chofer
+    // Verificación estricta de autenticación al inicializar app de chofer:
+    // Si no ha iniciado sesión, la pantalla de login/registro es obligatoria y no puede cerrarse.
     const activeDriverSession = getDriverSession();
     if (activeDriverSession) {
-        hideDriverAuthModal();
+        hideDriverAuthModal(true);
         renderDriverProfileInfo();
     } else {
         showDriverAuthModal('login');
@@ -7797,14 +7823,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const inputDesc = document.getElementById('ticketDescription');
             const inputTripId = document.getElementById('ticketTripId');
 
-            if (inputName && !inputName.value) inputName.value = driverName !== 'Conductor RutaPrivada' ? driverName : '';
-            if (inputPhone && !inputPhone.value) inputPhone.value = driverPhone;
-            if (inputEmail && !inputEmail.value) inputEmail.value = driverEmail;
+            if (inputName) inputName.value = (driverName !== 'Conductor RutaPrivada' ? driverName : '') || (inputName.value || '');
+            if (inputPhone) inputPhone.value = driverPhone || (inputPhone.value || '');
+            if (inputEmail) inputEmail.value = driverEmail || (inputEmail.value || '');
             if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
-            if (inputDesc && defaultDescription && !inputDesc.value) inputDesc.value = defaultDescription;
+            if (inputDesc) {
+                if (defaultDescription) inputDesc.value = defaultDescription;
+            }
 
             // Auto-completar ID de viaje activo si lo hay
-            const activeTripObj = window.currentActiveTrip || null;
+            const activeTripObj = window.currentActiveTrip || (typeof driverState !== 'undefined' ? driverState.activeTrip : null);
             if (inputTripId && activeTripObj && !inputTripId.value) {
                 inputTripId.value = 'Viaje #' + (activeTripObj.id || activeTripObj.reservaId || 'En Curso');
             }
@@ -7826,6 +7854,15 @@ document.addEventListener('DOMContentLoaded', () => {
             modal.classList.remove('active');
             modal.style.display = 'none';
         }
+    }
+    window.closeDriverTicketModal = closeDriverTicketModal;
+    window.closeDriverReportTicketModal = closeDriverTicketModal;
+    window.openDriverTicketModal = openDriverTicketModal;
+
+    if (modalDriverReportTicket) {
+        modalDriverReportTicket.addEventListener('click', (e) => {
+            if (e.target === modalDriverReportTicket) closeDriverTicketModal();
+        });
     }
 
     // Toggle Acordeón de Categorías de Ayuda
@@ -8132,10 +8169,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 return true;
             }
 
-            // 8. Cualquier otro overlay o modal activo
+            // Si el modal de autenticación está abierto y no hay chofer autenticado, bloquear back button
+            const modalAuth = document.getElementById('modalDriverAuth');
+            if (modalAuth && modalAuth.style.display === 'flex' && !getDriverSession()) {
+                return true;
+            }
+
+            // 8. Cualquier otro overlay o modal activo (excepto autenticación obligatoria)
             const activeOverlays = document.querySelectorAll('.driver-modal-overlay.active, .driver-sheet.active, .modal-overlay.active');
             let closedAny = false;
             activeOverlays.forEach(ov => {
+                if (ov.id === 'modalDriverAuth' || ov.id === 'modalDriverEmailVerify') {
+                    if (!getDriverSession()) return;
+                }
                 ov.classList.remove('active', 'open');
                 closedAny = true;
             });

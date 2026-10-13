@@ -267,6 +267,49 @@ window.openPassengerAuthModal = function(defaultTab = 'login') {
   }
 };
 
+window.handleForgotPassengerPassword = function() {
+  const modal = document.getElementById('modalPassengerPasswordReset');
+  if (!modal) return;
+  const idInput = document.getElementById('loginPassengerIdentifier');
+  const resetEmailInput = document.getElementById('resetPassengerEmail');
+  const sectionOtp = document.getElementById('sectionPassengerResetOtp');
+  const codeInput = document.getElementById('inputPassengerResetCode');
+  const newPassInput = document.getElementById('resetPassengerNewPass');
+  const newPassConfirmInput = document.getElementById('resetPassengerNewPassConfirm');
+
+  if (sectionOtp) sectionOtp.style.display = 'none';
+  if (codeInput) codeInput.value = '';
+  if (newPassInput) newPassInput.value = '';
+  if (newPassConfirmInput) newPassConfirmInput.value = '';
+
+  if (resetEmailInput && idInput) {
+    const val = idInput.value.trim();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+      resetEmailInput.value = val;
+    }
+  }
+
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+};
+
+window.closePassengerPasswordResetModal = function() {
+  const modal = document.getElementById('modalPassengerPasswordReset');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+};
+
+window.cancelPassengerEmailVerify = function() {
+  const modalVerify = document.getElementById('modalPassengerEmailVerify');
+  if (modalVerify) {
+    modalVerify.classList.add('hidden');
+    modalVerify.style.display = 'none';
+  }
+  window.openPassengerAuthModal('register');
+};
+
 // Medios de pago / Gestión de Tarjetas
 window.loadSavedCards = function() {
   try {
@@ -1052,7 +1095,13 @@ window.openPassengerAuthModal = function(defaultTab = 'login') {
   }
 };
 
-window.closePassengerAuthModal = function() {
+window.closePassengerAuthModal = function(force = false) {
+  if (!force) {
+    const session = typeof window.getPassengerSession === 'function' ? window.getPassengerSession() : null;
+    if (!session || (!session.nombre && !session.usuario && !session.email && !session.telefono && !session.id)) {
+      return; // Obligatorio iniciar sesión o registrarse
+    }
+  }
   const modal = document.getElementById('modalPassengerAuth');
   if (modal) {
     modal.classList.add('hidden');
@@ -4814,6 +4863,9 @@ function setupModalDismissals() {
   document.querySelectorAll('.modal-backdrop').forEach(m => {
     m.addEventListener('click', (e) => {
       if (e.target === m) {
+        if (m.id === 'modalPassengerAuth' || m.id === 'modalPassengerEmailVerify') {
+          return; // No permitir salir de la pantalla de autenticación obligatoria
+        }
         m.classList.add('hidden');
       }
     });
@@ -4821,7 +4873,12 @@ function setupModalDismissals() {
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.add('hidden'));
+      document.querySelectorAll('.modal-backdrop').forEach(m => {
+        if (m.id === 'modalPassengerAuth' || m.id === 'modalPassengerEmailVerify') {
+          return;
+        }
+        m.classList.add('hidden');
+      });
       const calDropdown = document.getElementById('custom-calendar-dropdown');
       if (calDropdown) calDropdown.classList.add('hidden');
     }
@@ -10321,8 +10378,8 @@ if (btnRecenterPassengerMap) {
         const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
         const passwordHash = await hashPassword(password);
 
-        // Guardar sesión de inmediato para que nunca se pierda
-        const finalUser = {
+        // Estructura de registro pendiente con código OTP de activación
+        pendingPassengerRegistration = {
           id: 'pass_' + Date.now(),
           nombre: name,
           telefono: phone,
@@ -10334,17 +10391,40 @@ if (btnRecenterPassengerMap) {
           ratingCount: 1,
           avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
           fechaRegistro: new Date().toISOString(),
-          emailVerificado: true
+          verifyCode: verifyCode,
+          emailVerificado: false
         };
 
-        savePassengerSession(finalUser);
-        closePassengerAuthModal();
-        if (typeof showToast === 'function') {
-          showToast(`🎉 ¡Cuenta creada y sesión iniciada con éxito! Bienvenido, ${finalUser.nombre}.`);
+        try {
+          localStorage.setItem('rutaprivada_pending_passenger_reg', JSON.stringify(pendingPassengerRegistration));
+        } catch(e) {}
+
+        // Ocultar modal de autenticación y abrir modal de validación de correo
+        closePassengerAuthModal(true);
+        const verifyTarget = document.getElementById('verifyPassengerEmailTarget');
+        if (verifyTarget) verifyTarget.textContent = email;
+        const inputVerify = document.getElementById('inputPassengerVerifyCode');
+        if (inputVerify) {
+          inputVerify.value = '';
+          setTimeout(() => inputVerify.focus(), 300);
+        }
+        if (modalPassengerEmailVerify) {
+          modalPassengerEmailVerify.classList.remove('hidden');
+          modalPassengerEmailVerify.style.display = 'flex';
         }
 
-        // Despachar correo electrónico de bienvenida en segundo plano
-        sendPassengerEmailJsVerification(email, verifyCode).catch(() => {});
+        if (typeof showToast === 'function') {
+          showToast(`⏳ Enviando código de activación a ${email}...`);
+        }
+
+        // Despachar correo electrónico real con código OTP
+        sendPassengerEmailJsVerification(email, verifyCode).then((res) => {
+          if (res.success) {
+            if (typeof showToast === 'function') showToast(`📨 ¡Código enviado con éxito a tu correo ${email}! Revisa tu buzón.`);
+          } else {
+            if (typeof showToast === 'function') showToast(`⚠️ Si no ves el código en tu correo ${email}, revisa spam o pulsa reenviar.`);
+          }
+        });
       });
     }
 
@@ -10393,7 +10473,10 @@ if (btnRecenterPassengerMap) {
 
         if (!pending) {
           if (typeof showToast === 'function') showToast('⚠️ No hay registro pendiente. Inicia el proceso de nuevo.');
-          if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.add('hidden');
+          if (modalPassengerEmailVerify) {
+            modalPassengerEmailVerify.classList.add('hidden');
+            modalPassengerEmailVerify.style.display = 'none';
+          }
           openPassengerAuthModal('register');
           return;
         }
@@ -10416,14 +10499,24 @@ if (btnRecenterPassengerMap) {
         delete finalUser.verifyCode;
         delete finalUser.recentCodes;
 
+        saveRegisteredPassenger(finalUser);
         savePassengerSession(finalUser);
         try {
           localStorage.removeItem('rutaprivada_pending_passenger_reg');
+          localStorage.removeItem('rutaprivada_passenger_logged_out');
         } catch(e) {}
 
-        if (modalPassengerEmailVerify) modalPassengerEmailVerify.classList.add('hidden');
+        if (modalPassengerEmailVerify) {
+          modalPassengerEmailVerify.classList.add('hidden');
+          modalPassengerEmailVerify.style.display = 'none';
+        }
+        closePassengerAuthModal(true);
+        renderPassengerProfileUI(finalUser);
+        if (typeof window.syncPassengerSessionUI === 'function') {
+          window.syncPassengerSessionUI(finalUser);
+        }
         if (typeof showToast === 'function') {
-          showToast(`🎉 ¡Correo validado y cuenta activada con éxito! Bienvenido ${finalUser.nombre}.`);
+          showToast(`🎉 ¡Correo validado y cuenta activada con éxito! Bienvenido, ${finalUser.nombre}.`);
         }
         pendingPassengerRegistration = null;
       });
@@ -10806,16 +10899,7 @@ if (btnRecenterPassengerMap) {
     if (btnClosePassengerProfile) {
       btnClosePassengerProfile.addEventListener('click', () => window.closePassengerProfileModal());
     }
-    if (btnClosePassengerAuthModal) {
-      btnClosePassengerAuthModal.addEventListener('click', () => window.closePassengerAuthModal());
-    }
 
-    // Click outside dismissals
-    if (modalPassengerAuth) {
-      modalPassengerAuth.addEventListener('click', (e) => {
-        if (e.target === modalPassengerAuth) window.closePassengerAuthModal();
-      });
-    }
     if (modalPassengerProfile) {
       modalPassengerProfile.addEventListener('click', (e) => {
         if (e.target === modalPassengerProfile) window.closePassengerProfileModal();
@@ -10825,6 +10909,7 @@ if (btnRecenterPassengerMap) {
       modalPassengerEmailVerify.addEventListener('click', (e) => {
         if (e.target === modalPassengerEmailVerify) {
           modalPassengerEmailVerify.classList.add('hidden');
+          modalPassengerEmailVerify.style.display = 'none';
           window.openPassengerAuthModal('register');
         }
       });
@@ -10855,19 +10940,16 @@ if (btnRecenterPassengerMap) {
         window.syncPassengerSessionUI(currentSession);
       }
     } else {
-      const wasExplicitlyLoggedOut = (function() {
-        try { return localStorage.getItem('rutaprivada_passenger_logged_out') === 'true'; } catch(e){ return false; }
-      })();
-      if (wasExplicitlyLoggedOut) {
-        const headerName = document.getElementById('headerPassengerName');
-        if (headerName) headerName.textContent = 'Iniciar Sesión';
-        const headerSub = document.querySelector('.passenger-status-sub');
-        if (headerSub) headerSub.textContent = 'Toca para ingresar';
-        const headerAvatar = document.getElementById('headerPassengerAvatar');
-        if (headerAvatar) {
-          headerAvatar.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="%2394a3b8"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
-        }
+      const headerName = document.getElementById('headerPassengerName');
+      if (headerName) headerName.textContent = 'Iniciar Sesión';
+      const headerSub = document.querySelector('.passenger-status-sub');
+      if (headerSub) headerSub.textContent = 'Toca para ingresar';
+      const headerAvatar = document.getElementById('headerPassengerAvatar');
+      if (headerAvatar) {
+        headerAvatar.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="%2394a3b8"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
       }
+      // Requisito estricto: Si no hay sesión iniciada, mostrar obligatoriamente la pantalla de autenticación
+      window.openPassengerAuthModal('login');
     }
   }
 
@@ -10990,10 +11072,23 @@ if (btnRecenterPassengerMap) {
         } catch(e) {}
       }
 
-      // 6. Cerrar cualquier otro modal o backdrop visible
+      // Si el modal de autenticación o verificación está activo y no hay sesión iniciada, bloquear back button
+      const modalAuth = document.getElementById('modalPassengerAuth');
+      if (modalAuth && !modalAuth.classList.contains('hidden')) {
+        const sess = typeof window.getPassengerSession === 'function' ? window.getPassengerSession() : null;
+        if (!sess || (!sess.nombre && !sess.email && !sess.usuario && !sess.id)) {
+          return true;
+        }
+      }
+
+      // 6. Cerrar cualquier otro modal o backdrop visible (excepto autenticación obligatoria)
       const openModals = document.querySelectorAll('.modal-backdrop:not(.hidden), .modal.active, .modal-overlay.active, .dialog-overlay.active');
       let modalClosed = false;
       openModals.forEach(m => {
+        if (m.id === 'modalPassengerAuth' || m.id === 'modalPassengerEmailVerify') {
+          const sess = typeof window.getPassengerSession === 'function' ? window.getPassengerSession() : null;
+          if (!sess) return;
+        }
         m.classList.add('hidden');
         m.classList.remove('active');
         modalClosed = true;
@@ -11216,6 +11311,12 @@ if (btnRecenterPassengerMap) {
     try { updateCalculation(); } catch (e) { console.warn('Calculation:', e); }
     try { initPwa(); } catch (e) { console.warn('PWA init:', e); }
     try { goToWizardStep(1); } catch (e) { console.warn('Wizard step 1:', e); }
+    try {
+      const sess = window.getPassengerSession();
+      if (!sess || (!sess.nombre && !sess.email && !sess.usuario && !sess.id) || localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') {
+        window.openPassengerAuthModal('login');
+      }
+    } catch(e) {}
   }
 
   // Inicializar al cargar el DOM o inmediatamente si ya cargó
