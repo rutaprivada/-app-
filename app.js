@@ -8176,11 +8176,13 @@ if (window.RutaSync) {
     if (pChatDriverAvatar) pChatDriverAvatar.src = driverPhoto;
   });
 
-  window.RutaSync.on('UBICACION_CHOFER_ACTUALIZADA', (locationData) => {
+  const handleDriverLocationUpdate = (locationData) => {
     if (locationData && typeof locationData.lat === 'number' && typeof locationData.lng === 'number') {
       onPassengerReceivedDriverLocation(locationData);
     }
-  });
+  };
+  window.RutaSync.on('UBICACION_CHOFER_ACTUALIZADA', handleDriverLocationUpdate);
+  window.RutaSync.on('ACTUALIZACION_UBICACION_CHOFER', handleDriverLocationUpdate);
 
   window.RutaSync.on('ESTADO_VIAJE_CAMBIADO', (viaje) => {
     if (!viaje) return;

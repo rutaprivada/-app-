@@ -2681,13 +2681,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch(e) {}
 
                 if (window.RutaSync) {
-                    window.RutaSync.emit('ACTUALIZACION_UBICACION_CHOFER', {
-                        lat: lat,
-                        lng: lng,
-                        heading: heading,
-                        speed: speed,
-                        choferNombre: (driverState.info && driverState.info.nombre) || 'Daniel Pabon'
-                    });
+                    if (typeof window.RutaSync.actualizarUbicacionChofer === 'function') {
+                        window.RutaSync.actualizarUbicacionChofer({
+                            lat: lat,
+                            lng: lng,
+                            heading: heading,
+                            speed: speed,
+                            stage: (driverState.activeTrip && driverState.activeTrip.etapa) || 'disponible',
+                            choferNombre: (driverState.info && driverState.info.nombre) || 'Daniel Pabon'
+                        });
+                    } else {
+                        window.RutaSync.emit('UBICACION_CHOFER_ACTUALIZADA', {
+                            lat: lat,
+                            lng: lng,
+                            heading: heading,
+                            speed: speed,
+                            stage: (driverState.activeTrip && driverState.activeTrip.etapa) || 'disponible',
+                            choferNombre: (driverState.info && driverState.info.nombre) || 'Daniel Pabon'
+                        });
+                    }
                 }
             },
             (err) => {

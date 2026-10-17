@@ -180,6 +180,23 @@ class RutaSyncManager {
                             console.warn('Firestore active trip listener warning:', err);
                         });
 
+                    // Escuchar ubicación del chofer en tiempo real (Cloud Push instantáneo Firestore)
+                    this.firestore.collection('live_trips').doc('driver_location')
+                        .onSnapshot((doc) => {
+                            if (doc.exists) {
+                                const data = doc.data();
+                                if (data && data.senderId !== this.deviceId && data.lat && data.lng) {
+                                    this.handleIncoming({
+                                        id: 'fs_loc_' + (data.timestamp || Date.now()),
+                                        type: 'UBICACION_CHOFER_ACTUALIZADA',
+                                        payload: data,
+                                        senderId: data.senderId,
+                                        timestamp: data.timestamp || Date.now()
+                                    });
+                                }
+                            }
+                        }, (err) => {});
+
                     // Escuchar chat en tiempo real
                     this.firestore.collection('live_trips').doc('chat_active')
                         .onSnapshot((doc) => {
@@ -470,7 +487,7 @@ class RutaSyncManager {
                         timestamp: now,
                         ultimoEstadoEn: now
                     }, { merge: true }).catch(() => {});
-                } else if (type === 'UBICACION_CHOFER_ACTUALIZADA') {
+                } else if (type === 'UBICACION_CHOFER_ACTUALIZADA' || type === 'ACTUALIZACION_UBICACION_CHOFER') {
                     this.firestore.collection('live_trips').doc('driver_location').set({
                         ...safePayload,
                         senderId: this.deviceId,
@@ -646,7 +663,7 @@ class RutaSyncManager {
                     });
                 }
             }
-        } else if (message.type === 'UBICACION_CHOFER_ACTUALIZADA') {
+        } else if (message.type === 'UBICACION_CHOFER_ACTUALIZADA' || message.type === 'ACTUALIZACION_UBICACION_CHOFER') {
             if (message.payload && message.payload.lat && message.payload.lng) {
                 try {
                     localStorage.setItem('rutaprivada_driver_location', JSON.stringify(message.payload));
