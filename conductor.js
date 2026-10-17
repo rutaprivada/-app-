@@ -2659,11 +2659,77 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ==========================================
-    // 7. CAMBIO DE ESTADO (EN LÍNEA / DESCONECTADO) Y GPS OBLIGATORIO
+    // 7. CAMBIO DE ESTADO (EN LÍNEA / DESCONECTADO), GPS Y BACKGROUND SERVICE
     // ==========================================
     let globalDriverGpsWatchId = null;
 
+    window.openBackgroundLocationModal = function() {
+        const modal = document.getElementById('modalBackgroundLocationConsent');
+        if (modal) {
+            modal.style.display = 'flex';
+            modal.classList.add('active');
+        }
+    };
+
+    window.closeBackgroundLocationModal = function() {
+        const modal = document.getElementById('modalBackgroundLocationConsent');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+        }
+    };
+
+    window.confirmBackgroundLocationConsent = function() {
+        try {
+            localStorage.setItem('rutaprivada_bg_location_consented', 'true');
+        } catch(e) {}
+        window.closeBackgroundLocationModal();
+        executeDriverGoOnline();
+    };
+
     function startGlobalGpsWatch() {
+        const drvId = getActiveDriverId();
+        const drvName = (driverState.info && driverState.info.nombre) || 'Chofer Partner';
+        const activeTripId = (driverState.activeTrip && driverState.activeTrip.id) ? driverState.activeTrip.id : '';
+
+        // 1. Conexión con Foreground Service Nativo de Android (APK instalada)
+        if (window.AndroidDriverBridge && typeof window.AndroidDriverBridge.startBackgroundLocation === 'function') {
+            try {
+                window.AndroidDriverBridge.startBackgroundLocation(drvId, drvName, activeTripId);
+                console.log('Foreground Service Nativo de Android iniciado para:', drvId);
+            } catch(e) {
+                console.warn('Native background service start warning:', e);
+            }
+        }
+
+        // 2. Callback de alta velocidad desde Android Service nativo (MainActivity.onNativeLocationUpdate)
+        window.onNativeGpsUpdate = function(lat, lng, heading, speed) {
+            const speedKmh = Math.round(speed || 0);
+            driverState.currentRealGpsCoords = { lat, lng, heading: heading || 0, speed: speedKmh };
+            if (currentDriverCoords) {
+                currentDriverCoords.lat = lat;
+                currentDriverCoords.lng = lng;
+            }
+            if (driverCarMarker && driverLiveMap) {
+                driverCarMarker.setLatLng([lat, lng]);
+            }
+            if (typeof onDriverLocationUpdate === 'function') {
+                try { onDriverLocationUpdate(lat, lng, heading, speedKmh); } catch(e) {}
+            }
+            if (window.RutaSync && typeof window.RutaSync.actualizarUbicacionChofer === 'function') {
+                window.RutaSync.actualizarUbicacionChofer({
+                    driverId: drvId,
+                    lat: lat,
+                    lng: lng,
+                    heading: heading || 0,
+                    speed: speedKmh,
+                    stage: (driverState.activeTrip && driverState.activeTrip.etapa) || 'disponible',
+                    choferNombre: drvName
+                });
+            }
+        };
+
+        // 3. Geolocation web estándar (navegador o WebView foreground)
         if (!navigator.geolocation) {
             alert('⚠️ GPS NO COMPATIBLE:\n\nTu navegador o dispositivo no soporta geolocalización.');
             setOnlineStatus(false);
@@ -2691,26 +2757,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     }));
                 } catch(e) {}
 
-                if (window.RutaSync) {
-                    if (typeof window.RutaSync.actualizarUbicacionChofer === 'function') {
-                        window.RutaSync.actualizarUbicacionChofer({
-                            lat: lat,
-                            lng: lng,
-                            heading: heading,
-                            speed: speed,
-                            stage: (driverState.activeTrip && driverState.activeTrip.etapa) || 'disponible',
-                            choferNombre: (driverState.info && driverState.info.nombre) || 'Daniel Pabon'
-                        });
-                    } else {
-                        window.RutaSync.emit('UBICACION_CHOFER_ACTUALIZADA', {
-                            lat: lat,
-                            lng: lng,
-                            heading: heading,
-                            speed: speed,
-                            stage: (driverState.activeTrip && driverState.activeTrip.etapa) || 'disponible',
-                            choferNombre: (driverState.info && driverState.info.nombre) || 'Daniel Pabon'
-                        });
-                    }
+                if (window.RutaSync && typeof window.RutaSync.actualizarUbicacionChofer === 'function') {
+                    window.RutaSync.actualizarUbicacionChofer({
+                        driverId: drvId,
+                        lat: lat,
+                        lng: lng,
+                        heading: heading,
+                        speed: speed,
+                        stage: (driverState.activeTrip && driverState.activeTrip.etapa) || 'disponible',
+                        choferNombre: drvName
+                    });
                 }
             },
             (err) => {
@@ -2732,9 +2788,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stopGlobalGpsWatch() {
+        if (window.AndroidDriverBridge && typeof window.AndroidDriverBridge.stopBackgroundLocation === 'function') {
+            try {
+                window.AndroidDriverBridge.stopBackgroundLocation();
+                console.log('Foreground Service Nativo de Android detenido');
+            } catch(e) {}
+        }
+
         if (globalDriverGpsWatchId !== null && navigator.geolocation) {
             navigator.geolocation.clearWatch(globalDriverGpsWatchId);
             globalDriverGpsWatchId = null;
+        }
+
+        const drvId = getActiveDriverId();
+        if (window.RutaSync && typeof window.RutaSync.desconectarChofer === 'function') {
+            window.RutaSync.desconectarChofer(drvId);
         }
     }
 
@@ -2772,7 +2840,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Mantener pantalla activa del celular
             requestWakeLock();
 
-            // Iniciar GPS continuo obligatorio
+            // Iniciar GPS continuo obligatorio y servicio en segundo plano
             startGlobalGpsWatch();
 
             // Iniciar contador de tiempo en línea
@@ -2833,6 +2901,68 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function executeDriverGoOnline() {
+        let docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
+        const statusVerif = (docs && docs.estadoVerificacion) ? docs.estadoVerificacion : 'pendiente';
+
+        if (statusVerif === 'rechazado') {
+            alert(`❌ DOCUMENTACIÓN RECHAZADA:\n\nEl Administrador indicó lo siguiente sobre tus documentos:\n\n"${docs.observaciones || 'Documentación incompleta o no cumple los requisitos'}"\n\nPor favor actualiza tus datos en la pestaña de documentación.`);
+            const modalDocsUpload = document.getElementById('modalDocsUpload');
+            if (modalDocsUpload) {
+                if (typeof populateDocsForm === 'function') populateDocsForm();
+                modalDocsUpload.classList.add('active');
+            }
+            return;
+        } else if (statusVerif !== 'aprobado') {
+            // Auto-aprobar para permitir conexión inmediata sin bloqueo
+            try {
+                if (!docs) docs = { id: getActiveDriverId(), nombre: 'Chofer Partner' };
+                docs.estadoVerificacion = 'aprobado';
+                if (typeof saveDocsData === 'function') saveDocsData(docs);
+            } catch(e) {}
+        }
+
+        // Poner en línea de inmediato para fluidez instantánea en la UI
+        setOnlineStatus(true);
+        if (typeof showDriverToast === 'function') {
+            showDriverToast('🟢 Conectado en línea. GPS activo en segundo plano.');
+        }
+
+        // Obtener coordenadas de alta precisión sin bloquear
+        if ('geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    driverState.currentRealGpsCoords = {
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude,
+                        heading: pos.coords.heading || 0,
+                        speed: pos.coords.speed || 0
+                    };
+                    if (driverLiveMap) {
+                        driverLiveMap.setView([pos.coords.latitude, pos.coords.longitude], 15);
+                    }
+                },
+                (err) => {
+                    console.warn('Advertencia GPS inicial:', err);
+                    driverState.currentRealGpsCoords = {
+                        lat: -34.6037,
+                        lng: -58.3816,
+                        heading: 0,
+                        speed: 0
+                    };
+                },
+                { enableHighAccuracy: true, timeout: 6000 }
+            );
+        } else {
+            driverState.currentRealGpsCoords = {
+                lat: -34.6037,
+                lng: -58.3816,
+                heading: 0,
+                speed: 0
+            };
+        }
+    }
+
     function handleDriverToggleStatus() {
         if (driverState.activeTrip) {
             alert('Tienes un viaje activo en curso. Debes finalizarlo antes de desconectarte.');
@@ -2840,65 +2970,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!driverState.isOnline) {
-            let docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
-            const statusVerif = (docs && docs.estadoVerificacion) ? docs.estadoVerificacion : 'pendiente';
+            // Requisito Google Play Store: Divulgación previa de ubicación en segundo plano
+            let hasConsented = false;
+            try {
+                hasConsented = localStorage.getItem('rutaprivada_bg_location_consented') === 'true';
+            } catch(e) {}
 
-            if (statusVerif === 'rechazado') {
-                alert(`❌ DOCUMENTACIÓN RECHAZADA:\n\nEl Administrador indicó lo siguiente sobre tus documentos:\n\n"${docs.observaciones || 'Documentación incompleta o no cumple los requisitos'}"\n\nPor favor actualiza tus datos en la pestaña de documentación.`);
-                const modalDocsUpload = document.getElementById('modalDocsUpload');
-                if (modalDocsUpload) {
-                    if (typeof populateDocsForm === 'function') populateDocsForm();
-                    modalDocsUpload.classList.add('active');
-                }
+            if (!hasConsented) {
+                window.openBackgroundLocationModal();
                 return;
-            } else if (statusVerif !== 'aprobado') {
-                // Auto-aprobar para permitir conexión inmediata sin bloqueo
-                try {
-                    if (!docs) docs = { id: getActiveDriverId(), nombre: 'Chofer Partner' };
-                    docs.estadoVerificacion = 'aprobado';
-                    if (typeof saveDocsData === 'function') saveDocsData(docs);
-                } catch(e) {}
             }
 
-            // Poner en línea de inmediato para fluidez instantánea en la UI
-            setOnlineStatus(true);
-            if (typeof showDriverToast === 'function') {
-                showDriverToast('🟢 Conectado en línea. Buscando viajes...');
-            }
-
-            // Obtener coordenadas de alta precisión sin bloquear
-            if ('geolocation' in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        driverState.currentRealGpsCoords = {
-                            lat: pos.coords.latitude,
-                            lng: pos.coords.longitude,
-                            heading: pos.coords.heading || 0,
-                            speed: pos.coords.speed || 0
-                        };
-                        if (driverLiveMap) {
-                            driverLiveMap.setView([pos.coords.latitude, pos.coords.longitude], 15);
-                        }
-                    },
-                    (err) => {
-                        console.warn('Advertencia GPS inicial:', err);
-                        driverState.currentRealGpsCoords = {
-                            lat: -34.6037,
-                            lng: -58.3816,
-                            heading: 0,
-                            speed: 0
-                        };
-                    },
-                    { enableHighAccuracy: true, timeout: 6000 }
-                );
-            } else {
-                driverState.currentRealGpsCoords = {
-                    lat: -34.6037,
-                    lng: -58.3816,
-                    heading: 0,
-                    speed: 0
-                };
-            }
+            executeDriverGoOnline();
         } else {
             setOnlineStatus(false);
             if (typeof showDriverToast === 'function') {
@@ -3453,10 +3536,72 @@ document.addEventListener('DOMContentLoaded', () => {
         startDriverGpsTracking(driverState.activeTrip);
     }
 
+    function launchExternalNavigation(nativeUri, webFallback) {
+        if (typeof showDriverToast === 'function') {
+            showDriverToast('🗺️ Abriendo navegador GPS (Waze / Maps)...');
+        }
+        try {
+            // Intento 1: Lanzar URI Nativa directa (waze:// o google.navigation:)
+            window.location.href = nativeUri;
+            setTimeout(() => {
+                // Si la app externa no está instalada o WebView bloqueó el intent, abrir fallback web
+                try {
+                    window.open(webFallback, '_system');
+                } catch(e) {}
+            }, 600);
+        } catch(err) {
+            try {
+                window.open(webFallback, '_system');
+            } catch(e) {}
+        }
+    }
+
     function updateGpsLinks(targetAddress) {
-        const encoded = encodeURIComponent(targetAddress || 'Buenos Aires');
-        btnOpenWaze.href = `https://waze.com/ul?q=${encoded}&navigate=yes`;
-        btnOpenGoogleMaps.href = `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
+        const trip = driverState.activeTrip;
+        let targetCoords = null;
+        if (trip) {
+            if (trip.etapa === 'en_camino') {
+                targetCoords = trip._originCoords || trip.originCoords;
+            } else if (trip.etapa === 'hacia_parada' || trip.etapa === 'en_origen') {
+                targetCoords = trip._stopCoords || trip.stopCoords || trip._destCoords || trip.destinationCoords;
+            } else {
+                targetCoords = trip._destCoords || trip.destinationCoords;
+            }
+        }
+
+        const encodedAddr = encodeURIComponent(targetAddress || 'Buenos Aires');
+
+        // Waze Native URI & Web Fallback
+        const wazeNativeUrl = targetCoords
+            ? `waze://?ll=${targetCoords.lat},${targetCoords.lng}&navigate=yes`
+            : `waze://?q=${encodedAddr}&navigate=yes`;
+        const wazeWebFallback = targetCoords
+            ? `https://waze.com/ul?ll=${targetCoords.lat},${targetCoords.lng}&navigate=yes`
+            : `https://waze.com/ul?q=${encodedAddr}&navigate=yes`;
+
+        // Google Maps Native URI & Web Fallback
+        const gmapsNativeUrl = targetCoords
+            ? `google.navigation:q=${targetCoords.lat},${targetCoords.lng}`
+            : `google.navigation:q=${encodedAddr}`;
+        const gmapsWebFallback = targetCoords
+            ? `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lng}`
+            : `https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}`;
+
+        if (btnOpenWaze) {
+            btnOpenWaze.href = wazeNativeUrl;
+            btnOpenWaze.onclick = function(e) {
+                e.preventDefault();
+                launchExternalNavigation(wazeNativeUrl, wazeWebFallback);
+            };
+        }
+
+        if (btnOpenGoogleMaps) {
+            btnOpenGoogleMaps.href = gmapsNativeUrl;
+            btnOpenGoogleMaps.onclick = function(e) {
+                e.preventDefault();
+                launchExternalNavigation(gmapsNativeUrl, gmapsWebFallback);
+            };
+        }
     }
 
     function updateTripStageUI() {
