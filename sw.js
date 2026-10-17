@@ -15,24 +15,35 @@ const STATIC_ASSETS = [
   './conductor.js',
   './sync.js',
   './admin.html',
+  './agenda.html',
+  './agenda.css',
+  './agenda.js',
+  './partners.html',
+  './privacidad.html',
   './favicon.svg',
   './icon-192.png',
   './icon-512.png',
+  './icon_chofer.png',
+  './icon_pasajero.png',
   './logo_rutaprivada.svg',
   './logo_chofer.svg',
   './logo_tarjeta.svg',
   './manifest.json',
   './manifest-driver.json',
   './robots.txt',
-  './sitemap.xml',
-  './privacidad.html'
+  './sitemap.xml'
 ];
 
-// Instalación: Precargar recursos estáticos fundamentales
+// Instalación: Precargar recursos estáticos fundamentales con tolerancia
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      const cachePromises = STATIC_ASSETS.map((asset) => {
+        return cache.add(asset).catch((err) => {
+          console.warn('[SW] No se pudo cachear recurso opcional:', asset, err);
+        });
+      });
+      await Promise.all(cachePromises);
     }).then(() => self.skipWaiting())
   );
 });

@@ -8501,7 +8501,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Registro y actualización de Service Worker para la PWA de Chofer
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js?v=26')
+            navigator.serviceWorker.register('sw.js?v=106')
                 .then(reg => {
                     reg.update().catch(() => {});
                 })

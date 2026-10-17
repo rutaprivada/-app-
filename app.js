@@ -6991,14 +6991,12 @@ function saveModalConfig() {
 let deferredInstallPrompt = null;
 
 function initPwa() {
-  // 1. Registro del Service Worker
+  // 1. Registro unificado del Service Worker (v106)
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=86')
+      navigator.serviceWorker.register('sw.js?v=106')
         .then((reg) => {
-          console.log('Service Worker de RutaPrivada registrado con éxito:', reg.scope);
-          // Forzar verificación de nueva versión en cada recarga
-          reg.update();
+          reg.update().catch(() => {});
         })
         .catch((err) => {
           console.warn('Error al registrar Service Worker:', err);
