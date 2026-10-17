@@ -6109,10 +6109,30 @@ html, body {
 }
 
 /* Modo App y Dispositivos Móviles */
-body.is-app-mode .passenger-uber-experience,
+body.is-app-mode:not(.force-web-view) .passenger-uber-experience {
+  display: flex !important;
+  flex-direction: column;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 1000;
+  overflow: hidden;
+  background: #080c14;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.is-app-mode:not(.force-web-view) .main-header,
+body.is-app-mode:not(.force-web-view) .main-layout,
+body.is-app-mode:not(.force-web-view) .main-footer {
+  display: none !important;
+}
+
 @media (max-width: 900px) {
   body:not(.force-web-view) .passenger-uber-experience {
-    display: flex;
+    display: flex !important;
     flex-direction: column;
     position: fixed;
     inset: 0;

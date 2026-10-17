@@ -515,7 +515,48 @@
 
       </div>
     </div>
+
+    <!-- Modal Selección de Medio de Pago para Uber Experience -->
+    <div id="modalUberPaymentSelect" class="modal-backdrop hidden" style="z-index: 99999;">
+      <div class="modal-dialog" style="max-width: 380px; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+          <h4 style="margin: 0; font-size: 1.1rem; color: #fff; font-weight: 800;">Elegí cómo pagar</h4>
+          <button type="button" onclick="closeUberPaymentModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;">✕</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="uber-payment-opt selected" id="optPayCash" onclick="selectUberPayment('efectivo', 'Efectivo al chofer', 'fa-money-bill-wave')" style="display: flex; align-items: center; gap: 14px; background: rgba(16, 185, 129, 0.1); border: 1.5px solid #10b981; border-radius: 14px; padding: 14px; cursor: pointer;">
+            <i class="fa-solid fa-money-bill-wave" style="font-size: 1.3rem; color: #34d399;"></i>
+            <div style="flex: 1;">
+              <strong style="display: block; color: #fff; font-size: 0.95rem;">Efectivo</strong>
+              <small style="color: #94a3b8;">Abonás directamente a tu chofer al finalizar</small>
+            </div>
+            <i class="fa-solid fa-circle-check" style="color: #10b981;"></i>
+          </div>
+
+          <div class="uber-payment-opt" id="optPayMp" onclick="selectUberPayment('transferencia', 'Mercado Pago / Transferencia', 'fa-mobile-screen-button')" style="display: flex; align-items: center; gap: 14px; background: rgba(255, 255, 255, 0.04); border: 1.5px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 14px; cursor: pointer;">
+            <i class="fa-solid fa-mobile-screen-button" style="font-size: 1.3rem; color: #38bdf8;"></i>
+            <div style="flex: 1;">
+              <strong style="display: block; color: #fff; font-size: 0.95rem;">Mercado Pago / Alias CBU</strong>
+              <small style="color: #94a3b8;">Transferencia instantánea sin recargo</small>
+            </div>
+          </div>
+
+          <div class="uber-payment-opt" id="optPayCard" onclick="selectUberPayment('tarjeta', 'Tarjeta Débito/Crédito', 'fa-credit-card')" style="display: flex; align-items: center; gap: 14px; background: rgba(255, 255, 255, 0.04); border: 1.5px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 14px; cursor: pointer;">
+            <i class="fa-solid fa-credit-card" style="font-size: 1.3rem; color: #fbbf24;"></i>
+            <div style="flex: 1;">
+              <strong style="display: block; color: #fff; font-size: 0.95rem;">Tarjeta Débito / Crédito</strong>
+              <small style="color: #94a3b8;">Pago seguro online con link de pago</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- Botón Flotante Desktop para alternar vista App Móvil <-> Web -->
+  <button type="button" id="btnToggleAppViewMode" class="btn-toggle-app-view web-only" onclick="toggleAppViewMode()" style="position: fixed; bottom: 20px; left: 20px; z-index: 9999; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(12px); border: 1.5px solid #38bdf8; color: #fff; border-radius: 9999px; padding: 10px 18px; font-size: 0.85rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+    <span id="toggleAppViewIcon">📱</span> <span id="toggleAppViewText">Probar Vista App Pasajero</span>
+  </button>
 
   <!-- Main Hero / Multi-Step Wizard Calculator Section -->
   <main class="container main-layout">
