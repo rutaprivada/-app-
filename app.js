@@ -11605,6 +11605,643 @@ if (btnRecenterPassengerMap) {
     }
   }
 
+  // =========================================================
+  // ITEM C: CONTROLADOR DE EXPERIENCIA MÓVIL UBER/CABIFY FULLSCREEN & BOTTOM SHEET
+  // =========================================================
+  let uberMap = null;
+  let uberPassengerMarker = null;
+  let uberFleetMarkers = {};
+  let uberRoutePolyline = null;
+  let uberCurrentCoords = [-34.6037, -58.3816]; // Default Buenos Aires
+  let uberSelectedCategory = 'Sedán Ejecutivo';
+  let uberCategoryMultiplier = 1.0;
+  let uberCalculatedBaseFare = 0;
+  let uberSelectedPayment = 'efectivo';
+  let uberActiveTripPolling = null;
+
+  function initPassengerUberExperience() {
+    const uberExpContainer = document.getElementById('passengerUberExperience');
+    const mapContainer = document.getElementById('passengerAppFullscreenMap');
+    if (!uberExpContainer || !mapContainer) return;
+
+    // 1. Inicializar Mapa Fullscreen Leaflet
+    try {
+      if (typeof L !== 'undefined' && !uberMap) {
+        uberMap = L.map('passengerAppFullscreenMap', {
+          zoomControl: false,
+          attributionControl: false,
+          fadeAnimation: true,
+          zoomAnimation: true
+        }).setView(uberCurrentCoords, 14);
+
+        // Capa de mapa nocturna / ejecutiva limpia CartoDB Dark Matter
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+          subdomains: 'abcd'
+        }).addTo(uberMap);
+
+        // Control de zoom posicionado en la esquina superior derecha
+        L.control.zoom({ position: 'topright' }).addTo(uberMap);
+      }
+    } catch(e) {
+      console.warn('Error inicializando mapa Uber Fullscreen:', e);
+    }
+
+    // 2. Geolocalización en vivo del Pasajero
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          uberCurrentCoords = [lat, lng];
+          updateUberPassengerMarker(lat, lng);
+          if (uberMap) uberMap.setView([lat, lng], 15);
+          
+          // Autofill Origen en modo Uber
+          const originInput = document.getElementById('uberOriginInput');
+          if (originInput && !originInput.value) {
+            originInput.value = 'Mi ubicación actual';
+            if (typeof state !== 'undefined') {
+              state.origin = { lat, lng, address: 'Mi ubicación actual' };
+            }
+          }
+        },
+        () => {
+          updateUberPassengerMarker(uberCurrentCoords[0], uberCurrentCoords[1]);
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+
+      // Monitoreo continuo
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          uberCurrentCoords = [lat, lng];
+          updateUberPassengerMarker(lat, lng);
+        },
+        null,
+        { enableHighAccuracy: true, maximumAge: 10000 }
+      );
+    } else {
+      updateUberPassengerMarker(uberCurrentCoords[0], uberCurrentCoords[1]);
+    }
+
+    // 3. Conectar Radar de Flota en Vivo
+    conectarRadarFlotaUber();
+
+    // 4. Configurar Gestos y Snap del Bottom Sheet
+    setupUberBottomSheetGestures();
+
+    // 5. Configurar Botones y Acciones de la Interfaz
+    setupUberExperienceListeners();
+
+    // 6. Verificar si ya hay un viaje activo en curso
+    verificarViajeActivoUber();
+  }
+
+  function updateUberPassengerMarker(lat, lng) {
+    if (!uberMap || typeof L === 'undefined') return;
+    try {
+      if (uberPassengerMarker) {
+        uberPassengerMarker.setLatLng([lat, lng]);
+      } else {
+        const beaconIcon = L.divIcon({
+          className: 'passenger-gps-beacon-wrap',
+          html: '<div class="passenger-gps-beacon"></div>',
+          iconSize: [22, 22],
+          iconAnchor: [11, 11]
+        });
+        uberPassengerMarker = L.marker([lat, lng], { icon: beaconIcon, zIndexOffset: 1000 }).addTo(uberMap);
+      }
+    } catch(e){}
+  }
+
+  function conectarRadarFlotaUber() {
+    const fleetBadgeText = document.getElementById('uberFleetCountText');
+    
+    // Generar marcadores iniciales realistas cerca del pasajero
+    generarChoferesSimuladosCercanos(uberCurrentCoords[0], uberCurrentCoords[1]);
+
+    // Si RutaSync tiene soporte de choferes en línea, escuchar actualizaciones
+    if (window.RutaSync && typeof window.RutaSync.escucharChoferesEnLinea === 'function') {
+      window.RutaSync.escucharChoferesEnLinea((choferes) => {
+        if (choferes && choferes.length > 0) {
+          actualizarMarcadoresFlotaUber(choferes);
+          if (fleetBadgeText) {
+            fleetBadgeText.textContent = `${choferes.length} chofer${choferes.length > 1 ? 'es' : ''} en línea`;
+          }
+        }
+      });
+    }
+  }
+
+  function generarChoferesSimuladosCercanos(baseLat, baseLng) {
+    if (!uberMap || typeof L === 'undefined') return;
+    const offsets = [
+      { dLat: 0.0035, dLng: 0.0028, name: 'Daniel P.', car: 'Cronos Negro' },
+      { dLat: -0.0028, dLng: 0.0042, name: 'Carlos M.', car: 'Corolla Blanco' },
+      { dLat: 0.0048, dLng: -0.0035, name: 'Matías R.', car: 'Vento Gris' },
+      { dLat: -0.0042, dLng: -0.0025, name: 'Alejandro S.', car: 'Mercedes Vito' }
+    ];
+
+    offsets.forEach((off, idx) => {
+      const driverId = `sim_driver_${idx}`;
+      const lat = baseLat + off.dLat;
+      const lng = baseLng + off.dLng;
+      
+      const carIcon = L.divIcon({
+        className: 'uber-fleet-car-marker',
+        html: '<div class="uber-fleet-car-icon" title="' + off.car + '">🚘</div>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      if (!uberFleetMarkers[driverId]) {
+        uberFleetMarkers[driverId] = L.marker([lat, lng], { icon: carIcon }).addTo(uberMap);
+      }
+    });
+
+    const fleetBadgeText = document.getElementById('uberFleetCountText');
+    if (fleetBadgeText) {
+      fleetBadgeText.textContent = '4 choferes en tu zona';
+    }
+  }
+
+  function actualizarMarcadoresFlotaUber(choferes) {
+    if (!uberMap || typeof L === 'undefined') return;
+    choferes.forEach((c) => {
+      const id = c.id || c.driverId || c.conductorId;
+      const lat = c.lat || (c.coords && c.coords.lat);
+      const lng = c.lng || (c.coords && c.coords.lng);
+      if (!id || !lat || !lng) return;
+
+      if (uberFleetMarkers[id]) {
+        uberFleetMarkers[id].setLatLng([lat, lng]);
+      } else {
+        const carIcon = L.divIcon({
+          className: 'uber-fleet-car-marker',
+          html: `<div class="uber-fleet-car-icon" title="${c.auto || 'Chofer'}">🚘</div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+        uberFleetMarkers[id] = L.marker([lat, lng], { icon: carIcon }).addTo(uberMap);
+      }
+    });
+  }
+
+  function setUberSheetSnap(stateName) {
+    const sheet = document.getElementById('passengerBottomSheet');
+    const controls = document.getElementById('passengerFloatingMapControls');
+    if (!sheet) return;
+
+    sheet.classList.remove('snap-collapsed', 'snap-half', 'snap-expanded');
+    sheet.classList.add(`snap-${stateName}`);
+
+    let bottomPx = 150;
+    if (stateName === 'half') bottomPx = Math.round(window.innerHeight * 0.54) + 15;
+    if (stateName === 'expanded') bottomPx = Math.round(window.innerHeight * 0.86) + 15;
+
+    document.documentElement.style.setProperty('--bottom-sheet-current-height', `${bottomPx}px`);
+  }
+
+  function setupUberBottomSheetGestures() {
+    const handleArea = document.getElementById('bottomSheetDragArea');
+    const sheet = document.getElementById('passengerBottomSheet');
+    if (!handleArea || !sheet) return;
+
+    let startY = 0;
+    let currentSnap = 'collapsed';
+
+    handleArea.addEventListener('touchstart', (e) => {
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    handleArea.addEventListener('touchend', (e) => {
+      const endY = e.changedTouches[0].clientY;
+      const diffY = endY - startY;
+
+      // Deslizar hacia arriba
+      if (diffY < -40) {
+        if (sheet.classList.contains('snap-collapsed')) {
+          setUberSheetSnap('half');
+        } else if (sheet.classList.contains('snap-half')) {
+          setUberSheetSnap('expanded');
+        }
+      } 
+      // Deslizar hacia abajo
+      else if (diffY > 40) {
+        if (sheet.classList.contains('snap-expanded')) {
+          setUberSheetSnap('half');
+        } else if (sheet.classList.contains('snap-half')) {
+          setUberSheetSnap('collapsed');
+        }
+      }
+    }, { passive: true });
+  }
+
+  function switchUberSheetSection(sectionId) {
+    const sections = ['sheetStateSearch', 'sheetStateRoutePicker', 'sheetStateRadar', 'sheetStateActiveTrip'];
+    sections.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = (id === sectionId) ? 'block' : 'none';
+    });
+  }
+
+  function setupUberExperienceListeners() {
+    // 1. Recenter Button
+    const btnRecenter = document.getElementById('btnUberRecenterMap');
+    if (btnRecenter) {
+      btnRecenter.addEventListener('click', () => {
+        if (uberMap && uberCurrentCoords) {
+          uberMap.flyTo(uberCurrentCoords, 16, { animate: true, duration: 0.8 });
+        }
+      });
+    }
+
+    // 2. Trigger Search Click -> Abrir Route Picker y expandir a half
+    const searchTrigger = document.getElementById('sheetSearchTriggerBox');
+    if (searchTrigger) {
+      searchTrigger.addEventListener('click', () => {
+        switchUberSheetSection('sheetStateRoutePicker');
+        setUberSheetSnap('half');
+        setTimeout(() => {
+          const destInput = document.getElementById('uberDestInput');
+          if (destInput) destInput.focus();
+        }, 200);
+      });
+    }
+
+    // 3. Volver de Route Picker a Search
+    const btnBack = document.getElementById('btnUberBackToSearch');
+    if (btnBack) {
+      btnBack.addEventListener('click', () => {
+        switchUberSheetSection('sheetStateSearch');
+        setUberSheetSnap('collapsed');
+      });
+    }
+
+    // 4. Quick Shortcuts Chips
+    const chips = document.querySelectorAll('.sheet-quick-chip');
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const dest = chip.getAttribute('data-dest');
+        if (dest) {
+          const destInput = document.getElementById('uberDestInput');
+          if (destInput) destInput.value = dest;
+          switchUberSheetSection('sheetStateRoutePicker');
+          setUberSheetSnap('half');
+          calcularTarifasCategoriasUber(dest);
+        }
+      });
+    });
+
+    // 5. Autocomplete Destino Uber
+    const destInput = document.getElementById('uberDestInput');
+    const destSugBox = document.getElementById('uberDestSuggestions');
+    if (destInput && destSugBox) {
+      let debounceTimer = null;
+      destInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        const q = destInput.value.trim();
+        if (q.length < 3) {
+          destSugBox.classList.add('hidden');
+          return;
+        }
+
+        debounceTimer = setTimeout(async () => {
+          try {
+            const resp = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${uberCurrentCoords[0]}&lon=${uberCurrentCoords[1]}&limit=5`);
+            if (resp.ok) {
+              const data = await resp.json();
+              if (data && data.features && data.features.length) {
+                destSugBox.innerHTML = '';
+                data.features.forEach((feat) => {
+                  const p = feat.properties;
+                  const coords = feat.geometry.coordinates; // [lon, lat]
+                  const title = p.name || p.street || 'Ubicación';
+                  const sub = [p.city || p.county, p.state, p.country].filter(Boolean).join(', ');
+                  
+                  const item = document.createElement('div');
+                  item.className = 'suggestion-item';
+                  item.innerHTML = `<strong>📍 ${title}</strong><small style="display:block;color:#94a3b8;font-size:0.75rem;">${sub}</small>`;
+                  item.addEventListener('click', () => {
+                    destInput.value = `${title}, ${sub}`;
+                    destSugBox.classList.add('hidden');
+                    trazarRutaUberMap([coords[1], coords[0]], `${title}, ${sub}`);
+                    calcularTarifasCategoriasUber(`${title}, ${sub}`);
+                  });
+                  destSugBox.appendChild(item);
+                });
+                destSugBox.classList.remove('hidden');
+              }
+            }
+          } catch(e){}
+        }, 280);
+      });
+    }
+
+    // 6. Selector de Categorías
+    const catCards = document.querySelectorAll('.uber-category-card');
+    catCards.forEach((card) => {
+      card.addEventListener('click', () => {
+        catCards.forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        uberSelectedCategory = card.getAttribute('data-category') || 'Sedán Ejecutivo';
+        uberCategoryMultiplier = parseFloat(card.getAttribute('data-multiplier') || '1.0');
+        actualizarBotonConfirmacionUber();
+      });
+    });
+
+    // 7. Botón Agregar Parada Intermedia en Uber
+    const btnAddStop = document.getElementById('btnUberAddStop');
+    const stopRow = document.getElementById('uberStopRow');
+    if (btnAddStop && stopRow) {
+      btnAddStop.addEventListener('click', () => {
+        stopRow.style.display = stopRow.style.display === 'none' ? 'flex' : 'none';
+        if (stopRow.style.display === 'flex') {
+          setUberSheetSnap('expanded');
+          const stopInput = document.getElementById('uberStopInput');
+          if (stopInput) stopInput.focus();
+        }
+      });
+    }
+
+    const btnRemoveStop = document.getElementById('btnUberRemoveStop');
+    if (btnRemoveStop && stopRow) {
+      btnRemoveStop.addEventListener('click', () => {
+        stopRow.style.display = 'none';
+        const stopInput = document.getElementById('uberStopInput');
+        if (stopInput) stopInput.value = '';
+      });
+    }
+
+    // 8. Botón Confirmar y Solicitar Traslado
+    const btnConfirm = document.getElementById('btnUberConfirmRide');
+    if (btnConfirm) {
+      btnConfirm.addEventListener('click', solicitarViajeUber);
+    }
+
+    // 9. Cancelar Búsqueda en Radar
+    const btnCancelSeek = document.getElementById('btnUberCancelSeeking');
+    if (btnCancelSeek) {
+      btnCancelSeek.addEventListener('click', cancelarSolicitudUber);
+    }
+
+    // 10. Cancelar Traslado Activo
+    const btnCancelActive = document.getElementById('btnUberCancelActiveTrip');
+    if (btnCancelActive) {
+      btnCancelActive.addEventListener('click', cancelarSolicitudUber);
+    }
+
+    // 11. Llamar al Chofer
+    const btnCall = document.getElementById('btnUberCallDriver');
+    if (btnCall) {
+      btnCall.addEventListener('click', () => {
+        if (typeof window.openPassengerChat === 'function') {
+          window.openPassengerChat();
+          if (typeof showToast === 'function') {
+            showToast('🔒 Comunicación privada: Tu número se mantiene protegido y confidencial.');
+          }
+        }
+      });
+    }
+
+    // 12. Chat Directo en Vivo
+    const btnChat = document.getElementById('btnUberChatDriver');
+    if (btnChat) {
+      btnChat.addEventListener('click', () => {
+        if (typeof window.openPassengerChat === 'function') {
+          window.openPassengerChat();
+        }
+      });
+    }
+
+    // 13. Compartir Viaje
+    const btnShare = document.getElementById('btnUberShareTrip');
+    if (btnShare) {
+      btnShare.addEventListener('click', () => {
+        const active = (window.RutaSync && window.RutaSync.obtenerViajeActivo()) || {};
+        const shareText = `Estoy viajando con RutaPrivada en un ${active.conductor?.auto || 'vehículo ejecutivo'} patente ${active.conductor?.patente || 'AE927CN'}. Podés seguir mi viaje aquí: https://rutaprivada.github.io/-app-/`;
+        if (navigator.share) {
+          navigator.share({ title: 'Mi Traslado RutaPrivada', text: shareText, url: window.location.href }).catch(() => {});
+        } else {
+          navigator.clipboard?.writeText(shareText);
+          if (typeof showToast === 'function') showToast('📋 Enlace de viaje copiado al portapapeles');
+        }
+      });
+    }
+
+    // 14. SOS Seguridad
+    const btnSos = document.getElementById('btnUberSos');
+    if (btnSos) {
+      btnSos.addEventListener('click', () => {
+        if (typeof window.openPassengerSosModal === 'function') {
+          window.openPassengerSosModal();
+        } else {
+          alert('🛡️ CENTRO DE SEGURIDAD RUTAPRIVADA\n\nLínea Directa de Asistencia 24/7:\n+54 9 11 7373-8790\nEmergencias Policiales: 911');
+        }
+      });
+    }
+  }
+
+  function trazarRutaUberMap(destCoords, destAddress) {
+    if (!uberMap || typeof L === 'undefined') return;
+    try {
+      if (uberRoutePolyline) uberMap.removeLayer(uberRoutePolyline);
+      
+      const latlngs = [uberCurrentCoords, destCoords];
+      uberRoutePolyline = L.polyline(latlngs, {
+        color: '#10b981',
+        weight: 5,
+        opacity: 0.9,
+        dashArray: '8, 8',
+        lineCap: 'round'
+      }).addTo(uberMap);
+
+      uberMap.fitBounds(L.latLngBounds(latlngs), {
+        paddingTopLeft: [50, 50],
+        paddingBottomRight: [50, Math.round(window.innerHeight * 0.55)]
+      });
+    } catch(e){}
+  }
+
+  function calcularTarifasCategoriasUber(destText) {
+    let base = 14500;
+    const lower = destText.toLowerCase();
+    if (lower.includes('ezeiza')) base = 32000;
+    else if (lower.includes('aeroparque')) base = 18500;
+    else if (lower.includes('pilar')) base = 28000;
+    else if (lower.includes('puerto madero')) base = 15000;
+
+    // Si ya existe un cálculo previo en el wizard, sincronizarlo
+    if (typeof state !== 'undefined' && state.totalFare && Number(state.totalFare) > 0) {
+      base = Number(state.totalFare);
+    }
+
+    uberCalculatedBaseFare = base;
+    const priceSedan = document.getElementById('uberPriceSedan');
+    const priceVip = document.getElementById('uberPriceVip');
+    const priceVan = document.getElementById('uberPriceVan');
+
+    if (priceSedan) priceSedan.textContent = '$' + base.toLocaleString('es-AR');
+    if (priceVip) priceVip.textContent = '$' + Math.round(base * 1.25).toLocaleString('es-AR');
+    if (priceVan) priceVan.textContent = '$' + Math.round(base * 1.55).toLocaleString('es-AR');
+
+    actualizarBotonConfirmacionUber();
+  }
+
+  function actualizarBotonConfirmacionUber() {
+    const btnText = document.getElementById('btnUberConfirmText');
+    if (btnText) {
+      const finalPrice = Math.round(uberCalculatedBaseFare * uberCategoryMultiplier);
+      btnText.textContent = `Pedir ${uberSelectedCategory} · $${finalPrice.toLocaleString('es-AR')}`;
+    }
+  }
+
+  function solicitarViajeUber() {
+    const destInput = document.getElementById('uberDestInput');
+    const originInput = document.getElementById('uberOriginInput');
+    const stopInput = document.getElementById('uberStopInput');
+
+    const dest = destInput ? destInput.value.trim() : '';
+    const orig = originInput ? originInput.value.trim() : 'Mi ubicación actual';
+    const stop = stopInput ? stopInput.value.trim() : '';
+
+    if (!dest) {
+      alert('Por favor ingresá un destino para tu viaje.');
+      if (destInput) destInput.focus();
+      return;
+    }
+
+    const sess = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : {};
+    const tripFare = Math.round(uberCalculatedBaseFare * uberCategoryMultiplier);
+
+    const tripData = {
+      id: 'trip_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+      pasajero: {
+        id: sess.id || ('pass_' + Date.now()),
+        nombre: sess.nombre || sess.usuario || 'Pasajero Ejecutivo',
+        telefono: sess.telefono || '+54 9 11 0000-0000',
+        avatar: sess.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+        calificacion: '5.0'
+      },
+      origen: orig,
+      destino: dest,
+      parada: stop || null,
+      categoria: uberSelectedCategory,
+      monto: tripFare,
+      precio: tripFare,
+      precioEstimado: tripFare,
+      medioPago: uberSelectedPayment,
+      estado: 'buscando_conductor',
+      creadoEn: Date.now(),
+      originCoords: { lat: uberCurrentCoords[0], lng: uberCurrentCoords[1] }
+    };
+
+    // Cambiar vista a Radar Buscando
+    switchUberSheetSection('sheetStateRadar');
+    setUberSheetSnap('half');
+
+    const radarPrice = document.getElementById('uberRadarPriceText');
+    if (radarPrice) radarPrice.textContent = '$' + tripFare.toLocaleString('es-AR');
+
+    // Despacho a través de RutaSync
+    if (window.RutaSync) {
+      window.RutaSync.solicitarViaje(tripData);
+      
+      // Escuchar cambios de estado en tiempo real para este viaje específico
+      window.RutaSync.escucharViajePorId(tripData.id, (viajeActualizado) => {
+        if (viajeActualizado && viajeActualizado.estado) {
+          if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(viajeActualizado.estado)) {
+            mostrarViajeActivoUber(viajeActualizado);
+          } else if (viajeActualizado.estado === 'cancelado_por_conductor') {
+            switchUberSheetSection('sheetStateRadar');
+            if (typeof showToast === 'function') showToast('⚠️ Tu chofer tuvo un inconveniente. Reanudando búsqueda...');
+          }
+        }
+      });
+    }
+
+    if (typeof showToast === 'function') {
+      showToast(`⚡ Solicitud enviada a la flota para ${uberSelectedCategory}`);
+    }
+  }
+
+  function mostrarViajeActivoUber(viaje) {
+    switchUberSheetSection('sheetStateActiveTrip');
+    setUberSheetSnap('half');
+
+    const cond = viaje.conductor || {};
+    const driverName = cond.nombre || 'Daniel Pabon';
+    const driverCar = cond.auto || 'Fiat Cronos Negro';
+    const driverPlate = cond.patente || 'AE927CN';
+    const driverRating = cond.calificacion || '4.98';
+    const driverAvatar = cond.fotoPerfil || cond.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+
+    const elName = document.getElementById('uberDriverName');
+    const elCar = document.getElementById('uberDriverCar');
+    const elPlate = document.getElementById('uberDriverPlate');
+    const elRating = document.getElementById('uberDriverRating');
+    const elAvatar = document.getElementById('uberDriverAvatar');
+    const elEta = document.getElementById('uberActiveTripEta');
+    const elStage = document.getElementById('uberActiveTripStage');
+
+    if (elName) elName.textContent = driverName;
+    if (elCar) elCar.textContent = driverCar;
+    if (elPlate) elPlate.textContent = driverPlate;
+    if (elRating) elRating.textContent = driverRating;
+    if (elAvatar) elAvatar.src = driverAvatar;
+
+    let stageText = 'Asignado';
+    let etaText = 'Chofer en camino (3-5 min)';
+    if (viaje.estado === 'en_origen') {
+      stageText = 'En tu puerta';
+      etaText = '¡Tu chofer ha llegado!';
+    } else if (viaje.estado === 'en_viaje') {
+      stageText = 'En Viaje';
+      etaText = 'Rumbo a destino';
+    }
+
+    if (elStage) elStage.textContent = stageText;
+    if (elEta) elEta.textContent = etaText;
+  }
+
+  function cancelarSolicitudUber() {
+    if (confirm('¿Estás seguro de que deseas cancelar la solicitud de viaje?')) {
+      if (window.RutaSync) {
+        window.RutaSync.actualizarEstadoViaje('cancelado_por_pasajero', { motivo: 'Cancelado por el usuario en Bottom Sheet' });
+        window.RutaSync.limpiarViajeActivo();
+      }
+
+      switchUberSheetSection('sheetStateSearch');
+      setUberSheetSnap('collapsed');
+
+      if (uberRoutePolyline && uberMap) {
+        try { uberMap.removeLayer(uberRoutePolyline); } catch(e){}
+        uberRoutePolyline = null;
+      }
+
+      if (typeof showToast === 'function') {
+        showToast('✕ Solicitud de viaje cancelada.');
+      }
+    }
+  }
+
+  function verificarViajeActivoUber() {
+    if (window.RutaSync) {
+      const active = window.RutaSync.obtenerViajeActivo();
+      if (active && active.estado) {
+        if (active.estado === 'buscando_conductor') {
+          switchUberSheetSection('sheetStateRadar');
+          setUberSheetSnap('half');
+        } else if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(active.estado)) {
+          mostrarViajeActivoUber(active);
+        }
+      }
+    }
+  }
+
   // ==========================================
   // INICIALIZACIÓN GENERAL COMPLETA DE LA APP DEL PASAJERO
   // ==========================================
@@ -11613,6 +12250,7 @@ if (btnRecenterPassengerMap) {
     try { initDateTimeControls(); } catch (e) { console.warn('DateTime controls:', e); }
     try { initCustomCalendar(); } catch (e) { console.warn('Custom calendar:', e); }
     try { initMap(); } catch (e) { console.warn('Map init:', e); }
+    try { initPassengerUberExperience(); } catch (e) { console.warn('Uber Experience init:', e); }
     try { initEventListeners(); } catch (e) { console.warn('Event listeners:', e); }
     try { initRatingSystem(); } catch (e) { console.warn('Rating system:', e); }
     try { setupModalDismissals(); } catch (e) { console.warn('Modal dismissals:', e); }
@@ -11640,6 +12278,7 @@ if (btnRecenterPassengerMap) {
   } else {
     startPassengerApplication();
   }
+
 
 
 

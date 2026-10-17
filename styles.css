@@ -6100,3 +6100,932 @@ html, body {
   }
 }
 
+/* =========================================================
+   ITEM C: PASSENGER FULLSCREEN MAP & UBER/CABIFY BOTTOM SHEET UX
+   ========================================================= */
+
+.passenger-uber-experience {
+  display: none;
+}
+
+/* Modo App y Dispositivos Móviles */
+body.is-app-mode .passenger-uber-experience,
+@media (max-width: 900px) {
+  body:not(.force-web-view) .passenger-uber-experience {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 1000;
+    overflow: hidden;
+    background: #080c14;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body:not(.force-web-view) .main-header,
+  body:not(.force-web-view) .main-layout,
+  body:not(.force-web-view) .main-footer {
+    display: none !important;
+  }
+}
+
+/* Capa de Mapa Pantalla Completa */
+.passenger-app-fullscreen-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  background-color: #0b111e;
+}
+
+/* Barra Superior Flotante */
+.passenger-floating-top-bar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  left: 14px;
+  right: 14px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.passenger-floating-top-bar * {
+  pointer-events: auto;
+}
+
+.top-bar-pill-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s;
+  flex-shrink: 0;
+}
+
+.top-bar-pill-btn:active {
+  transform: scale(0.92);
+}
+
+.top-bar-avatar-btn {
+  padding: 2px;
+  overflow: hidden;
+}
+
+.top-bar-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.top-bar-brand-capsule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+  padding: 8px 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+}
+
+.brand-capsule-logo {
+  width: 22px;
+  height: 22px;
+}
+
+.brand-capsule-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.3px;
+}
+
+.brand-capsule-title span {
+  color: #10b981;
+}
+
+.brand-capsule-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulse-green 1.8s infinite;
+}
+
+.top-bar-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Controles Flotantes sobre el Mapa */
+.passenger-floating-map-controls {
+  position: absolute;
+  right: 14px;
+  bottom: calc(var(--bottom-sheet-current-height, 140px) + 16px);
+  z-index: 24;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+  transition: bottom 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.passenger-floating-map-controls * {
+  pointer-events: auto;
+}
+
+.btn-uber-recenter {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #38bdf8;
+  font-size: 1.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.btn-uber-recenter:active {
+  transform: scale(0.9);
+  background: rgba(56, 189, 248, 0.2);
+}
+
+.uber-fleet-live-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: 9999px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #a7f3d0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.uber-fleet-live-badge .fleet-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+/* =========================================================
+   BOTTOM SHEET NATIVO TIPO UBER / CABIFY
+   ========================================================= */
+.passenger-bottom-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  background: linear-gradient(180deg, rgba(20, 27, 45, 0.98) 0%, rgba(10, 14, 24, 0.99) 100%);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top-left-radius: 26px;
+  border-top-right-radius: 26px;
+  box-shadow: 0 -12px 45px rgba(0, 0, 0, 0.7);
+  transition: height 0.32s cubic-bezier(0.16, 1, 0.3, 1), transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: calc(100dvh - 65px);
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+}
+
+.bottom-sheet-drag-area {
+  padding-top: 10px;
+  padding-bottom: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: grab;
+  touch-action: none;
+}
+
+.bottom-sheet-handle {
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.28);
+  transition: background 0.2s;
+}
+
+.bottom-sheet-drag-area:hover .bottom-sheet-handle {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.bottom-sheet-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 16px 12px 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Snap States del Bottom Sheet */
+.passenger-bottom-sheet.snap-collapsed {
+  height: 140px;
+}
+
+.passenger-bottom-sheet.snap-half {
+  height: 54vh;
+}
+
+.passenger-bottom-sheet.snap-expanded {
+  height: 86vh;
+}
+
+/* =========================================================
+   ESTADO 1: BÚSQUEDA RÁPIDA & ACCESOS DIRECTOS (COLLAPSED)
+   ========================================================= */
+.sheet-search-trigger-box {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 12px;
+}
+
+.sheet-search-trigger-box:hover,
+.sheet-search-trigger-box:active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+.sheet-search-icon {
+  font-size: 1.15rem;
+  color: #38bdf8;
+}
+
+.sheet-search-placeholder {
+  flex: 1;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.sheet-search-schedule-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  padding: 5px 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #fbbf24;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sheet-quick-shortcuts-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.sheet-quick-shortcuts-row::-webkit-scrollbar {
+  display: none;
+}
+
+.sheet-quick-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sheet-quick-chip:hover,
+.sheet-quick-chip:active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #ffffff;
+  transform: scale(1.03);
+}
+
+/* =========================================================
+   ESTADO 2: SELECCIÓN DE RUTA Y CATEGORÍAS (EXPANDED)
+   ========================================================= */
+.sheet-route-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.btn-sheet-back {
+  background: none;
+  border: none;
+  color: #cbd5e1;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sheet-section-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+}
+
+.uber-route-inputs-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  position: relative;
+}
+
+.uber-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.uber-pin-bullet {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.uber-pin-bullet.origin {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.uber-pin-bullet.stop {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.uber-pin-bullet.destination {
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+}
+
+.uber-route-line-connector {
+  position: absolute;
+  left: 18px;
+  top: 26px;
+  bottom: 26px;
+  width: 2px;
+  background: dashed rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+}
+
+.uber-input-field-wrap {
+  flex: 1;
+  position: relative;
+}
+
+.uber-text-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 8px 30px 8px 0;
+  outline: none;
+  font-family: inherit;
+}
+
+.uber-text-input:focus {
+  border-bottom-color: #38bdf8;
+}
+
+.uber-input-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 0.9rem;
+}
+
+.uber-input-divider {
+  height: 10px;
+}
+
+/* Selector de Categorías de Vehículos */
+.uber-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.uber-category-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.uber-category-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.uber-category-card.selected {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.2);
+  transform: scale(1.01);
+}
+
+.category-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.category-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.category-card-info h4 {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 2px 0;
+}
+
+.category-card-info p {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.category-card-info .category-eta-sub {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.category-card-right {
+  text-align: right;
+}
+
+.category-fare-price {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+
+.uber-category-card.selected .category-fare-price {
+  color: #34d399;
+}
+
+.category-badge-exclusive {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 2px 6px;
+  border-radius: 9999px;
+  display: inline-block;
+  margin-top: 2px;
+}
+
+/* Selector de Medios de Pago */
+.uber-payment-selector-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  cursor: pointer;
+}
+
+.payment-selector-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.payment-selector-left i {
+  color: #38bdf8;
+  font-size: 1.1rem;
+}
+
+.payment-selector-right {
+  font-size: 0.76rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Botón CTA Confirmar y Solicitar */
+.btn-uber-confirm-ride {
+  width: 100%;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 16px;
+  padding: 16px 20px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.45);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-uber-confirm-ride:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* =========================================================
+   ESTADO 3: RADAR DE BÚSQUEDA DE CHOFER
+   ========================================================= */
+.sheet-radar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 16px 0 10px 0;
+}
+
+.uber-radar-rings-wrap {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uber-radar-center-beacon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border: 3px solid #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.7);
+  z-index: 2;
+}
+
+.uber-radar-wave {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid #38bdf8;
+  animation: uberRadarPulse 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.uber-radar-wave.wave-2 {
+  animation-delay: 0.7s;
+}
+
+.uber-radar-wave.wave-3 {
+  animation-delay: 1.4s;
+}
+
+@keyframes uberRadarPulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.sheet-radar-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.sheet-radar-sub {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  margin-bottom: 16px;
+  max-width: 280px;
+}
+
+.sheet-radar-fare-pill {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #34d399;
+  margin-bottom: 16px;
+}
+
+.btn-uber-cancel-seeking {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+  border-radius: 14px;
+  padding: 12px 24px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.btn-uber-cancel-seeking:active {
+  background: rgba(239, 68, 68, 0.25);
+  transform: scale(0.97);
+}
+
+/* =========================================================
+   ESTADO 4: SEGUIMIENTO DE VIAJE ACTIVO EN BOTTOM SHEET
+   ========================================================= */
+.sheet-active-trip-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.active-trip-top-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.active-trip-eta-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.active-trip-eta-badge .pulse-green-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.active-trip-eta-text {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.active-trip-stage-pill {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 9999px;
+}
+
+.active-trip-driver-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+
+.active-trip-driver-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #10b981;
+  flex-shrink: 0;
+}
+
+.active-trip-driver-meta {
+  flex: 1;
+}
+
+.active-trip-driver-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.active-trip-driver-name {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.active-trip-rating {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.active-trip-car-desc {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.active-trip-plate-badge {
+  background: #0f172a;
+  border: 1.5px solid #cbd5e1;
+  color: #ffffff;
+  font-family: monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+
+/* Acciones Rápidas del Viaje */
+.active-trip-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.active-trip-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 10px 4px;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.active-trip-action-btn:active {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.active-trip-action-btn i {
+  font-size: 1.15rem;
+}
+
+.active-trip-action-btn.call-action {
+  color: #34d399;
+}
+
+.active-trip-action-btn.chat-action {
+  color: #38bdf8;
+}
+
+.active-trip-action-btn.share-action {
+  color: #cbd5e1;
+}
+
+.active-trip-action-btn.sos-action {
+  color: #f87171;
+}
+
+/* Marcadores Dinámicos de Choferes en el Mapa */
+.uber-fleet-car-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.uber-fleet-car-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 2px solid #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+
+.passenger-gps-beacon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #38bdf8;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.8);
+  position: relative;
+}
+
+.passenger-gps-beacon::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid #38bdf8;
+  animation: uberRadarPulse 1.8s infinite;
+}
+
+

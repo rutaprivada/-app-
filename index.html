@@ -229,6 +229,294 @@
     })();
   </script>
 
+  <!-- ==================================================== -->
+  <!-- ITEM C: EXPERIENCIA MÓVIL UBER / CABIFY FULLSCREEN MAP & BOTTOM SHEET -->
+  <!-- ==================================================== -->
+  <div id="passengerUberExperience" class="passenger-uber-experience">
+    <!-- 1. Fullscreen Map Layer -->
+    <div id="passengerAppFullscreenMap" class="passenger-app-fullscreen-map"></div>
+
+    <!-- 2. Floating Top Bar -->
+    <div class="passenger-floating-top-bar">
+      <!-- Passenger Profile Avatar Button -->
+      <button type="button" class="top-bar-pill-btn top-bar-avatar-btn" id="btnUberOpenProfile" onclick="openPassengerProfileModal()" title="Mi Perfil">
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='%2394a3b8'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>" alt="Perfil" class="top-bar-avatar-img" id="uberHeaderAvatar" />
+      </button>
+
+      <!-- Center Brand Capsule with Status Indicator -->
+      <div class="top-bar-brand-capsule">
+        <img src="favicon.svg" alt="RutaPrivada" class="brand-capsule-logo" />
+        <span class="brand-capsule-title">Ruta<span>Privada</span></span>
+        <span class="brand-capsule-status" title="Servicio activo en tiempo real"></span>
+      </div>
+
+      <!-- Action Buttons: Reservations & Help -->
+      <div class="top-bar-actions-group">
+        <button type="button" class="top-bar-pill-btn" id="btnUberReservations" onclick="openPassengerReservationsModal()" title="Mis Reservas">
+          <i class="fa-solid fa-calendar-days" style="color: #fbbf24; font-size: 1.1rem;"></i>
+        </button>
+        <button type="button" class="top-bar-pill-btn" id="btnUberHelp" onclick="openPassengerHelpModal()" title="Ayuda y Soporte">
+          <i class="fa-solid fa-circle-question" style="color: #38bdf8; font-size: 1.15rem;"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. Floating Map Controls (Recenter & Fleet Counter) -->
+    <div class="passenger-floating-map-controls" id="passengerFloatingMapControls">
+      <div class="uber-fleet-live-badge" id="uberFleetBadge">
+        <span class="fleet-dot"></span>
+        <span id="uberFleetCountText">Flota activa cerca</span>
+      </div>
+      <button type="button" class="btn-uber-recenter" id="btnUberRecenterMap" title="Centrar en mi ubicación">
+        <span>⌖</span>
+      </button>
+    </div>
+
+    <!-- 4. Native-Style Sliding Bottom Sheet -->
+    <div id="passengerBottomSheet" class="passenger-bottom-sheet snap-collapsed">
+      <!-- Drag & Touch Handle Area -->
+      <div class="bottom-sheet-drag-area" id="bottomSheetDragArea">
+        <div class="bottom-sheet-handle"></div>
+      </div>
+
+      <div class="bottom-sheet-content-scroll" id="bottomSheetContentScroll">
+        
+        <!-- ============================================== -->
+        <!-- ESTADO 1: BÚSQUEDA RÁPIDA (COLLAPSED DEFAULT) -->
+        <!-- ============================================== -->
+        <div id="sheetStateSearch" class="sheet-state-section">
+          <div class="sheet-search-trigger-box" id="sheetSearchTriggerBox">
+            <span class="sheet-search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <span class="sheet-search-placeholder">¿A dónde vamos hoy?</span>
+            <div class="sheet-search-schedule-btn" onclick="event.stopPropagation(); openPassengerReservationsModal();">
+              <i class="fa-regular fa-clock"></i> Reservar
+            </div>
+          </div>
+
+          <!-- Shortcuts Chips: Ezeiza, Aeroparque, Puerto Madero, Palermo -->
+          <div class="sheet-quick-shortcuts-row">
+            <button type="button" class="sheet-quick-chip" data-dest="Aeropuerto Internacional Ezeiza (EZE)">
+              <span>✈️</span> Ezeiza (EZE)
+            </button>
+            <button type="button" class="sheet-quick-chip" data-dest="Aeroparque Jorge Newbery (AEP)">
+              <span>🛫</span> Aeroparque (AEP)
+            </button>
+            <button type="button" class="sheet-quick-chip" data-dest="Puerto Madero, CABA">
+              <span>🏙️</span> Puerto Madero
+            </button>
+            <button type="button" class="sheet-quick-chip" data-dest="Palermo Soho, CABA">
+              <span>🍸</span> Palermo
+            </button>
+            <button type="button" class="sheet-quick-chip" data-dest="Pilar Centro, Buenos Aires">
+              <span>🌳</span> Pilar
+            </button>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- ESTADO 2: SELECCIÓN DE RUTA Y CATEGORÍAS VEHICULARES -->
+        <!-- ============================================== -->
+        <div id="sheetStateRoutePicker" class="sheet-state-section" style="display: none;">
+          <div class="sheet-route-picker-header">
+            <button type="button" class="btn-sheet-back" id="btnUberBackToSearch" title="Volver">
+              <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <h3 class="sheet-section-title">Elegí tu Traslado</h3>
+            <button type="button" class="btn-sheet-back" id="btnUberAddStop" title="Agregar Parada" style="font-size: 0.95rem; color: #f59e0b;">
+              <i class="fa-solid fa-plus"></i> Parada
+            </button>
+          </div>
+
+          <!-- Route Inputs Card -->
+          <div class="uber-route-inputs-card">
+            <div class="uber-route-line-connector"></div>
+            
+            <!-- Origin Row -->
+            <div class="uber-input-row">
+              <span class="uber-pin-bullet origin"></span>
+              <div class="uber-input-field-wrap">
+                <input type="text" id="uberOriginInput" class="uber-text-input" placeholder="Tu ubicación de partida..." autocomplete="off" />
+                <button type="button" class="uber-input-btn" id="btnUberGpsOrigin" title="Usar GPS actual">
+                  <i class="fa-solid fa-crosshairs" style="color: #10b981;"></i>
+                </button>
+                <div id="uberOriginSuggestions" class="suggestions-list hidden"></div>
+              </div>
+            </div>
+
+            <!-- Optional Stop Row -->
+            <div class="uber-input-row" id="uberStopRow" style="display: none; margin-top: 8px;">
+              <span class="uber-pin-bullet stop"></span>
+              <div class="uber-input-field-wrap">
+                <input type="text" id="uberStopInput" class="uber-text-input" placeholder="Parada intermedia..." autocomplete="off" />
+                <button type="button" class="uber-input-btn" id="btnUberRemoveStop" title="Quitar parada">✕</button>
+                <div id="uberStopSuggestions" class="suggestions-list hidden"></div>
+              </div>
+            </div>
+
+            <div class="uber-input-divider"></div>
+
+            <!-- Destination Row -->
+            <div class="uber-input-row">
+              <span class="uber-pin-bullet destination"></span>
+              <div class="uber-input-field-wrap">
+                <input type="text" id="uberDestInput" class="uber-text-input" placeholder="¿A dónde vas?..." autocomplete="off" />
+                <button type="button" class="uber-input-btn" id="btnUberClearDest" style="display: none;">✕</button>
+                <div id="uberDestSuggestions" class="suggestions-list hidden"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vehicle Categories List -->
+          <div class="uber-category-list">
+            <!-- 1. Sedán Ejecutivo -->
+            <div class="uber-category-card selected" data-category="Sedán Ejecutivo" data-multiplier="1.0">
+              <div class="category-card-left">
+                <div class="category-card-icon">🚘</div>
+                <div class="category-card-info">
+                  <h4>Sedán Ejecutivo</h4>
+                  <p>4 pers · Cronos / Corolla · Climatizado</p>
+                  <span class="category-eta-sub">A 3-5 min de tu ubicación</span>
+                </div>
+              </div>
+              <div class="category-card-right">
+                <div class="category-fare-price" id="uberPriceSedan">--</div>
+              </div>
+            </div>
+
+            <!-- 2. VIP Black -->
+            <div class="uber-category-card" data-category="VIP Black" data-multiplier="1.25">
+              <div class="category-card-left">
+                <div class="category-card-icon">⭐</div>
+                <div class="category-card-info">
+                  <h4>VIP Black</h4>
+                  <p>3 pers · Mercedes / Vento · Agua y Cargador</p>
+                  <span class="category-badge-exclusive">Chofer de Gala</span>
+                </div>
+              </div>
+              <div class="category-card-right">
+                <div class="category-fare-price" id="uberPriceVip">--</div>
+              </div>
+            </div>
+
+            <!-- 3. Van Ejecutiva -->
+            <div class="uber-category-card" data-category="Van Ejecutiva" data-multiplier="1.55">
+              <div class="category-card-left">
+                <div class="category-card-icon">🚐</div>
+                <div class="category-card-info">
+                  <h4>Van Ejecutiva</h4>
+                  <p>6-7 pers · Gran capacidad valijas · Sprinter</p>
+                  <span class="category-eta-sub">Ideal traslados a Ezeiza</span>
+                </div>
+              </div>
+              <div class="category-card-right">
+                <div class="category-fare-price" id="uberPriceVan">--</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment Method Selector -->
+          <div class="uber-payment-selector-bar" id="uberPaymentSelectorBar">
+            <div class="payment-selector-left">
+              <i class="fa-solid fa-money-bill-wave" id="uberSelectedPaymentIcon"></i>
+              <span id="uberSelectedPaymentLabel">Efectivo al chofer</span>
+            </div>
+            <div class="payment-selector-right">
+              <span>Cambiar ➔</span>
+            </div>
+          </div>
+
+          <!-- Confirm & Request CTA Button -->
+          <button type="button" class="btn-uber-confirm-ride" id="btnUberConfirmRide">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span id="btnUberConfirmText">Confirmar y Solicitar</span>
+          </button>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- ESTADO 3: RADAR BUSCANDO CHOFER -->
+        <!-- ============================================== -->
+        <div id="sheetStateRadar" class="sheet-state-section" style="display: none;">
+          <div class="sheet-radar-container">
+            <div class="uber-radar-rings-wrap">
+              <div class="uber-radar-wave"></div>
+              <div class="uber-radar-wave wave-2"></div>
+              <div class="uber-radar-wave wave-3"></div>
+              <div class="uber-radar-center-beacon">
+                <span>🚘</span>
+              </div>
+            </div>
+
+            <h3 class="sheet-radar-title" id="uberRadarTitle">Buscando Chofer Cercano...</h3>
+            <p class="sheet-radar-sub" id="uberRadarSub">Conectando con choferes ejecutivos a menos de 5 km</p>
+            
+            <div class="sheet-radar-fare-pill" id="uberRadarFarePill">
+              Tarifa estimada: <strong id="uberRadarPriceText">$0</strong>
+            </div>
+
+            <button type="button" class="btn-uber-cancel-seeking" id="btnUberCancelSeeking">
+              ✕ Cancelar Solicitud
+            </button>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- ESTADO 4: VIAJE ACTIVO / CHOFER EN CAMINO -->
+        <!-- ============================================== -->
+        <div id="sheetStateActiveTrip" class="sheet-state-section" style="display: none;">
+          <div class="sheet-active-trip-wrap">
+            <div class="active-trip-top-status">
+              <div class="active-trip-eta-badge">
+                <span class="pulse-green-dot"></span>
+                <span class="active-trip-eta-text" id="uberActiveTripEta">Chofer en camino (4 min)</span>
+              </div>
+              <span class="active-trip-stage-pill" id="uberActiveTripStage">Asignado</span>
+            </div>
+
+            <!-- Driver Card -->
+            <div class="active-trip-driver-card">
+              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" alt="Chofer" class="active-trip-driver-avatar" id="uberDriverAvatar" />
+              <div class="active-trip-driver-meta">
+                <div class="active-trip-driver-name-row">
+                  <span class="active-trip-driver-name" id="uberDriverName">Daniel Pabon</span>
+                  <span class="active-trip-rating">★ <span id="uberDriverRating">4.98</span></span>
+                </div>
+                <p class="active-trip-car-desc" id="uberDriverCar">Fiat Cronos Negro</p>
+                <span class="active-trip-plate-badge" id="uberDriverPlate">AE927CN</span>
+              </div>
+            </div>
+
+            <!-- 4 Quick Actions: Call, In-App Chat, Share, SOS -->
+            <div class="active-trip-actions-grid">
+              <button type="button" class="active-trip-action-btn call-action" id="btnUberCallDriver">
+                <i class="fa-solid fa-phone"></i>
+                <span>Llamar</span>
+              </button>
+              <button type="button" class="active-trip-action-btn chat-action" id="btnUberChatDriver">
+                <i class="fa-solid fa-comment-dots"></i>
+                <span>Mensaje</span>
+                <span id="uberChatUnreadBadge" class="chat-badge-counter hidden" style="position: absolute; top: -4px; right: 4px; background: #ef4444; color: #fff; font-size: 0.65rem; border-radius: 9999px; padding: 1px 5px; font-weight: 800;">1</span>
+              </button>
+              <button type="button" class="active-trip-action-btn share-action" id="btnUberShareTrip">
+                <i class="fa-solid fa-share-nodes"></i>
+                <span>Compartir</span>
+              </button>
+              <button type="button" class="active-trip-action-btn sos-action" id="btnUberSos">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>SOS</span>
+              </button>
+            </div>
+
+            <!-- Cancel Active Trip -->
+            <button type="button" class="btn-uber-cancel-seeking" id="btnUberCancelActiveTrip" style="margin-top: 4px;">
+              ✕ Cancelar Traslado
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Main Hero / Multi-Step Wizard Calculator Section -->
   <main class="container main-layout">
     
