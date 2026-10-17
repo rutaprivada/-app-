@@ -4640,18 +4640,23 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAvailableTripsList();
         });
 
-        // Polling en tiempo real de chat para Conductor
+        // Polling en tiempo real de chat para Conductor (Aislamiento por viaje)
         setInterval(async () => {
             if (!driverState.activeTrip && (!modalDriverChat || !modalDriverChat.classList.contains('active'))) return;
+            const tripId = driverState.activeTrip ? driverState.activeTrip.id : (window.RutaSync ? window.RutaSync.activeTripId : 'active_trip');
+            const chatDoc = (tripId && tripId !== 'active_trip') ? ('chat_' + tripId) : 'chat_active';
             try {
-                const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/chat_active?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+                let resp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/${chatDoc}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
+                if (!resp.ok && chatDoc !== 'chat_active') {
+                    resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/chat_active?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+                }
                 if (resp.ok) {
                     const json = await resp.json();
                     if (json && json.fields) {
                         const chatObj = (typeof window.firestoreDocToObject === 'function') ? window.firestoreDocToObject(json) : null;
                         if (chatObj && chatObj.ultimoMensaje && window.RutaSync) {
-                            const tripId = chatObj.tripId || (driverState.activeTrip ? driverState.activeTrip.id : 'active_trip');
-                            const prevMsgs = window.RutaSync.obtenerMensajesChat(tripId);
+                            const chatMsgTripId = chatObj.tripId || tripId;
+                            const prevMsgs = window.RutaSync.obtenerMensajesChat(chatMsgTripId);
                             const isNew = !prevMsgs.some(m => m.id === chatObj.ultimoMensaje.id || (m.timestamp === chatObj.ultimoMensaje.timestamp && m.texto === chatObj.ultimoMensaje.texto));
                             if (isNew) {
                                 window.RutaSync.guardarMensajeChatLocal(chatObj.ultimoMensaje);
@@ -4663,73 +4668,84 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch(e) {}
         }, 1500);
 
-        // Polling en tiempo real de viajes activos y solicitudes en la nube para Conductor
+        // Polling en tiempo real de viajes activos y solicitudes en la nube para Conductor (Multi-Usuario Real)
         setInterval(async () => {
             if (!driverState.isOnline) return;
             try {
-                const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
-                if (resp.ok) {
-                    const json = await resp.json();
-                    if (json && json.fields) {
-                        const tripObj = (typeof window.firestoreDocToObject === 'function') ? window.firestoreDocToObject(json) : null;
-                        if (tripObj && tripObj.id) {
-                            const cloudStatus = tripObj.estado;
-                            
-                            // 1. Si el viaje fue cancelado por el pasajero
-                            if (cloudStatus === 'cancelado_por_pasajero' || cloudStatus === 'cancelado') {
-                                // A. Si el conductor tenía este viaje activo
-                                if (driverState.activeTrip && (driverState.activeTrip.id === tripObj.id || !tripObj.id)) {
-                                    if (window.RutaSync) {
-                                        window.RutaSync.emit('ESTADO_VIAJE_CAMBIADO', tripObj);
-                                    }
-                                }
-                                // B. Si el conductor tenía este viaje en la alerta entrante (radar modal)
-                                if (driverState.incomingTrip && driverState.incomingTrip.id === tripObj.id) {
-                                    closeIncomingModal();
-                                    showDriverToast('ℹ️ El pasajero canceló la solicitud del viaje.');
-                                    processNextQueuedTrip();
-                                }
-                                // C. Si estaba en lista de espera / disponibles
-                                if (driverState.availableTrips && driverState.availableTrips.some(t => t.id === tripObj.id)) {
-                                    driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== tripObj.id);
-                                    renderAvailableTripsList();
-                                }
-                                if (driverRejectRecycleTimers[tripObj.id]) {
-                                    clearTimeout(driverRejectRecycleTimers[tripObj.id]);
-                                    delete driverRejectRecycleTimers[tripObj.id];
-                                }
-                            }
-                            // 2. Si hay un viaje nuevo buscando conductor en la nube
-                            else if (cloudStatus === 'buscando_conductor' || cloudStatus === 'solicitado') {
-                                if (!driverState.activeTrip) {
-                                    const tripCreatedAt = tripObj.creadoEn || tripObj.timestamp || Date.now();
-                                    const isRecent = (Date.now() - tripCreatedAt) < (6 * 60 * 1000);
-                                    if (isRecent && !driverState.availableTrips.some(t => t.id === tripObj.id)) {
-                                        enqueueIncomingTrip(tripObj);
-                                    }
-                                }
-                            }
-                            // 3. Si el viaje fue tomado por otro chofer
-                            else if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(cloudStatus)) {
-                                const myDriverName = (driverState.info && driverState.info.nombre) || 'Daniel Pabon';
-                                const assignedDriverName = tripObj.conductor ? tripObj.conductor.nombre : '';
-                                if (assignedDriverName && assignedDriverName !== myDriverName) {
-                                    if (driverState.incomingTrip && driverState.incomingTrip.id === tripObj.id) {
-                                        closeIncomingModal();
-                                        showDriverToast('ℹ️ El viaje fue tomado por otro chofer.');
-                                        processNextQueuedTrip();
-                                    }
-                                    if (driverState.availableTrips.some(t => t.id === tripObj.id)) {
-                                        driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== tripObj.id);
-                                        renderAvailableTripsList();
-                                    }
+                // 1. Si el conductor tiene un viaje activo, verificar ese viaje específico de inmediato
+                if (driverState.activeTrip && driverState.activeTrip.id) {
+                    const resp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/${driverState.activeTrip.id}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
+                    if (resp.ok) {
+                        const json = await resp.json();
+                        if (json && json.fields) {
+                            const tripObj = (typeof window.firestoreDocToObject === 'function') ? window.firestoreDocToObject(json) : null;
+                            if (tripObj && (tripObj.estado === 'cancelado_por_pasajero' || tripObj.estado === 'cancelado')) {
+                                if (window.RutaSync) {
+                                    window.RutaSync.emit('ESTADO_VIAJE_CAMBIADO', tripObj);
                                 }
                             }
                         }
                     }
                 }
+
+                // 2. Consultar la colección live_trips para descubrir nuevas solicitudes multi-usuario
+                const collResp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips?pageSize=25&key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+                if (collResp.ok) {
+                    const collJson = await collResp.json();
+                    const docs = Array.isArray(collJson.documents) ? collJson.documents : [];
+                    docs.forEach(doc => {
+                        const docName = doc.name ? doc.name.split('/').pop() : '';
+                        if (!docName || docName === 'chat_active' || docName.startsWith('chat_') || docName === 'driver_location' || docName === 'latest_event') return;
+                        const tripObj = (typeof window.firestoreDocToObject === 'function') ? window.firestoreDocToObject(doc) : null;
+                        if (!tripObj) return;
+                        if (!tripObj.id) tripObj.id = docName;
+
+                        const cloudStatus = tripObj.estado;
+
+                        // Si el viaje fue cancelado
+                        if (cloudStatus === 'cancelado_por_pasajero' || cloudStatus === 'cancelado') {
+                            if (driverState.incomingTrip && driverState.incomingTrip.id === tripObj.id) {
+                                closeIncomingModal();
+                                showDriverToast('ℹ️ El pasajero canceló la solicitud del viaje.');
+                                processNextQueuedTrip();
+                            }
+                            if (driverState.availableTrips && driverState.availableTrips.some(t => t.id === tripObj.id)) {
+                                driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== tripObj.id);
+                                renderAvailableTripsList();
+                            }
+                            if (driverRejectRecycleTimers[tripObj.id]) {
+                                clearTimeout(driverRejectRecycleTimers[tripObj.id]);
+                                delete driverRejectRecycleTimers[tripObj.id];
+                            }
+                        }
+                        // Si es un nuevo viaje buscando chofer en la nube
+                        else if (cloudStatus === 'buscando_conductor' || cloudStatus === 'solicitado') {
+                            if (!driverState.activeTrip) {
+                                const tripCreatedAt = tripObj.creadoEn || tripObj.timestamp || Date.now();
+                                const isRecent = (Date.now() - tripCreatedAt) < (6 * 60 * 1000);
+                                if (isRecent && !driverState.availableTrips.some(t => t.id === tripObj.id)) {
+                                    enqueueIncomingTrip(tripObj);
+                                }
+                            }
+                        }
+                        // Si el viaje fue tomado por otro chofer
+                        else if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(cloudStatus)) {
+                            const myDriverName = (driverState.info && driverState.info.nombre) || 'Daniel Pabon';
+                            const assignedDriverName = tripObj.conductor ? tripObj.conductor.nombre : '';
+                            if (assignedDriverName && assignedDriverName !== myDriverName) {
+                                if (driverState.incomingTrip && driverState.incomingTrip.id === tripObj.id) {
+                                    closeIncomingModal();
+                                    showDriverToast('ℹ️ El viaje fue tomado por otro chofer.');
+                                    processNextQueuedTrip();
+                                }
+                                driverState.availableTrips = driverState.availableTrips.filter(t => t.id !== tripObj.id);
+                                renderAvailableTripsList();
+                            }
+                        }
+                    });
+                }
             } catch(e) {}
-        }, 1500);
+        }, 2000);
 
         window.RutaSync.on('RESERVA_CREADA', (reserva) => {
             if (reserva && reserva.id && !isTestBooking(reserva)) {

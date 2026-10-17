@@ -7651,16 +7651,31 @@ function handlePassengerDriverAssigned(viaje, showNotification = true) {
 function startPassengerRealtimePoll(tripId) {
   if (passengerFastPollTimer) clearInterval(passengerFastPollTimer);
 
+  const targetTripId = tripId || (pActiveTripData && pActiveTripData.id) || (window.RutaSync ? window.RutaSync.activeTripId : null) || 'current_active_trip';
+
+  // Activar listener directo en Firestore en tiempo real (0ms delay sin saturar red)
+  if (window.RutaSync && typeof window.RutaSync.escucharViajePorId === 'function' && targetTripId !== 'current_active_trip') {
+    window.RutaSync.escucharViajePorId(targetTripId, (tripData) => {
+      if (tripData && tripData.estado) {
+        if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(tripData.estado)) {
+          if (pStateDriverAssigned && pStateDriverAssigned.classList.contains('hidden')) {
+            handlePassengerDriverAssigned(tripData, true);
+          }
+        }
+      }
+    });
+  }
+
   passengerFastPollTimer = setInterval(async () => {
     let activeTrip = null;
     if (window.RutaSync) {
-      activeTrip = window.RutaSync.obtenerViajeActivo();
+      activeTrip = window.RutaSync.obtenerViajePorId(targetTripId) || window.RutaSync.obtenerViajeActivo();
     }
     
     // 1. Check Firestore SDK directly
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
       try {
-        const doc = await firebase.firestore().collection('live_trips').doc('current_active_trip').get();
+        const doc = await firebase.firestore().collection('live_trips').doc(targetTripId).get();
         if (doc.exists) {
           const fsData = doc.data();
           if (fsData && fsData.estado) {
@@ -7670,9 +7685,9 @@ function startPassengerRealtimePoll(tripId) {
       } catch(e){}
     }
 
-    // 2. Check Firestore REST API directly (100% fiable entre redes y dispositivos móviles)
+    // 2. Check Firestore REST API directly (Aislamiento por viaje con fallback a singular)
     try {
-      const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+      const resp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/${targetTripId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
       if (resp.ok) {
         const json = await resp.json();
         if (json && json.fields) {
@@ -7681,6 +7696,15 @@ function startPassengerRealtimePoll(tripId) {
             : (typeof firestoreDocToObject === 'function' ? firestoreDocToObject(json) : null);
           if (tripObj && tripObj.estado) {
             activeTrip = tripObj;
+          }
+        }
+      } else if (targetTripId !== 'current_active_trip') {
+        const fbResp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+        if (fbResp.ok) {
+          const fbJson = await fbResp.json();
+          if (fbJson && fbJson.fields) {
+            const tripObj = (typeof window.firestoreDocToObject === 'function') ? window.firestoreDocToObject(fbJson) : null;
+            if (tripObj && (tripObj.id === targetTripId || !tripObj.id)) activeTrip = tripObj;
           }
         }
       }
@@ -8361,15 +8385,21 @@ setInterval(async () => {
   const isModalOpen = passengerChatModal && !passengerChatModal.classList.contains('hidden');
   if (!activeTrip && !isModalOpen) return;
 
+  const tripId = (activeTrip && activeTrip.id) ? activeTrip.id : (window.RutaSync ? window.RutaSync.activeTripId : 'active_trip');
+  const chatDoc = (tripId && tripId !== 'active_trip') ? ('chat_' + tripId) : 'chat_active';
+
   try {
-    const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/chat_active?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+    let resp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/${chatDoc}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
+    if (!resp.ok && chatDoc !== 'chat_active') {
+      resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/chat_active?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+    }
     if (resp.ok) {
       const json = await resp.json();
       if (json && json.fields) {
         const chatObj = (typeof window.firestoreDocToObject === 'function') ? window.firestoreDocToObject(json) : null;
         if (chatObj && chatObj.ultimoMensaje && window.RutaSync) {
-          const tripId = chatObj.tripId || (activeTrip ? activeTrip.id : 'active_trip');
-          const prevMsgs = window.RutaSync.obtenerMensajesChat(tripId);
+          const chatMsgTripId = chatObj.tripId || tripId;
+          const prevMsgs = window.RutaSync.obtenerMensajesChat(chatMsgTripId);
           const isNew = !prevMsgs.some(m => m.id === chatObj.ultimoMensaje.id || (m.timestamp === chatObj.ultimoMensaje.timestamp && m.texto === chatObj.ultimoMensaje.texto));
           if (isNew) {
             window.RutaSync.guardarMensajeChatLocal(chatObj.ultimoMensaje);

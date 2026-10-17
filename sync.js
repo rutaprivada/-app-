@@ -94,12 +94,52 @@ class RutaSyncManager {
         this.localServerAvailable = null;
         this.localServerFailCount = 0;
 
+        // Estado Multi-Usuario Cabify/Uber
+        this.activeTripId = null;
+        try {
+            this.activeTripId = localStorage.getItem('rutaprivada_active_trip_id') || null;
+        } catch(e) {}
+        this.activeDriverId = this.obtenerDriverIdLocal();
+        this.activeTripUnsub = null;
+        this.activeDriverLocUnsub = null;
+        this.onlineDriversUnsub = null;
+        this.tripChatUnsub = null;
+        this._lastListenedTripId = null;
+        this._lastListenedDriverId = null;
+        this._lastListenedChatTripId = null;
+
         this.initFirebaseSync();
         this.initLocalChannels();
         this.initNtfySseSync();
         this.initServerHttpSync();
         this.initNotificationManager();
         this.iniciarMotorMonitoreoReservas();
+    }
+
+    obtenerDriverIdLocal() {
+        try {
+            const raw = localStorage.getItem('rutaprivada_driver_profile');
+            if (raw) {
+                const p = JSON.parse(raw);
+                if (p && p.id) return String(p.id);
+                if (p && p.dni) return 'drv_' + String(p.dni).replace(/\D/g, '');
+            }
+            const docsRaw = localStorage.getItem('rutaprivada_driver_docs_v1');
+            if (docsRaw) {
+                const d = JSON.parse(docsRaw);
+                if (d && d.id) return String(d.id);
+                if (d && d.dni) return 'drv_' + String(d.dni).replace(/\D/g, '');
+            }
+        } catch(e){}
+        return this.deviceId;
+    }
+
+    obtenerDriverProfileLocal() {
+        try {
+            const raw = localStorage.getItem('rutaprivada_driver_profile');
+            if (raw) return JSON.parse(raw);
+        } catch(e){}
+        return null;
     }
 
     postFirestoreDocREST(collection, docId, data) {
@@ -117,7 +157,7 @@ class RutaSyncManager {
     }
 
     // ==========================================
-    // 1. FIREBASE CLOUD FIRESTORE REALTIME SYNC
+    // 1. FIREBASE CLOUD FIRESTORE REALTIME SYNC (MULTI-USUARIO UBER / CABIFY ARCHITECTURE)
     // ==========================================
     initFirebaseSync() {
         const FIREBASE_CONFIG = {
@@ -139,7 +179,72 @@ class RutaSyncManager {
                     }
                     this.firestore = firebase.firestore();
 
-                    // Escuchar directamente el documento de viaje activo (0 índices requeridos, 100% instantáneo)
+                    // 1. ESCUCHA DE LA COLECCIÓN DE VIAJES ACTIVOS (MULTI-VIAJE SIMULTÁNEO REAL)
+                    // Permite a cualquier cantidad de choferes y pasajeros ver solicitudes sin sobreescrituras
+                    this.firestore.collection('live_trips').limit(50)
+                        .onSnapshot((snapshot) => {
+                            snapshot.docChanges().forEach((change) => {
+                                const data = change.doc.data();
+                                const docId = change.doc.id;
+                                if (!data || docId === 'chat_active' || docId.startsWith('chat_') || docId === 'driver_location' || docId === 'latest_event') return;
+                                if (data.senderId === this.deviceId) return;
+
+                                data.id = data.id || docId;
+
+                                if (change.type === 'removed') {
+                                    this.handleIncoming({
+                                        id: 'fs_rm_' + data.id + '_' + Date.now(),
+                                        type: 'VIAJE_ELIMINADO',
+                                        payload: data,
+                                        senderId: data.senderId,
+                                        timestamp: Date.now()
+                                    });
+                                    return;
+                                }
+
+                                if (data.estado === 'buscando_conductor' || data.estado === 'solicitado') {
+                                    this.handleIncoming({
+                                        id: 'fs_req_' + data.id + '_' + (data.ultimoEstadoEn || data.timestamp || Date.now()),
+                                        type: 'NUEVO_VIAJE_SOLICITADO',
+                                        payload: data,
+                                        senderId: data.senderId,
+                                        timestamp: data.timestamp || Date.now()
+                                    });
+                                } else if (data.estado === 'aceptado' || data.estado === 'en_camino') {
+                                    this.handleIncoming({
+                                        id: 'fs_acc_' + data.id + '_' + (data.ultimoEstadoEn || Date.now()),
+                                        type: 'VIAJE_ACEPTADO',
+                                        payload: data,
+                                        senderId: data.senderId,
+                                        timestamp: data.timestamp || Date.now()
+                                    });
+                                    this.handleIncoming({
+                                        id: 'fs_st_' + data.id + '_' + data.estado + '_' + (data.ultimoEstadoEn || Date.now()),
+                                        type: 'ESTADO_VIAJE_CAMBIADO',
+                                        payload: data,
+                                        senderId: data.senderId,
+                                        timestamp: data.timestamp || Date.now()
+                                    });
+                                } else if (data.estado) {
+                                    this.handleIncoming({
+                                        id: 'fs_st_' + data.id + '_' + data.estado + '_' + (data.ultimoEstadoEn || Date.now()),
+                                        type: 'ESTADO_VIAJE_CAMBIADO',
+                                        payload: data,
+                                        senderId: data.senderId,
+                                        timestamp: data.timestamp || Date.now()
+                                    });
+                                }
+                            });
+                        }, (err) => {
+                            console.warn('Firestore live_trips collection listener warning:', err);
+                        });
+
+                    // 1.B Si el dispositivo tiene un viaje activo guardado, escuchar su documento de forma prioritaria
+                    if (this.activeTripId) {
+                        this.escucharViajePorId(this.activeTripId);
+                    }
+
+                    // 1.C Escuchar directamente el documento de viaje activo singular (puente de compatibilidad heredada)
                     this.firestore.collection('live_trips').doc('current_active_trip')
                         .onSnapshot((doc) => {
                             if (doc.exists) {
@@ -183,7 +288,7 @@ class RutaSyncManager {
                             console.warn('Firestore active trip listener warning:', err);
                         });
 
-                    // Escuchar ubicación del chofer en tiempo real (Cloud Push instantáneo Firestore)
+                    // 1.D Escuchar ubicación del chofer por documento singular (fallback de compatibilidad)
                     this.firestore.collection('live_trips').doc('driver_location')
                         .onSnapshot((doc) => {
                             if (doc.exists) {
@@ -200,7 +305,7 @@ class RutaSyncManager {
                             }
                         }, (err) => {});
 
-                    // Escuchar chat en tiempo real
+                    // 1.E Escuchar chat activo singular (fallback de compatibilidad)
                     this.firestore.collection('live_trips').doc('chat_active')
                         .onSnapshot((doc) => {
                             if (doc.exists) {
@@ -537,16 +642,51 @@ class RutaSyncManager {
                         timestamp: now,
                         ultimoEstadoEn: now
                     };
+                    // Multi-usuario: Guardar cada viaje con su propio ID independiente en Firestore
+                    this.firestore.collection('live_trips').doc(tripId).set(tripRecord, { merge: true }).catch(() => {});
+                    // Puente de compatibilidad con documento singular heredado
                     this.firestore.collection('live_trips').doc('current_active_trip').set(tripRecord, { merge: true }).catch(() => {});
-                    if (tripId !== 'current_active_trip') {
-                        this.firestore.collection('live_trips').doc(tripId).set(tripRecord, { merge: true }).catch(() => {});
-                    }
                 } else if (type === 'UBICACION_CHOFER_ACTUALIZADA' || type === 'ACTUALIZACION_UBICACION_CHOFER') {
-                    this.firestore.collection('live_trips').doc('driver_location').set({
+                    const driverId = String(safePayload.driverId || this.obtenerDriverIdLocal() || 'driver_default');
+                    const locRecord = {
                         ...safePayload,
+                        driverId: driverId,
+                        senderId: this.deviceId,
+                        online: safePayload.online !== undefined ? safePayload.online : true,
+                        timestamp: now
+                    };
+                    // Multi-usuario: Aislamiento por chofer en colección driver_locations
+                    this.firestore.collection('driver_locations').doc(driverId).set(locRecord, { merge: true }).catch(() => {});
+                    this.postFirestoreDocREST('driver_locations', driverId, locRecord);
+
+                    // Si hay un viaje activo asignado a este chofer, adjuntar ubicación a dicho viaje
+                    const activeTripId = safePayload.tripId || this.activeTripId;
+                    if (activeTripId && activeTripId !== 'active_trip') {
+                        this.firestore.collection('live_trips').doc(String(activeTripId)).set({
+                            driverLocation: locRecord,
+                            ultimoEstadoEn: now
+                        }, { merge: true }).catch(() => {});
+                        this.postFirestoreDocREST('live_trips', String(activeTripId), { driverLocation: locRecord, ultimoEstadoEn: now });
+                    }
+                    // Puente de compatibilidad heredada
+                    this.firestore.collection('live_trips').doc('driver_location').set(locRecord).catch(() => {});
+                } else if (type === 'CHAT_MENSAJE_ENVIADO' || type === 'NUEVO_MENSAJE_CHAT') {
+                    const chatTripId = String(safePayload.tripId || this.activeTripId || 'active_trip');
+                    const allMsgs = this.obtenerMensajesChat(chatTripId);
+                    const chatRecord = {
+                        tripId: chatTripId,
+                        ultimoMensaje: safePayload,
+                        mensajes: allMsgs,
                         senderId: this.deviceId,
                         timestamp: now
-                    }).catch(() => {});
+                    };
+                    if (chatTripId && chatTripId !== 'active_trip') {
+                        this.firestore.collection('trip_chats').doc(chatTripId).set(chatRecord, { merge: true }).catch(() => {});
+                        this.postFirestoreDocREST('trip_chats', chatTripId, chatRecord);
+                        this.postFirestoreDocREST('live_trips', 'chat_' + chatTripId, chatRecord);
+                    }
+                    this.firestore.collection('live_trips').doc('chat_active').set(chatRecord).catch(() => {});
+                    this.postFirestoreDocREST('live_trips', 'chat_active', chatRecord);
                 } else if (type === 'ESTADO_CONDUCTOR_ACTUALIZADO' || type === 'DOCUMENTOS_CONDUCTOR_ACTUALIZADOS') {
                     if (safePayload && (safePayload.id || safePayload.dni)) {
                         const cleanDni = String(safePayload.dni || '').replace(/\D/g, '');
@@ -597,10 +737,8 @@ class RutaSyncManager {
                 timestamp: now,
                 ultimoEstadoEn: now
             };
+            this.postFirestoreDocREST('live_trips', tripId, tripRecord);
             this.postFirestoreDocREST('live_trips', 'current_active_trip', tripRecord);
-            if (tripId !== 'current_active_trip') {
-                this.postFirestoreDocREST('live_trips', tripId, tripRecord);
-            }
         }
 
         // 2. Enviar a través de Cloud SSE / Push Bus (ntfy.sh canal privado)
@@ -1021,7 +1159,7 @@ class RutaSyncManager {
     }
 
     // ==========================================
-    // 6. MÉTODOS DE VIAJES EN VIVO
+    // 6. MÉTODOS DE VIAJES EN VIVO (MULTI-USUARIO UBER / CABIFY STYLE)
     // ==========================================
     solicitarViaje(viajeData) {
         let distanceKm = Number(viajeData.distanceKm) || 0;
@@ -1032,56 +1170,119 @@ class RutaSyncManager {
         const tollFare = Number(viajeData.tollFare || viajeData.peajes || 0) || 0;
         const fuelCostEst = Number(viajeData.fuelCostEst) || Math.round(distanceKm * 210);
 
+        // Generar identificador de viaje único mundial (Trip UUID / Timestamped)
+        const tripId = viajeData.id || ('trip_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
+
         const viaje = {
-            id: 'trip_' + Date.now(),
+            ...viajeData,
+            id: tripId,
             estado: 'buscando_conductor',
             creadoEn: Date.now(),
+            ultimoEstadoEn: Date.now(),
             distanceKm: distanceKm,
             tollFare: tollFare,
             peajes: tollFare,
             fuelCostEst: fuelCostEst,
-            ...viajeData
+            senderId: this.deviceId
         };
 
+        this.activeTripId = tripId;
+        try {
+            localStorage.setItem('rutaprivada_active_trip_id', tripId);
+        } catch(e) {}
+
         this.guardarViajeActivo(viaje);
+        this.escucharViajePorId(tripId);
         this.emit('NUEVO_VIAJE_SOLICITADO', viaje);
         return viaje;
     }
 
     aceptarViaje(viajeOrId, conductorData) {
-        let viaje = this.obtenerViajeActivo() || {};
+        const tripId = (typeof viajeOrId === 'object' && viajeOrId !== null)
+            ? (viajeOrId.id || viajeOrId.tripId)
+            : viajeOrId;
+        let viaje = this.obtenerViajePorId(tripId) || this.obtenerViajeActivo() || {};
         if (typeof viajeOrId === 'object' && viajeOrId !== null) {
             viaje = { ...viaje, ...viajeOrId };
-        } else if (viajeOrId) {
-            viaje.id = viajeOrId;
         }
+        viaje.id = tripId || viaje.id || ('trip_' + Date.now());
         viaje.estado = 'aceptado';
-        viaje.conductor = conductorData;
+        viaje.conductor = conductorData || this.obtenerDriverProfileLocal();
+        viaje.conductorId = viaje.conductor ? (viaje.conductor.id || viaje.conductor.dni || this.obtenerDriverIdLocal()) : this.obtenerDriverIdLocal();
         viaje.aceptadoEn = Date.now();
         viaje.ultimoEstadoEn = Date.now();
+
+        this.activeTripId = viaje.id;
+        try {
+            localStorage.setItem('rutaprivada_active_trip_id', viaje.id);
+        } catch(e) {}
+
         this.guardarViajeActivo(viaje);
+        this.escucharViajePorId(viaje.id);
         this.emit('VIAJE_ACEPTADO', viaje);
         return viaje;
     }
 
     actualizarEstadoViaje(nuevoEstado, metadata = {}) {
-        let viaje = this.obtenerViajeActivo() || {};
+        const tripId = metadata.id || metadata.tripId || this.activeTripId || (this.obtenerViajeActivo() ? this.obtenerViajeActivo().id : null);
+        let viaje = (tripId ? this.obtenerViajePorId(tripId) : null) || this.obtenerViajeActivo() || {};
+        if (tripId) viaje.id = tripId;
         viaje.estado = nuevoEstado;
         viaje.ultimoEstadoEn = Date.now();
         Object.assign(viaje, metadata);
         this.guardarViajeActivo(viaje);
         this.emit('ESTADO_VIAJE_CAMBIADO', viaje);
+
+        if (nuevoEstado === 'completado' || nuevoEstado === 'cancelado' || (typeof nuevoEstado === 'string' && nuevoEstado.startsWith('cancelado_'))) {
+            setTimeout(() => {
+                this.limpiarViajeActivo(viaje.id);
+            }, 6000);
+        }
         return viaje;
     }
 
     guardarViajeActivo(viaje) {
+        if (!viaje) return;
         try {
             localStorage.setItem('rutaprivada_viaje_activo', JSON.stringify(viaje));
+            if (viaje.id) {
+                this.activeTripId = viaje.id;
+                localStorage.setItem('rutaprivada_active_trip_id', viaje.id);
+                let map = {};
+                try {
+                    const rawMap = localStorage.getItem('rutaprivada_viajes_activos_map');
+                    if (rawMap) map = JSON.parse(rawMap);
+                } catch(e){}
+                map[viaje.id] = viaje;
+                localStorage.setItem('rutaprivada_viajes_activos_map', JSON.stringify(map));
+            }
         } catch (e) {}
     }
 
-    obtenerViajeActivo() {
+    obtenerViajePorId(tripId) {
+        if (!tripId) return null;
         try {
+            const rawMap = localStorage.getItem('rutaprivada_viajes_activos_map');
+            if (rawMap) {
+                const map = JSON.parse(rawMap);
+                if (map && map[tripId]) return map[tripId];
+            }
+        } catch(e){}
+        const active = this.obtenerViajeActivo();
+        if (active && active.id === tripId) return active;
+        return null;
+    }
+
+    obtenerViajeActivo(optionalTripId) {
+        if (optionalTripId) {
+            return this.obtenerViajePorId(optionalTripId);
+        }
+        try {
+            const targetId = this.activeTripId || localStorage.getItem('rutaprivada_active_trip_id');
+            if (targetId) {
+                const found = this.obtenerViajePorId(targetId);
+                if (found) return found;
+            }
             const raw = localStorage.getItem('rutaprivada_viaje_activo');
             return raw ? JSON.parse(raw) : null;
         } catch (e) {
@@ -1089,18 +1290,40 @@ class RutaSyncManager {
         }
     }
 
-    limpiarViajeActivo() {
+    limpiarViajeActivo(optionalTripId) {
         try {
-            const activo = this.obtenerViajeActivo();
-            if (activo && activo.id) {
-                this.limpiarChat(activo.id);
+            const activo = optionalTripId ? this.obtenerViajePorId(optionalTripId) : this.obtenerViajeActivo();
+            const tripId = (activo && activo.id) ? activo.id : optionalTripId;
+
+            if (tripId) {
+                this.limpiarChat(tripId);
+                try {
+                    let map = {};
+                    const rawMap = localStorage.getItem('rutaprivada_viajes_activos_map');
+                    if (rawMap) map = JSON.parse(rawMap);
+                    delete map[tripId];
+                    localStorage.setItem('rutaprivada_viajes_activos_map', JSON.stringify(map));
+                } catch(e){}
             }
-            this.limpiarChat('active_trip');
-            localStorage.removeItem('rutaprivada_viaje_activo');
-            localStorage.removeItem('rutaprivada_driver_location');
-            if (this.firestore) {
-                if (activo && activo.id && activo.id !== 'current_active_trip') {
-                    this.firestore.collection('live_trips').doc(String(activo.id)).set({
+
+            if (!optionalTripId || optionalTripId === this.activeTripId) {
+                this.activeTripId = null;
+                localStorage.removeItem('rutaprivada_active_trip_id');
+                localStorage.removeItem('rutaprivada_viaje_activo');
+                localStorage.removeItem('rutaprivada_driver_location');
+                if (this.activeTripUnsub) {
+                    try { this.activeTripUnsub(); } catch(e){}
+                    this.activeTripUnsub = null;
+                }
+                if (this.activeDriverLocUnsub) {
+                    try { this.activeDriverLocUnsub(); } catch(e){}
+                    this.activeDriverLocUnsub = null;
+                }
+            }
+
+            if (this.firestore && tripId) {
+                if (tripId !== 'current_active_trip') {
+                    this.firestore.collection('live_trips').doc(String(tripId)).set({
                         estado: 'finalizado',
                         finalizadoEn: Date.now()
                     }, { merge: true }).catch(() => {});
@@ -1113,14 +1336,65 @@ class RutaSyncManager {
 
     escucharViajePorId(tripId, callback) {
         if (!tripId || !this.firestore) return null;
+        const cleanTripId = String(tripId).trim();
         try {
-            return this.firestore.collection('live_trips').doc(String(tripId)).onSnapshot((doc) => {
-                if (doc.exists && typeof callback === 'function') {
-                    callback(doc.data());
+            if (this.activeTripUnsub && this._lastListenedTripId === cleanTripId) {
+                return this.activeTripUnsub;
+            }
+            if (this.activeTripUnsub) {
+                try { this.activeTripUnsub(); } catch(e){}
+            }
+            this._lastListenedTripId = cleanTripId;
+            this.activeTripUnsub = this.firestore.collection('live_trips').doc(cleanTripId).onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data) {
+                        data.id = data.id || doc.id;
+                        if (data.senderId !== this.deviceId) {
+                            this.guardarViajeActivo(data);
+                            if (data.estado === 'aceptado' || data.estado === 'en_camino') {
+                                this.handleIncoming({
+                                    id: 'fs_acc_' + data.id + '_' + (data.ultimoEstadoEn || Date.now()),
+                                    type: 'VIAJE_ACEPTADO',
+                                    payload: data,
+                                    senderId: data.senderId,
+                                    timestamp: Date.now()
+                                });
+                            }
+                            this.handleIncoming({
+                                id: 'fs_st_' + data.id + '_' + (data.estado || 'st') + '_' + (data.ultimoEstadoEn || Date.now()),
+                                type: 'ESTADO_VIAJE_CAMBIADO',
+                                payload: data,
+                                senderId: data.senderId,
+                                timestamp: Date.now()
+                            });
+
+                            // Si el viaje tiene asignado chofer, escuchar su GPS automáticamente de forma aislada
+                            const drvId = data.conductorId || (data.conductor ? (data.conductor.id || data.conductor.dni) : null);
+                            if (drvId && drvId !== this.activeDriverId) {
+                                this.escucharUbicacionChofer(drvId);
+                            }
+
+                            // Si el documento de viaje trae ubicación del chofer embebida:
+                            if (data.driverLocation && data.driverLocation.lat && data.driverLocation.lng) {
+                                this.handleIncoming({
+                                    id: 'fs_emb_loc_' + (data.driverLocation.timestamp || Date.now()),
+                                    type: 'UBICACION_CHOFER_ACTUALIZADA',
+                                    payload: data.driverLocation,
+                                    senderId: data.senderId,
+                                    timestamp: Date.now()
+                                });
+                            }
+                        }
+                        if (typeof callback === 'function') {
+                            callback(data);
+                        }
+                    }
                 }
             }, (err) => {
                 console.warn('Trip listener warning:', err);
             });
+            return this.activeTripUnsub;
         } catch(e) {
             return null;
         }
@@ -1328,18 +1602,25 @@ class RutaSyncManager {
     }
 
     // ==========================================
-    // 6.1 UBICACIÓN Y TELEMETRÍA GPS DEL CHOFER EN TIEMPO REAL
+    // 6.1 UBICACIÓN Y TELEMETRÍA GPS DEL CHOFER EN TIEMPO REAL (MULTI-CHOFER AISLADO)
     // ==========================================
     actualizarUbicacionChofer(coords) {
         if (!coords || typeof coords.lat !== 'number' || typeof coords.lng !== 'number') return;
+        const driverId = String(coords.driverId || this.obtenerDriverIdLocal() || this.deviceId);
+        const tripId = coords.tripId || this.activeTripId || null;
+        const driverInfo = coords.driverInfo || this.obtenerDriverProfileLocal() || null;
+
         const locationData = {
+            driverId: driverId,
             lat: coords.lat,
             lng: coords.lng,
             heading: coords.heading || 0,
             speed: coords.speed || 0,
             stage: coords.stage || 'en_camino',
-            tripId: coords.tripId || 'active_trip',
+            tripId: tripId,
             etaMin: coords.etaMin !== undefined ? coords.etaMin : null,
+            driverInfo: driverInfo,
+            online: coords.online !== undefined ? coords.online : true,
             timestamp: Date.now()
         };
 
@@ -1350,31 +1631,131 @@ class RutaSyncManager {
         this.emit('UBICACION_CHOFER_ACTUALIZADA', locationData);
     }
 
-    obtenerUbicacionChofer() {
+    obtenerUbicacionChofer(optionalDriverId) {
         try {
             const raw = localStorage.getItem('rutaprivada_driver_location');
-            return raw ? JSON.parse(raw) : null;
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (optionalDriverId && parsed && parsed.driverId && parsed.driverId !== optionalDriverId) {
+                return null;
+            }
+            return parsed;
         } catch (e) {
             return null;
         }
     }
 
+    setConductorOnlineStatus(isOnline, driverProfile, currentCoords) {
+        const driverId = this.obtenerDriverIdLocal();
+        const profile = driverProfile || this.obtenerDriverProfileLocal();
+        const payload = {
+            driverId: driverId,
+            online: Boolean(isOnline),
+            driverInfo: profile,
+            lat: currentCoords ? currentCoords.lat : null,
+            lng: currentCoords ? currentCoords.lng : null,
+            heading: currentCoords ? (currentCoords.heading || 0) : 0,
+            speed: currentCoords ? (currentCoords.speed || 0) : 0,
+            timestamp: Date.now(),
+            senderId: this.deviceId
+        };
+
+        if (this.firestore) {
+            this.firestore.collection('driver_locations').doc(driverId).set(payload, { merge: true }).catch(() => {});
+        }
+        this.postFirestoreDocREST('driver_locations', driverId, payload);
+        this.emit('DRIVER_ONLINE_STATUS_CHANGED', payload);
+    }
+
+    escucharUbicacionChofer(driverId, callback) {
+        if (!driverId || !this.firestore) return null;
+        const cleanId = String(driverId).trim();
+        if (this._lastListenedDriverId === cleanId && this.activeDriverLocUnsub) {
+            return this.activeDriverLocUnsub;
+        }
+        if (this.activeDriverLocUnsub) {
+            try { this.activeDriverLocUnsub(); } catch(e){}
+        }
+        this._lastListenedDriverId = cleanId;
+        try {
+            this.activeDriverLocUnsub = this.firestore.collection('driver_locations').doc(cleanId).onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data && data.lat && data.lng && data.senderId !== this.deviceId) {
+                        this.handleIncoming({
+                            id: 'fs_loc_drv_' + cleanId + '_' + (data.timestamp || Date.now()),
+                            type: 'UBICACION_CHOFER_ACTUALIZADA',
+                            payload: data,
+                            senderId: data.senderId,
+                            timestamp: Date.now()
+                        });
+                        if (typeof callback === 'function') {
+                            callback(data);
+                        }
+                    }
+                }
+            }, (err) => {
+                console.warn('Driver location listener warning:', err);
+            });
+            return this.activeDriverLocUnsub;
+        } catch(e) {
+            return null;
+        }
+    }
+
+    escucharChoferesEnLinea(callback) {
+        if (!this.firestore || typeof callback !== 'function') return null;
+        try {
+            if (this.onlineDriversUnsub) {
+                try { this.onlineDriversUnsub(); } catch(e){}
+            }
+            this.onlineDriversUnsub = this.firestore.collection('driver_locations').onSnapshot((snapshot) => {
+                const now = Date.now();
+                const list = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (!data || !data.lat || !data.lng) return;
+                    const isOnline = (data.online !== false);
+                    const isRecent = (now - (data.timestamp || 0)) < (4 * 60 * 1000);
+                    if (isOnline && isRecent) {
+                        list.push({
+                            id: doc.id,
+                            driverId: data.driverId || doc.id,
+                            lat: data.lat,
+                            lng: data.lng,
+                            heading: data.heading || 0,
+                            speed: data.speed || 0,
+                            driverInfo: data.driverInfo || null,
+                            timestamp: data.timestamp
+                        });
+                    }
+                });
+                callback(list);
+            }, (err) => {
+                console.warn('Online drivers listener warning:', err);
+            });
+            return this.onlineDriversUnsub;
+        } catch(e) {
+            return null;
+        }
+    }
+
     // ==========================================
-    // 7. MÉTODOS DE CHAT EN VIVO DIRECTO
+    // 7. MÉTODOS DE CHAT EN VIVO AISLADO POR VIAJE
     // ==========================================
     enviarMensajeChat(param1, param2, param3) {
-        let tripId = 'active_trip';
+        let tripId = this.activeTripId || 'active_trip';
         let remitente = 'pasajero';
         let texto = '';
         let autor = '';
 
         if (typeof param1 === 'object' && param1 !== null) {
-            tripId = param1.tripId || 'active_trip';
+            tripId = param1.tripId || this.activeTripId || 'active_trip';
             remitente = param1.remitente || 'pasajero';
             texto = param1.texto || '';
             autor = param1.autor || '';
         } else {
-            tripId = param1 || 'active_trip';
+            tripId = param1 || this.activeTripId || 'active_trip';
             remitente = param2 || 'pasajero';
             texto = param3 || '';
         }
@@ -1395,17 +1776,6 @@ class RutaSyncManager {
 
         this.guardarMensajeChatLocal(msg);
         this.emit('CHAT_MENSAJE_ENVIADO', msg);
-
-        // Guardar lista completa en Firestore REST para sincronización multi-dispositivo inmediata
-        try {
-            const allMsgs = this.obtenerMensajesChat(tripId);
-            this.postFirestoreDocREST('live_trips', 'chat_active', {
-                tripId: tripId,
-                ultimoMensaje: msg,
-                mensajes: allMsgs,
-                timestamp: Date.now()
-            });
-        } catch(e) {}
         return msg;
     }
 
@@ -1434,10 +1804,12 @@ class RutaSyncManager {
     }
 
     obtenerMensajesChat(tripId) {
-        const keys = ['rutaprivada_chat_live_shared'];
-        if (tripId && tripId !== 'active_trip') {
-            keys.unshift('rutaprivada_chat_' + tripId);
+        const targetTripId = tripId || this.activeTripId;
+        const keys = [];
+        if (targetTripId && targetTripId !== 'active_trip') {
+            keys.push('rutaprivada_chat_' + targetTripId);
         }
+        keys.push('rutaprivada_chat_live_shared');
         keys.push('rutaprivada_chat_active_trip');
 
         for (const key of keys) {
@@ -1457,9 +1829,36 @@ class RutaSyncManager {
     limpiarChat(tripId) {
         const keys = ['rutaprivada_chat_live_shared', 'rutaprivada_chat_active_trip'];
         if (tripId) keys.push('rutaprivada_chat_' + tripId);
+        if (this.activeTripId) keys.push('rutaprivada_chat_' + this.activeTripId);
         keys.forEach(k => {
             try { localStorage.removeItem(k); } catch (e) {}
         });
+    }
+
+    escucharChatTrip(tripId, callback) {
+        if (!tripId || !this.firestore) return null;
+        const cleanTripId = String(tripId).trim();
+        try {
+            return this.firestore.collection('trip_chats').doc(cleanTripId).onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data && data.ultimoMensaje && data.ultimoMensaje.id) {
+                        if (!this.processedEvents.has(data.ultimoMensaje.id)) {
+                            this.processedEvents.add(data.ultimoMensaje.id);
+                            this.guardarMensajeChatLocal(data.ultimoMensaje);
+                            this.emit('CHAT_MENSAJE_ENVIADO', data.ultimoMensaje);
+                        }
+                        if (typeof callback === 'function') {
+                            callback(data.mensajes || [data.ultimoMensaje]);
+                        }
+                    }
+                }
+            }, (err) => {
+                console.warn('Trip chat listener warning:', err);
+            });
+        } catch(e) {
+            return null;
+        }
     }
 
     guardarDocumentosConductor(docsData) {
