@@ -39,13 +39,27 @@ if (fs.existsSync(buildGradlePath)) {
     console.log(` Package ID: ${appId}`);
 }
 
-// Update strings.xml app_name
+// Update strings.xml app_name and package identifiers
 if (fs.existsSync(stringsXmlPath)) {
     let stringsContent = fs.readFileSync(stringsXmlPath, 'utf8');
     stringsContent = stringsContent.replace(/<string name="app_name">[^<]+<\/string>/, `<string name="app_name">${appName}</string>`);
     stringsContent = stringsContent.replace(/<string name="title_activity_main">[^<]+<\/string>/, `<string name="title_activity_main">${appName}</string>`);
+    stringsContent = stringsContent.replace(/<string name="package_name">[^<]+<\/string>/, `<string name="package_name">${appId}</string>`);
+    stringsContent = stringsContent.replace(/<string name="custom_url_scheme">[^<]+<\/string>/, `<string name="custom_url_scheme">${appId}</string>`);
     fs.writeFileSync(stringsXmlPath, stringsContent, 'utf8');
-    console.log(` Nombre App: ${appName}`);
+    console.log(` Nombre App: ${appName} | Scheme: ${appId}`);
+}
+
+// Sync capacitor.config.json with corresponding profile
+const capacitorProfilePath = mode === 'conductor'
+    ? path.join(__dirname, 'capacitor.driver.json')
+    : path.join(__dirname, 'capacitor.passenger.json');
+const capacitorDestPath = path.join(__dirname, 'capacitor.config.json');
+if (fs.existsSync(capacitorProfilePath)) {
+    try {
+        fs.copyFileSync(capacitorProfilePath, capacitorDestPath);
+        console.log(` Capacitor Config: [${mode === 'conductor' ? 'capacitor.driver.json' : 'capacitor.passenger.json'}] -> capacitor.config.json`);
+    } catch(e) {}
 }
 
 // Generate safe padded icons if script exists

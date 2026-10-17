@@ -13,11 +13,13 @@ if exist "C:\Program Files\nodejs\node.exe" (
 )
 
 echo.
-echo 2. Abriendo Android Studio...
+echo 2. Sincronizando recursos con Capacitor...
 if exist "C:\Program Files\nodejs\npx.cmd" (
-    call "C:\Program Files\nodejs\npx.cmd" cap open android
+    call "C:\Program Files\nodejs\npx.cmd" cap copy android --config capacitor.passenger.json
+    call "C:\Program Files\nodejs\npx.cmd" cap open android --config capacitor.passenger.json
 ) else (
-    call npx cap open android
+    call npx cap copy android --config capacitor.passenger.json
+    call npx cap open android --config capacitor.passenger.json
 )
 
 echo.
