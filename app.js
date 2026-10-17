@@ -1147,10 +1147,71 @@ let state = {
     roundtrip: false,
     pet: false
   },
+  invoice: {
+    type: 'none',
+    cuit: '',
+    razonSocial: '',
+    address: ''
+  },
   totalPrice: 0,
   breakdown: {}
 };
 window.state = state;
+
+// Selector de Facturación (Sin Factura / Factura B / Factura A)
+window.selectInvoiceType = function(type) {
+  if (!state.invoice) state.invoice = { type: 'none', cuit: '', razonSocial: '', address: '' };
+  state.invoice.type = type;
+
+  const btnNone = document.getElementById('btn-invoice-none');
+  const btnB = document.getElementById('btn-invoice-b');
+  const btnA = document.getElementById('btn-invoice-a');
+  const fields = document.getElementById('invoice-details-fields');
+
+  const btns = [
+    { el: btnNone, t: 'none' },
+    { el: btnB, t: 'B' },
+    { el: btnA, t: 'A' }
+  ];
+
+  btns.forEach(item => {
+    if (!item.el) return;
+    if (item.t === type) {
+      item.el.classList.add('active');
+      item.el.style.background = 'rgba(245, 158, 11, 0.15)';
+      item.el.style.borderColor = '#f59e0b';
+      item.el.style.color = '#fbbf24';
+    } else {
+      item.el.classList.remove('active');
+      item.el.style.background = 'rgba(15, 23, 42, 0.6)';
+      item.el.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+      item.el.style.color = '#94a3b8';
+    }
+  });
+
+  if (fields) {
+    if (type === 'none') {
+      fields.style.display = 'none';
+    } else {
+      fields.style.display = 'block';
+      const cuitInput = document.getElementById('invoice-cuit');
+      if (cuitInput && !cuitInput.value) {
+        cuitInput.focus();
+      }
+    }
+  }
+};
+
+window.getInvoiceDetails = function() {
+  const cuit = document.getElementById('invoice-cuit')?.value?.trim() || '';
+  const razonSocial = document.getElementById('invoice-razon-social')?.value?.trim() || '';
+  const address = document.getElementById('invoice-address')?.value?.trim() || '';
+  if (!state.invoice) state.invoice = { type: 'none', cuit: '', razonSocial: '', address: '' };
+  state.invoice.cuit = cuit;
+  state.invoice.razonSocial = razonSocial;
+  state.invoice.address = address;
+  return state.invoice;
+};
 
 // Instancias de Leaflet
 let map = null;
@@ -6529,6 +6590,9 @@ function buildReservationMessage() {
   const isRound = state.extras.roundtrip ? ' • 🔁 Ida y Vuelta' : '';
   const isPet = state.extras.pet ? ' • 🐾 Mascota' : '';
 
+  // Datos de Facturación
+  const inv = typeof window.getInvoiceDetails === 'function' ? window.getInvoiceDetails() : (state.invoice || { type: 'none' });
+
   let msg = `👋 ¡Hola! Solicito reserva de traslado en *RutaPrivada*:\n\n`;
   if (passName) msg += `👤 *Pasajero:* ${passName}\n`;
   msg += `📅 *Fecha:* ${dateFormatted}\n`;
@@ -6537,6 +6601,13 @@ function buildReservationMessage() {
   if (stopStr) msg += `🛑 *Parada:* ${stopStr}\n`;
   msg += `🏁 *Destino:* ${destStr}\n`;
   msg += `💵 *Tarifa Cotizada:* ${formatMoney(state.totalPrice)} ${state.config.currency}${isRound}${isPet}\n`;
+  if (inv && inv.type && inv.type !== 'none') {
+    msg += `🧾 *Facturación:* Factura ${inv.type}`;
+    if (inv.cuit) msg += ` | CUIT: ${inv.cuit}`;
+    if (inv.razonSocial) msg += ` | Titular: ${inv.razonSocial}`;
+    if (inv.address) msg += ` | Domicilio: ${inv.address}`;
+    msg += `\n`;
+  }
   if (passNotes) msg += `📝 *Notas:* ${passNotes}\n`;
   msg += `\n¿Tienen disponibilidad? ¡Muchas gracias!`;
 
@@ -6573,6 +6644,23 @@ async function sendWhatsAppReservation() {
     showToast('⚠️ Por favor ingresá el número de WhatsApp de contacto.');
     if (passPhoneInput) passPhoneInput.focus();
     return;
+  }
+
+  // Validación de datos de facturación si solicitó factura
+  const inv = typeof window.getInvoiceDetails === 'function' ? window.getInvoiceDetails() : (state.invoice || { type: 'none' });
+  if (inv && inv.type && inv.type !== 'none') {
+    if (!inv.cuit) {
+      showToast(`⚠️ Por favor ingresá el CUIT / CUIL para la Factura ${inv.type}`);
+      const cuitInput = document.getElementById('invoice-cuit');
+      if (cuitInput) cuitInput.focus();
+      return;
+    }
+    if (!inv.razonSocial) {
+      showToast(`⚠️ Por favor ingresá la Razón Social / Titular para la Factura ${inv.type}`);
+      const rsInput = document.getElementById('invoice-razon-social');
+      if (rsInput) rsInput.focus();
+      return;
+    }
   }
 
   // Auto-resolución si el usuario escribió texto pero no seleccionó del desplegable
@@ -6724,6 +6812,13 @@ function recordConfirmedReservation() {
       telefono: passPhone,
       category: 'Sedán Ejecutivo',
       categoria: 'Sedán Ejecutivo',
+      invoiceType: (state.invoice && state.invoice.type) || 'none',
+      invoiceCuit: (state.invoice && state.invoice.cuit) || '',
+      invoiceRazonSocial: (state.invoice && state.invoice.razonSocial) || '',
+      invoiceAddress: (state.invoice && state.invoice.address) || '',
+      tipoFactura: (state.invoice && state.invoice.type) || 'none',
+      cuitFactura: (state.invoice && state.invoice.cuit) || '',
+      razonSocialFactura: (state.invoice && state.invoice.razonSocial) || '',
       paymentStatus: 'Pendiente',
       paymentMethod: 'Efectivo / Transferencia',
       depositAmount: 0
@@ -7272,14 +7367,105 @@ const pLine2 = document.getElementById('pLine2');
 const pLine3 = document.getElementById('pLine3');
 
 let passengerSearchTimeoutTimer = null;
+let passengerWhatsAppFallbackTimer = null;
+
+function openWhatsAppFallbackModal(trip) {
+  const modal = document.getElementById('modal-whatsapp-fallback');
+  const detailsEl = document.getElementById('fallback-trip-details');
+  const btnGoWa = document.getElementById('btn-fallback-go-whatsapp');
+  if (!modal || !trip) return;
+
+  const originText = cleanAddressDisplay(trip.origen || trip.pickupAddress || 'Origen a coordinar');
+  const destText = cleanAddressDisplay(trip.destino || trip.dropoffAddress || 'Destino a coordinar');
+  const fareFormatted = formatMoney(trip.precioEstimado || trip.totalFare || trip.monto || state.totalPrice || 0);
+
+  if (detailsEl) {
+    detailsEl.innerHTML = `
+      <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+        <span style="color:#94a3b8;">📍 Origen:</span>
+        <strong style="color:#fff; text-align:right; max-width:65%;">${escapeHTML(originText)}</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+        <span style="color:#94a3b8;">🏁 Destino:</span>
+        <strong style="color:#fff; text-align:right; max-width:65%;">${escapeHTML(destText)}</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.15);">
+        <span style="color:#94a3b8;">💵 Tarifa Estimada:</span>
+        <strong style="color:#fbbf24;">${fareFormatted} ARS</strong>
+      </div>
+    `;
+  }
+
+  // Armar mensaje estructurado para WhatsApp
+  const phone = getFormattedWhatsAppNumber();
+  const passName = trip.nombrePasajero || trip.clientName || trip.customerName || '';
+  let msg = `👋 ¡Hola guardia de RutaPrivada! Estaba buscando chofer en la app y deseo despachar mi viaje prioritario por WhatsApp:\n\n`;
+  if (passName) msg += `👤 *Pasajero:* ${passName}\n`;
+  msg += `📍 *Origen:* ${originText}\n`;
+  msg += `🏁 *Destino:* ${destText}\n`;
+  msg += `💵 *Tarifa Cotizada:* ${fareFormatted} ARS\n`;
+  const invType = trip.invoiceType || trip.tipoFactura;
+  if (invType && invType !== 'none') {
+    msg += `🧾 *Factura:* Tipo ${invType} | CUIT: ${trip.invoiceCuit || trip.cuitFactura || ''} | Titular: ${trip.invoiceRazonSocial || trip.razonSocialFactura || ''}\n`;
+  }
+  msg += `\n¿Pueden asignarme un chofer de flota disponible de inmediato? ¡Muchas gracias!`;
+
+  const waUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
+
+  if (btnGoWa) {
+    btnGoWa.onclick = () => {
+      window.open(waUrl, '_blank');
+      closeWhatsAppFallbackModal(false);
+      // Cancelar viaje en app para que no quede duplicado buscando
+      if (window.RutaSync) {
+        window.RutaSync.actualizarEstadoViaje('cancelado_por_pasajero', {
+          motivo: 'derivado_a_whatsapp',
+          mensaje: 'El pasajero derivó su solicitud directamente a la guardia de WhatsApp.'
+        });
+        setTimeout(() => {
+          if (window.RutaSync) window.RutaSync.limpiarViajeActivo();
+        }, 800);
+      }
+      closeInAppTripModal();
+      showToast('📱 Solicitud derivada a WhatsApp.');
+    };
+  }
+
+  modal.classList.remove('hidden');
+}
+
+window.closeWhatsAppFallbackModal = function(keepSearching = true) {
+  const modal = document.getElementById('modal-whatsapp-fallback');
+  if (modal) modal.classList.add('hidden');
+  if (keepSearching) {
+    showToast('🔎 Continuando búsqueda de chofer en radar...');
+  }
+};
 
 function startPassengerSearchTimeout(trip) {
   clearPassengerSearchTimeout();
   
-  // 5 minutos de tiempo límite de búsqueda sin aceptación
-  const TIMEOUT_MS = 5 * 60 * 1000;
   const tripCreatedAt = trip.creadoEn || trip.timestamp || Date.now();
   const elapsed = Date.now() - tripCreatedAt;
+
+  // 1. Fallback a WhatsApp a los 60 segundos si ningún chofer aceptó aún
+  const FALLBACK_MS = 60 * 1000;
+  if (elapsed < FALLBACK_MS) {
+    passengerWhatsAppFallbackTimer = setTimeout(() => {
+      const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+      if (activeTrip && (activeTrip.estado === 'buscando_conductor' || activeTrip.estado === 'solicitado')) {
+        openWhatsAppFallbackModal(activeTrip);
+      }
+    }, Math.max(1000, FALLBACK_MS - elapsed));
+  } else {
+    const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+    if (activeTrip && (activeTrip.estado === 'buscando_conductor' || activeTrip.estado === 'solicitado')) {
+      openWhatsAppFallbackModal(activeTrip);
+    }
+  }
+
+  // 2. 5 minutos de tiempo límite total de búsqueda sin aceptación
+  const TIMEOUT_MS = 5 * 60 * 1000;
   const remaining = Math.max(1000, TIMEOUT_MS - elapsed);
 
   passengerSearchTimeoutTimer = setTimeout(() => {
@@ -7307,6 +7493,14 @@ function clearPassengerSearchTimeout() {
   if (passengerSearchTimeoutTimer) {
     clearTimeout(passengerSearchTimeoutTimer);
     passengerSearchTimeoutTimer = null;
+  }
+  if (passengerWhatsAppFallbackTimer) {
+    clearTimeout(passengerWhatsAppFallbackTimer);
+    passengerWhatsAppFallbackTimer = null;
+  }
+  const modal = document.getElementById('modal-whatsapp-fallback');
+  if (modal && !modal.classList.contains('hidden')) {
+    modal.classList.add('hidden');
   }
 }
 
@@ -7709,6 +7903,23 @@ if (btnRequestInapp) {
       return;
     }
 
+    // Validación de datos de facturación si solicitó factura
+    const inv = typeof window.getInvoiceDetails === 'function' ? window.getInvoiceDetails() : (state.invoice || { type: 'none' });
+    if (inv && inv.type && inv.type !== 'none') {
+      if (!inv.cuit) {
+        showToast(`⚠️ Por favor ingresá el CUIT / CUIL para la Factura ${inv.type}`);
+        const cuitInput = document.getElementById('invoice-cuit');
+        if (cuitInput) cuitInput.focus();
+        return;
+      }
+      if (!inv.razonSocial) {
+        showToast(`⚠️ Por favor ingresá la Razón Social / Titular para la Factura ${inv.type}`);
+        const rsInput = document.getElementById('invoice-razon-social');
+        if (rsInput) rsInput.focus();
+        return;
+      }
+    }
+
     // Si no había sesión persistente, guardarla automáticamente con los datos ingresados
     if (!session || !session.nombre) {
       session = {
@@ -7816,6 +8027,13 @@ if (btnRequestInapp) {
         emailPasajero: passEmail,
         notas: passNotes,
         categoria: 'Sedán Ejecutivo',
+        invoiceType: inv?.type || 'none',
+        invoiceCuit: inv?.cuit || '',
+        invoiceRazonSocial: inv?.razonSocial || '',
+        invoiceAddress: inv?.address || '',
+        tipoFactura: inv?.type || 'none',
+        cuitFactura: inv?.cuit || '',
+        razonSocialFactura: inv?.razonSocial || '',
         originCoords: state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null,
         destinationCoords: state.destination ? { lat: state.destination.lat, lng: state.destination.lng } : null,
         stopCoords: (hasIntermediateStop && state.stop && state.stop.lat) ? { lat: state.stop.lat, lng: state.stop.lng } : null
@@ -7907,6 +8125,13 @@ if (btnRequestInapp) {
       emailPasajero: passEmail,
       notas: passNotes,
       categoria: 'Sedán Ejecutivo',
+      invoiceType: inv?.type || 'none',
+      invoiceCuit: inv?.cuit || '',
+      invoiceRazonSocial: inv?.razonSocial || '',
+      invoiceAddress: inv?.address || '',
+      tipoFactura: inv?.type || 'none',
+      cuitFactura: inv?.cuit || '',
+      razonSocialFactura: inv?.razonSocial || '',
       fecha: curTodayStr,
       hora: state.time || '12:00',
       originCoords: state.origin ? { lat: state.origin.lat, lng: state.origin.lng } : null,

@@ -2107,6 +2107,11 @@ function initModals() {
   if (btnExportCsv) {
     btnExportCsv.addEventListener('click', exportBookingsToCSV);
   }
+
+  const btnExportCsvHeader = document.getElementById('btn-export-csv-header');
+  if (btnExportCsvHeader) {
+    btnExportCsvHeader.addEventListener('click', exportBookingsToCSV);
+  }
 }
 
 function openNotesModal(id) {
@@ -2127,42 +2132,70 @@ function openNotesModal(id) {
 }
 
 function exportBookingsToCSV() {
-  const list = getFilteredBookings();
+  let list = getFilteredBookings();
+  if (list.length === 0 && state.bookings && state.bookings.length > 0) {
+    list = state.bookings.filter(b => !isTestBooking(b));
+  }
   if (list.length === 0) {
     showToast('⚠️ No hay viajes para exportar.');
     return;
   }
 
-  let csv = 'Fecha,Hora,Origen,Destino,Tarifa,Estado,Pago,Metodo,Senia,Pasajero,Telefono,Notas\n';
+  // Encabezados con punto y coma (;) para compatibilidad nativa de Excel en español
+  const headers = [
+    'Fecha',
+    'Hora',
+    'Origen',
+    'Destino',
+    'Tarifa (ARS)',
+    'Peajes',
+    'Estado Viaje',
+    'Estado Pago',
+    'Metodo de Pago',
+    'Seña/Adelanto',
+    'Pasajero',
+    'Telefono',
+    'Tipo Factura',
+    'CUIT/CUIL',
+    'Razon Social',
+    'Domicilio Fiscal',
+    'Notas'
+  ];
+  let csv = headers.join(';') + '\n';
 
   list.forEach(b => {
     const row = [
-      b.date,
-      b.time,
-      `"${(b.origin || '').replace(/"/g, '""')}"`,
-      `"${(b.destination || '').replace(/"/g, '""')}"`,
-      b.totalFare || 0,
-      b.status || 'Pendiente',
-      b.paymentStatus || 'Pendiente',
-      b.paymentMethod || 'Efectivo',
+      b.date || b.fecha || '',
+      b.time || b.hora || '',
+      `"${(b.origin || b.pickupAddress || '').replace(/"/g, '""')}"`,
+      `"${(b.destination || b.dropoffAddress || '').replace(/"/g, '""')}"`,
+      b.totalFare || b.precio || b.monto || 0,
+      b.peajes || b.tollFare || b.tollCost || 0,
+      `"${(b.status || b.estado || 'Pendiente').replace(/"/g, '""')}"`,
+      `"${(b.paymentStatus || 'Pendiente').replace(/"/g, '""')}"`,
+      `"${(b.paymentMethod || 'Efectivo').replace(/"/g, '""')}"`,
       b.depositAmount || 0,
-      `"${(b.customerName || '').replace(/"/g, '""')}"`,
-      `"${(b.customerPhone || '').replace(/"/g, '""')}"`,
-      `"${(b.notes || '').replace(/"/g, '""')}"`
+      `"${(b.customerName || b.clientName || b.nombrePasajero || '').replace(/"/g, '""')}"`,
+      `"${(b.customerPhone || b.clientPhone || b.telefono || '').replace(/"/g, '""')}"`,
+      `"${(b.invoiceType || b.tipoFactura || 'Sin Factura').replace(/"/g, '""')}"`,
+      `"${(b.invoiceCuit || b.cuitFactura || '').replace(/"/g, '""')}"`,
+      `"${(b.invoiceRazonSocial || b.razonSocialFactura || '').replace(/"/g, '""')}"`,
+      `"${(b.invoiceAddress || '').replace(/"/g, '""')}"`,
+      `"${(b.notes || b.notas || '').replace(/"/g, '""')}"`
     ];
-    csv += row.join(',') + '\n';
+    csv += row.join(';') + '\n';
   });
 
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `rutaprivada_portal_${getTodayString()}.csv`;
+  a.download = `rutaprivada_agenda_${getTodayString()}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast('📥 Planilla Excel exportada.');
+  showToast(`📥 Exportados ${list.length} viajes a planilla Excel / CSV.`);
 }
 
 // ==========================================

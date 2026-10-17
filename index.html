@@ -699,6 +699,50 @@
             </div>
           </div>
 
+          <!-- Invoice Selection Card (Factura A / B / Sin Factura) -->
+          <div class="passenger-invoice-card" id="passenger-invoice-card" style="margin-top: 15px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 14px; backdrop-filter: blur(10px);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.15rem;">🧾</span>
+                <div>
+                  <h4 style="margin: 0; font-size: 0.92rem; font-weight: 700; color: #f8fafc;">Facturación y Comprobante</h4>
+                  <small style="color: #94a3b8; font-size: 0.75rem;">¿Precisas comprobante fiscal oficial para tu empresa o personal?</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Invoice Type Selector Buttons -->
+            <div class="invoice-type-selector" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+              <button type="button" id="btn-invoice-none" class="invoice-tab-btn active" onclick="selectInvoiceType('none')" style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #fbbf24; border-radius: 8px; padding: 8px 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                Sin Factura
+              </button>
+              <button type="button" id="btn-invoice-b" class="invoice-tab-btn" onclick="selectInvoiceType('B')" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); color: #94a3b8; border-radius: 8px; padding: 8px 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                Factura B
+              </button>
+              <button type="button" id="btn-invoice-a" class="invoice-tab-btn" onclick="selectInvoiceType('A')" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); color: #94a3b8; border-radius: 8px; padding: 8px 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+                Factura A
+              </button>
+            </div>
+
+            <!-- Invoice Fields Container (shown if A or B selected) -->
+            <div id="invoice-details-fields" style="display: none; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px; margin-top: 8px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                  <label for="invoice-cuit" style="display: block; font-size: 0.74rem; font-weight: 600; color: #cbd5e1; margin-bottom: 4px;">CUIT / CUIL *</label>
+                  <input type="text" id="invoice-cuit" placeholder="Ej: 20-33445566-9" style="width: 100%; box-sizing: border-box; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: #fff; padding: 7px 10px; font-size: 0.82rem;" />
+                </div>
+                <div>
+                  <label for="invoice-razon-social" style="display: block; font-size: 0.74rem; font-weight: 600; color: #cbd5e1; margin-bottom: 4px;">Razón Social / Titular *</label>
+                  <input type="text" id="invoice-razon-social" placeholder="Ej: Tech Solutions S.A." style="width: 100%; box-sizing: border-box; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: #fff; padding: 7px 10px; font-size: 0.82rem;" />
+                </div>
+              </div>
+              <div style="margin-top: 8px;">
+                <label for="invoice-address" style="display: block; font-size: 0.74rem; font-weight: 600; color: #cbd5e1; margin-bottom: 4px;">Domicilio Fiscal (Opcional)</label>
+                <input type="text" id="invoice-address" placeholder="Ej: Av. Corrientes 1234, CABA" style="width: 100%; box-sizing: border-box; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: #fff; padding: 7px 10px; font-size: 0.82rem;" />
+              </div>
+            </div>
+          </div>
+
           <!-- Booking & Action Buttons -->
           <div class="quote-actions" style="margin-top: 15px;">
             <button id="btn-request-inapp" class="btn btn-primary full-width btn-inapp-trip-action">
@@ -1041,6 +1085,36 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal Fallback a WhatsApp (>60s sin chofer asignado) -->
+  <div id="modal-whatsapp-fallback" class="modal-backdrop hidden" style="z-index: 10050;">
+    <div class="modal-dialog" style="max-width: 440px; background: linear-gradient(145deg, #1e293b, #0f172a); border: 1px solid rgba(37, 211, 102, 0.4); border-radius: 18px; box-shadow: 0 20px 40px rgba(0,0,0,0.7); padding: 22px; color: #f8fafc; text-align: center;">
+      <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(37, 211, 102, 0.18); border: 2px solid #25d366; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 14px;">
+        💬
+      </div>
+      <h3 style="margin: 0 0 8px; font-size: 1.15rem; font-weight: 800; color: #f8fafc;">
+        ¿Deseas atención prioritaria por WhatsApp?
+      </h3>
+      <p style="margin: 0 0 16px; font-size: 0.84rem; color: #94a3b8; line-height: 1.45;">
+        Los choferes disponibles en la app pueden estar finalizando viajes en curso. 
+        Nuestra <strong>guardia operativa central</strong> puede coordinar y despacharte un chofer de flota de inmediato por WhatsApp.
+      </p>
+
+      <div id="fallback-trip-details" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px; margin-bottom: 18px; text-align: left; font-size: 0.8rem; color: #cbd5e1;">
+        <!-- Se inyecta dinámicamente con openWhatsAppFallbackModal -->
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="button" id="btn-fallback-go-whatsapp" class="btn btn-whatsapp full-width" style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; padding: 12px; border-radius: 10px; font-size: 0.92rem; background: linear-gradient(135deg, #25d366, #128c7e); border: none; color: #fff; cursor: pointer; box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);">
+          <span>📱 Despachar por WhatsApp Ahora</span>
+        </button>
+        <button type="button" onclick="closeWhatsAppFallbackModal(true)" class="btn btn-secondary full-width" style="padding: 10px; font-size: 0.82rem; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(30, 41, 59, 0.6); color: #94a3b8; cursor: pointer;">
+          Seguir buscando en la app
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="booking-success-modal" class="modal-backdrop hidden">
     <div class="modal-dialog success-experience-dialog">
       <div class="modal-header success-header">
