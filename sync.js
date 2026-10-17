@@ -82,6 +82,7 @@ if (typeof window !== 'undefined') {
 class RutaSyncManager {
     constructor() {
         this.channelName = 'rutaprivada_sync_global_v3';
+        this.ntfyTopic = 'rp_fleet_sec_7a9f24e1b8c3';
         this.listeners = {};
         this.channel = null;
         this.pollTimer = null;
@@ -332,7 +333,7 @@ class RutaSyncManager {
     // 2. CANAL EN LA NUBE SSE Y FAST POLLING (ntfy.sh)
     // ==========================================
     initNtfySseSync() {
-        const topic = 'rutaprivada_fleet_sync_ar_v4';
+        const topic = this.ntfyTopic || 'rp_fleet_sec_7a9f24e1b8c3';
 
         // 1. SSE Stream en tiempo real con reconexión automática
         try {
@@ -500,6 +501,8 @@ class RutaSyncManager {
         if (safePayload.docsImages) {
             delete safePayload.docsImages;
         }
+        delete safePayload.password;
+        delete safePayload.passwordHash;
 
         const message = {
             id: 'evt_' + now + '_' + Math.random().toString(36).substr(2, 5),
@@ -526,12 +529,18 @@ class RutaSyncManager {
                 this.firestore.collection('live_trips').doc('latest_event').set(message).catch(() => {});
                 this.firestore.collection('fleet_events').doc(message.id).set(message).catch(() => {});
                 if (type === 'NUEVO_VIAJE_SOLICITADO' || type === 'VIAJE_ACEPTADO' || type === 'ESTADO_VIAJE_CAMBIADO') {
-                    this.firestore.collection('live_trips').doc('current_active_trip').set({
+                    const tripId = String(safePayload.id || safePayload.tripId || 'current_active_trip');
+                    const tripRecord = {
                         ...safePayload,
+                        id: tripId,
                         senderId: this.deviceId,
                         timestamp: now,
                         ultimoEstadoEn: now
-                    }, { merge: true }).catch(() => {});
+                    };
+                    this.firestore.collection('live_trips').doc('current_active_trip').set(tripRecord, { merge: true }).catch(() => {});
+                    if (tripId !== 'current_active_trip') {
+                        this.firestore.collection('live_trips').doc(tripId).set(tripRecord, { merge: true }).catch(() => {});
+                    }
                 } else if (type === 'UBICACION_CHOFER_ACTUALIZADA' || type === 'ACTUALIZACION_UBICACION_CHOFER') {
                     this.firestore.collection('live_trips').doc('driver_location').set({
                         ...safePayload,
@@ -580,16 +589,22 @@ class RutaSyncManager {
 
         // 1.B Direct Cloud Firestore REST Patch (Inmune a fallos de SDK o desconexión WebSockets)
         if (type === 'NUEVO_VIAJE_SOLICITADO' || type === 'VIAJE_ACEPTADO' || type === 'ESTADO_VIAJE_CAMBIADO') {
-            this.postFirestoreDocREST('live_trips', 'current_active_trip', {
+            const tripId = String(safePayload.id || safePayload.tripId || 'current_active_trip');
+            const tripRecord = {
                 ...safePayload,
+                id: tripId,
                 senderId: this.deviceId,
                 timestamp: now,
                 ultimoEstadoEn: now
-            });
+            };
+            this.postFirestoreDocREST('live_trips', 'current_active_trip', tripRecord);
+            if (tripId !== 'current_active_trip') {
+                this.postFirestoreDocREST('live_trips', tripId, tripRecord);
+            }
         }
 
-        // 2. Enviar a través de Cloud SSE / Push Bus (ntfy.sh)
-        fetch('https://ntfy.sh/rutaprivada_fleet_sync_ar_v4', {
+        // 2. Enviar a través de Cloud SSE / Push Bus (ntfy.sh canal privado)
+        fetch(`https://ntfy.sh/${this.ntfyTopic || 'rp_fleet_sec_7a9f24e1b8c3'}`, {
             method: 'POST',
             headers: { 'Title': 'RutaPrivada Event', 'Priority': 'max', 'Tags': 'car,bell' },
             body: JSON.stringify(message)
@@ -1084,10 +1099,31 @@ class RutaSyncManager {
             localStorage.removeItem('rutaprivada_viaje_activo');
             localStorage.removeItem('rutaprivada_driver_location');
             if (this.firestore) {
+                if (activo && activo.id && activo.id !== 'current_active_trip') {
+                    this.firestore.collection('live_trips').doc(String(activo.id)).set({
+                        estado: 'finalizado',
+                        finalizadoEn: Date.now()
+                    }, { merge: true }).catch(() => {});
+                }
                 this.firestore.collection('live_trips').doc('current_active_trip').delete().catch(() => {});
                 this.firestore.collection('live_trips').doc('driver_location').delete().catch(() => {});
             }
         } catch (e) {}
+    }
+
+    escucharViajePorId(tripId, callback) {
+        if (!tripId || !this.firestore) return null;
+        try {
+            return this.firestore.collection('live_trips').doc(String(tripId)).onSnapshot((doc) => {
+                if (doc.exists && typeof callback === 'function') {
+                    callback(doc.data());
+                }
+            }, (err) => {
+                console.warn('Trip listener warning:', err);
+            });
+        } catch(e) {
+            return null;
+        }
     }
 
     // ==========================================

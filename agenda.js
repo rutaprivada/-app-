@@ -634,24 +634,24 @@ function connectFirebase(configInput) {
 
 function isTestBooking(b) {
   if (!b) return true;
+  if (b.isTest === true || b.isMock === true) return true;
   const id = String(b.id || '');
-  const name = String(b.customerName || b.clientName || b.nombrePasajero || '');
-  const notes = String(b.notes || '');
-  const origin = String(b.pickupAddress || b.origin || b.origen || '');
+  const name = String(b.customerName || b.clientName || b.nombrePasajero || '').toLowerCase();
+  const notes = String(b.notes || '').toLowerCase();
+  const origin = String(b.pickupAddress || b.origin || b.origen || '').toLowerCase();
 
-  if (id.includes('_1') || id.includes('_2') || id.startsWith('mock_') || id.startsWith('test_')) {
-    if (name.includes('Alejandro Morales') || name.includes('Carla V.') || name.includes('Daniel Test')) return true;
-  }
-  if (name.toLowerCase().includes('simulación') || name.toLowerCase().includes('simulacion') ||
-      name.toLowerCase().includes('prueba') || name.toLowerCase().includes('test') ||
-      name.toLowerCase().includes('alejandro morales') || name.toLowerCase().includes('carla v.')) {
+  // Filtrar seeds prefabricados de prueba o IDs explícitos de test
+  if (id === '1' || id === '2' || id === 'mock_1' || id === 'mock_2' || id.startsWith('mock_') || id.startsWith('test_')) {
     return true;
   }
-  if (notes.toLowerCase().includes('simulación') || notes.toLowerCase().includes('simulacion') ||
-      notes.toLowerCase().includes('prueba') || notes.toLowerCase().includes('test')) {
+  // Palabras clave que indican una simulación explícita
+  if (name.includes('simulación') || name.includes('simulacion') || name.includes('viaje de prueba') || name.includes('daniel test')) {
     return true;
   }
-  if (origin.toLowerCase().includes('prueba') || origin.toLowerCase().includes('test')) {
+  if (notes.includes('simulación') || notes.includes('simulacion') || notes.includes('viaje de prueba')) {
+    return true;
+  }
+  if (origin.includes('simulación') || origin.includes('simulacion') || origin.includes('origen de prueba')) {
     return true;
   }
   return false;
