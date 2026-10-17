@@ -722,11 +722,11 @@
             <div style="margin-bottom: 20px;">
                 <i class="fa-solid fa-shield-halved" style="font-size: 3rem; color: #fbbf24; margin-bottom: 12px;"></i>
                 <h2 style="font-family: 'Outfit', sans-serif; margin: 0; color: #fff;">Acceso de Administrador</h2>
-                <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 6px;">Ingresa tu PIN de seguridad (Por defecto: <strong>4824</strong>) o pulsa ingresar directamente.</p>
+                <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 6px;">Ingresa tu PIN de seguridad para gestionar choferes, finanzas y configuración.</p>
             </div>
 
             <form id="adminPinForm">
-                <input type="password" id="adminPinInput" class="pin-input" maxlength="6" placeholder="4824" value="4824" autofocus required>
+                <input type="password" id="adminPinInput" class="pin-input" maxlength="8" placeholder="••••" autocomplete="off" autofocus required>
                 <button type="submit" class="admin-btn admin-btn-primary" style="width: 100%; padding: 14px; font-size: 1rem; justify-content: center;">
                     <i class="fa-solid fa-unlock"></i> Desbloquear Panel de Administración
                 </button>
@@ -1212,6 +1212,16 @@
 
             // 1. AUTENTICACIÓN
             function checkAuth() {
+                const enteredPin = (adminPinInput ? adminPinInput.value : '').trim();
+                const expectedPin = localStorage.getItem('rutaprivada_admin_pin') || ADMIN_PIN_SECRET;
+                if (enteredPin !== expectedPin) {
+                    alert('⚠️ PIN Incorrecto. Acceso denegado al Panel de Administración.');
+                    if (adminPinInput) {
+                        adminPinInput.value = '';
+                        adminPinInput.focus();
+                    }
+                    return;
+                }
                 sessionStorage.setItem('rutaprivada_admin_authed', 'true');
                 if (authModalOverlay) {
                     authModalOverlay.classList.remove('active');
@@ -1219,6 +1229,21 @@
                 }
                 loadDriversData();
                 loadRechargesData();
+            }
+
+            // Auto-desbloquear si ya inició sesión durante la sesión actual del navegador
+            if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
+                if (authModalOverlay) {
+                    authModalOverlay.classList.remove('active');
+                    authModalOverlay.style.display = 'none';
+                }
+                loadDriversData();
+                loadRechargesData();
+            } else {
+                if (authModalOverlay) {
+                    authModalOverlay.classList.add('active');
+                    authModalOverlay.style.display = 'flex';
+                }
             }
 
             if (adminPinForm) {

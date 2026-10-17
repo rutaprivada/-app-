@@ -245,28 +245,39 @@ window.handleDriverPasswordResetSubmit = async function(e) {
     const email = state.email;
 
     try {
+        let newHash = '';
+        try {
+            const msgBuffer = new TextEncoder().encode(newPass);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            newHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch(e) {
+            let h = 0;
+            for (let i = 0; i < newPass.length; i++) h = Math.imul(31, h) + newPass.charCodeAt(i) | 0;
+            newHash = 'h_' + Math.abs(h);
+        }
+
         let registered = JSON.parse(localStorage.getItem('rutaprivada_registered_drivers_v1') || '[]');
         const idx = registered.findIndex(d => d.email && d.email.toLowerCase() === email.toLowerCase());
         if (idx >= 0) {
-            registered[idx].password = newPass;
+            delete registered[idx].password;
+            registered[idx].passwordHash = newHash;
             localStorage.setItem('rutaprivada_registered_drivers_v1', JSON.stringify(registered));
         }
 
         let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
         const dIdx = driversList.findIndex(d => d.email && d.email.toLowerCase() === email.toLowerCase());
         if (dIdx >= 0) {
-            driversList[dIdx].password = newPass;
+            delete driversList[dIdx].password;
+            driversList[dIdx].passwordHash = newHash;
             localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
         }
-    } catch(err) {}
 
-    try {
         if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
             const db = firebase.firestore();
             const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
             db.collection('conductores').doc(emailDocId).set({
                 email,
-                password: newPass,
+                passwordHash: newHash,
                 updatedAt: new Date().toISOString()
             }, { merge: true }).catch(() => {});
         }
@@ -6036,6 +6047,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function saveDriverSession(driver, isNew = false) {
         if (!driver) return;
+        if (driver.password) {
+            delete driver.password;
+        }
         try {
             localStorage.removeItem('rutaprivada_driver_logged_out');
         } catch(e) {}
@@ -6178,7 +6192,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     telefono: driver.telefono || '',
                     email: (driver.email || '').toLowerCase(),
                     passwordHash: driver.passwordHash || '',
-                    password: driver.password || '',
                     aceptaComunicaciones: driver.aceptaComunicaciones !== false,
                     autoMarcaModelo: driver.autoMarcaModelo || '',
                     patente: driver.patente || '',
@@ -6216,7 +6229,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 telefono: { stringValue: driver.telefono || '' },
                 email: { stringValue: (driver.email || '').toLowerCase() },
                 passwordHash: { stringValue: driver.passwordHash || '' },
-                password: { stringValue: driver.password || '' },
                 estadoVerificacion: { stringValue: driver.estadoVerificacion || 'pendiente' },
                 updatedAt: { integerValue: String(Date.now()) }
             };
@@ -6827,32 +6839,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const newHash = await hashDriverPassword(newPass);
             const email = driverResetState.email;
 
-            // Actualizar en localStorage
+            // Actualizar en localStorage sin almacenar password en texto plano
             const list = getRegisteredDriversList();
             let driverIdx = list.findIndex(d => d.email && d.email.toLowerCase() === email);
             if (driverIdx >= 0) {
-                list[driverIdx].password = newPass;
+                delete list[driverIdx].password;
                 list[driverIdx].passwordHash = newHash;
                 saveRegisteredDriversList(list);
             } else {
                 const newDriver = {
                     ...driverResetState.driverObj,
                     email,
-                    password: newPass,
                     passwordHash: newHash
                 };
+                delete newDriver.password;
                 list.push(newDriver);
                 saveRegisteredDriversList(list);
             }
 
-            // Actualizar en Firestore si está disponible
+            // Actualizar en Firestore si está disponible (únicamente passwordHash)
             try {
                 if (typeof firebase !== 'undefined' && firebase.firestore) {
                     const db = firebase.firestore();
                     const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
                     await db.collection('conductores').doc(emailDocId).set({
                         email,
-                        password: newPass,
                         passwordHash: newHash,
                         updatedAt: new Date().toISOString()
                     }, { merge: true });

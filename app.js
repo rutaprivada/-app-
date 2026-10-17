@@ -9737,6 +9737,9 @@ if (btnRecenterPassengerMap) {
 
     function savePassengerSession(user) {
       if (!user) return;
+      if (user.password) {
+        delete user.password;
+      }
       try {
         localStorage.removeItem('rutaprivada_passenger_logged_out');
       } catch(e) {}
@@ -9771,13 +9774,14 @@ if (btnRecenterPassengerMap) {
           const emailDocId = user.email ? user.email.toLowerCase().replace(/[^a-z0-9_]/g, '_') : '';
           const phoneDocId = user.telefono ? ('pass_' + user.telefono.replace(/\D/g, '')) : '';
           const userId = user.id || emailDocId || phoneDocId;
+          const safeUser = { ...user };
+          delete safeUser.password;
           const cloudPayload = {
-            ...user,
+            ...safeUser,
             id: userId,
             email: (user.email || '').toLowerCase(),
             telefono: user.telefono || '',
             passwordHash: user.passwordHash || '',
-            password: user.password || '',
             ultimaActividad: firebase.firestore.FieldValue.serverTimestamp()
           };
 
@@ -9797,7 +9801,6 @@ if (btnRecenterPassengerMap) {
             telefono: { stringValue: user.telefono || '' },
             email: { stringValue: (user.email || '').toLowerCase() },
             passwordHash: { stringValue: user.passwordHash || '' },
-            password: { stringValue: user.password || '' },
             rating: { stringValue: user.rating || '5.00' }
           };
           fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/pasajeros/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
@@ -10152,17 +10155,17 @@ if (btnRecenterPassengerMap) {
         const newHash = await hashPassword(newPass);
         const email = passengerResetState.email;
 
-        // Actualizar en localStorage
+        // Actualizar en localStorage sin almacenar password en texto plano
         const users = getRegisteredPassengers();
         let user = users.find(u => u.email && u.email.toLowerCase() === email);
         if (user) {
-          user.password = newPass;
+          delete user.password;
           user.passwordHash = newHash;
         } else {
           const s = window.getPassengerSession();
           if (s && s.email && s.email.toLowerCase() === email) {
             user = s;
-            user.password = newPass;
+            delete user.password;
             user.passwordHash = newHash;
           } else {
             user = {
@@ -10170,7 +10173,6 @@ if (btnRecenterPassengerMap) {
               nombre: email.split('@')[0],
               telefono: '',
               email: email,
-              password: newPass,
               passwordHash: newHash,
               rating: '5.00',
               medioPago: 'efectivo',
@@ -10182,14 +10184,13 @@ if (btnRecenterPassengerMap) {
         saveRegisteredPassengers(users);
         savePassengerSession(user);
 
-        // Actualizar en Firestore si está disponible
+        // Actualizar en Firestore si está disponible (únicamente passwordHash)
         try {
           if (typeof firebase !== 'undefined' && firebase.firestore) {
             const db = firebase.firestore();
             const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
             await db.collection('pasajeros').doc(emailDocId).set({
               email,
-              password: newPass,
               passwordHash: newHash,
               updatedAt: new Date().toISOString()
             }, { merge: true });
@@ -10323,7 +10324,6 @@ if (btnRecenterPassengerMap) {
             usuario: rawIdentifier,
             telefono: cleanPhone ? rawIdentifier : '',
             email: isEmail ? cleanIdentifier : '',
-            password: password,
             passwordHash: enteredHash,
             medioPago: 'efectivo',
             rating: '5.00',
@@ -10446,7 +10446,6 @@ if (btnRecenterPassengerMap) {
           telefono: phone,
           email: email,
           passwordHash: passwordHash,
-          password: password,
           medioPago: payment,
           rating: '5.00',
           ratingCount: 1,
