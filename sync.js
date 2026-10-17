@@ -90,6 +90,8 @@ class RutaSyncManager {
         this.processedEvents = new Set();
         this.deviceId = 'dev_' + Math.random().toString(36).substr(2, 9);
         this.firestore = null;
+        this.localServerAvailable = null;
+        this.localServerFailCount = 0;
 
         this.initFirebaseSync();
         this.initLocalChannels();
@@ -365,9 +367,11 @@ class RutaSyncManager {
             }
         } catch (err) {}
 
-        // 2. Polling de respaldo cada 1.2s por si la conexión SSE se suspende en celulares
+        // 2. Polling de respaldo adaptativo solo si la conexión SSE se suspende
         if (this.ntfyPollTimer) clearInterval(this.ntfyPollTimer);
         this.ntfyPollTimer = setInterval(async () => {
+            // Si el stream SSE está activo y conectado, no saturar con polling innecesario
+            if (this.sse && this.sse.readyState === 1) return;
             try {
                 const resp = await fetch(`https://ntfy.sh/${topic}/json?poll=1&since=45s`, { cache: 'no-store' });
                 if (resp.ok) {
@@ -420,12 +424,34 @@ class RutaSyncManager {
     // 4. HTTP REST SYNC CON SERVIDOR LOCAL (PC <-> Celular en Wi-Fi)
     // ==========================================
     initServerHttpSync() {
+        if (typeof window === 'undefined') return;
+
+        const hostname = window.location.hostname || '';
+        const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
+
+        // Si estamos en hosting de producción (GitHub Pages, Firebase, etc.) o en Capacitor APK, no existe /api/sync
+        if (!isLocalHost || (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) {
+            this.localServerAvailable = false;
+            return;
+        }
+
         const pollServer = async () => {
+            if (this.localServerAvailable === false) return;
+
             try {
+                const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+                const timeoutId = controller ? setTimeout(() => controller.abort(), 2000) : null;
+
                 const resp = await fetch(`/api/sync/events?seq=${this.lastEventSeq}`, {
-                    cache: 'no-store'
+                    cache: 'no-store',
+                    signal: controller ? controller.signal : undefined
                 });
+
+                if (timeoutId) clearTimeout(timeoutId);
+
                 if (resp.ok) {
+                    this.localServerAvailable = true;
+                    this.localServerFailCount = 0;
                     const rawData = await resp.json();
                     const events = Array.isArray(rawData) ? rawData : (rawData && rawData.type ? [rawData] : []);
                     events.forEach(ev => {
@@ -436,12 +462,31 @@ class RutaSyncManager {
                             this.handleIncoming(ev);
                         }
                     });
+                } else {
+                    // Si responde 404 u otro error HTTP
+                    this.localServerFailCount = (this.localServerFailCount || 0) + 1;
+                    if (this.localServerFailCount >= 3) {
+                        this.localServerAvailable = false;
+                        if (this.pollTimer) clearInterval(this.pollTimer);
+                        // Reintentar suavemente cada 30 segundos por si el servidor se inicia más tarde
+                        this.pollTimer = setInterval(pollServer, 30000);
+                    }
                 }
-            } catch (e) {}
+            } catch (e) {
+                this.localServerFailCount = (this.localServerFailCount || 0) + 1;
+                if (this.localServerFailCount >= 3) {
+                    this.localServerAvailable = false;
+                    if (this.pollTimer) clearInterval(this.pollTimer);
+                    // Reintentar suavemente cada 30 segundos
+                    this.pollTimer = setInterval(pollServer, 30000);
+                }
+            }
         };
 
         if (this.pollTimer) clearInterval(this.pollTimer);
-        this.pollTimer = setInterval(pollServer, 400);
+        // Intervalo saludable de 1500ms en local en lugar de 400ms continuo
+        this.pollTimer = setInterval(pollServer, 1500);
+        setTimeout(pollServer, 200);
     }
 
     // ==========================================
@@ -551,11 +596,15 @@ class RutaSyncManager {
         }).catch(() => {});
 
         // 3. Enviar al Servidor Local HTTP si está disponible
-        fetch('/api/sync/emit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(message)
-        }).catch(() => {});
+        if (this.localServerAvailable !== false) {
+            fetch('/api/sync/emit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(message)
+            }).catch(() => {
+                this.localServerFailCount = (this.localServerFailCount || 0) + 1;
+            });
+        }
 
         // 4. Enviar a través de BroadcastChannel local
         if (this.channel) {
