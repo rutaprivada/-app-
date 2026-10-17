@@ -6123,6 +6123,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     activeIndex = -1;
 
     const wrap = input.closest('.input-field-wrap');
+    const fieldBody = input.closest('.field-body');
 
     if (!items || items.length === 0) {
       list.classList.add('hidden');
@@ -6132,10 +6133,22 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     }
 
     list.classList.remove('hidden');
-    list.style.display = 'flex';
-    list.style.flexDirection = 'column';
-    list.style.zIndex = '99999999';
-    if (wrap) wrap.classList.add('has-suggestions');
+    list.style.setProperty('display', 'flex', 'important');
+    list.style.setProperty('flex-direction', 'column', 'important');
+    list.style.setProperty('z-index', '999999999', 'important');
+    list.style.setProperty('visibility', 'visible', 'important');
+    list.style.setProperty('opacity', '1', 'important');
+    list.style.setProperty('pointer-events', 'auto', 'important');
+
+    if (wrap) {
+      wrap.classList.add('has-suggestions');
+      wrap.style.setProperty('z-index', '99999999', 'important');
+      wrap.style.setProperty('overflow', 'visible', 'important');
+    }
+    if (fieldBody) {
+      fieldBody.style.setProperty('z-index', '99999999', 'important');
+      fieldBody.style.setProperty('overflow', 'visible', 'important');
+    }
 
     items.slice(0, 8).forEach((place) => {
       const item = document.createElement('div');
@@ -6213,13 +6226,29 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
   }
 
   async function executeSearch(query) {
-    // 1. MOSTRAR INMEDIATAMENTE A 0ms LAS SUGERENCIAS LOCALES SIN ESPERAR RED
-    const instantItems = (typeof getInstantLocalSuggestions === 'function') ? getInstantLocalSuggestions(query) : [];
-    if (instantItems && instantItems.length > 0) {
-      renderList(instantItems);
+    // 1. Mostrar sugerencias locales inmediatamente (0ms)
+    let instantItems = [];
+    try {
+      if (typeof getInstantLocalSuggestions === 'function') {
+        instantItems = getInstantLocalSuggestions(query) || [];
+      }
+    } catch (err) {}
+
+    if (instantItems.length === 0 && query.length >= 2) {
+      const cap = (typeof capitalizeWords === 'function') ? capitalizeWords(query) : query;
+      instantItems.push({
+        lat: '-34.6037',
+        lon: '-58.3816',
+        display_name: `${cap}, Ciudad Autónoma de Buenos Aires, Argentina`,
+        _mainTitle: cap,
+        _subTitle: 'Ciudad Autónoma de Buenos Aires, Argentina',
+        _icon: '📍'
+      });
     }
 
-    // 2. ENRIQUECER EN SEGUNDO PLANO VÍA RED
+    renderList(instantItems);
+
+    // 2. Enriquecer en segundo plano vía Photon / OpenStreetMap
     if (abortController) {
       abortController.abort();
     }
@@ -6231,26 +6260,13 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
         renderList(results);
       }
     } catch (err) {
-      // Si la red se abortó o falló, mantener en pantalla las opciones instantáneas
       if (instantItems && instantItems.length > 0) {
         renderList(instantItems);
       }
     }
   }
 
-  input.addEventListener('focus', () => {
-    const query = input.value.trim();
-    if (query.length >= 2) {
-      executeSearch(query);
-    } else if (query.length === 0 && typeof getDefaultPopularDestinations === 'function') {
-      const popular = getDefaultPopularDestinations();
-      if (popular && popular.length > 0) {
-        renderList(popular);
-      }
-    }
-  });
-
-  input.addEventListener('input', () => {
+  const handleInputTrigger = () => {
     clearTimeout(debounceTimeout);
     const query = input.value.trim();
 
@@ -6262,6 +6278,13 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
     if (query.length < 2) {
       if (abortController) abortController.abort();
+      if (query.length === 0 && typeof getDefaultPopularDestinations === 'function') {
+        const popular = getDefaultPopularDestinations();
+        if (popular && popular.length > 0) {
+          renderList(popular);
+          return;
+        }
+      }
       list.classList.add('hidden');
       list.style.display = 'none';
       const wrap = input.closest('.input-field-wrap');
@@ -6269,17 +6292,37 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       return;
     }
 
-    // Respuesta instantánea en 0ms al presionar cada tecla
-    const instantMatches = (typeof getInstantLocalSuggestions === 'function') ? getInstantLocalSuggestions(query) : [];
-    if (instantMatches && instantMatches.length > 0) {
-      renderList(instantMatches);
+    // Respuesta instantánea en 0ms
+    let instantMatches = [];
+    try {
+      if (typeof getInstantLocalSuggestions === 'function') {
+        instantMatches = getInstantLocalSuggestions(query) || [];
+      }
+    } catch(e) {}
+
+    if (instantMatches.length === 0 && query.length >= 2) {
+      const cap = (typeof capitalizeWords === 'function') ? capitalizeWords(query) : query;
+      instantMatches.push({
+        lat: '-34.6037',
+        lon: '-58.3816',
+        display_name: `${cap}, Ciudad Autónoma de Buenos Aires, Argentina`,
+        _mainTitle: cap,
+        _subTitle: 'Ciudad Autónoma de Buenos Aires, Argentina',
+        _icon: '📍'
+      });
     }
 
-    // Red en segundo plano con debounce breve para no saturar
+    renderList(instantMatches);
+
+    // Consulta en segundo plano enriquecida
     debounceTimeout = setTimeout(() => {
       executeSearch(query);
-    }, 180);
-  });
+    }, 150);
+  };
+
+  input.addEventListener('input', handleInputTrigger);
+  input.addEventListener('focus', handleInputTrigger);
+  input.addEventListener('click', handleInputTrigger);
 
   input.addEventListener('keydown', async (e) => {
     const items = list.querySelectorAll('.suggestion-item');
@@ -11618,6 +11661,8 @@ if (btnRecenterPassengerMap) {
   let uberCalculatedBaseFare = 0;
   let uberSelectedPayment = 'efectivo';
   let uberActiveTripPolling = null;
+  let uberAssignedDriverMarker = null;
+  let uberDriverRouteLine = null;
 
   function initPassengerUberExperience() {
     const uberExpContainer = document.getElementById('passengerUberExperience');
@@ -11900,44 +11945,12 @@ if (btnRecenterPassengerMap) {
     const destInput = document.getElementById('uberDestInput');
     const destSugBox = document.getElementById('uberDestSuggestions');
     if (destInput && destSugBox) {
-      let debounceTimer = null;
-      destInput.addEventListener('input', () => {
-        clearTimeout(debounceTimer);
-        const q = destInput.value.trim();
-        if (q.length < 3) {
-          destSugBox.classList.add('hidden');
-          return;
+      setupAddressAutocomplete('uberDestInput', 'uberDestSuggestions', (place) => {
+        trazarRutaUberMap([place.lat, place.lon], place.display_name);
+        calcularTarifasCategoriasUber(place.display_name);
+        if (typeof state !== 'undefined') {
+          state.destination = { lat: place.lat, lng: place.lon, address: place.display_name };
         }
-
-        debounceTimer = setTimeout(async () => {
-          try {
-            const resp = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${uberCurrentCoords[0]}&lon=${uberCurrentCoords[1]}&limit=5`);
-            if (resp.ok) {
-              const data = await resp.json();
-              if (data && data.features && data.features.length) {
-                destSugBox.innerHTML = '';
-                data.features.forEach((feat) => {
-                  const p = feat.properties;
-                  const coords = feat.geometry.coordinates; // [lon, lat]
-                  const title = p.name || p.street || 'Ubicación';
-                  const sub = [p.city || p.county, p.state, p.country].filter(Boolean).join(', ');
-                  
-                  const item = document.createElement('div');
-                  item.className = 'suggestion-item';
-                  item.innerHTML = `<strong>📍 ${title}</strong><small style="display:block;color:#94a3b8;font-size:0.75rem;">${sub}</small>`;
-                  item.addEventListener('click', () => {
-                    destInput.value = `${title}, ${sub}`;
-                    destSugBox.classList.add('hidden');
-                    trazarRutaUberMap([coords[1], coords[0]], `${title}, ${sub}`);
-                    calcularTarifasCategoriasUber(`${title}, ${sub}`);
-                  });
-                  destSugBox.appendChild(item);
-                });
-                destSugBox.classList.remove('hidden');
-              }
-            }
-          } catch(e){}
-        }, 280);
       });
     }
 
@@ -11975,6 +11988,13 @@ if (btnRecenterPassengerMap) {
         if (stopInput) stopInput.value = '';
       });
     }
+
+    setupAddressAutocomplete('uberStopInput', 'uberStopSuggestions', (place) => {
+      if (typeof showToast === 'function') showToast('🛑 Parada intermedia establecida');
+      if (typeof state !== 'undefined') {
+        state.intermediateStop = { lat: place.lat, lng: place.lon, address: place.display_name };
+      }
+    });
 
     // 8. Botón Confirmar y Solicitar Traslado
     const btnConfirm = document.getElementById('btnUberConfirmRide');
@@ -12077,45 +12097,13 @@ if (btnRecenterPassengerMap) {
     const origInput = document.getElementById('uberOriginInput');
     const origSugBox = document.getElementById('uberOriginSuggestions');
     if (origInput && origSugBox) {
-      let origDebounce = null;
-      origInput.addEventListener('input', () => {
-        clearTimeout(origDebounce);
-        const q = origInput.value.trim();
-        if (q.length < 3) {
-          origSugBox.classList.add('hidden');
-          return;
+      setupAddressAutocomplete('uberOriginInput', 'uberOriginSuggestions', (place) => {
+        uberCurrentCoords = [place.lat, place.lon];
+        updateUberPassengerMarker(place.lat, place.lon);
+        if (uberMap) uberMap.setView(uberCurrentCoords, 15);
+        if (typeof state !== 'undefined') {
+          state.origin = { lat: place.lat, lng: place.lon, address: place.display_name };
         }
-
-        origDebounce = setTimeout(async () => {
-          try {
-            const resp = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${uberCurrentCoords[0]}&lon=${uberCurrentCoords[1]}&limit=5`);
-            if (resp.ok) {
-              const data = await resp.json();
-              if (data && data.features && data.features.length) {
-                origSugBox.innerHTML = '';
-                data.features.forEach((feat) => {
-                  const p = feat.properties;
-                  const coords = feat.geometry.coordinates; // [lon, lat]
-                  const title = p.name || p.street || 'Ubicación';
-                  const sub = [p.city || p.county, p.state, p.country].filter(Boolean).join(', ');
-
-                  const item = document.createElement('div');
-                  item.className = 'suggestion-item';
-                  item.innerHTML = `<strong>📍 ${title}</strong><small style="display:block;color:#94a3b8;font-size:0.75rem;">${sub}</small>`;
-                  item.addEventListener('click', () => {
-                    origInput.value = `${title}, ${sub}`;
-                    origSugBox.classList.add('hidden');
-                    uberCurrentCoords = [coords[1], coords[0]];
-                    updateUberPassengerMarker(coords[1], coords[0]);
-                    if (uberMap) uberMap.setView(uberCurrentCoords, 15);
-                  });
-                  origSugBox.appendChild(item);
-                });
-                origSugBox.classList.remove('hidden');
-              }
-            }
-          } catch(e){}
-        }, 280);
       });
     }
 
@@ -12290,9 +12278,6 @@ if (btnRecenterPassengerMap) {
       showToast(`⚡ Solicitud enviada a la flota para ${uberSelectedCategory}`);
     }
   }
-
-  let uberAssignedDriverMarker = null;
-  let uberDriverRouteLine = null;
 
   function actualizarChoferAsignadoEnMapa(viaje) {
     if (!uberMap || typeof L === 'undefined') return;
@@ -12481,11 +12466,11 @@ if (btnRecenterPassengerMap) {
   // ==========================================
   function startPassengerApplication() {
     try { window.syncPassengerSessionUI(window.getPassengerSession()); } catch (e) { console.warn('Passenger session init:', e); }
+    try { initEventListeners(); } catch (e) { console.warn('Event listeners:', e); }
     try { initDateTimeControls(); } catch (e) { console.warn('DateTime controls:', e); }
     try { initCustomCalendar(); } catch (e) { console.warn('Custom calendar:', e); }
     try { initMap(); } catch (e) { console.warn('Map init:', e); }
     try { initPassengerUberExperience(); } catch (e) { console.warn('Uber Experience init:', e); }
-    try { initEventListeners(); } catch (e) { console.warn('Event listeners:', e); }
     try { initRatingSystem(); } catch (e) { console.warn('Rating system:', e); }
     try { setupModalDismissals(); } catch (e) { console.warn('Modal dismissals:', e); }
     try { loadConfigToModal(); } catch (e) { console.warn('Config modal:', e); }

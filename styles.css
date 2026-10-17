@@ -723,13 +723,20 @@ body {
 .input-field-wrap {
   position: relative;
   overflow: visible !important;
+  z-index: 10;
+}
+
+.field-body {
+  position: relative !important;
+  overflow: visible !important;
+  width: 100%;
 }
 
 .input-field-wrap:focus-within,
 .input-field-wrap.has-suggestions {
   border-color: #38bdf8 !important;
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25) !important;
-  z-index: 9999999 !important;
+  z-index: 99999999 !important;
 }
 
 .suggestions-list {
@@ -737,12 +744,14 @@ body {
   top: calc(100% + 4px);
   left: 0;
   right: 0;
+  width: 100%;
+  min-width: 280px;
   background: #0b1329 !important;
   border: 1.5px solid #38bdf8 !important;
   border-radius: 14px;
   max-height: 290px;
   overflow-y: auto;
-  z-index: 99999999 !important;
+  z-index: 999999999 !important;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.95), 0 0 25px rgba(56, 189, 248, 0.35);
 }
 
@@ -5917,10 +5926,12 @@ html, body {
   top: calc(100% + 4px);
   left: 0;
   right: 0;
+  width: 100%;
+  min-width: 280px;
   background: #0b1329 !important;
   border: 1.5px solid #38bdf8 !important;
   border-radius: 14px;
-  z-index: 99999999 !important;
+  z-index: 999999999 !important;
   max-height: 290px;
   overflow-y: auto;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.95), 0 0 25px rgba(56, 189, 248, 0.25);
@@ -5929,10 +5940,14 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  pointer-events: auto !important;
 }
 
 .suggestions-list.hidden {
   display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .suggestion-item {
