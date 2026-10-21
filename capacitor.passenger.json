@@ -1,7 +1,7 @@
 {
   "appId": "com.rutaprivada.pasajero",
   "appName": "RutaPrivada",
-  "webDir": ".",
+  "webDir": "www_pasajero",
   "bundledWebRuntime": false,
   "server": {
     "androidScheme": "https"

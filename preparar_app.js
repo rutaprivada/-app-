@@ -1,35 +1,46 @@
 const fs = require('fs');
 const path = require('path');
 
-const mode = process.argv[2] || 'pasajero'; // 'pasajero' or 'conductor'
+const mode = (process.argv[2] || 'pasajero').toLowerCase(); // 'pasajero' or 'conductor'
+const isConductor = mode === 'conductor';
+
+// Directorios web de distribución según perfil
+const distFolder = isConductor ? 'www_conductor' : 'www_pasajero';
+const distDir = path.join(__dirname, distFolder);
 const targetDir = path.join(__dirname, 'android', 'app', 'src', 'main', 'assets', 'public');
 const androidBuildDir = path.join(__dirname, 'android', 'app', 'build');
 const buildGradlePath = path.join(__dirname, 'android', 'app', 'build.gradle');
 const stringsXmlPath = path.join(__dirname, 'android', 'app', 'src', 'main', 'res', 'values', 'strings.xml');
 
-// 1. Locate and prepare icons from user uploads
-const userUploadedDir = 'C:\\Users\\daniel\\.gemini\\antigravity-ide\\brain\\74630162-6221-4fb8-ab2f-5ac43b640c3c\\.user_uploaded';
-const fileChoferUploaded = path.join(userUploadedDir, 'media_1790190043516.png');
-const filePasajeroUploaded = path.join(userUploadedDir, 'media_1790190074835.png');
-
+// 1. Preparación de íconos seguros
 const iconChoferPng = path.join(__dirname, 'icon_chofer.png');
 const iconPasajeroPng = path.join(__dirname, 'icon_pasajero.png');
+const iconChoferPadded = path.join(__dirname, 'icon_chofer_padded.png');
+const iconPasajeroPadded = path.join(__dirname, 'icon_pasajero_padded.png');
 
-if (fs.existsSync(fileChoferUploaded)) {
-    try { fs.copyFileSync(fileChoferUploaded, iconChoferPng); } catch(e){}
-}
-
-if (fs.existsSync(filePasajeroUploaded)) {
-    try { fs.copyFileSync(filePasajeroUploaded, iconPasajeroPng); } catch(e){}
+// Fallback opcional a carpeta temporal si existiera
+const userUploadedDir = 'C:\\Users\\daniel\\.gemini\\antigravity-ide\\brain\\74630162-6221-4fb8-ab2f-5ac43b640c3c\\.user_uploaded';
+if (fs.existsSync(userUploadedDir)) {
+    try {
+        const fileChoferUploaded = path.join(userUploadedDir, 'media_1790190043516.png');
+        const filePasajeroUploaded = path.join(userUploadedDir, 'media_1790190074835.png');
+        if (!fs.existsSync(iconChoferPng) && fs.existsSync(fileChoferUploaded)) {
+            fs.copyFileSync(fileChoferUploaded, iconChoferPng);
+        }
+        if (!fs.existsSync(iconPasajeroPng) && fs.existsSync(filePasajeroUploaded)) {
+            fs.copyFileSync(filePasajeroUploaded, iconPasajeroPng);
+        }
+    } catch(e) {}
 }
 
 console.log(`==========================================`);
 console.log(` Sincronizando App Android: [ ${mode.toUpperCase()} ]`);
+console.log(` Carpeta WebDir: ${distFolder}`);
 console.log(`==========================================`);
 
-// 2. Configure applicationId and app_name
-let appId = mode === 'conductor' ? 'com.rutaprivada.chofer' : 'com.rutaprivada.pasajero';
-let appName = mode === 'conductor' ? 'RutaPrivada Chofer' : 'Ruta Privada';
+// 2. Configurar applicationId y app_name en Android
+let appId = isConductor ? 'com.rutaprivada.chofer' : 'com.rutaprivada.pasajero';
+let appName = isConductor ? 'RutaPrivada Chofer' : 'Ruta Privada';
 
 // Update build.gradle applicationId
 if (fs.existsSync(buildGradlePath)) {
@@ -50,46 +61,42 @@ if (fs.existsSync(stringsXmlPath)) {
     console.log(` Nombre App: ${appName} | Scheme: ${appId}`);
 }
 
-// Sync capacitor.config.json with corresponding profile
-const capacitorProfilePath = mode === 'conductor'
+// 3. Sincronizar capacitor.config.json con el perfil correspondiente
+const capacitorProfilePath = isConductor
     ? path.join(__dirname, 'capacitor.driver.json')
     : path.join(__dirname, 'capacitor.passenger.json');
 const capacitorDestPath = path.join(__dirname, 'capacitor.config.json');
+
 if (fs.existsSync(capacitorProfilePath)) {
     try {
         fs.copyFileSync(capacitorProfilePath, capacitorDestPath);
-        console.log(` Capacitor Config: [${mode === 'conductor' ? 'capacitor.driver.json' : 'capacitor.passenger.json'}] -> capacitor.config.json`);
+        console.log(` Capacitor Config: [${path.basename(capacitorProfilePath)}] -> capacitor.config.json`);
     } catch(e) {}
 }
 
-// Generate safe padded icons if script exists
-const { execSync } = require('child_process');
+// 4. Generar íconos padded si existe el script de PowerShell
 const psScript = path.join(__dirname, 'generar_iconos_padded.ps1');
 if (fs.existsSync(psScript)) {
     try {
+        const { execSync } = require('child_process');
         execSync(`powershell -ExecutionPolicy Bypass -File "${psScript}"`, { stdio: 'ignore' });
     } catch(e){}
 }
 
-const iconChoferPadded = path.join(__dirname, 'icon_chofer_padded.png');
-const iconPasajeroPadded = path.join(__dirname, 'icon_pasajero_padded.png');
-
 let chosenIcon = null;
-if (mode === 'conductor') {
+if (isConductor) {
     if (fs.existsSync(iconChoferPadded)) chosenIcon = iconChoferPadded;
     else if (fs.existsSync(iconChoferPng)) chosenIcon = iconChoferPng;
-    else if (fs.existsSync(fileChoferUploaded)) chosenIcon = fileChoferUploaded;
 } else {
     if (fs.existsSync(iconPasajeroPadded)) chosenIcon = iconPasajeroPadded;
     else if (fs.existsSync(iconPasajeroPng)) chosenIcon = iconPasajeroPng;
-    else if (fs.existsSync(filePasajeroUploaded)) chosenIcon = filePasajeroUploaded;
-    else chosenIcon = path.join(__dirname, 'icon-512.png');
+    else if (fs.existsSync(path.join(__dirname, 'icon-512.png'))) chosenIcon = path.join(__dirname, 'icon-512.png');
 }
 
 const resDir = path.join(__dirname, 'android', 'app', 'src', 'main', 'res');
 const mipmapFolders = ['mipmap-hdpi', 'mipmap-mdpi', 'mipmap-xhdpi', 'mipmap-xxhdpi', 'mipmap-xxxhdpi'];
 
-// Clean up any png icons mistakenly copied to mipmap-anydpi-v26 (which causes "Duplicate resources" error in Android Studio)
+// Limpiar PNGs duplicados en mipmap-anydpi-v26
 const anydpiDir = path.join(resDir, 'mipmap-anydpi-v26');
 if (fs.existsSync(anydpiDir)) {
     ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png'].forEach(pngFile => {
@@ -111,50 +118,78 @@ if (chosenIcon && fs.existsSync(chosenIcon) && fs.existsSync(resDir)) {
             });
         }
     });
-    console.log(` Icono oficial asignado a mipmaps nativos.`);
+    console.log(` Ícono oficial aplicado a recursos Android mipmap.`);
 }
 
-// 4. Clean assets directory
-if (fs.existsSync(targetDir)) {
-    fs.rmSync(targetDir, { recursive: true, force: true });
-}
-fs.mkdirSync(targetDir, { recursive: true });
+// 5. Limpiar y recrear carpetas de salida
+[distDir, targetDir].forEach(dir => {
+    if (fs.existsSync(dir)) {
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch(e){}
+    }
+    fs.mkdirSync(dir, { recursive: true });
+});
 
-// 5. Clean Android build folder to force fresh compilation
+// Limpiar cache de Gradle si existe
 if (fs.existsSync(androidBuildDir)) {
     try {
         fs.rmSync(androidBuildDir, { recursive: true, force: true });
-        console.log(` Cache de compilacion limpiada.`);
+        console.log(` Cache de compilacion de Android limpiada.`);
     } catch (e) {}
 }
 
-// 6. Copy web files to assets
-const allowedExtensions = ['.html', '.js', '.css', '.svg', '.png', '.jpg', '.jpeg', '.json', '.webp', '.ico'];
-const files = fs.readdirSync(__dirname);
+// 6. Lista de archivos compartidos (recursos estáticos)
+const commonAssets = [
+    'sync.js',
+    'sw.js',
+    'favicon.svg',
+    'icon-192.png',
+    'icon-512.png',
+    'logo_rutaprivada.svg',
+    'logo_chofer.svg',
+    'logo_tarjeta.svg',
+    'privacidad.html'
+];
 
-files.forEach(file => {
-    const ext = path.extname(file).toLowerCase();
-    const fullPath = path.join(__dirname, file);
-
-    if (fs.statSync(fullPath).isFile() && allowedExtensions.includes(ext) && !file.startsWith('capacitor') && !file.startsWith('package')) {
-        const destPath = path.join(targetDir, file);
-        fs.copyFileSync(fullPath, destPath);
+// Helper para copiar a ambas carpetas (distDir y targetDir)
+function copyToDestinations(srcFilename, destFilename = null) {
+    const srcPath = path.join(__dirname, srcFilename);
+    const finalName = destFilename || srcFilename;
+    if (fs.existsSync(srcPath)) {
+        fs.copyFileSync(srcPath, path.join(distDir, finalName));
+        fs.copyFileSync(srcPath, path.join(targetDir, finalName));
     }
-});
+}
 
-// 7. Configure entry point (index.html)
-if (mode === 'conductor') {
-    const conductorPath = path.join(__dirname, 'conductor.html');
-    const destIndexPath = path.join(targetDir, 'index.html');
-    fs.copyFileSync(conductorPath, destIndexPath);
-    console.log(` Entrypoint: conductor.html -> index.html (CHOFER)`);
+// Copiar recursos comunes
+commonAssets.forEach(file => copyToDestinations(file));
+
+// 7. Empaquetar según el rol (Chofer vs Pasajero)
+if (isConductor) {
+    // Para el Chofer: conductor.html pasa a ser el index.html principal
+    copyToDestinations('conductor.html', 'index.html');
+    copyToDestinations('conductor.html'); // Mantener copia por compatibilidad
+    copyToDestinations('conductor.js');
+    copyToDestinations('conductor.css');
+    copyToDestinations('manifest-driver.json', 'manifest.json');
+    copyToDestinations('manifest-driver.json');
+    copyToDestinations('agenda.html');
+    copyToDestinations('agenda.js');
+    copyToDestinations('agenda.css');
+    if (fs.existsSync(iconChoferPng)) copyToDestinations('icon_chofer.png');
+    if (fs.existsSync(iconChoferPadded)) copyToDestinations('icon_chofer_padded.png');
+    console.log(` Entrypoint generado: conductor.html -> [${distFolder}/index.html] (CHOFER)`);
 } else {
-    const passengerPath = path.join(__dirname, 'index.html');
-    const destIndexPath = path.join(targetDir, 'index.html');
-    fs.copyFileSync(passengerPath, destIndexPath);
-    console.log(` Entrypoint: index.html -> index.html (PASAJERO)`);
+    // Para el Pasajero: index.html se mantiene como index.html
+    copyToDestinations('index.html');
+    copyToDestinations('app.js');
+    copyToDestinations('styles.css');
+    copyToDestinations('manifest.json');
+    if (fs.existsSync(iconPasajeroPng)) copyToDestinations('icon_pasajero.png');
+    if (fs.existsSync(iconPasajeroPadded)) copyToDestinations('icon_pasajero_padded.png');
+    console.log(` Entrypoint generado: index.html -> [${distFolder}/index.html] (PASAJERO)`);
 }
 
 console.log(`==========================================`);
 console.log(` Sincronizacion finalizada con exito.`);
+console.log(` Archivos listos en: ${distFolder} y assets/public`);
 console.log(`==========================================\n`);

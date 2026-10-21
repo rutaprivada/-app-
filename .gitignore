@@ -16,5 +16,9 @@ android/build/
 android/captures/
 android/.idea/
 
+# Web distribution builds (Capacitor)
+www_pasajero/
+www_conductor/
+
 # Temporary reference folders
 scratch_ref/

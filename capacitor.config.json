@@ -1,7 +1,7 @@
 {
-  "appId": "com.rutaprivada.app",
-  "appName": "Ruta Privada",
-  "webDir": ".",
+  "appId": "com.rutaprivada.chofer",
+  "appName": "RutaPrivada Chofer",
+  "webDir": "www_conductor",
   "bundledWebRuntime": false,
   "server": {
     "androidScheme": "https"
