@@ -426,7 +426,18 @@ window.handlePassengerPasswordResetSubmit = async function(e) {
     return false;
   }
 
-  // Actualizar en localStorage lista de usuarios registrados
+  let newHash = '';
+  try {
+    const msgBuffer = new TextEncoder().encode(newPass);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    newHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch(e) {
+    let h = 0;
+    for (let i = 0; i < newPass.length; i++) h = Math.imul(31, h) + newPass.charCodeAt(i) | 0;
+    newHash = 'h_' + Math.abs(h);
+  }
+
+  // Actualizar en localStorage lista de usuarios registrados (únicamente hash SHA-256, sin texto plano)
   const email = state.email;
   let registered = [];
   try {
@@ -434,11 +445,25 @@ window.handlePassengerPasswordResetSubmit = async function(e) {
   } catch(err) {}
   let userIdx = registered.findIndex(u => u.email && u.email.toLowerCase() === email);
   if (userIdx >= 0) {
-    registered[userIdx].password = newPass;
+    delete registered[userIdx].password;
+    registered[userIdx].passwordHash = newHash;
     try {
       localStorage.setItem('rutaprivada_registered_passengers_v1', JSON.stringify(registered));
     } catch(err) {}
   }
+
+  // Actualizar en Firestore si está disponible (únicamente hash)
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const db = firebase.firestore();
+      const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
+      db.collection('pasajeros').doc(emailDocId).set({
+        email,
+        passwordHash: newHash,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(() => {});
+    }
+  } catch(e) {}
 
   window.closePassengerPasswordResetModal();
 
@@ -1250,6 +1275,29 @@ window.getPassengerSession = function() {
 
   return null;
 };
+
+// Saneamiento de seguridad: purgar credenciales en texto plano heredadas
+try {
+  ['rutaprivada_registered_passengers_v1', 'rutaprivada_passenger_session_v1', 'rutaprivada_passenger_profile', 'rutaprivada_passenger_auth_v1'].forEach(k => {
+    const raw = localStorage.getItem(k);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (Array.isArray(data)) {
+        let dirty = false;
+        data.forEach(item => {
+          if (item && item.password) {
+            delete item.password;
+            dirty = true;
+          }
+        });
+        if (dirty) localStorage.setItem(k, JSON.stringify(data));
+      } else if (data && typeof data === 'object' && data.password) {
+        delete data.password;
+        localStorage.setItem(k, JSON.stringify(data));
+      }
+    }
+  });
+} catch(e) {}
 
 // Sincronización inmediata temprana para evitar parpadeo en recarga
 try {
@@ -10606,9 +10654,16 @@ if (btnRecenterPassengerMap) {
               if (passwordInput) passwordInput.focus();
               return;
             }
+            // Migrar credencial heredada en texto plano a SHA-256 seguro
+            if (user.password) {
+              delete user.password;
+              user.passwordHash = enteredHash;
+              saveRegisteredPassenger(user);
+            }
           } else {
-            user.password = password;
+            delete user.password;
             user.passwordHash = enteredHash;
+            saveRegisteredPassenger(user);
           }
         } else {
           // 5. Si no existe previamente: AUTO-CREAR CUENTA Y ACTIVAR SESIÓN DE FORMA TRANSPARENTE

@@ -6561,6 +6561,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Migrar credencial heredada en texto plano a SHA-256 y eliminar clave plana
+            if (driver.password) {
+                delete driver.password;
+                driver.passwordHash = enteredHash;
+                try {
+                    let registered = JSON.parse(localStorage.getItem('rutaprivada_registered_drivers_v1') || '[]');
+                    const idx = registered.findIndex(d => d.email && d.email.toLowerCase() === (driver.email || '').toLowerCase());
+                    if (idx >= 0) {
+                        delete registered[idx].password;
+                        registered[idx].passwordHash = enteredHash;
+                        localStorage.setItem('rutaprivada_registered_drivers_v1', JSON.stringify(registered));
+                    }
+                } catch(e) {}
+            }
+
             saveDriverSession(driver, false);
             hideDriverAuthModal();
             showDriverToast(`👋 ¡Bienvenido Chofer Partner, ${driver.nombre || 'Conductor'}!`);
