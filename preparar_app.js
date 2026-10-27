@@ -12,26 +12,11 @@ const androidBuildDir = path.join(__dirname, 'android', 'app', 'build');
 const buildGradlePath = path.join(__dirname, 'android', 'app', 'build.gradle');
 const stringsXmlPath = path.join(__dirname, 'android', 'app', 'src', 'main', 'res', 'values', 'strings.xml');
 
-// 1. Preparación de íconos seguros
+// 1. Preparación de íconos oficiales (rutas relativas al proyecto)
 const iconChoferPng = path.join(__dirname, 'icon_chofer.png');
 const iconPasajeroPng = path.join(__dirname, 'icon_pasajero.png');
 const iconChoferPadded = path.join(__dirname, 'icon_chofer_padded.png');
 const iconPasajeroPadded = path.join(__dirname, 'icon_pasajero_padded.png');
-
-// Fallback opcional a carpeta temporal si existiera
-const userUploadedDir = 'C:\\Users\\daniel\\.gemini\\antigravity-ide\\brain\\74630162-6221-4fb8-ab2f-5ac43b640c3c\\.user_uploaded';
-if (fs.existsSync(userUploadedDir)) {
-    try {
-        const fileChoferUploaded = path.join(userUploadedDir, 'media_1790190043516.png');
-        const filePasajeroUploaded = path.join(userUploadedDir, 'media_1790190074835.png');
-        if (!fs.existsSync(iconChoferPng) && fs.existsSync(fileChoferUploaded)) {
-            fs.copyFileSync(fileChoferUploaded, iconChoferPng);
-        }
-        if (!fs.existsSync(iconPasajeroPng) && fs.existsSync(filePasajeroUploaded)) {
-            fs.copyFileSync(filePasajeroUploaded, iconPasajeroPng);
-        }
-    } catch(e) {}
-}
 
 console.log(`==========================================`);
 console.log(` Sincronizando App Android: [ ${mode.toUpperCase()} ]`);
