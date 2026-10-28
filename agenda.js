@@ -50,7 +50,7 @@ const state = {
 
 document.addEventListener('DOMContentLoaded', () => {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=106').catch(() => {});
+    navigator.serviceWorker.register('sw.js?v=107').catch(() => {});
   }
   initAuth();
   initTabs();

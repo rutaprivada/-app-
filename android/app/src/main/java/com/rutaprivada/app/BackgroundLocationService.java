@@ -75,6 +75,14 @@ public class BackgroundLocationService extends Service implements LocationListen
                 return START_NOT_STICKY;
             }
 
+            if ("UPDATE_TRIP".equals(action)) {
+                if (intent.hasExtra("activeTripId")) {
+                    currentActiveTripId = intent.getStringExtra("activeTripId");
+                    Log.d(TAG, "Active trip updated in background service: " + currentActiveTripId);
+                }
+                return START_STICKY;
+            }
+
             if (intent.hasExtra("driverId")) {
                 currentDriverId = intent.getStringExtra("driverId");
             }
@@ -133,6 +141,7 @@ public class BackgroundLocationService extends Service implements LocationListen
 
         // Send offline status to Firestore
         sendLocationToFirestore(null, false);
+        currentActiveTripId = "";
 
         if (wakeLock != null && wakeLock.isHeld()) {
             try {

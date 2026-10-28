@@ -2787,7 +2787,27 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
+    function syncNativeActiveTrip(tripId = '') {
+        const targetTripId = tripId || (driverState.activeTrip && driverState.activeTrip.id) || '';
+        if (window.AndroidDriverBridge) {
+            if (typeof window.AndroidDriverBridge.updateActiveTripId === 'function') {
+                try {
+                    window.AndroidDriverBridge.updateActiveTripId(targetTripId);
+                    console.log('Viaje activo sincronizado con BackgroundLocationService:', targetTripId);
+                } catch(e) {}
+            } else if (typeof window.AndroidDriverBridge.startBackgroundLocation === 'function' && driverState.isOnline) {
+                try {
+                    const drvId = getActiveDriverId();
+                    const drvName = (driverState.info && driverState.info.nombre) || 'Chofer Partner';
+                    window.AndroidDriverBridge.startBackgroundLocation(drvId, drvName, targetTripId);
+                } catch(e) {}
+            }
+        }
+    }
+    window.syncNativeActiveTrip = syncNativeActiveTrip;
+
     function stopGlobalGpsWatch() {
+        syncNativeActiveTrip('');
         if (window.AndroidDriverBridge && typeof window.AndroidDriverBridge.stopBackgroundLocation === 'function') {
             try {
                 window.AndroidDriverBridge.stopBackgroundLocation();
@@ -3436,6 +3456,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             localStorage.setItem('rutaprivada_driver_active_trip', JSON.stringify(driverState.activeTrip));
         } catch(e) {}
+
+        syncNativeActiveTrip((driverState.activeTrip && driverState.activeTrip.id) || '');
 
         stateSearching.classList.remove('active');
         stateOffline.classList.remove('active');
@@ -4445,6 +4467,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleDriverStatusBar(true);
             try { localStorage.removeItem('rutaprivada_driver_active_trip'); } catch(e) {}
             driverState.activeTrip = null;
+            syncNativeActiveTrip('');
 
             if (modalDriverFareSummary) {
                 modalDriverFareSummary.classList.remove('active');
@@ -4625,6 +4648,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             driverState.activeTrip = null;
+            syncNativeActiveTrip('');
             stateActiveTrip.classList.remove('active');
             stateSearching.classList.add('active');
             showDriverToast('ℹ️ Viaje cancelado. Solicitud re-enviada a otros choferes.');
@@ -5000,6 +5024,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     toggleDriverStatusBar(true);
                     try { localStorage.removeItem('rutaprivada_driver_active_trip'); } catch(e) {}
                     driverState.activeTrip = null;
+                    syncNativeActiveTrip('');
                     stateActiveTrip.classList.remove('active');
                     stateSearching.classList.add('active');
                     showDriverToast('🚨 El pasajero canceló el viaje.');
@@ -8688,7 +8713,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Registro y actualización de Service Worker para la PWA de Chofer
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js?v=106')
+            navigator.serviceWorker.register('sw.js?v=107')
                 .then(reg => {
                     reg.update().catch(() => {});
                 })

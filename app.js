@@ -7177,10 +7177,10 @@ function saveModalConfig() {
 let deferredInstallPrompt = null;
 
 function initPwa() {
-  // 1. Registro unificado del Service Worker (v106)
+  // 1. Registro unificado del Service Worker (v107)
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=106')
+      navigator.serviceWorker.register('sw.js?v=107')
         .then((reg) => {
           reg.update().catch(() => {});
         })

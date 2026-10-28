@@ -41,6 +41,22 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 @JavascriptInterface
+                public void updateActiveTripId(String activeTripId) {
+                    try {
+                        Intent intent = new Intent(MainActivity.this, BackgroundLocationService.class);
+                        intent.setAction("UPDATE_TRIP");
+                        intent.putExtra("activeTripId", activeTripId != null ? activeTripId : "");
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(intent);
+                        } else {
+                            startService(intent);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @JavascriptInterface
                 public void stopBackgroundLocation() {
                     try {
                         Intent intent = new Intent(MainActivity.this, BackgroundLocationService.class);
