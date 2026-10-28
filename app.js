@@ -1000,12 +1000,6 @@ window.handlePassengerLogout = function() {
     localStorage.removeItem('rutaprivada_pending_passenger_reg');
     sessionStorage.removeItem('rutaprivada_passenger_auth_v1');
     sessionStorage.removeItem('rutaprivada_passenger_session_v1');
-    if (window.AndroidNativeBridge && typeof window.AndroidNativeBridge.removeItem === 'function') {
-      window.AndroidNativeBridge.removeItem('rutaprivada_passenger_session_v1');
-    }
-    if (window.AndroidDriverBridge && typeof window.AndroidDriverBridge.removeItem === 'function') {
-      window.AndroidDriverBridge.removeItem('rutaprivada_passenger_session_v1');
-    }
     try {
       document.cookie = "rutaprivada_passenger_session_v1=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     } catch(e){}
@@ -1256,25 +1250,13 @@ let routePolyline = null;
 // ==========================================
 window.getPassengerSession = function() {
   try {
-    let raw = null;
-    // 1. Prioridad: Almacenamiento nativo persistente de Android (SharedPreferences)
-    if (window.AndroidNativeBridge && typeof window.AndroidNativeBridge.getItem === 'function') {
-      raw = window.AndroidNativeBridge.getItem('rutaprivada_passenger_session_v1');
-    } else if (window.AndroidDriverBridge && typeof window.AndroidDriverBridge.getItem === 'function') {
-      raw = window.AndroidDriverBridge.getItem('rutaprivada_passenger_session_v1');
-    }
-
-    // 2. Almacenamiento web (localStorage / sessionStorage)
-    if (!raw) {
-      raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
-            localStorage.getItem('rutaprivada_passenger_auth_v1') || 
-            localStorage.getItem('rutaprivada_passenger_profile') ||
-            localStorage.getItem('rutaprivada_passenger_session') ||
-            localStorage.getItem('rutaprivada_user_session') ||
-            sessionStorage.getItem('rutaprivada_passenger_session_v1') ||
-            sessionStorage.getItem('rutaprivada_passenger_auth_v1');
-    }
-
+    const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
+                localStorage.getItem('rutaprivada_passenger_auth_v1') || 
+                localStorage.getItem('rutaprivada_passenger_profile') ||
+                localStorage.getItem('rutaprivada_passenger_session') ||
+                localStorage.getItem('rutaprivada_user_session') ||
+                sessionStorage.getItem('rutaprivada_passenger_session_v1') ||
+                sessionStorage.getItem('rutaprivada_passenger_auth_v1');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && (parsed.email || parsed.nombre || parsed.usuario || parsed.telefono || parsed.id)) {
@@ -6123,9 +6105,9 @@ async function searchLocations(rawQuery, signal) {
     }, true);
   }
 
-  // 3. Consulta de red en segundo plano para complementar con OpenStreetMap / Photon + Nominatim
+  // 3. Consulta de red en segundo plano para complementar con OpenStreetMap / Photon
   const cleanQ = cleanAddressQuery(query);
-  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=8`;
+  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6&lang=es`;
   
   try {
     const res = await fetch(photonUrl, { signal: signal || null });
@@ -6156,37 +6138,6 @@ async function searchLocations(rawQuery, signal) {
       }
     }
   } catch(e) {}
-
-  // 4. Si Photon no obtuvo resultados de red, consultar Nominatim OpenStreetMap
-  if (results.length <= 1 && query.length >= 2) {
-    try {
-      const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ)}&countrycodes=ar&limit=6&addressdetails=1`;
-      const nomRes = await fetch(nomUrl, {
-        signal: signal || null,
-        headers: { 'Accept': 'application/json' }
-      });
-      if (nomRes && nomRes.ok) {
-        const nomData = await nomRes.json();
-        if (Array.isArray(nomData)) {
-          nomData.forEach(item => {
-            const addr = item.address || {};
-            const road = addr.road || addr.pedestrian || addr.street || item.name || cleanQ;
-            const house = addr.house_number ? `${addr.house_number}, ` : '';
-            const city = addr.city || addr.town || addr.suburb || addr.municipality || 'Buenos Aires';
-            const state = addr.state || 'Argentina';
-            addResult({
-              lat: String(item.lat),
-              lon: String(item.lon),
-              display_name: item.display_name,
-              _mainTitle: `${house}${road}`.trim(),
-              _subTitle: `${city}, ${state}`,
-              _icon: '📍'
-            }, false);
-          });
-        }
-      }
-    } catch(err) {}
-  }
 
   // Fallback garantizado absoluto
   if (results.length === 0 && query.length >= 2) {
@@ -6219,9 +6170,8 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     currentResults = items || [];
     activeIndex = -1;
 
-    const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
-    const fieldBody = input.closest('.field-body') || input.closest('.uber-input-row');
-    const routeCard = input.closest('.uber-route-inputs-card');
+    const wrap = input.closest('.input-field-wrap');
+    const fieldBody = input.closest('.field-body');
 
     if (!items || items.length === 0) {
       list.classList.add('hidden');
@@ -6246,10 +6196,6 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     if (fieldBody) {
       fieldBody.style.setProperty('z-index', '99999999', 'important');
       fieldBody.style.setProperty('overflow', 'visible', 'important');
-    }
-    if (routeCard) {
-      routeCard.style.setProperty('z-index', '999999', 'important');
-      routeCard.style.setProperty('overflow', 'visible', 'important');
     }
 
     items.slice(0, 8).forEach((place) => {
@@ -6309,7 +6255,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     list.style.display = 'none';
     currentResults = [];
 
-    const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
+    const wrap = input.closest('.input-field-wrap');
     if (wrap) wrap.classList.remove('has-suggestions');
 
     const clearBtn = input.parentElement ? input.parentElement.querySelector('.btn-clear-address') : null;
@@ -6462,7 +6408,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     } else if (e.key === 'Escape') {
       list.classList.add('hidden');
       list.style.display = 'none';
-      const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
+      const wrap = input.closest('.input-field-wrap');
       if (wrap) wrap.classList.remove('has-suggestions');
     }
   });
@@ -6471,7 +6417,7 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     if (!input.contains(e.target) && !list.contains(e.target)) {
       list.classList.add('hidden');
       list.style.display = 'none';
-      const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
+      const wrap = input.closest('.input-field-wrap');
       if (wrap) wrap.classList.remove('has-suggestions');
     }
   });
@@ -10117,20 +10063,12 @@ if (btnRecenterPassengerMap) {
 
     function getPassengerSession() {
       try {
-        let raw = null;
-        if (window.AndroidNativeBridge && typeof window.AndroidNativeBridge.getItem === 'function') {
-          raw = window.AndroidNativeBridge.getItem('rutaprivada_passenger_session_v1');
-        } else if (window.AndroidDriverBridge && typeof window.AndroidDriverBridge.getItem === 'function') {
-          raw = window.AndroidDriverBridge.getItem('rutaprivada_passenger_session_v1');
-        }
-        if (!raw) {
-          raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
-                localStorage.getItem('rutaprivada_passenger_auth_v1') || 
-                localStorage.getItem('rutaprivada_passenger_profile') ||
-                localStorage.getItem('rutaprivada_passenger_session') ||
-                localStorage.getItem('rutaprivada_user_session') ||
-                sessionStorage.getItem('rutaprivada_passenger_session_v1');
-        }
+        const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
+                    localStorage.getItem('rutaprivada_passenger_auth_v1') || 
+                    localStorage.getItem('rutaprivada_passenger_profile') ||
+                    localStorage.getItem('rutaprivada_passenger_session') ||
+                    localStorage.getItem('rutaprivada_user_session') ||
+                    sessionStorage.getItem('rutaprivada_passenger_session_v1');
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && (parsed.email || parsed.nombre || parsed.usuario || parsed.telefono || parsed.id)) {
@@ -10168,12 +10106,6 @@ if (btnRecenterPassengerMap) {
         localStorage.setItem('rutaprivada_passenger_profile', str);
         localStorage.setItem('rutaprivada_user_session', str);
         localStorage.setItem('rutaprivada_profile', str);
-        if (window.AndroidNativeBridge && typeof window.AndroidNativeBridge.setItem === 'function') {
-          window.AndroidNativeBridge.setItem('rutaprivada_passenger_session_v1', str);
-        }
-        if (window.AndroidDriverBridge && typeof window.AndroidDriverBridge.setItem === 'function') {
-          window.AndroidDriverBridge.setItem('rutaprivada_passenger_session_v1', str);
-        }
         try {
           document.cookie = `rutaprivada_passenger_session_v1=${encodeURIComponent(str)}; path=/; max-age=315360000; SameSite=Lax`;
         } catch(err){}

@@ -5950,28 +5950,6 @@ html, body {
   pointer-events: none !important;
 }
 
-.uber-input-field-wrap {
-  flex: 1;
-  position: relative;
-}
-
-.uber-input-field-wrap.has-suggestions {
-  z-index: 99999999 !important;
-}
-
-.uber-route-inputs-card:has(.has-suggestions) {
-  overflow: visible !important;
-  z-index: 999999 !important;
-}
-
-.uber-input-field-wrap .suggestions-list {
-  min-width: 100%;
-  width: 100%;
-  left: 0;
-  right: 0;
-  box-sizing: border-box;
-}
-
 .suggestion-item {
   display: flex;
   align-items: center;
