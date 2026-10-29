@@ -332,10 +332,11 @@
             <div class="uber-route-line-connector"></div>
             
             <!-- Origin Row -->
-            <div class="uber-input-row">
+            <div class="uber-input-row" id="uberOriginRow">
               <span class="uber-pin-bullet origin"></span>
               <div class="uber-input-field-wrap">
                 <input type="text" id="uberOriginInput" class="uber-text-input" placeholder="Tu ubicación de partida..." autocomplete="off" />
+                <button type="button" class="uber-input-btn btn-clear-address hidden" id="btnUberClearOrigin" title="Borrar dirección">✕</button>
                 <button type="button" class="uber-input-btn" id="btnUberGpsOrigin" title="Usar GPS actual">
                   <i class="fa-solid fa-crosshairs" style="color: #10b981;"></i>
                 </button>
@@ -348,6 +349,7 @@
               <span class="uber-pin-bullet stop"></span>
               <div class="uber-input-field-wrap">
                 <input type="text" id="uberStopInput" class="uber-text-input" placeholder="Parada intermedia..." autocomplete="off" />
+                <button type="button" class="uber-input-btn btn-clear-address hidden" id="btnUberClearStop" title="Borrar parada">✕</button>
                 <button type="button" class="uber-input-btn" id="btnUberRemoveStop" title="Quitar parada">✕</button>
                 <div id="uberStopSuggestions" class="suggestions-list hidden"></div>
               </div>
@@ -356,11 +358,11 @@
             <div class="uber-input-divider"></div>
 
             <!-- Destination Row -->
-            <div class="uber-input-row">
+            <div class="uber-input-row" id="uberDestRow">
               <span class="uber-pin-bullet destination"></span>
               <div class="uber-input-field-wrap">
                 <input type="text" id="uberDestInput" class="uber-text-input" placeholder="¿A dónde vas?..." autocomplete="off" />
-                <button type="button" class="uber-input-btn" id="btnUberClearDest" style="display: none;">✕</button>
+                <button type="button" class="uber-input-btn btn-clear-address hidden" id="btnUberClearDest" title="Borrar dirección">✕</button>
                 <div id="uberDestSuggestions" class="suggestions-list hidden"></div>
               </div>
             </div>

@@ -6035,7 +6035,7 @@ function cleanAddressQuery(str) {
     .trim();
 }
 
-// Motor inteligente de geocodificación de alta precisión: Base local instantánea (0ms) + Photon OpenStreetMap
+// Motor inteligente de geocodificación de alta precisión: Base local instantánea (0ms) + Photon + OpenStreetMap Nominatim
 async function searchLocations(rawQuery, signal) {
   const query = (rawQuery || '').trim();
   if (query.length < 2) return (typeof getDefaultPopularDestinations === 'function') ? getDefaultPopularDestinations() : [];
@@ -6105,15 +6105,19 @@ async function searchLocations(rawQuery, signal) {
     }, true);
   }
 
-  // 3. Consulta de red en segundo plano para complementar con OpenStreetMap / Photon
+  // 3. Consulta de red en segundo plano (Proveedor 1: Photon OpenStreetMap)
   const cleanQ = cleanAddressQuery(query);
-  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=6&lang=es`;
+  const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQ)}&lat=-34.6037&lon=-58.3816&limit=8&lang=es`;
   
+  let photonSuccess = false;
   try {
-    const res = await fetch(photonUrl, { signal: signal || null });
+    const res = (typeof fetchWithTimeout === 'function') 
+      ? await fetchWithTimeout(photonUrl, { signal: signal || null }, 2200)
+      : await fetch(photonUrl, { signal: signal || null });
+
     if (res && res.ok) {
       const data = await res.json();
-      if (data && Array.isArray(data.features)) {
+      if (data && Array.isArray(data.features) && data.features.length > 0) {
         data.features.forEach(f => {
           if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
             const [lon, lat] = f.geometry.coordinates;
@@ -6133,13 +6137,48 @@ async function searchLocations(rawQuery, signal) {
               _subTitle: [loc, state, country].filter(Boolean).join(', ') || 'Buenos Aires, Argentina',
               _icon: '📍'
             }, false);
+            photonSuccess = true;
           }
         });
       }
     }
   } catch(e) {}
 
-  // Fallback garantizado absoluto
+  // 4. Proveedor 2 de Respaldo: OpenStreetMap Nominatim Directo (si Photon devolvió pocos resultados)
+  if (results.length < 4) {
+    try {
+      const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ + ', Argentina')}&countrycodes=ar&limit=6&addressdetails=1`;
+      const nomRes = (typeof fetchWithTimeout === 'function')
+        ? await fetchWithTimeout(nomUrl, { headers: { 'Accept-Language': 'es' }, signal: signal || null }, 2200)
+        : await fetch(nomUrl, { headers: { 'Accept-Language': 'es' }, signal: signal || null });
+
+      if (nomRes && nomRes.ok) {
+        const nomList = await nomRes.json();
+        if (Array.isArray(nomList) && nomList.length > 0) {
+          nomList.forEach(item => {
+            const a = item.address || {};
+            const street = a.road || a.pedestrian || a.street || item.name || cleanQ;
+            const houseNum = a.house_number ? `${a.house_number}, ` : '';
+            const suburb = a.suburb || a.neighbourhood || a.city_district || '';
+            const city = a.city || a.town || a.municipality || 'Buenos Aires';
+            const state = a.state || 'Argentina';
+            const mainTitle = `${houseNum}${street}`.trim() || (item.display_name ? item.display_name.split(',')[0] : cleanQ);
+            const subTitle = [suburb, city, state].filter(Boolean).join(', ') || 'Buenos Aires, Argentina';
+            addResult({
+              lat: String(item.lat),
+              lon: String(item.lon),
+              display_name: item.display_name,
+              _mainTitle: mainTitle,
+              _subTitle: subTitle,
+              _icon: '📍'
+            }, false);
+          });
+        }
+      }
+    } catch(e) {}
+  }
+
+  // 5. Fallback garantizado absoluto
   if (results.length === 0 && query.length >= 2) {
     const capitalized = query.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     addResult({
@@ -6170,13 +6209,16 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     currentResults = items || [];
     activeIndex = -1;
 
-    const wrap = input.closest('.input-field-wrap');
+    const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
     const fieldBody = input.closest('.field-body');
+    const parentRow = input.closest('.uber-input-row');
+    const parentCard = input.closest('.uber-route-inputs-card') || input.closest('.route-card');
 
     if (!items || items.length === 0) {
       list.classList.add('hidden');
       list.style.display = 'none';
       if (wrap) wrap.classList.remove('has-suggestions');
+      if (parentRow) parentRow.classList.remove('has-active-suggestions');
       return;
     }
 
@@ -6192,6 +6234,15 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       wrap.classList.add('has-suggestions');
       wrap.style.setProperty('z-index', '99999999', 'important');
       wrap.style.setProperty('overflow', 'visible', 'important');
+    }
+    if (parentRow) {
+      parentRow.classList.add('has-active-suggestions');
+      parentRow.style.setProperty('z-index', '99999999', 'important');
+      parentRow.style.setProperty('overflow', 'visible', 'important');
+    }
+    if (parentCard) {
+      parentCard.style.setProperty('overflow', 'visible', 'important');
+      parentCard.style.setProperty('z-index', '999999', 'important');
     }
     if (fieldBody) {
       fieldBody.style.setProperty('z-index', '99999999', 'important');
@@ -6255,11 +6306,16 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     list.style.display = 'none';
     currentResults = [];
 
-    const wrap = input.closest('.input-field-wrap');
+    const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
     if (wrap) wrap.classList.remove('has-suggestions');
+    const parentRow = input.closest('.uber-input-row');
+    if (parentRow) parentRow.classList.remove('has-active-suggestions');
 
     const clearBtn = input.parentElement ? input.parentElement.querySelector('.btn-clear-address') : null;
-    if (clearBtn) clearBtn.classList.remove('hidden');
+    if (clearBtn) {
+      clearBtn.classList.remove('hidden');
+      clearBtn.style.display = 'flex';
+    }
 
     const pLat = parseFloat(place.lat || place.latitude);
     const pLon = parseFloat(place.lon || place.lng || place.longitude);
@@ -6318,10 +6374,21 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     clearTimeout(debounceTimeout);
     const query = input.value.trim();
 
+    // En Uber Experience: expandir el bottom sheet para garantizar visibilidad amplia sobre el teclado móvil
+    const isUberInput = input.id === 'uberOriginInput' || input.id === 'uberDestInput' || input.id === 'uberStopInput';
+    if (isUberInput && typeof setUberSheetSnap === 'function') {
+      setUberSheetSnap('expanded');
+    }
+
     const clearBtn = input.parentElement ? input.parentElement.querySelector('.btn-clear-address') : null;
     if (clearBtn) {
-      if (query.length > 0) clearBtn.classList.remove('hidden');
-      else clearBtn.classList.add('hidden');
+      if (query.length > 0) {
+        clearBtn.classList.remove('hidden');
+        clearBtn.style.display = 'flex';
+      } else {
+        clearBtn.classList.add('hidden');
+        clearBtn.style.display = 'none';
+      }
     }
 
     if (query.length < 2) {
@@ -6335,8 +6402,10 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       }
       list.classList.add('hidden');
       list.style.display = 'none';
-      const wrap = input.closest('.input-field-wrap');
+      const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
       if (wrap) wrap.classList.remove('has-suggestions');
+      const parentRow = input.closest('.uber-input-row');
+      if (parentRow) parentRow.classList.remove('has-active-suggestions');
       return;
     }
 
@@ -6408,19 +6477,26 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     } else if (e.key === 'Escape') {
       list.classList.add('hidden');
       list.style.display = 'none';
-      const wrap = input.closest('.input-field-wrap');
+      const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
       if (wrap) wrap.classList.remove('has-suggestions');
+      const parentRow = input.closest('.uber-input-row');
+      if (parentRow) parentRow.classList.remove('has-active-suggestions');
     }
   });
 
-  document.addEventListener('click', (e) => {
+  const handleDismiss = (e) => {
     if (!input.contains(e.target) && !list.contains(e.target)) {
       list.classList.add('hidden');
       list.style.display = 'none';
-      const wrap = input.closest('.input-field-wrap');
+      const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
       if (wrap) wrap.classList.remove('has-suggestions');
+      const parentRow = input.closest('.uber-input-row');
+      if (parentRow) parentRow.classList.remove('has-active-suggestions');
     }
-  });
+  };
+
+  document.addEventListener('click', handleDismiss);
+  document.addEventListener('touchstart', handleDismiss, { passive: true });
 }
 
 window.setupAddressAutocomplete = setupAddressAutocomplete;
@@ -11959,16 +12035,16 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // 2. Trigger Search Click -> Abrir Route Picker y expandir a half
+    // 2. Trigger Search Click -> Abrir Route Picker y expandir
     const searchTrigger = document.getElementById('sheetSearchTriggerBox');
     if (searchTrigger) {
       searchTrigger.addEventListener('click', () => {
         switchUberSheetSection('sheetStateRoutePicker');
-        setUberSheetSnap('half');
+        setUberSheetSnap('expanded');
         setTimeout(() => {
           const destInput = document.getElementById('uberDestInput');
           if (destInput) destInput.focus();
-        }, 200);
+        }, 150);
       });
     }
 
@@ -11981,7 +12057,15 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // 4. Quick Shortcuts Chips
+    // 4. Quick Shortcuts Chips (Ezeiza, Aeroparque, Puerto Madero, Palermo, Pilar)
+    const CHIP_COORDINATES = {
+      'ezeiza': [-34.8222, -58.5358],
+      'aeroparque': [-34.5580, -58.4170],
+      'puerto madero': [-34.6025, -58.3645],
+      'palermo': [-34.5880, -58.4280],
+      'pilar': [-34.4587, -58.9142]
+    };
+
     const chips = document.querySelectorAll('.sheet-quick-chip');
     chips.forEach((chip) => {
       chip.addEventListener('click', () => {
@@ -11989,23 +12073,177 @@ if (btnRecenterPassengerMap) {
         if (dest) {
           const destInput = document.getElementById('uberDestInput');
           if (destInput) destInput.value = dest;
+          const clearDestBtn = document.getElementById('btnUberClearDest');
+          if (clearDestBtn) {
+            clearDestBtn.classList.remove('hidden');
+            clearDestBtn.style.display = 'flex';
+          }
           switchUberSheetSection('sheetStateRoutePicker');
           setUberSheetSnap('half');
+
+          // Buscar coordenadas del chip
+          let coords = [-34.6037, -58.3816];
+          const destLower = dest.toLowerCase();
+          for (const [key, c] of Object.entries(CHIP_COORDINATES)) {
+            if (destLower.includes(key)) {
+              coords = c;
+              break;
+            }
+          }
+
+          if (typeof state !== 'undefined') {
+            state.destination = { lat: coords[0], lng: coords[1], address: dest };
+          }
+          trazarRutaUberMap(coords, dest);
           calcularTarifasCategoriasUber(dest);
         }
       });
     });
 
-    // 5. Autocomplete Destino Uber
+    // 5. Autocomplete Origen y Destino Uber
+    const origInput = document.getElementById('uberOriginInput');
+    const origSugBox = document.getElementById('uberOriginSuggestions');
     const destInput = document.getElementById('uberDestInput');
     const destSugBox = document.getElementById('uberDestSuggestions');
+    const stopInput = document.getElementById('uberStopInput');
+    const stopSugBox = document.getElementById('uberStopSuggestions');
+
+    // Auto-expandir bottom sheet al enfocar inputs
+    if (origInput) {
+      origInput.addEventListener('focus', () => {
+        setUberSheetSnap('expanded');
+      });
+    }
+    if (destInput) {
+      destInput.addEventListener('focus', () => {
+        setUberSheetSnap('expanded');
+      });
+    }
+    if (stopInput) {
+      stopInput.addEventListener('focus', () => {
+        setUberSheetSnap('expanded');
+      });
+    }
+
+    // Configurar Autocompletado de Origen
+    if (origInput && origSugBox) {
+      setupAddressAutocomplete('uberOriginInput', 'uberOriginSuggestions', (place) => {
+        const pLat = parseFloat(place.lat);
+        const pLon = parseFloat(place.lon);
+        uberCurrentCoords = [pLat, pLon];
+        updateUberPassengerMarker(pLat, pLon);
+        if (uberMap) uberMap.flyTo(uberCurrentCoords, 16);
+        if (typeof state !== 'undefined') {
+          state.origin = { lat: pLat, lng: pLon, address: place.display_name };
+        }
+        if (state && state.destination) {
+          trazarRutaUberMap([state.destination.lat, state.destination.lng], state.destination.address);
+          calcularTarifasCategoriasUber(state.destination.address);
+          setUberSheetSnap('half');
+        } else if (destInput) {
+          setTimeout(() => destInput.focus(), 150);
+        }
+      });
+    }
+
+    // Configurar Autocompletado de Destino
     if (destInput && destSugBox) {
       setupAddressAutocomplete('uberDestInput', 'uberDestSuggestions', (place) => {
-        trazarRutaUberMap([place.lat, place.lon], place.display_name);
-        calcularTarifasCategoriasUber(place.display_name);
+        const dLat = parseFloat(place.lat);
+        const dLon = parseFloat(place.lon);
         if (typeof state !== 'undefined') {
-          state.destination = { lat: place.lat, lng: place.lon, address: place.display_name };
+          state.destination = { lat: dLat, lng: dLon, address: place.display_name };
         }
+        trazarRutaUberMap([dLat, dLon], place.display_name);
+        calcularTarifasCategoriasUber(place.display_name);
+        setUberSheetSnap('half');
+
+        setTimeout(() => {
+          const catList = document.querySelector('.uber-category-list');
+          if (catList) catList.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 150);
+      });
+    }
+
+    // Configurar Autocompletado de Parada Intermedia
+    if (stopInput && stopSugBox) {
+      setupAddressAutocomplete('uberStopInput', 'uberStopSuggestions', (place) => {
+        if (typeof showToast === 'function') showToast('🛑 Parada intermedia establecida');
+        if (typeof state !== 'undefined') {
+          state.intermediateStop = { lat: parseFloat(place.lat), lng: parseFloat(place.lon), address: place.display_name };
+        }
+        if (state && state.destination) {
+          trazarRutaUberMap([state.destination.lat, state.destination.lng], state.destination.address);
+          calcularTarifasCategoriasUber(state.destination.address);
+        }
+      });
+    }
+
+    // Botones de Borrado Rápido (✕) en Uber Experience
+    const btnClearOrigin = document.getElementById('btnUberClearOrigin');
+    if (origInput && btnClearOrigin) {
+      origInput.addEventListener('input', () => {
+        btnClearOrigin.classList.toggle('hidden', !origInput.value.trim());
+        btnClearOrigin.style.display = origInput.value.trim() ? 'flex' : 'none';
+      });
+      btnClearOrigin.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        origInput.value = '';
+        btnClearOrigin.classList.add('hidden');
+        btnClearOrigin.style.display = 'none';
+        if (origSugBox) {
+          origSugBox.classList.add('hidden');
+          origSugBox.style.display = 'none';
+        }
+        if (typeof state !== 'undefined') state.origin = null;
+        origInput.focus();
+      });
+    }
+
+    const btnClearDest = document.getElementById('btnUberClearDest');
+    if (destInput && btnClearDest) {
+      destInput.addEventListener('input', () => {
+        btnClearDest.classList.toggle('hidden', !destInput.value.trim());
+        btnClearDest.style.display = destInput.value.trim() ? 'flex' : 'none';
+      });
+      btnClearDest.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        destInput.value = '';
+        btnClearDest.classList.add('hidden');
+        btnClearDest.style.display = 'none';
+        if (destSugBox) {
+          destSugBox.classList.add('hidden');
+          destSugBox.style.display = 'none';
+        }
+        if (typeof state !== 'undefined') state.destination = null;
+        if (uberRoutePolyline && uberMap) {
+          try { uberMap.removeLayer(uberRoutePolyline); } catch(err){}
+          uberRoutePolyline = null;
+        }
+        destInput.focus();
+      });
+    }
+
+    const btnClearStop = document.getElementById('btnUberClearStop');
+    if (stopInput && btnClearStop) {
+      stopInput.addEventListener('input', () => {
+        btnClearStop.classList.toggle('hidden', !stopInput.value.trim());
+        btnClearStop.style.display = stopInput.value.trim() ? 'flex' : 'none';
+      });
+      btnClearStop.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        stopInput.value = '';
+        btnClearStop.classList.add('hidden');
+        btnClearStop.style.display = 'none';
+        if (stopSugBox) {
+          stopSugBox.classList.add('hidden');
+          stopSugBox.style.display = 'none';
+        }
+        if (typeof state !== 'undefined') state.intermediateStop = null;
+        stopInput.focus();
       });
     }
 
@@ -12021,7 +12259,7 @@ if (btnRecenterPassengerMap) {
       });
     });
 
-    // 7. Botón Agregar Parada Intermedia en Uber
+    // 7. Botón Agregar y Quitar Parada Intermedia
     const btnAddStop = document.getElementById('btnUberAddStop');
     const stopRow = document.getElementById('uberStopRow');
     if (btnAddStop && stopRow) {
@@ -12029,8 +12267,7 @@ if (btnRecenterPassengerMap) {
         stopRow.style.display = stopRow.style.display === 'none' ? 'flex' : 'none';
         if (stopRow.style.display === 'flex') {
           setUberSheetSnap('expanded');
-          const stopInput = document.getElementById('uberStopInput');
-          if (stopInput) stopInput.focus();
+          if (stopInput) setTimeout(() => stopInput.focus(), 150);
         }
       });
     }
@@ -12039,37 +12276,72 @@ if (btnRecenterPassengerMap) {
     if (btnRemoveStop && stopRow) {
       btnRemoveStop.addEventListener('click', () => {
         stopRow.style.display = 'none';
-        const stopInput = document.getElementById('uberStopInput');
         if (stopInput) stopInput.value = '';
+        if (typeof state !== 'undefined') state.intermediateStop = null;
       });
     }
 
-    setupAddressAutocomplete('uberStopInput', 'uberStopSuggestions', (place) => {
-      if (typeof showToast === 'function') showToast('🛑 Parada intermedia establecida');
-      if (typeof state !== 'undefined') {
-        state.intermediateStop = { lat: place.lat, lng: place.lon, address: place.display_name };
-      }
-    });
+    // 8. Botón GPS Origen
+    const btnGpsOrigin = document.getElementById('btnUberGpsOrigin');
+    if (btnGpsOrigin) {
+      btnGpsOrigin.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+          if (typeof showToast === 'function') showToast('⚠️ Geolocalización no disponible.');
+          return;
+        }
+        if (typeof showToast === 'function') showToast('📍 Obteniendo tu ubicación actual...');
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            uberCurrentCoords = [lat, lng];
+            updateUberPassengerMarker(lat, lng);
+            if (uberMap) uberMap.flyTo([lat, lng], 16);
+            let addr = `Mi Ubicación (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+            try {
+              addr = await reverseGeocode(lat, lng);
+            } catch(e){}
+            if (origInput) origInput.value = addr;
+            if (btnClearOrigin) {
+              btnClearOrigin.classList.remove('hidden');
+              btnClearOrigin.style.display = 'flex';
+            }
+            if (typeof state !== 'undefined') {
+              state.origin = { lat, lng, address: addr };
+            }
+            if (state && state.destination) {
+              trazarRutaUberMap([state.destination.lat, state.destination.lng], state.destination.address);
+              calcularTarifasCategoriasUber(state.destination.address);
+            }
+            if (typeof showToast === 'function') showToast('✅ Ubicación de partida fijada');
+          },
+          (err) => {
+            if (typeof showToast === 'function') showToast('⚠️ No se pudo obtener la ubicación.');
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      });
+    }
 
-    // 8. Botón Confirmar y Solicitar Traslado
+    // 9. Botón Confirmar y Solicitar Traslado
     const btnConfirm = document.getElementById('btnUberConfirmRide');
     if (btnConfirm) {
       btnConfirm.addEventListener('click', solicitarViajeUber);
     }
 
-    // 9. Cancelar Búsqueda en Radar
+    // 10. Cancelar Búsqueda en Radar
     const btnCancelSeek = document.getElementById('btnUberCancelSeeking');
     if (btnCancelSeek) {
       btnCancelSeek.addEventListener('click', cancelarSolicitudUber);
     }
 
-    // 10. Cancelar Traslado Activo
+    // 11. Cancelar Traslado Activo
     const btnCancelActive = document.getElementById('btnUberCancelActiveTrip');
     if (btnCancelActive) {
       btnCancelActive.addEventListener('click', cancelarSolicitudUber);
     }
 
-    // 11. Llamar al Chofer
+    // 12. Llamar al Chofer
     const btnCall = document.getElementById('btnUberCallDriver');
     if (btnCall) {
       btnCall.addEventListener('click', () => {
@@ -12082,7 +12354,7 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // 12. Chat Directo en Vivo
+    // 13. Chat Directo en Vivo
     const btnChat = document.getElementById('btnUberChatDriver');
     if (btnChat) {
       btnChat.addEventListener('click', () => {
@@ -12092,7 +12364,7 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // 13. Compartir Viaje
+    // 14. Compartir Viaje
     const btnShare = document.getElementById('btnUberShareTrip');
     if (btnShare) {
       btnShare.addEventListener('click', () => {
@@ -12107,7 +12379,7 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // 14. SOS Seguridad
+    // 15. SOS Seguridad
     const btnSos = document.getElementById('btnUberSos');
     if (btnSos) {
       btnSos.addEventListener('click', () => {
@@ -12119,62 +12391,12 @@ if (btnRecenterPassengerMap) {
       });
     }
 
-    // 15. Selector de Medios de Pago Click
+    // 16. Selector de Medios de Pago Click
     const payBar = document.getElementById('uberPaymentSelectorBar');
     if (payBar) {
       payBar.addEventListener('click', () => {
         if (typeof window.openUberPaymentModal === 'function') {
           window.openUberPaymentModal();
-        }
-      });
-    }
-
-    // 16. Botón GPS Origen
-    const btnGpsOrigin = document.getElementById('btnUberGpsOrigin');
-    if (btnGpsOrigin) {
-      btnGpsOrigin.addEventListener('click', () => {
-        if ('geolocation' in navigator) {
-          navigator.geolocation.getCurrentPosition((pos) => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            uberCurrentCoords = [lat, lng];
-            updateUberPassengerMarker(lat, lng);
-            if (uberMap) uberMap.setView([lat, lng], 15);
-            const origInput = document.getElementById('uberOriginInput');
-            if (origInput) origInput.value = 'Mi ubicación actual';
-            if (typeof showToast === 'function') showToast('📍 Ubicación actual fijada como origen');
-          });
-        }
-      });
-    }
-
-    // 17. Autocomplete Origen Uber
-    const origInput = document.getElementById('uberOriginInput');
-    const origSugBox = document.getElementById('uberOriginSuggestions');
-    if (origInput && origSugBox) {
-      setupAddressAutocomplete('uberOriginInput', 'uberOriginSuggestions', (place) => {
-        uberCurrentCoords = [place.lat, place.lon];
-        updateUberPassengerMarker(place.lat, place.lon);
-        if (uberMap) uberMap.setView(uberCurrentCoords, 15);
-        if (typeof state !== 'undefined') {
-          state.origin = { lat: place.lat, lng: place.lon, address: place.display_name };
-        }
-      });
-    }
-
-    // 18. Botón Borrar Destino
-    const btnClearDest = document.getElementById('btnUberClearDest');
-    if (destInput && btnClearDest) {
-      destInput.addEventListener('input', () => {
-        btnClearDest.style.display = destInput.value.trim() ? 'block' : 'none';
-      });
-      btnClearDest.addEventListener('click', () => {
-        destInput.value = '';
-        btnClearDest.style.display = 'none';
-        if (destSugBox) destSugBox.classList.add('hidden');
-        if (uberRoutePolyline && uberMap) {
-          try { uberMap.removeLayer(uberRoutePolyline); } catch(e){}
-          uberRoutePolyline = null;
         }
       });
     }
