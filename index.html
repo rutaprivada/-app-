@@ -139,7 +139,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=108" />
+  <link rel="stylesheet" href="styles.css?v=109" />
 </head>
 <body>
 
@@ -1065,49 +1065,7 @@
             </div>
           </div>
 
-          <!-- Invoice Selection Card (Factura A / B / Sin Factura) -->
-          <div class="passenger-invoice-card" id="passenger-invoice-card" style="margin-top: 15px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 14px; backdrop-filter: blur(10px);">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 1.15rem;">🧾</span>
-                <div>
-                  <h4 style="margin: 0; font-size: 0.92rem; font-weight: 700; color: #f8fafc;">Facturación y Comprobante</h4>
-                  <small style="color: #94a3b8; font-size: 0.75rem;">¿Precisas comprobante fiscal oficial para tu empresa o personal?</small>
-                </div>
-              </div>
-            </div>
 
-            <!-- Invoice Type Selector Buttons -->
-            <div class="invoice-type-selector" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-              <button type="button" id="btn-invoice-none" class="invoice-tab-btn active" onclick="selectInvoiceType('none')" style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #fbbf24; border-radius: 8px; padding: 8px 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">
-                Sin Factura
-              </button>
-              <button type="button" id="btn-invoice-b" class="invoice-tab-btn" onclick="selectInvoiceType('B')" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); color: #94a3b8; border-radius: 8px; padding: 8px 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">
-                Factura B
-              </button>
-              <button type="button" id="btn-invoice-a" class="invoice-tab-btn" onclick="selectInvoiceType('A')" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); color: #94a3b8; border-radius: 8px; padding: 8px 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">
-                Factura A
-              </button>
-            </div>
-
-            <!-- Invoice Fields Container (shown if A or B selected) -->
-            <div id="invoice-details-fields" style="display: none; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px; margin-top: 8px;">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div>
-                  <label for="invoice-cuit" style="display: block; font-size: 0.74rem; font-weight: 600; color: #cbd5e1; margin-bottom: 4px;">CUIT / CUIL *</label>
-                  <input type="text" id="invoice-cuit" placeholder="Ej: 20-33445566-9" style="width: 100%; box-sizing: border-box; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: #fff; padding: 7px 10px; font-size: 0.82rem;" />
-                </div>
-                <div>
-                  <label for="invoice-razon-social" style="display: block; font-size: 0.74rem; font-weight: 600; color: #cbd5e1; margin-bottom: 4px;">Razón Social / Titular *</label>
-                  <input type="text" id="invoice-razon-social" placeholder="Ej: Tech Solutions S.A." style="width: 100%; box-sizing: border-box; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: #fff; padding: 7px 10px; font-size: 0.82rem;" />
-                </div>
-              </div>
-              <div style="margin-top: 8px;">
-                <label for="invoice-address" style="display: block; font-size: 0.74rem; font-weight: 600; color: #cbd5e1; margin-bottom: 4px;">Domicilio Fiscal (Opcional)</label>
-                <input type="text" id="invoice-address" placeholder="Ej: Av. Corrientes 1234, CABA" style="width: 100%; box-sizing: border-box; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: #fff; padding: 7px 10px; font-size: 0.82rem;" />
-              </div>
-            </div>
-          </div>
 
           <!-- Booking & Action Buttons -->
           <div class="quote-actions" style="margin-top: 15px;">
@@ -2616,10 +2574,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=108"></script>
+  <script src="sync.js?v=109"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=108"></script>
+  <script src="app.js?v=109"></script>
 
   <!-- Inicializador Directo de Autocompletado de Direcciones & Auto-Purga de Caché -->
   <script>
@@ -2628,7 +2586,7 @@
       if ('serviceWorker' in navigator && window.caches) {
         caches.keys().then(function(keys) {
           keys.forEach(function(k) {
-            if (k !== 'rutaprivada-pwa-v108') {
+            if (k !== 'rutaprivada-pwa-v109') {
               caches.delete(k);
             }
           });
@@ -2676,7 +2634,7 @@
   <!-- PWA Service Worker Auto-Update -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=108').then(function(reg) {
+      navigator.serviceWorker.register('sw.js?v=109').then(function(reg) {
         reg.update();
       }).catch(function(){});
       navigator.serviceWorker.getRegistrations().then(function(registrations) {

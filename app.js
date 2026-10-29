@@ -4906,15 +4906,27 @@ function renderQuote() {
   const durEl = document.getElementById('metric-duration');
   if (durEl) durEl.textContent = `${state.durationMin || 0} min`;
 
-  // Hora de llegada estimada
+  // Hora de llegada estimada y breadcrumb
   const arrEl = document.getElementById('metric-arrival');
-  if (arrEl && state.time) {
-    const [hh, mm] = state.time.split(':').map(Number);
-    const totalMin = (hh || 0) * 60 + (mm || 0) + (state.durationMin || 0);
+  if (arrEl) {
+    let hh = 12, mm = 0;
+    if (state.time && state.time.includes(':')) {
+      const parts = state.time.split(':').map(Number);
+      hh = parts[0] || 0;
+      mm = parts[1] || 0;
+    } else {
+      const now = new Date();
+      hh = now.getHours();
+      mm = now.getMinutes();
+    }
+    const totalMin = hh * 60 + mm + (state.durationMin || 0);
     const arrH = Math.floor(totalMin / 60) % 24;
     const arrM = totalMin % 60;
-    const arrStr = `${String(arrH).padStart(2, '0')}:${String(arrM).padStart(2, '0')}`;
-    arrEl.textContent = arrStr;
+    arrEl.textContent = `${String(arrH).padStart(2, '0')}:${String(arrM).padStart(2, '0')} hs`;
+  }
+
+  if (typeof updateRouteBreadcrumb === 'function') {
+    updateRouteBreadcrumb();
   }
 
   // Actualizar Banner de Tráfico según el Horario de Reserva
