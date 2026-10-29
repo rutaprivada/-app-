@@ -1619,33 +1619,30 @@ async function goToWizardStep(step) {
           map.invalidateSize();
           if (state.origin && state.origin.lat) {
             if (!originMarker || !map.hasLayer(originMarker)) {
-              const originIcon = typeof getOfficialPinIcon === 'function'
-                ? getOfficialPinIcon('origin', state.origin.address)
-                : L.divIcon({ className: 'custom-map-pin origin-marker-pin', html: '<div style="background:#10b981; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff;"></div>' });
-              originMarker = L.marker([state.origin.lat, state.origin.lng], { icon: originIcon }).addTo(map);
-              originMarker.bindPopup(`<div class="official-map-popup"><strong>🟢 Punto de Partida</strong><p>${escapeHtml(state.origin.address || originVal)}</p></div>`);
+              originMarker = L.marker([state.origin.lat, state.origin.lng], { 
+                icon: getOfficialPinIcon('origin') 
+              }).addTo(map);
+              originMarker.bindPopup(`<div class="official-map-popup"><strong>🟢 Partida</strong><p>${escapeHtml(state.origin.address || originVal)}</p></div>`);
             } else {
               originMarker.setLatLng([state.origin.lat, state.origin.lng]);
             }
           }
           if (state.destination && state.destination.lat) {
             if (!destinationMarker || !map.hasLayer(destinationMarker)) {
-              const destinationIcon = typeof getOfficialPinIcon === 'function'
-                ? getOfficialPinIcon('destination', state.destination.address)
-                : L.divIcon({ className: 'custom-map-pin dest-marker-pin', html: '<div style="background:#ef4444; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff;"></div>' });
-              destinationMarker = L.marker([state.destination.lat, state.destination.lng], { icon: destinationIcon }).addTo(map);
-              destinationMarker.bindPopup(`<div class="official-map-popup"><strong>🔴 Destino Final</strong><p>${escapeHtml(state.destination.address || destVal)}</p></div>`);
+              destinationMarker = L.marker([state.destination.lat, state.destination.lng], { 
+                icon: getOfficialPinIcon('destination') 
+              }).addTo(map);
+              destinationMarker.bindPopup(`<div class="official-map-popup"><strong>🔴 Destino</strong><p>${escapeHtml(state.destination.address || destVal)}</p></div>`);
             } else {
               destinationMarker.setLatLng([state.destination.lat, state.destination.lng]);
             }
           }
           if (state.hasIntermediateStop && state.intermediateStop && state.intermediateStop.lat) {
             if (!stopMarker || !map.hasLayer(stopMarker)) {
-              const stopIcon = typeof getOfficialPinIcon === 'function'
-                ? getOfficialPinIcon('stop', state.intermediateStop.address)
-                : L.divIcon({ className: 'custom-map-pin stop-marker-pin', html: '<div style="background:#f59e0b; width:20px; height:20px; border-radius:50%; border:3px solid #ffffff;"></div>' });
-              stopMarker = L.marker([state.intermediateStop.lat, state.intermediateStop.lng], { icon: stopIcon }).addTo(map);
-              stopMarker.bindPopup(`<div class="official-map-popup"><strong>🟡 Parada Intermedia</strong><p>${escapeHtml(state.intermediateStop.address || stopVal)}</p></div>`);
+              stopMarker = L.marker([state.intermediateStop.lat, state.intermediateStop.lng], { 
+                icon: getOfficialPinIcon('stop') 
+              }).addTo(map);
+              stopMarker.bindPopup(`<div class="official-map-popup"><strong>🟡 Parada</strong><p>${escapeHtml(state.intermediateStop.address || stopVal)}</p></div>`);
             } else {
               stopMarker.setLatLng([state.intermediateStop.lat, state.intermediateStop.lng]);
             }
@@ -1653,17 +1650,20 @@ async function goToWizardStep(step) {
           if (typeof updateRouteBreadcrumb === 'function') {
             updateRouteBreadcrumb();
           }
-          if (routePolyline && map.hasLayer(routePolyline)) {
-            map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
+          if (typeof drawRouteOnMap === 'function') {
+            drawRouteOnMap();
           }
           setTimeout(() => {
             if (map) {
               map.invalidateSize();
               if (routePolyline && map.hasLayer(routePolyline)) {
-                map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
+                map.fitBounds(routePolyline.getBounds(), { padding: [50, 50], maxZoom: 16 });
+              } else if (originMarker && destinationMarker) {
+                const group = new L.featureGroup([originMarker, destinationMarker]);
+                map.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 16 });
               }
             }
-          }, 250);
+          }, 200);
         } catch(e){}
       }
     }, 80);
@@ -3396,61 +3396,41 @@ function updateDateDisplay() {
 // 5. MAPA INTERACTIVO (LEAFLET + OSRM)
 // ==========================================
 
-// Creador de pines personalizados con badges flotantes de alta legibilidad
-function getOfficialPinIcon(type, address) {
-  const shortAddr = address ? address.split(',')[0].trim() : (type === 'origin' ? 'Punto de Partida' : (type === 'stop' ? 'Parada' : 'Destino Final'));
-  const esc = window.escapeHtml || function(s){ return s || ''; };
-  
+// Creador de pines modernos estilo Uber / Cabify / Google Maps
+function getOfficialPinIcon(type) {
   if (type === 'origin') {
     return L.divIcon({
-      className: 'official-custom-marker origin-marker',
+      className: 'route-uber-pin',
       html: `
-        <div class="official-pin-card">
-          <div class="official-pin-badge origin-badge">
-            <span class="badge-dot"></span>
-            <span class="badge-text">${esc(shortAddr)}</span>
-          </div>
-          <div class="official-pin-pointer origin-pointer">
-            <span class="pointer-core"></span>
-          </div>
+        <div class="route-uber-pin-pulse"></div>
+        <div class="route-uber-pin-core origin-core">
+          <div class="route-uber-pin-dot"></div>
         </div>
       `,
-      iconSize: [140, 52],
-      iconAnchor: [70, 48]
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
     });
   } else if (type === 'destination') {
     return L.divIcon({
-      className: 'official-custom-marker dest-marker',
+      className: 'route-uber-pin',
       html: `
-        <div class="official-pin-card">
-          <div class="official-pin-badge dest-badge">
-            <span class="badge-dot"></span>
-            <span class="badge-text">${esc(shortAddr)}</span>
-          </div>
-          <div class="official-pin-pointer dest-pointer">
-            <span class="pointer-core"></span>
-          </div>
+        <div class="route-uber-pin-core dest-core">
+          <div class="route-uber-pin-dot"></div>
         </div>
       `,
-      iconSize: [140, 52],
-      iconAnchor: [70, 48]
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
     });
   } else {
     return L.divIcon({
-      className: 'official-custom-marker stop-marker',
+      className: 'route-uber-pin',
       html: `
-        <div class="official-pin-card">
-          <div class="official-pin-badge stop-badge">
-            <span class="badge-dot"></span>
-            <span class="badge-text">${esc(shortAddr)}</span>
-          </div>
-          <div class="official-pin-pointer stop-pointer">
-            <span class="pointer-core"></span>
-          </div>
+        <div class="route-uber-pin-core stop-core">
+          <div class="route-uber-pin-dot"></div>
         </div>
       `,
-      iconSize: [140, 52],
-      iconAnchor: [70, 48]
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
     });
   }
 }
@@ -3471,24 +3451,12 @@ function initMap() {
   // Zoom control personalizado arriba a la derecha
   L.control.zoom({ position: 'topright' }).addTo(map);
 
-  // Capa ejecutiva limpia CartoDB Voyager por defecto
-  const voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; CartoDB &copy; OpenStreetMap',
-    subdomains: 'abcd',
+  // Mosaicos oficiales limpios de alta velocidad y 0 marcas de agua
+  const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   });
-
-  // Capa ejecutiva nocturna CartoDB Dark Matter
-  const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; CartoDB &copy; OpenStreetMap',
-    subdomains: 'abcd',
-    maxZoom: 19
-  });
-
-  window._officialMapVoyagerLayer = voyagerLayer;
-  window._officialMapDarkLayer = darkLayer;
-  window._currentOfficialMapTheme = 'voyager';
-  voyagerLayer.addTo(map);
+  osmLayer.addTo(map);
 
   // Geolocalización suave inicial si no hay origen fijado
   if ('geolocation' in navigator && (!state.origin || !state.origin.lat)) {
@@ -3505,28 +3473,17 @@ function initMap() {
 
 // Controles interactivos del mapa de Paso 2
 window.toggleOfficialMapTheme = function() {
-  if (!map || !window._officialMapVoyagerLayer || !window._officialMapDarkLayer) return;
+  if (!map) return;
+  const container = document.getElementById('map-container');
   const lbl = document.getElementById('lblMapTheme');
   const btn = document.getElementById('btnToggleMapTheme');
-  if (window._currentOfficialMapTheme === 'voyager') {
-    map.removeLayer(window._officialMapVoyagerLayer);
-    window._officialMapDarkLayer.addTo(map);
-    window._currentOfficialMapTheme = 'dark';
-    if (lbl) lbl.textContent = 'Día';
+  if (container) {
+    const isDark = container.classList.toggle('map-dark-mode');
+    if (lbl) lbl.textContent = isDark ? 'Día' : 'Noche';
     if (btn) {
       const icon = btn.querySelector('i');
-      if (icon) icon.className = 'fa-solid fa-sun';
-      btn.style.color = '#fbbf24';
-    }
-  } else {
-    map.removeLayer(window._officialMapDarkLayer);
-    window._officialMapVoyagerLayer.addTo(map);
-    window._currentOfficialMapTheme = 'voyager';
-    if (lbl) lbl.textContent = 'Noche';
-    if (btn) {
-      const icon = btn.querySelector('i');
-      if (icon) icon.className = 'fa-solid fa-moon';
-      btn.style.color = '#38bdf8';
+      if (icon) icon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+      btn.style.color = isDark ? '#fbbf24' : '#38bdf8';
     }
   }
 };
@@ -3534,14 +3491,60 @@ window.toggleOfficialMapTheme = function() {
 window.recenterOfficialRouteMap = function() {
   if (!map) return;
   if (routePolyline && map.hasLayer(routePolyline)) {
-    map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
+    map.fitBounds(routePolyline.getBounds(), { padding: [50, 50], maxZoom: 16 });
   } else if (originMarker && destinationMarker) {
     const group = new L.featureGroup([originMarker, destinationMarker]);
-    map.fitBounds(group.getBounds(), { padding: [55, 55], maxZoom: 16 });
+    map.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 16 });
   } else if (originMarker) {
     map.flyTo(originMarker.getLatLng(), 15);
   }
 };
+
+function drawRouteOnMap() {
+  if (!map) return;
+  if (!state.currentRouteCoords || state.currentRouteCoords.length === 0) {
+    if (state.origin && state.origin.lat && state.destination && state.destination.lat) {
+      if (typeof checkAndRoute === 'function') checkAndRoute();
+    }
+    return;
+  }
+
+  try {
+    if (routeGlowPolyline && map.hasLayer(routeGlowPolyline)) {
+      map.removeLayer(routeGlowPolyline);
+      routeGlowPolyline = null;
+    }
+    if (routePolyline && map.hasLayer(routePolyline)) {
+      map.removeLayer(routePolyline);
+      routePolyline = null;
+    }
+
+    const coords = state.currentRouteCoords;
+
+    // 1. Contorno oscuro de alta definición (estilo Google Maps / Uber)
+    routeGlowPolyline = L.polyline(coords, {
+      color: '#0f172a',
+      weight: 8,
+      opacity: 0.6,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map);
+
+    // 2. Línea de navegación eléctrica viva
+    routePolyline = L.polyline(coords, {
+      color: '#0284c7', // Azul navegación Uber/Google
+      weight: 5,
+      opacity: 0.98,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map);
+
+    map.fitBounds(routePolyline.getBounds(), { padding: [50, 50], maxZoom: 16 });
+  } catch(e) {
+    console.warn('drawRouteOnMap error:', e);
+  }
+}
+window.drawRouteOnMap = drawRouteOnMap;
 
 function updateRouteBreadcrumb() {
   const bOrig = document.getElementById('breadcrumbOriginText');
@@ -3960,50 +3963,11 @@ async function checkAndRoute() {
     state.tollDetails = tollAnalysis.details;
     state.tollRoadNames = tollAnalysis.roadNames;
 
+    // Guardar siempre las coordenadas completas de la ruta para que persistan al cambiar de paso
+    state.currentRouteCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
     if (map) {
-      try {
-        if (routeGlowPolyline) { map.removeLayer(routeGlowPolyline); routeGlowPolyline = null; }
-        if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
-        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-        
-        let routeColor = '#10b981';
-        let glowColor = 'rgba(16, 185, 129, 0.35)';
-        if (state.trafficEngine === 'mapbox') {
-          if (state.trafficCongestion === 'heavy') {
-            routeColor = '#ef4444';
-            glowColor = 'rgba(239, 68, 68, 0.40)';
-          } else if (state.trafficCongestion === 'moderate') {
-            routeColor = '#f59e0b';
-            glowColor = 'rgba(245, 158, 11, 0.40)';
-          } else {
-            routeColor = state.routeHasTolls ? '#06b6d4' : '#10b981';
-            glowColor = state.routeHasTolls ? 'rgba(6, 182, 212, 0.35)' : 'rgba(16, 185, 129, 0.35)';
-          }
-        } else {
-          routeColor = state.routeHasTolls ? '#06b6d4' : '#10b981';
-          glowColor = state.routeHasTolls ? 'rgba(6, 182, 212, 0.35)' : 'rgba(16, 185, 129, 0.35)';
-        }
-
-        // 1. Halo exterior brillante estilo navegación premium
-        routeGlowPolyline = L.polyline(coords, {
-          color: glowColor,
-          weight: 10,
-          opacity: 0.8,
-          lineCap: 'round',
-          lineJoin: 'round'
-        }).addTo(map);
-
-        // 2. Línea sólida principal
-        routePolyline = L.polyline(coords, {
-          color: routeColor,
-          weight: 5,
-          opacity: 0.98,
-          lineCap: 'round',
-          lineJoin: 'round'
-        }).addTo(map);
-
-        map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
-      } catch(e) {}
+      drawRouteOnMap();
     }
 
     // Actualizar pills de estado
@@ -4052,18 +4016,10 @@ async function checkAndRoute() {
     state.tollDetails = state.routeHasTolls ? [{ name: 'Peaje Troncal Nacional', fee: 2200 }] : [];
     state.tollRoadNames = state.routeHasTolls ? ['Autopista / Vía rápida'] : [];
 
+    const linePoints = s ? [[o.lat, o.lng], [s.lat, s.lng], [d.lat, d.lng]] : [[o.lat, o.lng], [d.lat, d.lng]];
+    state.currentRouteCoords = linePoints;
     if (map) {
-      try {
-        if (routeGlowPolyline) { map.removeLayer(routeGlowPolyline); routeGlowPolyline = null; }
-        if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
-        const linePoints = s ? [[o.lat, o.lng], [s.lat, s.lng], [d.lat, d.lng]] : [[o.lat, o.lng], [d.lat, d.lng]];
-        routePolyline = L.polyline(linePoints, {
-          color: '#38bdf8',
-          dashArray: '8, 8',
-          weight: 4
-        }).addTo(map);
-        map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
-      } catch(e) {}
+      drawRouteOnMap();
     }
 
     if (trafficPill) {

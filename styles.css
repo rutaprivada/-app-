@@ -1888,105 +1888,77 @@ body {
   position: relative;
 }
 
-/* Marcadores Personalizados de Alta Estética (Leaflet Pins) */
-.official-custom-marker {
+/* Marcadores Oficiales de Navegación (Estilo Uber / Google Maps) */
+.route-uber-pin {
   background: transparent !important;
   border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
 }
 
-.official-pin-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.7));
-}
-
-.official-pin-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #0d1527;
-  border: 1.5px solid #38bdf8;
-  border-radius: 20px;
-  padding: 3px 8px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: #ffffff;
-  white-space: nowrap;
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-}
-
-.official-pin-badge.origin-badge {
-  border-color: #10b981;
-  background: #064e3b;
-}
-
-.official-pin-badge.dest-badge {
-  border-color: #ef4444;
-  background: #450a0a;
-}
-
-.official-pin-badge.stop-badge {
-  border-color: #f59e0b;
-  background: #451a03;
-}
-
-.official-pin-badge .badge-dot {
-  width: 6px;
-  height: 6px;
+.route-uber-pin-core {
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.origin-badge .badge-dot {
-  background: #34d399;
-  box-shadow: 0 0 6px #34d399;
-}
-
-.dest-badge .badge-dot {
-  background: #f87171;
-  box-shadow: 0 0 6px #f87171;
-}
-
-.stop-badge .badge-dot {
-  background: #fbbf24;
-  box-shadow: 0 0 6px #fbbf24;
-}
-
-.official-pin-pointer {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+  background: #0f172a;
+  border: 3px solid #10b981;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 2px;
   position: relative;
+  z-index: 2;
 }
 
-.origin-pointer {
-  background: #10b981;
-  box-shadow: 0 0 10px #10b981;
+.route-uber-pin-core.dest-core {
+  border-color: #ef4444;
+  border-radius: 6px;
+  width: 20px;
+  height: 20px;
 }
 
-.dest-pointer {
-  background: #ef4444;
-  box-shadow: 0 0 10px #ef4444;
+.route-uber-pin-core.stop-core {
+  border-color: #f59e0b;
+  width: 18px;
+  height: 18px;
 }
 
-.stop-pointer {
-  background: #f59e0b;
-  box-shadow: 0 0 10px #f59e0b;
-}
-
-.pointer-core {
-  width: 6px;
-  height: 6px;
-  background: #ffffff;
+.route-uber-pin-dot {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
+  background: #10b981;
+}
+
+.dest-core .route-uber-pin-dot {
+  background: #ef4444;
+  border-radius: 2px;
+}
+
+.stop-core .route-uber-pin-dot {
+  background: #f59e0b;
+}
+
+.route-uber-pin-pulse {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.35);
+  animation: uberPinPulse 2s infinite ease-out;
+  z-index: 1;
+}
+
+@keyframes uberPinPulse {
+  0% { transform: scale(0.5); opacity: 0.9; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+/* Modo Nocturno para Mosaicos OpenStreetMap */
+.map-dark-mode .leaflet-tile {
+  filter: brightness(0.65) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7) !important;
 }
 
 /* Popup de Leaflet Personalizado */
