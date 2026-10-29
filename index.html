@@ -555,10 +555,6 @@
     </div>
   </div>
 
-  <!-- Botón Flotante Desktop para alternar vista App Móvil <-> Web -->
-  <button type="button" id="btnToggleAppViewMode" class="btn-toggle-app-view web-only" onclick="toggleAppViewMode()" style="position: fixed; bottom: 20px; left: 20px; z-index: 9999; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(12px); border: 1.5px solid #38bdf8; color: #fff; border-radius: 9999px; padding: 10px 18px; font-size: 0.85rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-    <span id="toggleAppViewIcon">📱</span> <span id="toggleAppViewText">Probar Vista App Pasajero</span>
-  </button>
 
   <!-- Main Hero / Multi-Step Wizard Calculator Section -->
   <main class="container main-layout">
@@ -675,16 +671,55 @@
           <div id="step-datetime-summary-step2" class="step-summary-badge">📍 Ruta</div>
         </div>
 
-        <div class="card map-card">
+        <div class="card map-card official-map-card">
           <div class="map-header">
             <div class="map-header-left">
               <h3>Trazado de Ruta Oficial</h3>
               <span id="traffic-indicator-pill" class="traffic-indicator-pill">⏱️ Tráfico estimado</span>
             </div>
-            <span id="route-calc-status" class="status-indicator">Calculando trazado...</span>
+            <div class="map-header-right-actions">
+              <span id="route-calc-status" class="status-indicator">Calculando trazado...</span>
+              <button type="button" class="btn-map-quick-action" id="btnRecenterRouteMap" onclick="recenterOfficialRouteMap()" title="Centrar ruta en pantalla">
+                <i class="fa-solid fa-crosshairs"></i> <span>Centrar</span>
+              </button>
+              <button type="button" class="btn-map-quick-action" id="btnToggleMapTheme" onclick="toggleOfficialMapTheme()" title="Cambiar tema de mapa (Día/Noche)">
+                <i class="fa-solid fa-moon"></i> <span id="lblMapTheme">Noche</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Resumen visual claro de itinerario -->
+          <div class="official-route-breadcrumb" id="officialRouteBreadcrumb">
+            <div class="breadcrumb-item origin">
+              <span class="breadcrumb-dot origin"></span>
+              <div class="breadcrumb-texts">
+                <span class="breadcrumb-label">PUNTO DE PARTIDA</span>
+                <strong class="breadcrumb-title" id="breadcrumbOriginText">Origen</strong>
+              </div>
+            </div>
+            <div class="breadcrumb-separator" id="breadcrumbStopSep" style="display: none;">
+              <span class="breadcrumb-arrow-icon"><i class="fa-solid fa-arrow-right"></i></span>
+              <div class="breadcrumb-item stop">
+                <span class="breadcrumb-dot stop"></span>
+                <div class="breadcrumb-texts">
+                  <span class="breadcrumb-label">PARADA</span>
+                  <strong class="breadcrumb-title" id="breadcrumbStopText">Parada intermedia</strong>
+                </div>
+              </div>
+            </div>
+            <div class="breadcrumb-arrow-icon">
+              <i class="fa-solid fa-arrow-right"></i>
+            </div>
+            <div class="breadcrumb-item destination">
+              <span class="breadcrumb-dot destination"></span>
+              <div class="breadcrumb-texts">
+                <span class="breadcrumb-label">DESTINO FINAL</span>
+                <strong class="breadcrumb-title" id="breadcrumbDestText">Destino</strong>
+              </div>
+            </div>
           </div>
           
-          <div id="map-container" class="map-container" style="height: 260px;"></div>
+          <div id="map-container" class="map-container"></div>
 
           <div id="traffic-live-banner" class="traffic-live-banner">
             <div class="traffic-banner-icon-wrap">
@@ -702,17 +737,17 @@
 
           <div class="route-metrics-bar">
             <div class="metric-box">
-              <span class="metric-label">Distancia</span>
+              <span class="metric-label">📏 Distancia</span>
               <span class="metric-value" id="metric-distance">0.0 km</span>
             </div>
             <div class="metric-divider"></div>
             <div class="metric-box">
-              <span class="metric-label">Duración</span>
+              <span class="metric-label">⏱️ Duración</span>
               <span class="metric-value" id="metric-duration">0 min</span>
             </div>
             <div class="metric-divider"></div>
             <div class="metric-box">
-              <span class="metric-label">Llegada Estimada</span>
+              <span class="metric-label">🏁 Llegada Estimada</span>
               <span class="metric-value" id="metric-arrival">--:--</span>
             </div>
           </div>

@@ -1697,8 +1697,138 @@ body {
 .map-header-left {
   display: flex;
   align-items: center;
+.map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.map-header-left {
+  display: flex;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.map-header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-map-quick-action {
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+}
+
+.btn-map-quick-action:hover {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #38bdf8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+}
+
+.official-map-card {
+  border: 1.5px solid rgba(56, 189, 248, 0.25) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.1) !important;
+}
+
+/* Itinerario Breadcrumb de Ruta */
+.official-route-breadcrumb {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(24, 34, 52, 0.95) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 14px;
+  padding: 8px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.breadcrumb-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.breadcrumb-dot.origin {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.breadcrumb-dot.destination {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+}
+
+.breadcrumb-dot.stop {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.breadcrumb-texts {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.breadcrumb-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  line-height: 1.1;
+}
+
+.breadcrumb-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breadcrumb-arrow-icon {
+  color: #38bdf8;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.breadcrumb-separator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 
 .map-header h3 {
@@ -1761,11 +1891,155 @@ body {
 
 .map-container {
   width: 100%;
-  height: 270px;
-  border-radius: var(--radius-md);
+  height: 320px !important;
+  border-radius: 18px;
   overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  background-color: #1a2233;
+  border: 1.5px solid rgba(56, 189, 248, 0.3);
+  background-color: #0b1329;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+/* Marcadores Personalizados de Alta Estética (Leaflet Pins) */
+.official-custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.official-pin-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.7));
+}
+
+.official-pin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #0d1527;
+  border: 1.5px solid #38bdf8;
+  border-radius: 20px;
+  padding: 3px 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.official-pin-badge.origin-badge {
+  border-color: #10b981;
+  background: #064e3b;
+}
+
+.official-pin-badge.dest-badge {
+  border-color: #ef4444;
+  background: #450a0a;
+}
+
+.official-pin-badge.stop-badge {
+  border-color: #f59e0b;
+  background: #451a03;
+}
+
+.official-pin-badge .badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.origin-badge .badge-dot {
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
+}
+
+.dest-badge .badge-dot {
+  background: #f87171;
+  box-shadow: 0 0 6px #f87171;
+}
+
+.stop-badge .badge-dot {
+  background: #fbbf24;
+  box-shadow: 0 0 6px #fbbf24;
+}
+
+.official-pin-pointer {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  position: relative;
+}
+
+.origin-pointer {
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+}
+
+.dest-pointer {
+  background: #ef4444;
+  box-shadow: 0 0 10px #ef4444;
+}
+
+.stop-pointer {
+  background: #f59e0b;
+  box-shadow: 0 0 10px #f59e0b;
+}
+
+.pointer-core {
+  width: 6px;
+  height: 6px;
+  background: #ffffff;
+  border-radius: 50%;
+}
+
+/* Popup de Leaflet Personalizado */
+.official-map-popup {
+  padding: 4px 2px;
+  color: #0f172a;
+}
+
+.official-map-popup strong {
+  font-size: 0.88rem;
+  color: #0284c7;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.official-map-popup p {
+  font-size: 0.78rem;
+  color: #334155;
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* Custom Leaflet Zoom Bar Glassmorphism */
+.leaflet-bar {
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45) !important;
+}
+
+.leaflet-bar a {
+  background-color: rgba(13, 21, 39, 0.88) !important;
+  color: #38bdf8 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(10px) !important;
+  transition: all 0.18s ease !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: #0284c7 !important;
+  color: #ffffff !important;
 }
 
 /* ---------------- Dynamic Traffic Forecast Banner ---------------- */

@@ -1244,6 +1244,7 @@ let originMarker = null;
 let destinationMarker = null;
 let stopMarker = null;
 let routePolyline = null;
+let routeGlowPolyline = null;
 
 // ==========================================
 // ACCESOS GLOBALES TEMPRANOS PARA MODALES Y ACCIONES
@@ -1618,48 +1619,42 @@ async function goToWizardStep(step) {
           map.invalidateSize();
           if (state.origin && state.origin.lat) {
             if (!originMarker || !map.hasLayer(originMarker)) {
-              const originIcon = L.divIcon({
-                className: 'custom-map-pin origin-marker-pin',
-                html: '<div style="background:#10b981; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
-                iconSize: [22, 22],
-                iconAnchor: [11, 11]
-              });
+              const originIcon = typeof getOfficialPinIcon === 'function'
+                ? getOfficialPinIcon('origin', state.origin.address)
+                : L.divIcon({ className: 'custom-map-pin origin-marker-pin', html: '<div style="background:#10b981; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff;"></div>' });
               originMarker = L.marker([state.origin.lat, state.origin.lng], { icon: originIcon }).addTo(map);
-              originMarker.bindPopup(`<strong>Origen:</strong><br>${state.origin.address || originVal}`);
+              originMarker.bindPopup(`<div class="official-map-popup"><strong>🟢 Punto de Partida</strong><p>${escapeHtml(state.origin.address || originVal)}</p></div>`);
             } else {
               originMarker.setLatLng([state.origin.lat, state.origin.lng]);
             }
           }
           if (state.destination && state.destination.lat) {
             if (!destinationMarker || !map.hasLayer(destinationMarker)) {
-              const destinationIcon = L.divIcon({
-                className: 'custom-map-pin dest-marker-pin',
-                html: '<div style="background:#ef4444; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
-                iconSize: [22, 22],
-                iconAnchor: [11, 11]
-              });
+              const destinationIcon = typeof getOfficialPinIcon === 'function'
+                ? getOfficialPinIcon('destination', state.destination.address)
+                : L.divIcon({ className: 'custom-map-pin dest-marker-pin', html: '<div style="background:#ef4444; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff;"></div>' });
               destinationMarker = L.marker([state.destination.lat, state.destination.lng], { icon: destinationIcon }).addTo(map);
-              destinationMarker.bindPopup(`<strong>Destino:</strong><br>${state.destination.address || destVal}`);
+              destinationMarker.bindPopup(`<div class="official-map-popup"><strong>🔴 Destino Final</strong><p>${escapeHtml(state.destination.address || destVal)}</p></div>`);
             } else {
               destinationMarker.setLatLng([state.destination.lat, state.destination.lng]);
             }
           }
           if (state.hasIntermediateStop && state.intermediateStop && state.intermediateStop.lat) {
             if (!stopMarker || !map.hasLayer(stopMarker)) {
-              const stopIcon = L.divIcon({
-                className: 'custom-map-pin stop-marker-pin',
-                html: '<div style="background:#f59e0b; width:20px; height:20px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
-                iconSize: [20, 20],
-                iconAnchor: [10, 10]
-              });
+              const stopIcon = typeof getOfficialPinIcon === 'function'
+                ? getOfficialPinIcon('stop', state.intermediateStop.address)
+                : L.divIcon({ className: 'custom-map-pin stop-marker-pin', html: '<div style="background:#f59e0b; width:20px; height:20px; border-radius:50%; border:3px solid #ffffff;"></div>' });
               stopMarker = L.marker([state.intermediateStop.lat, state.intermediateStop.lng], { icon: stopIcon }).addTo(map);
-              stopMarker.bindPopup(`<strong>Parada:</strong><br>${state.intermediateStop.address || stopVal}`);
+              stopMarker.bindPopup(`<div class="official-map-popup"><strong>🟡 Parada Intermedia</strong><p>${escapeHtml(state.intermediateStop.address || stopVal)}</p></div>`);
             } else {
               stopMarker.setLatLng([state.intermediateStop.lat, state.intermediateStop.lng]);
             }
           }
+          if (typeof updateRouteBreadcrumb === 'function') {
+            updateRouteBreadcrumb();
+          }
           if (routePolyline && map.hasLayer(routePolyline)) {
-            map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+            map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
           }
         } catch(e){}
       }
@@ -3393,6 +3388,65 @@ function updateDateDisplay() {
 // 5. MAPA INTERACTIVO (LEAFLET + OSRM)
 // ==========================================
 
+// Creador de pines personalizados con badges flotantes de alta legibilidad
+function getOfficialPinIcon(type, address) {
+  const shortAddr = address ? address.split(',')[0].trim() : (type === 'origin' ? 'Punto de Partida' : (type === 'stop' ? 'Parada' : 'Destino Final'));
+  const esc = window.escapeHtml || function(s){ return s || ''; };
+  
+  if (type === 'origin') {
+    return L.divIcon({
+      className: 'official-custom-marker origin-marker',
+      html: `
+        <div class="official-pin-card">
+          <div class="official-pin-badge origin-badge">
+            <span class="badge-dot"></span>
+            <span class="badge-text">${esc(shortAddr)}</span>
+          </div>
+          <div class="official-pin-pointer origin-pointer">
+            <span class="pointer-core"></span>
+          </div>
+        </div>
+      `,
+      iconSize: [140, 52],
+      iconAnchor: [70, 48]
+    });
+  } else if (type === 'destination') {
+    return L.divIcon({
+      className: 'official-custom-marker dest-marker',
+      html: `
+        <div class="official-pin-card">
+          <div class="official-pin-badge dest-badge">
+            <span class="badge-dot"></span>
+            <span class="badge-text">${esc(shortAddr)}</span>
+          </div>
+          <div class="official-pin-pointer dest-pointer">
+            <span class="pointer-core"></span>
+          </div>
+        </div>
+      `,
+      iconSize: [140, 52],
+      iconAnchor: [70, 48]
+    });
+  } else {
+    return L.divIcon({
+      className: 'official-custom-marker stop-marker',
+      html: `
+        <div class="official-pin-card">
+          <div class="official-pin-badge stop-badge">
+            <span class="badge-dot"></span>
+            <span class="badge-text">${esc(shortAddr)}</span>
+          </div>
+          <div class="official-pin-pointer stop-pointer">
+            <span class="pointer-core"></span>
+          </div>
+        </div>
+      `,
+      iconSize: [140, 52],
+      iconAnchor: [70, 48]
+    });
+  }
+}
+
 function initMap() {
   const mapElem = document.getElementById('map-container');
   if (!mapElem) return;
@@ -3400,21 +3454,40 @@ function initMap() {
   const defaultCoords = [-34.6037, -58.3816]; // Buenos Aires (Obelisco)
 
   map = L.map('map-container', {
-    zoomControl: true,
-    scrollWheelZoom: false
-  }).setView(defaultCoords, 12);
+    zoomControl: false,
+    scrollWheelZoom: false,
+    fadeAnimation: true,
+    zoomAnimation: true
+  }).setView(defaultCoords, 13);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  // Zoom control personalizado arriba a la derecha
+  L.control.zoom({ position: 'topright' }).addTo(map);
+
+  // Capa ejecutiva limpia CartoDB Voyager por defecto
+  const voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; CartoDB &copy; OpenStreetMap',
+    subdomains: 'abcd',
     maxZoom: 19
-  }).addTo(map);
+  });
 
-  // Geolocalización suave inicial
-  if ('geolocation' in navigator) {
+  // Capa ejecutiva nocturna CartoDB Dark Matter
+  const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; CartoDB &copy; OpenStreetMap',
+    subdomains: 'abcd',
+    maxZoom: 19
+  });
+
+  window._officialMapVoyagerLayer = voyagerLayer;
+  window._officialMapDarkLayer = darkLayer;
+  window._currentOfficialMapTheme = 'voyager';
+  voyagerLayer.addTo(map);
+
+  // Geolocalización suave inicial si no hay origen fijado
+  if ('geolocation' in navigator && (!state.origin || !state.origin.lat)) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const userLatLng = [pos.coords.latitude, pos.coords.longitude];
-        map.setView(userLatLng, 13);
+        if (map) map.setView(userLatLng, 13);
       },
       () => {},
       { timeout: 5000 }
@@ -3422,20 +3495,78 @@ function initMap() {
   }
 }
 
+// Controles interactivos del mapa de Paso 2
+window.toggleOfficialMapTheme = function() {
+  if (!map || !window._officialMapVoyagerLayer || !window._officialMapDarkLayer) return;
+  const lbl = document.getElementById('lblMapTheme');
+  const btn = document.getElementById('btnToggleMapTheme');
+  if (window._currentOfficialMapTheme === 'voyager') {
+    map.removeLayer(window._officialMapVoyagerLayer);
+    window._officialMapDarkLayer.addTo(map);
+    window._currentOfficialMapTheme = 'dark';
+    if (lbl) lbl.textContent = 'Día';
+    if (btn) {
+      const icon = btn.querySelector('i');
+      if (icon) icon.className = 'fa-solid fa-sun';
+      btn.style.color = '#fbbf24';
+    }
+  } else {
+    map.removeLayer(window._officialMapDarkLayer);
+    window._officialMapVoyagerLayer.addTo(map);
+    window._currentOfficialMapTheme = 'voyager';
+    if (lbl) lbl.textContent = 'Noche';
+    if (btn) {
+      const icon = btn.querySelector('i');
+      if (icon) icon.className = 'fa-solid fa-moon';
+      btn.style.color = '#38bdf8';
+    }
+  }
+};
+
+window.recenterOfficialRouteMap = function() {
+  if (!map) return;
+  if (routePolyline && map.hasLayer(routePolyline)) {
+    map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
+  } else if (originMarker && destinationMarker) {
+    const group = new L.featureGroup([originMarker, destinationMarker]);
+    map.fitBounds(group.getBounds(), { padding: [55, 55], maxZoom: 16 });
+  } else if (originMarker) {
+    map.flyTo(originMarker.getLatLng(), 15);
+  }
+};
+
+function updateRouteBreadcrumb() {
+  const bOrig = document.getElementById('breadcrumbOriginText');
+  const bDest = document.getElementById('breadcrumbDestText');
+  const bStopSep = document.getElementById('breadcrumbStopSep');
+  const bStop = document.getElementById('breadcrumbStopText');
+  
+  if (bOrig) {
+    bOrig.textContent = state.origin ? (state.origin.address ? state.origin.address.split(',')[0].trim() : 'Partida') : 'Partida';
+  }
+  if (bDest) {
+    bDest.textContent = state.destination ? (state.destination.address ? state.destination.address.split(',')[0].trim() : 'Destino') : 'Destino';
+  }
+  if (bStopSep && bStop) {
+    if (state.hasIntermediateStop && state.intermediateStop && state.intermediateStop.address) {
+      bStopSep.style.display = 'flex';
+      bStop.textContent = state.intermediateStop.address.split(',')[0].trim();
+    } else {
+      bStopSep.style.display = 'none';
+    }
+  }
+}
+
 function setOrigin(lat, lng, address) {
   state.origin = { lat: parseFloat(lat), lng: parseFloat(lng), address };
+  updateRouteBreadcrumb();
   
   if (map) {
     try {
       if (originMarker) map.removeLayer(originMarker);
-      const originIcon = L.divIcon({
-        className: 'custom-map-pin origin-marker-pin',
-        html: '<div style="background:#10b981; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
-      });
+      const originIcon = getOfficialPinIcon('origin', address);
       originMarker = L.marker([lat, lng], { icon: originIcon }).addTo(map);
-      originMarker.bindPopup(`<strong>Origen:</strong><br>${address}`).openPopup();
+      originMarker.bindPopup(`<div class="official-map-popup"><strong>🟢 Punto de Partida</strong><p>${escapeHtml(address)}</p></div>`);
     } catch(e) {}
   }
 
@@ -3445,18 +3576,14 @@ function setOrigin(lat, lng, address) {
 function setIntermediateStop(lat, lng, address) {
   state.intermediateStop = { lat: parseFloat(lat), lng: parseFloat(lng), address };
   state.hasIntermediateStop = true;
+  updateRouteBreadcrumb();
 
   if (map) {
     try {
       if (stopMarker) map.removeLayer(stopMarker);
-      const stopIcon = L.divIcon({
-        className: 'custom-map-pin stop-marker-pin',
-        html: '<div style="background:#f59e0b; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
-      });
+      const stopIcon = getOfficialPinIcon('stop', address);
       stopMarker = L.marker([lat, lng], { icon: stopIcon }).addTo(map);
-      stopMarker.bindPopup(`<strong>Parada Intermedia:</strong><br>${address}`).openPopup();
+      stopMarker.bindPopup(`<div class="official-map-popup"><strong>🟡 Parada Intermedia</strong><p>${escapeHtml(address)}</p></div>`);
     } catch(e) {}
   }
 
@@ -3465,18 +3592,14 @@ function setIntermediateStop(lat, lng, address) {
 
 function setDestination(lat, lng, address) {
   state.destination = { lat: parseFloat(lat), lng: parseFloat(lng), address };
+  updateRouteBreadcrumb();
 
   if (map) {
     try {
       if (destinationMarker) map.removeLayer(destinationMarker);
-      const destinationIcon = L.divIcon({
-        className: 'custom-map-pin dest-marker-pin',
-        html: '<div style="background:#ef4444; width:22px; height:22px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
-      });
+      const destinationIcon = getOfficialPinIcon('destination', address);
       destinationMarker = L.marker([lat, lng], { icon: destinationIcon }).addTo(map);
-      destinationMarker.bindPopup(`<strong>Destino:</strong><br>${address}`).openPopup();
+      destinationMarker.bindPopup(`<div class="official-map-popup"><strong>🔴 Destino Final</strong><p>${escapeHtml(address)}</p></div>`);
     } catch(e) {}
   }
 
@@ -3831,26 +3954,47 @@ async function checkAndRoute() {
 
     if (map) {
       try {
-        if (routePolyline) map.removeLayer(routePolyline);
+        if (routeGlowPolyline) { map.removeLayer(routeGlowPolyline); routeGlowPolyline = null; }
+        if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
         const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
         
         let routeColor = '#10b981';
+        let glowColor = 'rgba(16, 185, 129, 0.35)';
         if (state.trafficEngine === 'mapbox') {
-          if (state.trafficCongestion === 'heavy') routeColor = '#ef4444';
-          else if (state.trafficCongestion === 'moderate') routeColor = '#f59e0b';
-          else routeColor = state.routeHasTolls ? '#f59e0b' : '#10b981';
+          if (state.trafficCongestion === 'heavy') {
+            routeColor = '#ef4444';
+            glowColor = 'rgba(239, 68, 68, 0.40)';
+          } else if (state.trafficCongestion === 'moderate') {
+            routeColor = '#f59e0b';
+            glowColor = 'rgba(245, 158, 11, 0.40)';
+          } else {
+            routeColor = state.routeHasTolls ? '#06b6d4' : '#10b981';
+            glowColor = state.routeHasTolls ? 'rgba(6, 182, 212, 0.35)' : 'rgba(16, 185, 129, 0.35)';
+          }
         } else {
-          routeColor = state.routeHasTolls ? '#f59e0b' : '#10b981';
+          routeColor = state.routeHasTolls ? '#06b6d4' : '#10b981';
+          glowColor = state.routeHasTolls ? 'rgba(6, 182, 212, 0.35)' : 'rgba(16, 185, 129, 0.35)';
         }
 
-        routePolyline = L.polyline(coords, {
-          color: routeColor,
-          weight: 5,
-          opacity: 0.9,
+        // 1. Halo exterior brillante estilo navegación premium
+        routeGlowPolyline = L.polyline(coords, {
+          color: glowColor,
+          weight: 10,
+          opacity: 0.8,
+          lineCap: 'round',
           lineJoin: 'round'
         }).addTo(map);
 
-        map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+        // 2. Línea sólida principal
+        routePolyline = L.polyline(coords, {
+          color: routeColor,
+          weight: 5,
+          opacity: 0.98,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(map);
+
+        map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
       } catch(e) {}
     }
 
@@ -3902,14 +4046,15 @@ async function checkAndRoute() {
 
     if (map) {
       try {
-        if (routePolyline) map.removeLayer(routePolyline);
+        if (routeGlowPolyline) { map.removeLayer(routeGlowPolyline); routeGlowPolyline = null; }
+        if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
         const linePoints = s ? [[o.lat, o.lng], [s.lat, s.lng], [d.lat, d.lng]] : [[o.lat, o.lng], [d.lat, d.lng]];
         routePolyline = L.polyline(linePoints, {
           color: '#38bdf8',
           dashArray: '8, 8',
           weight: 4
         }).addTo(map);
-        map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+        map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
       } catch(e) {}
     }
 
