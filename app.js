@@ -11953,10 +11953,10 @@ if (btnRecenterPassengerMap) {
           zoomAnimation: true
         }).setView(uberCurrentCoords, 14);
 
-        // Capa de mapa nocturna / ejecutiva limpia CartoDB Dark Matter
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        // Mosaicos oficiales limpios de alta velocidad y 0 marcas de agua
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
-          subdomains: 'abcd'
+          attribution: '&copy; OpenStreetMap contributors'
         }).addTo(uberMap);
 
         // Control de zoom posicionado en la esquina superior derecha

@@ -7359,4 +7359,12 @@ body.is-app-mode:not(.force-web-view) .main-footer {
   animation: uberRadarPulse 1.8s infinite;
 }
 
+/* Ocultar permanentemente botón de prueba de vista */
+#toggleAppViewBtn,
+.btn-toggle-app-view,
+[onclick*="toggleAppViewMode"] {
+  display: none !important;
+}
+
+
 
