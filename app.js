@@ -6730,6 +6730,28 @@ function initEventListeners() {
   }
 }
 
+// Invocación inmediata y en eventos para asegurar que los listeners de autocompletado siempre estén activos
+try {
+  initEventListeners();
+} catch (e) {
+  console.warn('[RutaPrivada] Immediate initEventListeners warning:', e);
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      try { initEventListeners(); } catch(e){}
+    });
+  } else {
+    try { initEventListeners(); } catch(e){}
+  }
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    try { initEventListeners(); } catch(e){}
+  });
+}
+
 async function reverseGeocode(lat, lon) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`;

@@ -712,12 +712,15 @@ body {
 
 /* Autocomplete suggestions dropdown */
 .route-inputs-group {
-  position: relative;
+  position: relative !important;
   overflow: visible !important;
+  z-index: 50;
 }
 
 .route-card {
+  position: relative !important;
   overflow: visible !important;
+  z-index: 50;
 }
 
 .input-field-wrap {
@@ -739,20 +742,21 @@ body {
   z-index: 99999999 !important;
 }
 
+.field-body .suggestions-list,
 .suggestions-list {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  width: 100%;
-  min-width: 280px;
+  position: absolute !important;
+  top: calc(100% + 4px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  min-width: 280px !important;
   background: #0b1329 !important;
   border: 1.5px solid #38bdf8 !important;
   border-radius: 14px;
   max-height: 290px;
   overflow-y: auto;
   z-index: 999999999 !important;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.95), 0 0 25px rgba(56, 189, 248, 0.35);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.95), 0 0 25px rgba(56, 189, 248, 0.35) !important;
 }
 
 .suggestions-list::-webkit-scrollbar {

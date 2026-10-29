@@ -139,7 +139,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=107" />
+  <link rel="stylesheet" href="styles.css?v=108" />
 </head>
 <body>
 
@@ -2581,15 +2581,67 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=107"></script>
+  <script src="sync.js?v=108"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=107"></script>
+  <script src="app.js?v=108"></script>
+
+  <!-- Inicializador Directo de Autocompletado de Direcciones & Auto-Purga de Caché -->
+  <script>
+    (function() {
+      // 1. Limpieza de cachés de service workers obsoletos
+      if ('serviceWorker' in navigator && window.caches) {
+        caches.keys().then(function(keys) {
+          keys.forEach(function(k) {
+            if (k !== 'rutaprivada-pwa-v108') {
+              caches.delete(k);
+            }
+          });
+        }).catch(function(){});
+      }
+
+      // 2. Activación directa de autocompletado en campos de origen y destino
+      function initDirectAutocomplete() {
+        if (typeof window.setupAddressAutocomplete === 'function') {
+          window.setupAddressAutocomplete('origin-input', 'origin-suggestions', function(place) {
+            if (typeof setOrigin === 'function') setOrigin(place.lat, place.lon, place.display_name);
+          });
+          window.setupAddressAutocomplete('destination-input', 'destination-suggestions', function(place) {
+            if (typeof setDestination === 'function') setDestination(place.lat, place.lon, place.display_name);
+          });
+          window.setupAddressAutocomplete('stop-input', 'stop-suggestions', function(place) {
+            if (typeof setIntermediateStop === 'function') setIntermediateStop(place.lat, place.lon, place.display_name);
+          });
+          window.setupAddressAutocomplete('uberOriginInput', 'uberOriginSuggestions', function(place) {
+            var pLat = parseFloat(place.lat), pLon = parseFloat(place.lon);
+            if (typeof uberCurrentCoords !== 'undefined') uberCurrentCoords = [pLat, pLon];
+            if (typeof updateUberPassengerMarker === 'function') updateUberPassengerMarker(pLat, pLon);
+            if (typeof state !== 'undefined') state.origin = { lat: pLat, lng: pLon, address: place.display_name };
+          });
+          window.setupAddressAutocomplete('uberDestInput', 'uberDestSuggestions', function(place) {
+            var dLat = parseFloat(place.lat), dLon = parseFloat(place.lon);
+            if (typeof state !== 'undefined') state.destination = { lat: dLat, lng: dLon, address: place.display_name };
+            if (typeof trazarRutaUberMap === 'function') trazarRutaUberMap([dLat, dLon], place.display_name);
+            if (typeof calcularTarifasCategoriasUber === 'function') calcularTarifasCategoriasUber(place.display_name);
+          });
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDirectAutocomplete);
+      } else {
+        initDirectAutocomplete();
+      }
+      window.addEventListener('load', initDirectAutocomplete);
+      setTimeout(initDirectAutocomplete, 200);
+      setTimeout(initDirectAutocomplete, 800);
+    })();
+  </script>
 
   <!-- PWA Service Worker Auto-Update -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=107').then(function(reg) {
+      navigator.serviceWorker.register('sw.js?v=108').then(function(reg) {
         reg.update();
       }).catch(function(){});
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
