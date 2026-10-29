@@ -1656,6 +1656,14 @@ async function goToWizardStep(step) {
           if (routePolyline && map.hasLayer(routePolyline)) {
             map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
           }
+          setTimeout(() => {
+            if (map) {
+              map.invalidateSize();
+              if (routePolyline && map.hasLayer(routePolyline)) {
+                map.fitBounds(routePolyline.getBounds(), { padding: [55, 55], maxZoom: 16 });
+              }
+            }
+          }, 250);
         } catch(e){}
       }
     }, 80);

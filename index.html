@@ -139,7 +139,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=109" />
+  <link rel="stylesheet" href="styles.css?v=110" />
 </head>
 <body>
 
@@ -719,7 +719,7 @@
             </div>
           </div>
           
-          <div id="map-container" class="map-container"></div>
+          <div id="map-container" class="map-container" style="width: 100%; min-height: 320px; height: 320px; border-radius: 18px; overflow: hidden; position: relative;"></div>
 
           <div id="traffic-live-banner" class="traffic-live-banner">
             <div class="traffic-banner-icon-wrap">
@@ -2574,10 +2574,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=109"></script>
+  <script src="sync.js?v=110"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=109"></script>
+  <script src="app.js?v=110"></script>
 
   <!-- Inicializador Directo de Autocompletado de Direcciones & Auto-Purga de Caché -->
   <script>
@@ -2586,7 +2586,7 @@
       if ('serviceWorker' in navigator && window.caches) {
         caches.keys().then(function(keys) {
           keys.forEach(function(k) {
-            if (k !== 'rutaprivada-pwa-v109') {
+            if (k !== 'rutaprivada-pwa-v110') {
               caches.delete(k);
             }
           });
@@ -2634,7 +2634,7 @@
   <!-- PWA Service Worker Auto-Update -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=109').then(function(reg) {
+      navigator.serviceWorker.register('sw.js?v=110').then(function(reg) {
         reg.update();
       }).catch(function(){});
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
