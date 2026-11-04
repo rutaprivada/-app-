@@ -1854,12 +1854,18 @@ async function handleStep1Next() {
       await Promise.allSettled(geoTasks);
     }
 
-    // Fallbacks seguros para que nunca quede bloqueado
+    // Fallbacks inteligentes y seguros basados en calles, intersecciones y POIs (nunca forzar Obelisco ciegamente)
     if (!state.origin || !state.origin.lat) {
-      state.origin = { lat: -34.6037, lng: -58.3816, address: originVal };
+      const smartOrig = (typeof resolveAddressCoords === 'function') 
+        ? resolveAddressCoords(originVal, { lat: -34.6037, lng: -58.3816, address: originVal })
+        : { lat: -34.6037, lng: -58.3816, address: originVal };
+      state.origin = { lat: smartOrig.lat, lng: smartOrig.lng, address: smartOrig.address || originVal };
     }
     if (!state.destination || !state.destination.lat) {
-      state.destination = { lat: -34.8127, lng: -58.5372, address: destVal };
+      const smartDest = (typeof resolveAddressCoords === 'function') 
+        ? resolveAddressCoords(destVal, { lat: -34.8127, lng: -58.5372, address: destVal })
+        : { lat: -34.8127, lng: -58.5372, address: destVal };
+      state.destination = { lat: smartDest.lat, lng: smartDest.lng, address: smartDest.address || destVal };
     }
     if (Math.abs(state.origin.lat - state.destination.lat) < 0.001 && Math.abs(state.origin.lng - state.destination.lng) < 0.001 && originVal.toLowerCase() !== destVal.toLowerCase()) {
       state.destination = { lat: -34.8127, lng: -58.5372, address: destVal };
@@ -2591,7 +2597,7 @@ function getMinAllowedTimeForDate(dateStr) {
   const todayStr = formatDateToString(new Date());
   if (dateStr === todayStr) {
     const fresh = new Date();
-    const rawMin = fresh.getHours() * 60 + fresh.getMinutes() + 45; // 45 min mínimo
+    const rawMin = fresh.getHours() * 60 + fresh.getMinutes() + 50; // 50 min mínimo estricto
     const roundedMin = Math.ceil(rawMin / 5) * 5;
     return roundedMin;
   }
@@ -2654,7 +2660,7 @@ function initDateTimeControls() {
   state.date = todayStr;
   updateDateDisplay();
 
-  // 4. Calcular hora inicial con regla de 45 minutos si es hoy
+  // 4. Calcular hora inicial con regla de 50 minutos si es hoy
   const minAllowedTotalMin = getMinAllowedTimeForDate(todayStr);
   currentHour = Math.floor(minAllowedTotalMin / 60) % 24;
   currentMin = minAllowedTotalMin % 60;
@@ -2667,7 +2673,7 @@ function initDateTimeControls() {
     const curTodayStr = formatDateToString(new Date());
     const minAllowedMin = getMinAllowedTimeForDate(state.date);
 
-    // Validación estricta para reservas de hoy: mínimo ahora + 45 min
+    // Validación estricta para reservas de hoy: mínimo ahora + 50 min
     if (state.date === curTodayStr && (currentHour * 60 + currentMin) < minAllowedMin) {
       currentHour = Math.floor(minAllowedMin / 60) % 24;
       currentMin = minAllowedMin % 60;
@@ -2704,8 +2710,8 @@ function initDateTimeControls() {
     const slotTag = currentHour < 12 ? 'Mañana' : (currentHour < 20 ? 'Tarde' : 'Noche');
     const highlightEl = document.getElementById('selected-time-highlight');
     if (highlightEl) {
-      const note45 = (state.date === curTodayStr) ? ' • Mín. 45 min de anticipación' : '';
-      highlightEl.textContent = `${fullTime24Str} hs (${slotTag}${note45})`;
+      const note50 = (state.date === curTodayStr) ? ' • Mín. 50 min de anticipación' : '';
+      highlightEl.textContent = `${fullTime24Str} hs (${slotTag}${note50})`;
     }
 
     // Actualizar matriz de atajos activos
@@ -2741,7 +2747,7 @@ function initDateTimeControls() {
       if (state.date === curTodayStr && nextTotal < minAllowed) {
         currentHour = Math.floor(minAllowed / 60) % 24;
         currentMin = minAllowed % 60;
-        showToast('⚠️ Las reservas para el mismo día requieren al menos 45 minutos de anticipación.');
+        showToast('⚠️ Las reservas para el mismo día requieren al menos 50 minutos de anticipación.');
       } else {
         currentHour = (currentHour - 1 + 24) % 24;
       }
@@ -2776,7 +2782,7 @@ function initDateTimeControls() {
       if (state.date === curTodayStr && nextTotal < minAllowed) {
         currentHour = Math.floor(minAllowed / 60) % 24;
         currentMin = minAllowed % 60;
-        showToast('⚠️ Las reservas para el mismo día requieren al menos 45 minutos de anticipación.');
+        showToast('⚠️ Las reservas para el mismo día requieren al menos 50 minutos de anticipación.');
       } else {
         currentHour = targetH;
         currentMin = targetM;
@@ -2817,7 +2823,7 @@ function initDateTimeControls() {
         const pillTotal = h * 60 + m;
 
         if (state.date === curTodayStr && pillTotal < minAllowed) {
-          showToast('⚠️ Este horario es anterior a los 45 min requeridos para hoy.');
+          showToast('⚠️ Este horario es anterior a los 50 min requeridos para hoy.');
           return;
         }
 
@@ -2839,7 +2845,7 @@ function initDateTimeControls() {
         const minAllowed = getMinAllowedTimeForDate(curTodayStr);
         currentHour = Math.floor(minAllowed / 60) % 24;
         currentMin = minAllowed % 60;
-        showToast('Horario fijado en el horario más próximo (+45 min).');
+        showToast('Horario fijado en el horario más próximo (+50 min).');
       } else {
         const rMin = Math.ceil(fresh.getMinutes() / 5) * 5;
         fresh.setMinutes(rMin);
@@ -4613,71 +4619,470 @@ function isLowDemandHour(timeStr) {
 }
 
 // ==========================================
-// 5.9 RESOLUCIÓN GEOESPACIAL DE PUNTOS Y HITOS (AMBA / BUENOS AIRES)
+// 5.9 RESOLUCIÓN GEOESPACIAL DE PUNTOS, HITOS Y ESQUINAS (AMBA / BUENOS AIRES)
 // ==========================================
 const BUE_LANDMARKS = {
-  'ezeiza': { lat: -34.8150, lng: -58.5348 },
-  'aeropuerto internacional de ezeiza': { lat: -34.8150, lng: -58.5348 },
-  'aeropuerto de ezeiza': { lat: -34.8150, lng: -58.5348 },
-  'aeropuerto ezeiza': { lat: -34.8150, lng: -58.5348 },
-  'eze': { lat: -34.8150, lng: -58.5348 },
-  'pistarini': { lat: -34.8150, lng: -58.5348 },
-  'aeroparque': { lat: -34.5580, lng: -58.4173 },
-  'aeroparque jorge newbery': { lat: -34.5580, lng: -58.4173 },
-  'aep': { lat: -34.5580, lng: -58.4173 },
-  'newbery': { lat: -34.5580, lng: -58.4173 },
-  'obelisco': { lat: -34.6037, lng: -58.3816 },
-  'centro': { lat: -34.6037, lng: -58.3816 },
-  '9 de julio': { lat: -34.6037, lng: -58.3816 },
-  'av. 9 de julio': { lat: -34.6037, lng: -58.3816 },
-  'corrientes': { lat: -34.6037, lng: -58.3816 },
-  'puerto madero': { lat: -34.6118, lng: -58.3644 },
-  'hilton': { lat: -34.6050, lng: -58.3644 },
-  'faena': { lat: -34.6163, lng: -58.3619 },
-  'palermo': { lat: -34.5889, lng: -58.4306 },
-  'palermo soho': { lat: -34.5889, lng: -58.4306 },
-  'palermo hollywood': { lat: -34.5815, lng: -58.4350 },
-  'campos': { lat: -34.5682, lng: -58.4371 },
-  'luis m. av': { lat: -34.5682, lng: -58.4371 },
-  'luis maria campos': { lat: -34.5682, lng: -58.4371 },
-  'las cañitas': { lat: -34.5694, lng: -58.4336 },
-  'cañitas': { lat: -34.5694, lng: -58.4336 },
-  'recoleta': { lat: -34.5875, lng: -58.3974 },
-  'belgrano': { lat: -34.5614, lng: -58.4563 },
-  'nuñez': { lat: -34.5448, lng: -58.4632 },
-  'san telmo': { lat: -34.6212, lng: -58.3731 },
-  'caballito': { lat: -34.6186, lng: -58.4428 },
-  'almagro': { lat: -34.6105, lng: -58.4237 },
-  'villa crespo': { lat: -34.5975, lng: -58.4419 },
-  'villa urquiza': { lat: -34.5721, lng: -58.4908 },
-  'devoto': { lat: -34.5996, lng: -58.5135 },
-  'san isidro': { lat: -34.4719, lng: -58.5283 },
-  'vicente lopez': { lat: -34.5273, lng: -58.4764 },
-  'olivos': { lat: -34.5108, lng: -58.4878 },
-  'martinez': { lat: -34.4938, lng: -58.5085 },
-  'tigre': { lat: -34.4251, lng: -58.5796 },
-  'nordelta': { lat: -34.4072, lng: -58.6472 },
-  'pilar': { lat: -34.4589, lng: -58.9142 },
-  'escobar': { lat: -34.3486, lng: -58.7942 },
-  'ramos mejia': { lat: -34.6534, lng: -58.5636 },
-  'moron': { lat: -34.6521, lng: -58.6198 },
-  'castelar': { lat: -34.6530, lng: -58.6400 },
-  'quilmes': { lat: -34.7242, lng: -58.2527 },
-  'lanus': { lat: -34.7071, lng: -58.3934 },
-  'banfield': { lat: -34.7431, lng: -58.3970 },
-  'lomas de zamora': { lat: -34.7600, lng: -58.4000 },
-  'avellaneda': { lat: -34.6625, lng: -58.3653 },
-  'la plata': { lat: -34.9214, lng: -57.9545 }
+  // Puntos de Transporte y Aeropuertos
+  'ezeiza': { lat: -34.8222, lng: -58.5358, address: 'Aeropuerto Internacional Ministro Pistarini (Ezeiza)' },
+  'aeropuerto internacional de ezeiza': { lat: -34.8222, lng: -58.5358, address: 'Aeropuerto Internacional Ezeiza (EZE)' },
+  'aeropuerto ezeiza': { lat: -34.8222, lng: -58.5358, address: 'Aeropuerto Ezeiza (EZE)' },
+  'pistarini': { lat: -34.8222, lng: -58.5358, address: 'Aeropuerto Pistarini (Ezeiza)' },
+  'aeroparque': { lat: -34.5580, lng: -58.4170, address: 'Aeroparque Internacional Jorge Newbery (AEP)' },
+  'aeroparque jorge newbery': { lat: -34.5580, lng: -58.4170, address: 'Aeroparque Jorge Newbery (AEP)' },
+  'jorge newbery': { lat: -34.5580, lng: -58.4170, address: 'Aeroparque Jorge Newbery (AEP)' },
+  'buquebus': { lat: -34.5975, lng: -58.3685, address: 'Terminal Buquebus Puerto Madero, CABA' },
+  'terminal de retiro': { lat: -34.5888, lng: -58.3750, address: 'Terminal de Ómnibus de Retiro, CABA' },
+  'estacion retiro': { lat: -34.5912, lng: -58.3745, address: 'Estación Retiro Mitre / Belgrano / San Martín' },
+  'estacion constitucion': { lat: -34.6275, lng: -58.3815, address: 'Estación Constitución, CABA' },
+  'estacion once': { lat: -34.6095, lng: -58.4072, address: 'Estación Once de Septiembre, CABA' },
+
+  // Shoppings y Centros Comerciales
+  'abasto': { lat: -34.6035, lng: -58.4110, address: 'Abasto Shopping, Av. Corrientes 3247, Balvanera, CABA' },
+  'abasto shopping': { lat: -34.6035, lng: -58.4110, address: 'Abasto Shopping, Av. Corrientes 3247, Balvanera, CABA' },
+  'alto palermo': { lat: -34.5878, lng: -58.4105, address: 'Alto Palermo Shopping, Av. Santa Fe 3253, Palermo, CABA' },
+  'dot baires': { lat: -34.5450, lng: -58.4890, address: 'Dot Baires Shopping, Vedia 3600, Saavedra, CABA' },
+  'dot shopping': { lat: -34.5450, lng: -58.4890, address: 'Dot Baires Shopping, Saavedra, CABA' },
+  'unicenter': { lat: -34.5085, lng: -58.5235, address: 'Unicenter Shopping, Paraná 3745, Martínez, PBA' },
+  'solar de la abadia': { lat: -34.5668, lng: -58.4392, address: 'El Solar Shopping, Av. Luis M. Campos 901, Las Cañitas, CABA' },
+  'galerias pacifico': { lat: -34.5996, lng: -58.3745, address: 'Galerías Pacífico, Florida 737, San Nicolás, CABA' },
+  'recoleta urban mall': { lat: -34.5878, lng: -58.3934, address: 'Recoleta Urban Mall, Vicente López 2050, CABA' },
+  'alcorta shopping': { lat: -34.5760, lng: -58.4050, address: 'Alcorta Shopping, Jerónimo Salguero 3172, Palermo, CABA' },
+
+  // Hoteles y Puntos Emblemáticos
+  'obelisco': { lat: -34.6037, lng: -58.3816, address: 'Obelisco de Buenos Aires, San Nicolás, CABA' },
+  'teatro colon': { lat: -34.6011, lng: -58.3831, address: 'Teatro Colón, Cerrito 628, San Nicolás, CABA' },
+  'hilton': { lat: -34.6050, lng: -58.3644, address: 'Hotel Hilton Buenos Aires, Macacha Güemes 351, Puerto Madero' },
+  'faena': { lat: -34.6145, lng: -58.3620, address: 'Faena Hotel Buenos Aires, Martha Salotti 445, Puerto Madero' },
+  'alvear palace': { lat: -34.5875, lng: -58.3890, address: 'Alvear Palace Hotel, Av. Alvear 1891, Recoleta, CABA' },
+  'sheraton retiro': { lat: -34.5930, lng: -58.3740, address: 'Sheraton Buenos Aires Hotel, San Martín 1225, Retiro, CABA' },
+  'plaza de mayo': { lat: -34.6083, lng: -58.3712, address: 'Plaza de Mayo, Monserrat, CABA' },
+  'casa rosada': { lat: -34.6081, lng: -58.3703, address: 'Casa Rosada, Balcarce 50, Monserrat, CABA' },
+  'congreso': { lat: -34.6098, lng: -58.3927, address: 'Congreso de la Nación, Balvanera, CABA' },
+  'cementerio de la recoleta': { lat: -34.5875, lng: -58.3934, address: 'Cementerio de la Recoleta, Junín 1760, Recoleta, CABA' },
+  'plaza serrano': { lat: -34.5889, lng: -58.4306, address: 'Plaza Serrano (Plaza Cortázar), Palermo Soho, CABA' },
+  'plaza italia': { lat: -34.5810, lng: -58.4210, address: 'Plaza Italia, Av. Santa Fe y Thames, Palermo, CABA' },
+  'barrancas de belgrano': { lat: -34.5620, lng: -58.4505, address: 'Barrancas de Belgrano, Av. Juramento y Zavalía, CABA' },
+
+  // Barrios y Zonas AMBA
+  'palermo': { lat: -34.5889, lng: -58.4306, address: 'Palermo, CABA' },
+  'palermo soho': { lat: -34.5889, lng: -58.4306, address: 'Palermo Soho, CABA' },
+  'palermo hollywood': { lat: -34.5815, lng: -58.4350, address: 'Palermo Hollywood, CABA' },
+  'las canitas': { lat: -34.5694, lng: -58.4336, address: 'Las Cañitas, Palermo, CABA' },
+  'recoleta': { lat: -34.5875, lng: -58.3974, address: 'Recoleta, CABA' },
+  'belgrano': { lat: -34.5614, lng: -58.4563, address: 'Belgrano, CABA' },
+  'nunez': { lat: -34.5448, lng: -58.4632, address: 'Núñez, CABA' },
+  'puerto madero': { lat: -34.6118, lng: -58.3644, address: 'Puerto Madero, CABA' },
+  'san telmo': { lat: -34.6212, lng: -58.3731, address: 'San Telmo, CABA' },
+  'caballito': { lat: -34.6186, lng: -58.4428, address: 'Caballito, CABA' },
+  'almagro': { lat: -34.6105, lng: -58.4237, address: 'Almagro, CABA' },
+  'balvanera': { lat: -34.6080, lng: -58.4020, address: 'Balvanera, CABA' },
+  'villa crespo': { lat: -34.5975, lng: -58.4419, address: 'Villa Crespo, CABA' },
+  'villa urquiza': { lat: -34.5721, lng: -58.4908, address: 'Villa Urquiza, CABA' },
+  'colegiales': { lat: -34.5740, lng: -58.4480, address: 'Colegiales, CABA' },
+  'chacarita': { lat: -34.5870, lng: -58.4500, address: 'Chacarita, CABA' },
+  'devoto': { lat: -34.5996, lng: -58.5135, address: 'Villa Devoto, CABA' },
+  'flores': { lat: -34.6280, lng: -58.4630, address: 'Flores, CABA' },
+  'san isidro': { lat: -34.4719, lng: -58.5283, address: 'San Isidro, GBA Norte' },
+  'vicente lopez': { lat: -34.5273, lng: -58.4764, address: 'Vicente López, GBA Norte' },
+  'olivos': { lat: -34.5108, lng: -58.4878, address: 'Olivos, Vicente López, GBA Norte' },
+  'martinez': { lat: -34.4938, lng: -58.5085, address: 'Martínez, San Isidro, GBA Norte' },
+  'tigre': { lat: -34.4251, lng: -58.5796, address: 'Tigre Centro, GBA Norte' },
+  'nordelta': { lat: -34.4172, lng: -58.6472, address: 'Nordelta, Tigre, GBA Norte' },
+  'pilar': { lat: -34.4589, lng: -58.9142, address: 'Pilar, GBA Norte' },
+  'escobar': { lat: -34.3486, lng: -58.7942, address: 'Belén de Escobar, GBA Norte' },
+  'ramos mejia': { lat: -34.6534, lng: -58.5636, address: 'Ramos Mejía, La Matanza, GBA Oeste' },
+  'moron': { lat: -34.6521, lng: -58.6198, address: 'Morón Centro, GBA Oeste' },
+  'castelar': { lat: -34.6530, lng: -58.6400, address: 'Castelar, Morón, GBA Oeste' },
+  'quilmes': { lat: -34.7242, lng: -58.2527, address: 'Quilmes Centro, GBA Sur' },
+  'lanus': { lat: -34.7071, lng: -58.3934, address: 'Lanús Centro, GBA Sur' },
+  'banfield': { lat: -34.7431, lng: -58.3970, address: 'Banfield, Lomas de Zamora, GBA Sur' },
+  'lomas de zamora': { lat: -34.7600, lng: -58.4000, address: 'Lomas de Zamora Centro, GBA Sur' },
+  'avellaneda': { lat: -34.6625, lng: -58.3653, address: 'Avellaneda Centro, GBA Sur' },
+  'la plata': { lat: -34.9214, lng: -57.9545, address: 'La Plata, Provincia de Buenos Aires' }
 };
 
-function resolveAddressCoords(addressStr, defaultFallback) {
-  if (!addressStr || typeof addressStr !== 'string') return defaultFallback;
-  const norm = addressStr.toLowerCase().trim();
-  for (const [key, coords] of Object.entries(BUE_LANDMARKS)) {
-    if (norm.includes(key)) {
-      return { lat: coords.lat, lng: coords.lng, address: addressStr };
+// ==========================================
+// BASE DE DATOS DE ESQUINAS E INTERSECCIONES DE ALTA PRECISIÓN (CABA / AMBA)
+// ==========================================
+const BUE_INTERSECTIONS = [
+  // Avenidas Corrientes
+  { s1: 'corrientes', s2: 'medrano', lat: -34.6036, lon: -58.4215, name: 'Av. Corrientes y Av. Medrano', sub: 'Almagro, CABA' },
+  { s1: 'corrientes', s2: 'pueyrredon', lat: -34.6045, lon: -58.4048, name: 'Av. Corrientes y Av. Pueyrredón', sub: 'Balvanera / Once, CABA' },
+  { s1: 'corrientes', s2: 'callao', lat: -34.6043, lon: -58.3926, name: 'Av. Corrientes y Av. Callao', sub: 'Balvanera / San Nicolás, CABA' },
+  { s1: 'corrientes', s2: '9 de julio', lat: -34.6037, lon: -58.3816, name: 'Av. Corrientes y Av. 9 de Julio (Obelisco)', sub: 'San Nicolás, CABA' },
+  { s1: 'corrientes', s2: 'angel gallardo', lat: -34.6015, lon: -58.4342, name: 'Av. Corrientes y Av. Ángel Gallardo', sub: 'Almagro / Villa Crespo, CABA' },
+  { s1: 'corrientes', s2: 'scalabrini ortiz', lat: -34.5976, lon: -58.4418, name: 'Av. Corrientes y Av. Scalabrini Ortiz', sub: 'Villa Crespo, CABA' },
+  { s1: 'corrientes', s2: 'juan b justo', lat: -34.5942, lon: -58.4468, name: 'Av. Corrientes y Av. Juan B. Justo', sub: 'Villa Crespo, CABA' },
+  { s1: 'corrientes', s2: 'dorrego', lat: -34.5912, lon: -58.4502, name: 'Av. Corrientes y Av. Dorrego', sub: 'Chacarita, CABA' },
+  { s1: 'corrientes', s2: 'federico lacroze', lat: -34.5862, lon: -58.4552, name: 'Av. Corrientes y Av. Federico Lacroze', sub: 'Chacarita, CABA' },
+  { s1: 'corrientes', s2: 'florida', lat: -34.6033, lon: -58.3752, name: 'Av. Corrientes y Florida', sub: 'San Nicolás / Microcentro, CABA' },
+  { s1: 'corrientes', s2: 'leandro n alem', lat: -34.6030, lon: -58.3705, name: 'Av. Corrientes y Av. Leandro N. Alem', sub: 'San Nicolás / Retiro, CABA' },
+  { s1: 'corrientes', s2: 'pastoril', lat: -34.6035, lon: -58.4110, name: 'Av. Corrientes y Anchorena (Abasto)', sub: 'Balvanera, CABA' },
+  { s1: 'corrientes', s2: 'anchorena', lat: -34.6035, lon: -58.4110, name: 'Av. Corrientes y Anchorena (Abasto)', sub: 'Balvanera, CABA' },
+  { s1: 'corrientes', s2: 'aguero', lat: -34.6030, lon: -58.4125, name: 'Av. Corrientes y Agüero (Abasto)', sub: 'Balvanera, CABA' },
+
+  // Avenida Santa Fe
+  { s1: 'santa fe', s2: 'callao', lat: -34.5947, lon: -58.3934, name: 'Av. Santa Fe y Av. Callao', sub: 'Recoleta, CABA' },
+  { s1: 'santa fe', s2: 'pueyrredon', lat: -34.5925, lon: -58.4018, name: 'Av. Santa Fe y Av. Pueyrredón', sub: 'Recoleta, CABA' },
+  { s1: 'santa fe', s2: 'coronel diaz', lat: -34.5878, lon: -58.4105, name: 'Av. Santa Fe y Av. Coronel Díaz (Alto Palermo)', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'scalabrini ortiz', lat: -34.5835, lon: -58.4182, name: 'Av. Santa Fe y Av. Scalabrini Ortiz', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'thames', lat: -34.5810, lon: -58.4210, name: 'Av. Santa Fe y Thames (Plaza Italia)', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'juan b justo', lat: -34.5775, lon: -58.4262, name: 'Av. Santa Fe y Av. Juan B. Justo (Pacífico)', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'dorrego', lat: -34.5750, lon: -58.4310, name: 'Av. Santa Fe y Av. Dorrego (Carranza)', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: '9 de julio', lat: -34.5940, lon: -58.3810, name: 'Av. Santa Fe y Av. 9 de Julio', sub: 'Retiro, CABA' },
+
+  // Avenida Córdoba
+  { s1: 'cordoba', s2: 'callao', lat: -34.6003, lon: -58.3933, name: 'Av. Córdoba y Av. Callao', sub: 'Recoleta / San Nicolás, CABA' },
+  { s1: 'cordoba', s2: 'pueyrredon', lat: -34.6006, lon: -58.4032, name: 'Av. Córdoba y Av. Pueyrredón', sub: 'Recoleta / Balvanera, CABA' },
+  { s1: 'cordoba', s2: 'medrano', lat: -34.5976, lon: -58.4232, name: 'Av. Córdoba y Av. Medrano', sub: 'Almagro / Palermo, CABA' },
+  { s1: 'cordoba', s2: 'gascon', lat: -34.5972, lon: -58.4242, name: 'Av. Córdoba y Gascón (Altura 4070)', sub: 'Almagro / Palermo, CABA' },
+  { s1: 'cordoba', s2: 'scalabrini ortiz', lat: -34.5942, lon: -58.4312, name: 'Av. Córdoba y Av. Scalabrini Ortiz', sub: 'Palermo / Villa Crespo, CABA' },
+  { s1: 'cordoba', s2: 'juan b justo', lat: -34.5908, lon: -58.4385, name: 'Av. Córdoba y Av. Juan B. Justo', sub: 'Palermo Queens / Villa Crespo, CABA' },
+  { s1: 'cordoba', s2: 'jorge newbery', lat: -34.5870, lon: -58.4440, name: 'Av. Córdoba y Jorge Newbery', sub: 'Chacarita, CABA' },
+  { s1: 'cordoba', s2: 'federico lacroze', lat: -34.5865, lon: -58.4455, name: 'Av. Córdoba y Av. Federico Lacroze', sub: 'Chacarita, CABA' },
+  { s1: 'cordoba', s2: '9 de julio', lat: -34.5998, lon: -58.3820, name: 'Av. Córdoba y Av. 9 de Julio', sub: 'Retiro / San Nicolás, CABA' },
+  { s1: 'cordoba', s2: 'florida', lat: -34.5990, lon: -58.3745, name: 'Av. Córdoba y Florida (Galerías Pacífico)', sub: 'Retiro, CABA' },
+  { s1: 'cordoba', s2: 'leandro n alem', lat: -34.5990, lon: -58.3715, name: 'Av. Córdoba y Av. Leandro N. Alem', sub: 'Retiro / Catalinas, CABA' },
+
+  // Avenida Luis María Campos
+  { s1: 'luis maria campos', s2: 'dorrego', lat: -34.5768, lon: -58.4284, name: 'Av. Luis M. Campos y Av. Dorrego', sub: 'Palermo / Las Cañitas, CABA' },
+  { s1: 'luis maria campos', s2: 'arevalo', lat: -34.5742, lon: -58.4308, name: 'Av. Luis M. Campos y Arévalo', sub: 'Las Cañitas, Palermo, CABA' },
+  { s1: 'luis maria campos', s2: 'chenaut', lat: -34.5728, lon: -58.4322, name: 'Av. Luis M. Campos y Tte. Benjamín Matienzo / Chenaut', sub: 'Las Cañitas, Palermo, CABA' },
+  { s1: 'luis maria campos', s2: 'maure', lat: -34.5682, lon: -58.4371, name: 'Av. Luis M. Campos y Maure (Solar de la Abadía)', sub: 'Las Cañitas, Palermo, CABA' },
+  { s1: 'luis maria campos', s2: 'olleros', lat: -34.5668, lon: -58.4392, name: 'Av. Luis M. Campos y Olleros', sub: 'Las Cañitas / Belgrano, CABA' },
+  { s1: 'luis maria campos', s2: 'federico lacroze', lat: -34.5645, lon: -58.4418, name: 'Av. Luis M. Campos y Av. Federico Lacroze', sub: 'Belgrano / Colegiales, CABA' },
+  { s1: 'luis maria campos', s2: 'virrey del pino', lat: -34.5620, lon: -58.4440, name: 'Av. Luis M. Campos y Virrey del Pino', sub: 'Belgrano, CABA' },
+
+  // Calles de Palermo Soho & Hollywood
+  { s1: 'thames', s2: 'charcas', lat: -34.5843, lon: -58.4236, name: 'Thames y Charcas', sub: 'Palermo, CABA' },
+  { s1: 'thames', s2: 'guemes', lat: -34.5855, lon: -58.4258, name: 'Thames y Güemes', sub: 'Palermo, CABA' },
+  { s1: 'thames', s2: 'paraguay', lat: -34.5865, lon: -58.4282, name: 'Thames y Paraguay', sub: 'Palermo Soho, CABA' },
+  { s1: 'thames', s2: 'gorriti', lat: -34.5880, lon: -58.4312, name: 'Thames y Gorriti', sub: 'Palermo Soho, CABA' },
+  { s1: 'thames', s2: 'honduras', lat: -34.5895, lon: -58.4338, name: 'Thames y Honduras (Plaza Serrano)', sub: 'Palermo Soho, CABA' },
+  { s1: 'thames', s2: 'costa rica', lat: -34.5905, lon: -58.4358, name: 'Thames y Costa Rica', sub: 'Palermo Soho, CABA' },
+  { s1: 'thames', s2: 'el salvador', lat: -34.5915, lon: -58.4378, name: 'Thames y El Salvador', sub: 'Palermo Soho, CABA' },
+
+  // Avenida Cabildo
+  { s1: 'cabildo', s2: 'juramento', lat: -34.5619, lon: -58.4564, name: 'Av. Cabildo y Av. Juramento', sub: 'Belgrano, CABA' },
+  { s1: 'cabildo', s2: 'mendoza', lat: -34.5610, lon: -58.4580, name: 'Av. Cabildo y Mendoza', sub: 'Belgrano, CABA' },
+  { s1: 'cabildo', s2: 'olazabal', lat: -34.5595, lon: -58.4600, name: 'Av. Cabildo y Olazábal', sub: 'Belgrano, CABA' },
+  { s1: 'cabildo', s2: 'monroe', lat: -34.5562, lon: -58.4632, name: 'Av. Cabildo y Av. Monroe', sub: 'Belgrano, CABA' },
+  { s1: 'cabildo', s2: 'congreso', lat: -34.5520, lon: -58.4670, name: 'Av. Cabildo y Av. Congreso', sub: 'Belgrano / Núñez, CABA' },
+  { s1: 'cabildo', s2: 'garcia del rio', lat: -34.5420, lon: -58.4730, name: 'Av. Cabildo y Av. García del Río', sub: 'Saavedra, CABA' },
+  { s1: 'cabildo', s2: 'general paz', lat: -34.5360, lon: -58.4680, name: 'Av. Cabildo y Av. Gral. Paz (Puente Saavedra)', sub: 'Saavedra / Vicente López' },
+  { s1: 'cabildo', s2: 'federico lacroze', lat: -34.5720, lon: -58.4460, name: 'Av. Cabildo y Av. Federico Lacroze', sub: 'Colegiales / Belgrano, CABA' },
+
+  // Avenida Rivadavia
+  { s1: 'rivadavia', s2: 'acoyte', lat: -34.6186, lon: -58.4367, name: 'Av. Rivadavia y Av. Acoyte / José M. Moreno', sub: 'Caballito, CABA' },
+  { s1: 'rivadavia', s2: 'jose maria moreno', lat: -34.6186, lon: -58.4367, name: 'Av. Rivadavia y Av. José María Moreno', sub: 'Caballito, CABA' },
+  { s1: 'rivadavia', s2: 'carabobo', lat: -34.6248, lon: -58.4578, name: 'Av. Rivadavia y Av. Carabobo', sub: 'Flores, CABA' },
+  { s1: 'rivadavia', s2: 'nazca', lat: -34.6288, lon: -58.4722, name: 'Av. Rivadavia y Av. Nazca / San Pedrito', sub: 'Flores, CABA' },
+  { s1: 'rivadavia', s2: 'san pedrito', lat: -34.6288, lon: -58.4722, name: 'Av. Rivadavia y San Pedrito', sub: 'Flores, CABA' },
+  { s1: 'rivadavia', s2: 'medrano', lat: -34.6125, lon: -58.4190, name: 'Av. Rivadavia y Av. Medrano / Castro Barros', sub: 'Almagro, CABA' },
+  { s1: 'rivadavia', s2: 'pueyrredon', lat: -34.6095, lon: -58.4072, name: 'Av. Rivadavia y Av. Pueyrredón (Plaza Miserere)', sub: 'Balvanera / Once, CABA' },
+  { s1: 'rivadavia', s2: 'callao', lat: -34.6095, lon: -58.3915, name: 'Av. Rivadavia y Av. Callao (Congreso)', sub: 'Balvanera / Montserrat, CABA' },
+  { s1: 'rivadavia', s2: '9 de julio', lat: -34.6080, lon: -58.3810, name: 'Av. Rivadavia y Av. 9 de Julio', sub: 'Monserrat / San Nicolás, CABA' },
+  { s1: 'rivadavia', s2: 'general paz', lat: -34.6400, lon: -58.5300, name: 'Av. Rivadavia y Av. Gral. Paz', sub: 'Liniers, CABA' },
+
+  // Avenida Las Heras
+  { s1: 'las heras', s2: 'coronel diaz', lat: -34.5832, lon: -58.4072, name: 'Av. Las Heras y Av. Coronel Díaz (Parque Las Heras)', sub: 'Palermo, CABA' },
+  { s1: 'las heras', s2: 'pueyrredon', lat: -34.5875, lon: -58.3974, name: 'Av. Las Heras y Av. Pueyrredón', sub: 'Recoleta, CABA' },
+  { s1: 'las heras', s2: 'callao', lat: -34.5902, lon: -58.3905, name: 'Av. Las Heras y Av. Callao', sub: 'Recoleta, CABA' },
+  { s1: 'las heras', s2: 'scalabrini ortiz', lat: -34.5810, lon: -58.4120, name: 'Av. Las Heras y Av. Scalabrini Ortiz (Botánico)', sub: 'Palermo, CABA' },
+
+  // Avenida del Libertador
+  { s1: 'libertador', s2: 'coronel diaz', lat: -34.5810, lon: -58.4030, name: 'Av. del Libertador y Av. Coronel Díaz', sub: 'Palermo Chico, CABA' },
+  { s1: 'libertador', s2: 'salguero', lat: -34.5785, lon: -58.4075, name: 'Av. del Libertador y Jerónimo Salguero', sub: 'Palermo Chico, CABA' },
+  { s1: 'libertador', s2: 'sarmiento', lat: -34.5740, lon: -58.4150, name: 'Av. del Libertador y Av. Sarmiento (Monumento)', sub: 'Palermo, CABA' },
+  { s1: 'libertador', s2: 'bullrich', lat: -34.5710, lon: -58.4230, name: 'Av. del Libertador y Av. Intendente Bullrich', sub: 'Palermo, CABA' },
+  { s1: 'libertador', s2: 'dorrego', lat: -34.5680, lon: -58.4280, name: 'Av. del Libertador y Av. Dorrego (Hipódromo)', sub: 'Palermo, CABA' },
+  { s1: 'libertador', s2: 'olleros', lat: -34.5615, lon: -58.4380, name: 'Av. del Libertador y Olleros', sub: 'Las Cañitas / Belgrano, CABA' },
+  { s1: 'libertador', s2: 'juramento', lat: -34.5560, lon: -58.4480, name: 'Av. del Libertador y Av. Juramento (Barrancas)', sub: 'Belgrano, CABA' },
+  { s1: 'libertador', s2: 'monroe', lat: -34.5510, lon: -58.4540, name: 'Av. del Libertador y Av. Monroe', sub: 'Belgrano, CABA' },
+  { s1: 'libertador', s2: 'congreso', lat: -34.5460, lon: -58.4610, name: 'Av. del Libertador y Av. Congreso', sub: 'Núñez, CABA' },
+  { s1: 'libertador', s2: 'general paz', lat: -34.5320, lon: -58.4750, name: 'Av. del Libertador y Av. Gral. Paz', sub: 'Núñez / Vicente López' },
+
+  // Otras Intersecciones Emblemáticas
+  { s1: 'san martin', s2: 'juan b justo', lat: -34.6035, lon: -58.4612, name: 'Av. San Martín y Av. Juan B. Justo', sub: 'La Paternal / Villa Crespo, CABA' },
+  { s1: 'triunvirato', s2: 'monroe', lat: -34.5732, lon: -58.4891, name: 'Av. Triunvirato y Av. Monroe', sub: 'Villa Urquiza, CABA' },
+  { s1: 'triunvirato', s2: 'olazabal', lat: -34.5745, lon: -58.4868, name: 'Av. Triunvirato y Olazábal', sub: 'Villa Urquiza, CABA' },
+  { s1: 'belgrano', s2: 'entre rios', lat: -34.6142, lon: -58.3912, name: 'Av. Belgrano y Av. Entre Ríos', sub: 'Balvanera / Montserrat, CABA' },
+  { s1: 'belgrano', s2: '9 de julio', lat: -34.6115, lon: -58.3812, name: 'Av. Belgrano y Av. 9 de Julio', sub: 'Montserrat, CABA' },
+  { s1: 'montes de oca', s2: 'martin garcia', lat: -34.6305, lon: -58.3725, name: 'Av. Montes de Oca y Av. Martín García', sub: 'Barracas, CABA' },
+  { s1: 'boedo', s2: 'san juan', lat: -34.6225, lon: -58.4180, name: 'Av. San Juan y Av. Boedo (Esquina Homero Manzi)', sub: 'Boedo, CABA' },
+  { s1: 'independencia', s2: '9 de julio', lat: -34.6175, lon: -58.3810, name: 'Av. Independencia y Av. 9 de Julio', sub: 'Constitución / San Telmo, CABA' },
+  { s1: 'san juan', s2: '9 de julio', lat: -34.6210, lon: -58.3810, name: 'Av. San Juan y Av. 9 de Julio', sub: 'Constitución, CABA' }
+];
+
+// Resolver esquinas conocidas con soporte bidireccional y conectores en español
+function findKnownIntersection(rawQuery) {
+  if (!rawQuery || typeof rawQuery !== 'string') return null;
+  const q = stripAccents(rawQuery.toLowerCase())
+    .replace(/^(esquina|esq\.?)\s+/i, '')
+    .replace(/\b(avenida|av\.?|calle|pasaje|pje\.?)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Detectar conectores de intersección: " y ", " e/ ", " esquina ", " esq ", " & "
+  const splitMatch = q.match(/^(.+?)\s+(?:y|esquina|esq\.?|e\/|&)\s+(.+)$/i);
+  if (!splitMatch) return null;
+
+  const part1 = splitMatch[1].trim();
+  const part2 = splitMatch[2].trim();
+  if (part1.length < 2 || part2.length < 2) return null;
+
+  for (const item of BUE_INTERSECTIONS) {
+    const s1 = stripAccents(item.s1.toLowerCase());
+    const s2 = stripAccents(item.s2.toLowerCase());
+
+    const direct = (part1.includes(s1) || s1.includes(part1)) && (part2.includes(s2) || s2.includes(part2));
+    const reverse = (part1.includes(s2) || s2.includes(part1)) && (part2.includes(s1) || s1.includes(part2));
+
+    if (direct || reverse) {
+      return {
+        lat: String(item.lat),
+        lon: String(item.lon),
+        display_name: `${item.name}, ${item.sub}`,
+        _mainTitle: item.name,
+        _subTitle: item.sub,
+        _icon: '🚦',
+        _isIntersection: true,
+        _poiBadge: 'Esquina / Intersección'
+      };
     }
   }
+
+  return null;
+}
+
+// Búsqueda de todas las esquinas que coincidan con la búsqueda (para autocompletado en tiempo real)
+function findKnownIntersectionsList(rawQuery) {
+  if (!rawQuery || typeof rawQuery !== 'string') return [];
+  const q = stripAccents(rawQuery.toLowerCase())
+    .replace(/^(esquina|esq\.?)\s+/i, '')
+    .replace(/\b(avenida|av\.?|calle|pasaje|pje\.?)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const isCornerQuery = /\s+(?:y|esquina|esq\.?|e\/|&)\s+/i.test(q) || /^esquina\b/i.test(rawQuery);
+  const matched = [];
+  const seenNames = new Set();
+
+  if (isCornerQuery) {
+    const single = findKnownIntersection(rawQuery);
+    if (single) return [single];
+
+    const split = q.split(/\s+(?:y|esquina|esq\.?|e\/|&)\s+/i);
+    const p1 = (split[0] || '').trim();
+    const p2 = (split[1] || '').trim();
+
+    BUE_INTERSECTIONS.forEach(item => {
+      const s1 = stripAccents(item.s1.toLowerCase());
+      const s2 = stripAccents(item.s2.toLowerCase());
+      const match1 = p1.length >= 2 && (s1.includes(p1) || p1.includes(s1));
+      const match2 = !p2 || (p2.length >= 2 && (s2.includes(p2) || p2.includes(s2)));
+      const revMatch1 = p1.length >= 2 && (s2.includes(p1) || p1.includes(s2));
+      const revMatch2 = !p2 || (p2.length >= 2 && (s1.includes(p2) || p2.includes(s1)));
+
+      if ((match1 && match2) || (revMatch1 && revMatch2)) {
+        if (!seenNames.has(item.name)) {
+          seenNames.add(item.name);
+          matched.push({
+            lat: String(item.lat),
+            lon: String(item.lon),
+            display_name: `${item.name}, ${item.sub}`,
+            _mainTitle: item.name,
+            _subTitle: item.sub,
+            _icon: '🚦',
+            _isIntersection: true,
+            _poiBadge: 'Esquina / Intersección'
+          });
+        }
+      }
+    });
+  }
+
+  return matched;
+}
+
+// Resolver coordenadas exactas para avenidas y calles con altura numérica (ej: Cordoba 4070, Luis Maria Campos 129)
+function resolveStreetNumberCoords(rawStr) {
+  if (!rawStr || typeof rawStr !== 'string') return null;
+  const qNorm = stripAccents(rawStr.toLowerCase());
+  const numMatch = qNorm.match(/\b\d{1,5}\b/);
+  if (!numMatch) return null;
+
+  const numVal = parseInt(numMatch[0], 10);
+  const streetNameNorm = qNorm
+    .replace(/\b\d{1,5}\b/, '')
+    .replace(/\b(avenida|av\.?|calle|pasaje|pje\.?)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (streetNameNorm.length < 2) return null;
+
+  // Av. Córdoba (0 a 6100): Retiro -> Balvanera/Recoleta -> Almagro/Palermo (4070) -> Chacarita
+  if (streetNameNorm.includes('cordoba')) {
+    const clamped = Math.max(1, Math.min(6100, numVal));
+    let lat, lon, sub;
+    if (clamped <= 1500) {
+      const r = clamped / 1500;
+      lat = -34.5990 + r * (-34.6000 - -34.5990);
+      lon = -58.3720 + r * (-58.3880 - -58.3720);
+      sub = 'Retiro / Tribunales / San Nicolás, CABA';
+    } else if (clamped <= 3200) {
+      const r = (clamped - 1500) / 1700;
+      lat = -34.6000 + r * (-34.6005 - -34.6000);
+      lon = -58.3880 + r * (-58.4100 - -58.3880);
+      sub = 'Recoleta / Balvanera, CABA';
+    } else if (clamped <= 4600) {
+      // 4070 está exactamente entre Medrano (3900) y Gascón (4100) en Almagro / Palermo
+      const r = (clamped - 3200) / 1400;
+      lat = -34.6005 + r * (-34.5940 - -34.6005);
+      lon = -58.4100 + r * (-58.4310 - -58.4100);
+      sub = 'Almagro / Palermo, CABA';
+    } else {
+      const r = (clamped - 4600) / 1500;
+      lat = -34.5940 + r * (-34.5870 - -34.5940);
+      lon = -58.4310 + r * (-58.4440 - -58.4310);
+      sub = 'Palermo Queens / Chacarita, CABA';
+    }
+    return {
+      lat: Number(lat.toFixed(6)),
+      lng: Number(lon.toFixed(6)),
+      address: `Av. Córdoba ${numVal}, ${sub}`
+    };
+  }
+
+  // Av. Luis María Campos (1 a 1700): Palermo / Las Cañitas (1-700) -> Belgrano (700-1700)
+  if (streetNameNorm.includes('luis maria campos') || streetNameNorm.includes('campos') || streetNameNorm.includes('luis m campos')) {
+    const clamped = Math.max(1, Math.min(1700, numVal));
+    const r = clamped / 1700;
+    const lat = -34.5770 + r * (-34.5620 - -34.5770);
+    const lon = -58.4280 + r * (-58.4440 - -58.4280);
+    const sub = clamped <= 700 ? 'Palermo / Las Cañitas, CABA' : 'Las Cañitas / Belgrano, CABA';
+    return {
+      lat: Number(lat.toFixed(6)),
+      lng: Number(lon.toFixed(6)),
+      address: `Av. Luis María Campos ${numVal}, ${sub}`
+    };
+  }
+
+  // Av. Santa Fe (1 a 5400)
+  if (streetNameNorm.includes('santa fe')) {
+    const clamped = Math.max(1, Math.min(5400, numVal));
+    const r = clamped / 5400;
+    const lat = -34.5950 + r * (-34.5750 - -34.5950);
+    const lon = -58.3780 + r * (-58.4280 - -58.3780);
+    const sub = clamped <= 1800 ? 'Retiro / Recoleta, CABA' : (clamped <= 3600 ? 'Recoleta / Palermo, CABA' : 'Palermo, CABA');
+    return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), address: `Av. Santa Fe ${numVal}, ${sub}` };
+  }
+
+  // Av. Corrientes (1 a 6900)
+  if (streetNameNorm.includes('corrientes')) {
+    const clamped = Math.max(1, Math.min(6900, numVal));
+    const r = clamped / 6900;
+    const lat = -34.6037 + r * (-34.5860 - -34.6037);
+    const lon = -58.3700 + r * (-58.4550 - -58.3700);
+    const sub = clamped <= 1500 ? 'San Nicolás / Centro, CABA' : (clamped <= 3000 ? 'Balvanera / Once, CABA' : (clamped <= 4200 ? 'Abasto / Almagro, CABA' : 'Villa Crespo / Chacarita, CABA'));
+    return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), address: `Av. Corrientes ${numVal}, ${sub}` };
+  }
+
+  // Av. Cabildo (1 a 5000)
+  if (streetNameNorm.includes('cabildo')) {
+    const clamped = Math.max(1, Math.min(5000, numVal));
+    const r = clamped / 5000;
+    const lat = -34.5750 + r * (-34.5360 - -34.5750);
+    const lon = -58.4420 + r * (-58.4680 - -58.4420);
+    const sub = clamped <= 2000 ? 'Colegiales / Belgrano, CABA' : (clamped <= 3500 ? 'Belgrano, CABA' : 'Núñez / Saavedra, CABA');
+    return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), address: `Av. Cabildo ${numVal}, ${sub}` };
+  }
+
+  // Av. Rivadavia (1 a 12000)
+  if (streetNameNorm.includes('rivadavia')) {
+    const clamped = Math.max(1, Math.min(12000, numVal));
+    const r = clamped / 12000;
+    const lat = -34.6080 + r * (-34.6390 - -34.6080);
+    const lon = -58.3710 + r * (-58.5300 - -58.3710);
+    const sub = clamped <= 2500 ? 'Congreso / Balvanera, CABA' : (clamped <= 6000 ? 'Almagro / Caballito, CABA' : (clamped <= 8500 ? 'Flores, CABA' : 'Liniers, CABA'));
+    return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), address: `Av. Rivadavia ${numVal}, ${sub}` };
+  }
+
+  // Av. del Libertador (1 a 15000)
+  if (streetNameNorm.includes('libertador')) {
+    const clamped = Math.max(1, Math.min(15000, numVal));
+    const r = clamped / 15000;
+    const lat = -34.5890 + r * (-34.5200 - -34.5890);
+    const lon = -58.3780 + r * (-58.4800 - -58.3780);
+    const sub = clamped <= 3000 ? 'Retiro / Recoleta, CABA' : (clamped <= 6000 ? 'Palermo / Las Cañitas, CABA' : (clamped <= 9000 ? 'Belgrano / Núñez, CABA' : 'Vicente López / San Isidro, PBA'));
+    return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), address: `Av. del Libertador ${numVal}, ${sub}` };
+  }
+
+  return null;
+}
+
+// Resolver dirección a coordenadas con máxima precisión y 0 caídas al Obelisco
+function resolveAddressCoords(addressStr, defaultFallback) {
+  if (!addressStr || typeof addressStr !== 'string') return defaultFallback;
+  const raw = addressStr.trim();
+  const norm = stripAccents(raw.toLowerCase());
+
+  // 1. Esquinas e Intersecciones conocidas (ej: Thames y Charcas, Córdoba y Medrano, Cabildo y Juramento)
+  const inter = findKnownIntersection(raw);
+  if (inter && inter.lat && inter.lon) {
+    return { lat: parseFloat(inter.lat), lng: parseFloat(inter.lon), address: inter.display_name || addressStr };
+  }
+
+  // 2. POIs y Destinos Estratégicos Clave (Abasto, Alto Palermo, Dot, Unicenter, Aeropuertos)
+  if (norm.includes('abasto')) {
+    return { lat: -34.6035, lng: -58.4110, address: 'Abasto Shopping, Av. Corrientes 3247, Balvanera, CABA' };
+  }
+  if (norm.includes('alto palermo')) {
+    return { lat: -34.5878, lng: -58.4105, address: 'Alto Palermo Shopping, Av. Santa Fe 3253, Palermo, CABA' };
+  }
+  if (norm.includes('dot baires') || norm.includes('dot shopping')) {
+    return { lat: -34.5450, lng: -58.4890, address: 'Dot Baires Shopping, Vedia 3600, Saavedra, CABA' };
+  }
+  if (norm.includes('unicenter')) {
+    return { lat: -34.5085, lng: -58.5235, address: 'Unicenter Shopping, Paraná 3745, Martínez, PBA' };
+  }
+  if (/aeroparque|jorge newbery|\baep\b/.test(norm)) {
+    return { lat: -34.5580, lng: -58.4170, address: 'Aeroparque Internacional Jorge Newbery (AEP), Palermo, CABA' };
+  }
+  if (/ezeiza|pistarini|\beze\b/.test(norm)) {
+    return { lat: -34.8222, lng: -58.5358, address: 'Aeropuerto Internacional Ministro Pistarini (Ezeiza), PBA' };
+  }
+  if (norm.includes('buquebus')) {
+    return { lat: -34.5975, lng: -58.3685, address: 'Terminal Buquebus Puerto Madero, CABA' };
+  }
+  if (norm.includes('solar de la abadia')) {
+    return { lat: -34.5668, lng: -58.4392, address: 'El Solar Shopping, Av. Luis M. Campos 901, Las Cañitas, CABA' };
+  }
+  if (norm.includes('hilton')) {
+    return { lat: -34.6050, lng: -58.3644, address: 'Hotel Hilton Buenos Aires, Puerto Madero' };
+  }
+  if (norm.includes('faena')) {
+    return { lat: -34.6145, lng: -58.3620, address: 'Faena Hotel Buenos Aires, Puerto Madero' };
+  }
+  if (norm.includes('obelisco') || norm.includes('plaza de la republica')) {
+    return { lat: -34.6037, lng: -58.3816, address: 'Obelisco de Buenos Aires, San Nicolás, CABA' };
+  }
+
+  // 3. Avenidas y Calles con Altura Numérica (ej: Cordoba 4070, Luis Maria Campos 129, Santa Fe 3200)
+  const streetCoords = resolveStreetNumberCoords(raw);
+  if (streetCoords && streetCoords.lat && streetCoords.lng) {
+    return { lat: streetCoords.lat, lng: streetCoords.lng, address: streetCoords.address || addressStr };
+  }
+
+  // 4. Búsqueda segura en tabla de Barrios y Puntos AMBA (sin falsos positivos)
+  for (const [key, coords] of Object.entries(BUE_LANDMARKS)) {
+    if (key === 'corrientes' || key === 'centro') continue;
+    const regex = new RegExp(`(^|\\b)${key}(\\b|$)`, 'i');
+    if (regex.test(norm)) {
+      return { lat: coords.lat, lng: coords.lng, address: coords.address || addressStr };
+    }
+  }
+
   return defaultFallback;
 }
 
@@ -5648,6 +6053,12 @@ function getInstantLocalSuggestions(rawQuery) {
       seen.add(key);
       results.push(item);
     }
+  // 0. Esquinas e Intersecciones en Tiempo Real (Prioridad Máxima)
+  if (typeof findKnownIntersectionsList === 'function') {
+    const matchedCorners = findKnownIntersectionsList(query);
+    if (Array.isArray(matchedCorners) && matchedCorners.length > 0) {
+      matchedCorners.forEach(c => pushItem(c));
+    }
   }
 
   // 1. Puntos estratégicos, Aeropuertos, Terminales y Shoppings
@@ -6047,22 +6458,29 @@ function getInstantLocalSuggestions(rawQuery) {
       let finalLon = s.startLon;
 
       if (numberVal > 0 && s.maxNum > 0) {
-        // Cálculo con altura exacta ingresada
-        const ratio = Math.min(1.0, Math.max(0.0, numberVal / s.maxNum));
-        finalLat = s.startLat + ratio * (s.endLat - s.startLat);
-        finalLon = s.startLon + ratio * (s.endLon - s.startLon);
+        // Cálculo con altura exacta ingresada de alta fidelidad
+        const streetResolved = (typeof resolveStreetNumberCoords === 'function') ? resolveStreetNumberCoords(`${s.name} ${numberStr}`) : null;
+        let finalLat = streetResolved ? streetResolved.lat : s.startLat;
+        let finalLon = streetResolved ? streetResolved.lng : s.startLon;
+        let subTitle = (streetResolved && streetResolved.address) ? streetResolved.address.split(',').slice(1).join(',').trim() : s.sub;
+
+        if (!streetResolved) {
+          const ratio = Math.min(1.0, Math.max(0.0, numberVal / s.maxNum));
+          finalLat = Number((s.startLat + ratio * (s.endLat - s.startLat)).toFixed(6));
+          finalLon = Number((s.startLon + ratio * (s.endLon - s.startLon)).toFixed(6));
+        }
 
         const fullTitle = `${s.name} ${numberStr}`;
         pushItem({
-          lat: String(finalLat.toFixed(6)),
-          lon: String(finalLon.toFixed(6)),
-          display_name: `${fullTitle}, ${s.sub}`,
+          lat: String(finalLat),
+          lon: String(finalLon),
+          display_name: `${fullTitle}, ${subTitle}`,
           _isIntersection: false,
           _isPoi: false,
           _poiBadge: `Dirección Exacta (Altura ${numberStr})`,
           _icon: '📍',
           _mainTitle: fullTitle,
-          _subTitle: s.sub
+          _subTitle: subTitle
         });
       } else {
         // Si no ingresó número de altura, mostrar la calle principal Y ejemplos de altura
@@ -6100,26 +6518,31 @@ function getInstantLocalSuggestions(rawQuery) {
     }
   });
 
-  // 3. GENERADOR DINÁMICO UNIVERSAL DE CALLE Y ALTURA (Garantiza 0ms para CUALQUIER dirección ingresada)
+  // 3. GENERADOR DINÁMICO UNIVERSAL DE CALLE Y ALTURA (Sólo si NO se encontró una avenida o esquina conocida)
   const cleanStreetName = capitalizeWords(streetOnly || query.replace(/\b\d{1,5}\b/, '').trim());
 
-  if (numberVal > 0) {
+  if (numberVal > 0 && !matchedAvenue) {
     const customTitle = `${cleanStreetName} ${numberStr}`;
+    const dynamicCoords = (typeof resolveStreetNumberCoords === 'function') ? resolveStreetNumberCoords(`${cleanStreetName} ${numberStr}`) : null;
+    const finalLat = dynamicCoords ? String(dynamicCoords.lat) : '-34.5990';
+    const finalLon = dynamicCoords ? String(dynamicCoords.lng) : '-58.4200';
+    const finalSub = dynamicCoords ? dynamicCoords.address : `${cleanStreetName} ${numberStr}, Ciudad Autónoma de Buenos Aires`;
+
     pushItem({
-      lat: '-34.6037',
-      lon: '-58.3816',
-      display_name: `${customTitle}, Buenos Aires, Argentina`,
+      lat: finalLat,
+      lon: finalLon,
+      display_name: `${customTitle}, ${finalSub}`,
       _isIntersection: false,
       _isPoi: false,
       _poiBadge: `Dirección Exacta (Altura ${numberStr})`,
       _icon: '📍',
       _mainTitle: customTitle,
-      _subTitle: `${cleanStreetName} ${numberStr}, Ciudad Autónoma de Buenos Aires / GBA`
+      _subTitle: finalSub
     });
   } else if (cleanStreetName.length >= 3 && !matchedAvenue) {
     pushItem({
-      lat: '-34.6037',
-      lon: '-58.3816',
+      lat: '-34.5990',
+      lon: '-58.4200',
       display_name: `${cleanStreetName}, Buenos Aires, Argentina`,
       _isIntersection: false,
       _isPoi: false,
@@ -6131,8 +6554,8 @@ function getInstantLocalSuggestions(rawQuery) {
 
     [500, 1000, 1500, 2000, 3000].forEach(sampleNum => {
       pushItem({
-        lat: '-34.6037',
-        lon: '-58.3816',
+        lat: '-34.5990',
+        lon: '-58.4200',
         display_name: `${cleanStreetName} ${sampleNum}, Buenos Aires, Argentina`,
         _isIntersection: false,
         _isPoi: false,
@@ -6162,16 +6585,47 @@ async function searchLocations(rawQuery, signal) {
   if (query.length < 2) return (typeof getDefaultPopularDestinations === 'function') ? getDefaultPopularDestinations() : [];
 
   const results = [];
-  const seenKeys = new Set();
+  const seenTitles = new Set();
+  const userNumMatch = query.match(/\b\d{1,5}\b/);
+  const userNum = userNumMatch ? userNumMatch[0] : null;
 
   function addResult(item, prepend = false) {
     if (!item || !item.lat || !item.lon || !item.display_name) return;
     const latF = parseFloat(item.lat);
     const lonF = parseFloat(item.lon);
     if (isNaN(latF) || isNaN(lonF)) return;
-    const key = (item.display_name || `${latF.toFixed(4)},${lonF.toFixed(4)}`).toLowerCase().trim();
-    if (!seenKeys.has(key)) {
-      seenKeys.add(key);
+
+    // Control de límites AMBA / Gran Buenos Aires / CABA: descartar coordenadas fuera del área metropolitana
+    if (latF < -35.3 || latF > -34.1 || lonF < -59.5 || lonF > -57.8) return;
+
+    // Clave de normalización para deduplicación estricta
+    const rawTitle = (item._mainTitle || item.display_name || '').toLowerCase();
+    const normTitle = rawTitle
+      .replace(/^(av\.|avenida|calle|pasaje|bvd\.|boulevard)\s+/i, '')
+      .replace(/[,\.\-\/]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Comprobar si ya existe un resultado con el mismo título normalizado o a menos de 250m con nombre idéntico
+    const duplicate = results.some(existing => {
+      const exRaw = (existing._mainTitle || existing.display_name || '').toLowerCase();
+      const exNorm = exRaw
+        .replace(/^(av\.|avenida|calle|pasaje|bvd\.|boulevard)\s+/i, '')
+        .replace(/[,\.\-\/]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (exNorm === normTitle) return true;
+      const exLat = parseFloat(existing.lat);
+      const exLon = parseFloat(existing.lon);
+      const distKm = Math.hypot(exLat - latF, exLon - lonF) * 111;
+      if (distKm < 0.25 && (exNorm.includes(normTitle.slice(0, 8)) || normTitle.includes(exNorm.slice(0, 8)))) {
+        return true;
+      }
+      return false;
+    });
+
+    if (!duplicate) {
+      seenTitles.add(normTitle);
       if (prepend) {
         results.unshift(item);
       } else {
@@ -6180,7 +6634,7 @@ async function searchLocations(rawQuery, signal) {
     }
   }
 
-  // 1. Incorporar SIEMPRE las sugerencias locales inteligentes instantáneas (Avenidas, calles, alturas CABA/GBA, POIs)
+  // 1. Incorporar SIEMPRE las sugerencias locales inteligentes instantáneas (Avenidas, esquinas, calles, alturas CABA/GBA, POIs)
   if (typeof getInstantLocalSuggestions === 'function') {
     try {
       const localItems = getInstantLocalSuggestions(query);
@@ -6190,9 +6644,17 @@ async function searchLocations(rawQuery, signal) {
     } catch(e) {}
   }
 
-  // 2. Aeropuertos y terminales clave prioritarias si coinciden
+  // 2. POIs y terminales clave prioritarias si coinciden
   const queryLower = query.toLowerCase();
-  if (/aeroparque|jorge newbery|aep/i.test(queryLower)) {
+  if (/abasto/i.test(queryLower)) {
+    addResult({
+      lat: '-34.6035', lon: '-58.4110',
+      display_name: 'Abasto Shopping, Avenida Corrientes 3247, Balvanera, CABA, Argentina',
+      _mainTitle: 'Abasto Shopping',
+      _subTitle: 'Av. Corrientes 3247, Balvanera, CABA',
+      _icon: '🛍️'
+    }, true);
+  } else if (/aeroparque|jorge newbery|aep/i.test(queryLower)) {
     addResult({
       lat: '-34.5580', lon: '-58.4170',
       display_name: 'Aeroparque Internacional Jorge Newbery (AEP), Avenida Costanera Rafael Obligado, Buenos Aires, Argentina',
@@ -6243,18 +6705,39 @@ async function searchLocations(rawQuery, signal) {
           if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length >= 2) {
             const [lon, lat] = f.geometry.coordinates;
             const p = f.properties || {};
-            const streetName = p.street || p.name || cleanQ;
-            const houseNum = p.housenumber ? `${p.housenumber}, ` : '';
-            const loc = p.district || p.suburb || p.locality || p.city || '';
+            let streetName = p.street || p.name || cleanQ;
+            let houseNum = p.housenumber || '';
+
+            // Sanitización de altura numérica: si el usuario escribió un número exacto y el proveedor devolvió otro deformado, respetar al usuario
+            if (userNum) {
+              if (!houseNum || houseNum !== userNum) {
+                houseNum = userNum;
+              }
+              streetName = streetName.replace(/\b\d{1,5}\b/g, '').trim();
+            }
+
+            let loc = p.district || p.suburb || p.locality || p.city || '';
+            // Luis María Campos discurre entre Palermo y Belgrano; NUNCA es Recoleta
+            if (/luis\s*m(ar[ií]a)?\s*campos/i.test(streetName)) {
+              loc = 'Palermo / Belgrano';
+            }
+            // Av Córdoba a alturas mayores a 3500 es Almagro / Palermo
+            if (/c[oó]rdoba/i.test(streetName) && userNum && parseInt(userNum) >= 3500) {
+              loc = 'Almagro / Palermo';
+            }
+
             const state = p.state || (p.countrycode === 'AR' ? 'Buenos Aires' : '');
             const country = p.country || 'Argentina';
-            const parts = [`${houseNum}${streetName}`.trim(), loc, state, country].filter(Boolean);
+            const displayHouse = houseNum ? `${houseNum}, ` : '';
+            const mainTitle = houseNum ? `${streetName} ${houseNum}`.trim() : streetName;
+            const parts = [mainTitle, loc, state, country].filter(Boolean);
             const fullDisplay = parts.join(', ');
+
             addResult({
               lat: String(lat),
               lon: String(lon),
               display_name: fullDisplay,
-              _mainTitle: `${houseNum}${streetName}`.trim(),
+              _mainTitle: mainTitle,
               _subTitle: [loc, state, country].filter(Boolean).join(', ') || 'Buenos Aires, Argentina',
               _icon: '📍'
             }, false);
@@ -6278,12 +6761,27 @@ async function searchLocations(rawQuery, signal) {
         if (Array.isArray(nomList) && nomList.length > 0) {
           nomList.forEach(item => {
             const a = item.address || {};
-            const street = a.road || a.pedestrian || a.street || item.name || cleanQ;
-            const houseNum = a.house_number ? `${a.house_number}, ` : '';
-            const suburb = a.suburb || a.neighbourhood || a.city_district || '';
+            let street = a.road || a.pedestrian || a.street || item.name || cleanQ;
+            let houseNum = a.house_number || '';
+
+            if (userNum) {
+              if (!houseNum || houseNum !== userNum) {
+                houseNum = userNum;
+              }
+              street = street.replace(/\b\d{1,5}\b/g, '').trim();
+            }
+
+            let suburb = a.suburb || a.neighbourhood || a.city_district || '';
+            if (/luis\s*m(ar[ií]a)?\s*campos/i.test(street)) {
+              suburb = 'Palermo / Belgrano';
+            }
+            if (/c[oó]rdoba/i.test(street) && userNum && parseInt(userNum) >= 3500) {
+              suburb = 'Almagro / Palermo';
+            }
+
             const city = a.city || a.town || a.municipality || 'Buenos Aires';
             const state = a.state || 'Argentina';
-            const mainTitle = `${houseNum}${street}`.trim() || (item.display_name ? item.display_name.split(',')[0] : cleanQ);
+            const mainTitle = houseNum ? `${street} ${houseNum}`.trim() : (street || cleanQ);
             const subTitle = [suburb, city, state].filter(Boolean).join(', ') || 'Buenos Aires, Argentina';
             addResult({
               lat: String(item.lat),
@@ -6299,15 +6797,21 @@ async function searchLocations(rawQuery, signal) {
     } catch(e) {}
   }
 
-  // 5. Fallback garantizado absoluto
+  // 5. Fallback garantizado inteligente (nunca forzar Obelisco a ciegas)
   if (results.length === 0 && query.length >= 2) {
     const capitalized = query.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    const smartCoords = (typeof resolveAddressCoords === 'function')
+      ? resolveAddressCoords(query, { lat: -34.6037, lng: -58.3816, address: `${capitalized}, CABA` })
+      : { lat: -34.6037, lng: -58.3816, address: `${capitalized}, CABA` };
+
     addResult({
-      lat: '-34.6037',
-      lon: '-58.3816',
-      display_name: `${capitalized}, Ciudad Autónoma de Buenos Aires, Argentina`,
+      lat: String(smartCoords.lat),
+      lon: String(smartCoords.lng),
+      display_name: smartCoords.address || `${capitalized}, Ciudad Autónoma de Buenos Aires, Argentina`,
       _mainTitle: capitalized,
-      _subTitle: 'Ciudad Autónoma de Buenos Aires, Argentina',
+      _subTitle: (smartCoords.address && smartCoords.address.includes(',')) 
+        ? smartCoords.address.split(',').slice(1).join(',').trim() 
+        : 'Ciudad Autónoma de Buenos Aires, Argentina',
       _icon: '📍'
     });
   }
@@ -6338,10 +6842,27 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     if (!items || items.length === 0) {
       list.classList.add('hidden');
       list.style.display = 'none';
-      if (wrap) wrap.classList.remove('has-suggestions');
-      if (parentRow) parentRow.classList.remove('has-active-suggestions');
+      if (wrap) {
+        wrap.classList.remove('has-suggestions');
+        wrap.style.removeProperty('z-index');
+      }
+      if (parentRow) {
+        parentRow.classList.remove('has-active-suggestions');
+        parentRow.style.removeProperty('z-index');
+      }
+      if (fieldBody) {
+        fieldBody.style.removeProperty('z-index');
+      }
       return;
     }
+
+    // Resetear z-index y clase de sugerencias en TODOS los demás contenedores de la pantalla para evitar que tapen este menú
+    document.querySelectorAll('.input-field-wrap, .uber-input-field-wrap').forEach(w => {
+      if (w !== wrap) {
+        w.classList.remove('has-suggestions');
+        w.style.removeProperty('z-index');
+      }
+    });
 
     list.classList.remove('hidden');
     list.style.setProperty('display', 'flex', 'important');
@@ -6428,9 +6949,19 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     currentResults = [];
 
     const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
-    if (wrap) wrap.classList.remove('has-suggestions');
+    if (wrap) {
+      wrap.classList.remove('has-suggestions');
+      wrap.style.removeProperty('z-index');
+    }
     const parentRow = input.closest('.uber-input-row');
-    if (parentRow) parentRow.classList.remove('has-active-suggestions');
+    if (parentRow) {
+      parentRow.classList.remove('has-active-suggestions');
+      parentRow.style.removeProperty('z-index');
+    }
+    const fieldBody = input.closest('.field-body');
+    if (fieldBody) {
+      fieldBody.style.removeProperty('z-index');
+    }
 
     const clearBtn = input.parentElement ? input.parentElement.querySelector('.btn-clear-address') : null;
     if (clearBtn) {
@@ -6461,12 +6992,17 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
     if (instantItems.length === 0 && query.length >= 2) {
       const cap = (typeof capitalizeWords === 'function') ? capitalizeWords(query) : query;
+      const smartCoords = (typeof resolveAddressCoords === 'function') 
+        ? resolveAddressCoords(query, { lat: -34.6037, lng: -58.3816, address: `${cap}, CABA` })
+        : { lat: -34.6037, lng: -58.3816, address: `${cap}, CABA` };
       instantItems.push({
-        lat: '-34.6037',
-        lon: '-58.3816',
-        display_name: `${cap}, Ciudad Autónoma de Buenos Aires, Argentina`,
+        lat: String(smartCoords.lat),
+        lon: String(smartCoords.lng),
+        display_name: smartCoords.address || `${cap}, Ciudad Autónoma de Buenos Aires, Argentina`,
         _mainTitle: cap,
-        _subTitle: 'Ciudad Autónoma de Buenos Aires, Argentina',
+        _subTitle: (smartCoords.address && smartCoords.address.includes(',')) 
+          ? smartCoords.address.split(',').slice(1).join(',').trim() 
+          : 'Ciudad Autónoma de Buenos Aires, Argentina',
         _icon: '📍'
       });
     }
@@ -6524,9 +7060,19 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       list.classList.add('hidden');
       list.style.display = 'none';
       const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
-      if (wrap) wrap.classList.remove('has-suggestions');
+      if (wrap) {
+        wrap.classList.remove('has-suggestions');
+        wrap.style.removeProperty('z-index');
+      }
       const parentRow = input.closest('.uber-input-row');
-      if (parentRow) parentRow.classList.remove('has-active-suggestions');
+      if (parentRow) {
+        parentRow.classList.remove('has-active-suggestions');
+        parentRow.style.removeProperty('z-index');
+      }
+      const fieldBody = input.closest('.field-body');
+      if (fieldBody) {
+        fieldBody.style.removeProperty('z-index');
+      }
       return;
     }
 
@@ -6540,12 +7086,17 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
 
     if (instantMatches.length === 0 && query.length >= 2) {
       const cap = (typeof capitalizeWords === 'function') ? capitalizeWords(query) : query;
+      const smartCoords = (typeof resolveAddressCoords === 'function') 
+        ? resolveAddressCoords(query, { lat: -34.6037, lng: -58.3816, address: `${cap}, CABA` })
+        : { lat: -34.6037, lng: -58.3816, address: `${cap}, CABA` };
       instantMatches.push({
-        lat: '-34.6037',
-        lon: '-58.3816',
-        display_name: `${cap}, Ciudad Autónoma de Buenos Aires, Argentina`,
+        lat: String(smartCoords.lat),
+        lon: String(smartCoords.lng),
+        display_name: smartCoords.address || `${cap}, Ciudad Autónoma de Buenos Aires, Argentina`,
         _mainTitle: cap,
-        _subTitle: 'Ciudad Autónoma de Buenos Aires, Argentina',
+        _subTitle: (smartCoords.address && smartCoords.address.includes(',')) 
+          ? smartCoords.address.split(',').slice(1).join(',').trim() 
+          : 'Ciudad Autónoma de Buenos Aires, Argentina',
         _icon: '📍'
       });
     }
@@ -6599,9 +7150,19 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       list.classList.add('hidden');
       list.style.display = 'none';
       const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
-      if (wrap) wrap.classList.remove('has-suggestions');
+      if (wrap) {
+        wrap.classList.remove('has-suggestions');
+        wrap.style.removeProperty('z-index');
+      }
       const parentRow = input.closest('.uber-input-row');
-      if (parentRow) parentRow.classList.remove('has-active-suggestions');
+      if (parentRow) {
+        parentRow.classList.remove('has-active-suggestions');
+        parentRow.style.removeProperty('z-index');
+      }
+      const fieldBody = input.closest('.field-body');
+      if (fieldBody) {
+        fieldBody.style.removeProperty('z-index');
+      }
     }
   });
 
@@ -6610,9 +7171,19 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
       list.classList.add('hidden');
       list.style.display = 'none';
       const wrap = input.closest('.input-field-wrap') || input.closest('.uber-input-field-wrap');
-      if (wrap) wrap.classList.remove('has-suggestions');
+      if (wrap) {
+        wrap.classList.remove('has-suggestions');
+        wrap.style.removeProperty('z-index');
+      }
       const parentRow = input.closest('.uber-input-row');
-      if (parentRow) parentRow.classList.remove('has-active-suggestions');
+      if (parentRow) {
+        parentRow.classList.remove('has-active-suggestions');
+        parentRow.style.removeProperty('z-index');
+      }
+      const fieldBody = input.closest('.field-body');
+      if (fieldBody) {
+        fieldBody.style.removeProperty('z-index');
+      }
     }
   };
 
@@ -8299,12 +8870,12 @@ if (btnRequestInapp) {
     const isReservation = (state.tripType === 'schedule');
     const curTodayStr = formatDateToString(new Date());
 
-    // Si es reserva para hoy, verificar regla de 45 minutos
+    // Si es reserva para hoy, verificar regla estricta de 50 minutos
     if (isReservation && state.date === curTodayStr && typeof getMinAllowedTimeForDate === 'function') {
       const minAllowed = getMinAllowedTimeForDate(curTodayStr);
       const [h, m] = (state.time || '00:00').split(':').map(Number);
       if ((h * 60 + m) < minAllowed) {
-        showToast('⚠️ Las reservas para el mismo día requieren al menos 45 minutos de anticipación.');
+        showToast('⚠️ Las reservas para el mismo día requieren al menos 50 minutos de anticipación para que un conductor la acepte.');
         goToWizardStep(4);
         return;
       }
@@ -8880,6 +9451,10 @@ let pCurrentDriverCoords = null;
 let pActiveTripData = null;
 
 const PASSENGER_BUE_LANDMARKS = {
+  'abasto': { lat: -34.6035, lng: -58.4110 },
+  'abasto shopping': { lat: -34.6035, lng: -58.4110 },
+  'alto palermo': { lat: -34.5878, lng: -58.4105 },
+  'alto palermo shopping': { lat: -34.5878, lng: -58.4105 },
   'ezeiza': { lat: -34.8150, lng: -58.5348 },
   'aeropuerto internacional de ezeiza': { lat: -34.8150, lng: -58.5348 },
   'aeropuerto de ezeiza': { lat: -34.8150, lng: -58.5348 },
@@ -8888,10 +9463,9 @@ const PASSENGER_BUE_LANDMARKS = {
   'aeroparque jorge newbery': { lat: -34.5580, lng: -58.4173 },
   'aep': { lat: -34.5580, lng: -58.4173 },
   'obelisco': { lat: -34.6037, lng: -58.3816 },
-  'centro': { lat: -34.6037, lng: -58.3816 },
+  'plaza de la republica': { lat: -34.6037, lng: -58.3816 },
   '9 de julio': { lat: -34.6037, lng: -58.3816 },
   'av. 9 de julio': { lat: -34.6037, lng: -58.3816 },
-  'corrientes': { lat: -34.6037, lng: -58.3816 },
   'puerto madero': { lat: -34.6118, lng: -58.3644 },
   'palermo': { lat: -34.5889, lng: -58.4306 },
   'recoleta': { lat: -34.5875, lng: -58.3974 },
@@ -8921,9 +9495,20 @@ const PASSENGER_BUE_LANDMARKS = {
 
 function resolvePassengerCoords(addressStr, defaultFallback) {
   if (!addressStr || typeof addressStr !== 'string') return defaultFallback;
+  // 1. Intentar con el motor central de geocodificación de alta fidelidad (POIs, esquinas, alturas exactas)
+  if (typeof resolveAddressCoords === 'function') {
+    const resolved = resolveAddressCoords(addressStr, null);
+    if (resolved && resolved.lat && resolved.lng) {
+      return { lat: resolved.lat, lng: resolved.lng };
+    }
+  }
+
+  // 2. Coincidencia segura por límites de palabra (sin falsos positivos)
   const norm = addressStr.toLowerCase().trim();
   for (const [key, coords] of Object.entries(PASSENGER_BUE_LANDMARKS)) {
-    if (norm.includes(key)) {
+    if (key === 'corrientes' || key === 'centro') continue;
+    const regex = new RegExp(`(^|\\b)${key}(\\b|$)`, 'i');
+    if (regex.test(norm)) {
       return coords;
     }
   }
