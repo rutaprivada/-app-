@@ -6053,6 +6053,8 @@ function getInstantLocalSuggestions(rawQuery) {
       seen.add(key);
       results.push(item);
     }
+  }
+
   // 0. Esquinas e Intersecciones en Tiempo Real (Prioridad Máxima)
   if (typeof findKnownIntersectionsList === 'function') {
     const matchedCorners = findKnownIntersectionsList(query);
