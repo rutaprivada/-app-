@@ -4905,6 +4905,25 @@ function findKnownIntersectionsList(rawQuery) {
   return matched;
 }
 
+// Función auxiliar para interpolar tramos reales entre anclas calibradas de avenidas
+function interpolateAvenueSegments(num, anchors) {
+  if (!anchors || anchors.length === 0) return null;
+  const n = Math.max(anchors[0].num, Math.min(anchors[anchors.length - 1].num, num));
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const a1 = anchors[i];
+    const a2 = anchors[i + 1];
+    if (n >= a1.num && n <= a2.num) {
+      const span = a2.num - a1.num;
+      const r = span > 0 ? (n - a1.num) / span : 0;
+      const lat = a1.lat + r * (a2.lat - a1.lat);
+      const lon = a1.lon + r * (a2.lon - a1.lon);
+      return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), sub: (r > 0.5 && a2.sub) ? a2.sub : (a1.sub || a2.sub) };
+    }
+  }
+  const last = anchors[anchors.length - 1];
+  return { lat: last.lat, lng: last.lon, sub: last.sub };
+}
+
 // Resolver coordenadas exactas para avenidas y calles con altura numérica (ej: Cordoba 4070, Luis Maria Campos 129)
 function resolveStreetNumberCoords(rawStr) {
   if (!rawStr || typeof rawStr !== 'string') return null;
@@ -4921,101 +4940,118 @@ function resolveStreetNumberCoords(rawStr) {
 
   if (streetNameNorm.length < 2) return null;
 
-  // Av. Córdoba (0 a 6100): Retiro -> Balvanera/Recoleta -> Almagro/Palermo (4070) -> Chacarita
+  // 1. Av. Córdoba (0 a 6100): Calibrada con precisión métrica sobre la traza real
   if (streetNameNorm.includes('cordoba')) {
-    const clamped = Math.max(1, Math.min(6100, numVal));
-    let lat, lon, sub;
-    if (clamped <= 1500) {
-      const r = clamped / 1500;
-      lat = -34.5990 + r * (-34.6000 - -34.5990);
-      lon = -58.3720 + r * (-58.3880 - -58.3720);
-      sub = 'Retiro / Tribunales / San Nicolás, CABA';
-    } else if (clamped <= 3200) {
-      const r = (clamped - 1500) / 1700;
-      lat = -34.6000 + r * (-34.6005 - -34.6000);
-      lon = -58.3880 + r * (-58.4100 - -58.3880);
-      sub = 'Recoleta / Balvanera, CABA';
-    } else if (clamped <= 4600) {
-      // 4070 está exactamente entre Medrano (3900) y Gascón (4100) en Almagro / Palermo
-      const r = (clamped - 3200) / 1400;
-      lat = -34.6005 + r * (-34.5940 - -34.6005);
-      lon = -58.4100 + r * (-58.4310 - -58.4100);
-      sub = 'Almagro / Palermo, CABA';
-    } else {
-      const r = (clamped - 4600) / 1500;
-      lat = -34.5940 + r * (-34.5870 - -34.5940);
-      lon = -58.4310 + r * (-58.4440 - -58.4310);
-      sub = 'Palermo Queens / Chacarita, CABA';
-    }
-    return {
-      lat: Number(lat.toFixed(6)),
-      lng: Number(lon.toFixed(6)),
-      address: `Av. Córdoba ${numVal}, ${sub}`
-    };
+    const anchors = [
+      { num: 1, lat: -34.5985, lon: -58.3688, sub: 'Retiro / Puerto Madero, CABA' },
+      { num: 1000, lat: -34.5992, lon: -58.3798, sub: 'Retiro / San Nicolás (9 de Julio), CABA' },
+      { num: 1800, lat: -34.5997, lon: -58.3920, sub: 'Recoleta / Balvanera (Callao), CABA' },
+      { num: 2600, lat: -34.6002, lon: -58.4038, sub: 'Recoleta / Once (Pueyrredón), CABA' },
+      { num: 3200, lat: -34.6000, lon: -58.4124, sub: 'Balvanera / Almagro (Bustamante), CABA' },
+      { num: 3600, lat: -34.5997, lon: -58.4172, sub: 'Almagro / Palermo (Salguero / Mario Bravo), CABA' },
+      { num: 3900, lat: -34.5994, lon: -58.4220, sub: 'Almagro / Palermo (Av. Medrano), CABA' },
+      { num: 4000, lat: -34.5993, lon: -58.4234, sub: 'Almagro / Palermo (Acuña de Figueroa), CABA' },
+      { num: 4100, lat: -34.5991, lon: -58.4247, sub: 'Almagro / Palermo (Gascón), CABA' },
+      { num: 4300, lat: -34.5986, lon: -58.4276, sub: 'Palermo (Av. Scalabrini Ortiz), CABA' },
+      { num: 4600, lat: -34.5980, lon: -58.4318, sub: 'Palermo Queens (Malabia), CABA' },
+      { num: 5000, lat: -34.5968, lon: -58.4372, sub: 'Palermo Soho (Serrano / Thames), CABA' },
+      { num: 5500, lat: -34.5948, lon: -58.4426, sub: 'Palermo Hollywood (Humboldt / Fitz Roy), CABA' },
+      { num: 6100, lat: -34.5878, lon: -58.4485, sub: 'Chacarita (Av. Federico Lacroze), CABA' }
+    ];
+    const res = interpolateAvenueSegments(numVal, anchors);
+    return res ? { lat: res.lat, lng: res.lng, address: `Av. Córdoba ${numVal}, ${res.sub}` } : null;
   }
 
-  // Av. Luis María Campos (1 a 1700): Palermo / Las Cañitas (1-700) -> Belgrano (700-1700)
+  // 2. Av. Luis María Campos (1 a 1700): Palermo / Las Cañitas -> Belgrano
   if (streetNameNorm.includes('luis maria campos') || streetNameNorm.includes('campos') || streetNameNorm.includes('luis m campos')) {
-    const clamped = Math.max(1, Math.min(1700, numVal));
-    const r = clamped / 1700;
-    const lat = -34.5770 + r * (-34.5620 - -34.5770);
-    const lon = -58.4280 + r * (-58.4440 - -58.4280);
-    const sub = clamped <= 700 ? 'Palermo / Las Cañitas, CABA' : 'Las Cañitas / Belgrano, CABA';
-    return {
-      lat: Number(lat.toFixed(6)),
-      lng: Number(lon.toFixed(6)),
-      address: `Av. Luis María Campos ${numVal}, ${sub}`
-    };
+    const anchors = [
+      { num: 1, lat: -34.5768, lon: -58.4278, sub: 'Palermo / Las Cañitas (Dorrego / Pacífico), CABA' },
+      { num: 129, lat: -34.5760, lon: -58.4288, sub: 'Palermo / Las Cañitas, CABA' },
+      { num: 400, lat: -34.5728, lon: -58.4326, sub: 'Palermo / Las Cañitas (Ortega y Gasset), CABA' },
+      { num: 800, lat: -34.5684, lon: -58.4378, sub: 'Las Cañitas / Belgrano (Matienzo), CABA' },
+      { num: 1100, lat: -34.5654, lon: -58.4412, sub: 'Belgrano (Solar de la Abadía / Gorostiaga), CABA' },
+      { num: 1500, lat: -34.5620, lon: -58.4445, sub: 'Belgrano (Olleros / José Hernández), CABA' },
+      { num: 1700, lat: -34.5595, lon: -58.4470, sub: 'Belgrano / Barrancas (Federico Lacroze), CABA' }
+    ];
+    const res = interpolateAvenueSegments(numVal, anchors);
+    return res ? { lat: res.lat, lng: res.lng, address: `Av. Luis María Campos ${numVal}, ${res.sub}` } : null;
   }
 
-  // Av. Santa Fe (1 a 5400)
-  if (streetNameNorm.includes('santa fe')) {
-    const clamped = Math.max(1, Math.min(5400, numVal));
-    const r = clamped / 5400;
-    const lat = -34.5950 + r * (-34.5750 - -34.5950);
-    const lon = -58.3780 + r * (-58.4280 - -58.3780);
-    const sub = clamped <= 1800 ? 'Retiro / Recoleta, CABA' : (clamped <= 3600 ? 'Recoleta / Palermo, CABA' : 'Palermo, CABA');
-    return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), address: `Av. Santa Fe ${numVal}, ${sub}` };
-  }
-
-  // Av. Corrientes (1 a 6900)
+  // 3. Av. Corrientes (1 a 6900): Centro -> Once -> Abasto -> Almagro -> Villa Crespo -> Chacarita
   if (streetNameNorm.includes('corrientes')) {
-    const clamped = Math.max(1, Math.min(6900, numVal));
-    const r = clamped / 6900;
-    const lat = -34.6037 + r * (-34.5860 - -34.6037);
-    const lon = -58.3700 + r * (-58.4550 - -58.3700);
-    const sub = clamped <= 1500 ? 'San Nicolás / Centro, CABA' : (clamped <= 3000 ? 'Balvanera / Once, CABA' : (clamped <= 4200 ? 'Abasto / Almagro, CABA' : 'Villa Crespo / Chacarita, CABA'));
-    return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), address: `Av. Corrientes ${numVal}, ${sub}` };
+    const anchors = [
+      { num: 1, lat: -34.6025, lon: -58.3680, sub: 'Puerto Madero / Luna Park, CABA' },
+      { num: 1000, lat: -34.6037, lon: -58.3816, sub: 'San Nicolás / Obelisco, CABA' },
+      { num: 1800, lat: -34.6042, lon: -58.3922, sub: 'Balvanera / San Nicolás (Callao), CABA' },
+      { num: 2600, lat: -34.6046, lon: -58.4035, sub: 'Balvanera / Once (Pueyrredón), CABA' },
+      { num: 3200, lat: -34.6035, lon: -58.4110, sub: 'Balvanera (Abasto Shopping / Anchorena), CABA' },
+      { num: 4000, lat: -34.6025, lon: -58.4225, sub: 'Almagro (Av. Medrano), CABA' },
+      { num: 5000, lat: -34.5995, lon: -58.4370, sub: 'Villa Crespo (Av. Scalabrini Ortiz), CABA' },
+      { num: 6000, lat: -34.5890, lon: -58.4475, sub: 'Chacarita (Dorrego), CABA' },
+      { num: 6900, lat: -34.5855, lon: -58.4550, sub: 'Chacarita (Av. Federico Lacroze), CABA' }
+    ];
+    const res = interpolateAvenueSegments(numVal, anchors);
+    return res ? { lat: res.lat, lng: res.lng, address: `Av. Corrientes ${numVal}, ${res.sub}` } : null;
   }
 
-  // Av. Cabildo (1 a 5000)
+  // 4. Av. Santa Fe (1 a 5400): Retiro -> Recoleta -> Palermo
+  if (streetNameNorm.includes('santa fe')) {
+    const anchors = [
+      { num: 1000, lat: -34.5945, lon: -58.3780, sub: 'Retiro / Plaza San Martín, CABA' },
+      { num: 1800, lat: -34.5940, lon: -58.3915, sub: 'Recoleta (Av. Callao), CABA' },
+      { num: 2600, lat: -34.5925, lon: -58.4040, sub: 'Recoleta (Av. Pueyrredón), CABA' },
+      { num: 3200, lat: -34.5880, lon: -58.4110, sub: 'Palermo (Alto Palermo / Cnel. Díaz), CABA' },
+      { num: 4000, lat: -34.5815, lon: -58.4205, sub: 'Palermo (Plaza Italia / Botánico), CABA' },
+      { num: 4800, lat: -34.5775, lon: -58.4265, sub: 'Palermo (Puente Pacífico / J.B. Justo), CABA' },
+      { num: 5400, lat: -34.5745, lon: -58.4330, sub: 'Palermo / Belgrano (Carranza), CABA' }
+    ];
+    const res = interpolateAvenueSegments(numVal, anchors);
+    return res ? { lat: res.lat, lng: res.lng, address: `Av. Santa Fe ${numVal}, ${res.sub}` } : null;
+  }
+
+  // 5. Av. Cabildo (1 a 5000): Colegiales -> Belgrano -> Núñez -> Saavedra
   if (streetNameNorm.includes('cabildo')) {
-    const clamped = Math.max(1, Math.min(5000, numVal));
-    const r = clamped / 5000;
-    const lat = -34.5750 + r * (-34.5360 - -34.5750);
-    const lon = -58.4420 + r * (-58.4680 - -58.4420);
-    const sub = clamped <= 2000 ? 'Colegiales / Belgrano, CABA' : (clamped <= 3500 ? 'Belgrano, CABA' : 'Núñez / Saavedra, CABA');
-    return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), address: `Av. Cabildo ${numVal}, ${sub}` };
+    const anchors = [
+      { num: 1, lat: -34.5760, lon: -58.4385, sub: 'Colegiales / Palermo (Dorrego), CABA' },
+      { num: 1500, lat: -34.5680, lon: -58.4470, sub: 'Colegiales / Belgrano (Virrey del Pino), CABA' },
+      { num: 2200, lat: -34.5615, lon: -58.4560, sub: 'Belgrano (Juramento), CABA' },
+      { num: 3000, lat: -34.5520, lon: -58.4630, sub: 'Núñez (Av. Congreso), CABA' },
+      { num: 4000, lat: -34.5420, lon: -58.4680, sub: 'Saavedra (García del Río), CABA' },
+      { num: 5000, lat: -34.5360, lon: -58.4710, sub: 'Saavedra / Vicente López (General Paz), CABA' }
+    ];
+    const res = interpolateAvenueSegments(numVal, anchors);
+    return res ? { lat: res.lat, lng: res.lng, address: `Av. Cabildo ${numVal}, ${res.sub}` } : null;
   }
 
-  // Av. Rivadavia (1 a 12000)
+  // 6. Av. Rivadavia (1 a 12000): Microcentro -> Once -> Almagro -> Caballito -> Flores -> Liniers
   if (streetNameNorm.includes('rivadavia')) {
-    const clamped = Math.max(1, Math.min(12000, numVal));
-    const r = clamped / 12000;
-    const lat = -34.6080 + r * (-34.6390 - -34.6080);
-    const lon = -58.3710 + r * (-58.5300 - -58.3710);
-    const sub = clamped <= 2500 ? 'Congreso / Balvanera, CABA' : (clamped <= 6000 ? 'Almagro / Caballito, CABA' : (clamped <= 8500 ? 'Flores, CABA' : 'Liniers, CABA'));
-    return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), address: `Av. Rivadavia ${numVal}, ${sub}` };
+    const anchors = [
+      { num: 1, lat: -34.6080, lon: -58.3710, sub: 'Plaza de Mayo / Microcentro, CABA' },
+      { num: 1800, lat: -34.6095, lon: -58.3910, sub: 'Congreso Nacional (Callao), CABA' },
+      { num: 3000, lat: -34.6105, lon: -58.4075, sub: 'Once / Plaza Miserere, CABA' },
+      { num: 4500, lat: -34.6150, lon: -58.4260, sub: 'Almagro (Castro Barros), CABA' },
+      { num: 5500, lat: -34.6200, lon: -58.4410, sub: 'Caballito (Acoyte / Primera Junta), CABA' },
+      { num: 7000, lat: -34.6285, lon: -58.4635, sub: 'Flores (Plaza Flores), CABA' },
+      { num: 9000, lat: -34.6360, lon: -58.4950, sub: 'Floresta / Villa Luro, CABA' },
+      { num: 12000, lat: -34.6435, lon: -58.5280, sub: 'Liniers (General Paz), CABA' }
+    ];
+    const res = interpolateAvenueSegments(numVal, anchors);
+    return res ? { lat: res.lat, lng: res.lng, address: `Av. Rivadavia ${numVal}, ${res.sub}` } : null;
   }
 
-  // Av. del Libertador (1 a 15000)
+  // 7. Av. del Libertador (1 a 15000): Retiro -> Recoleta -> Palermo -> Belgrano -> Núñez -> Vicente López
   if (streetNameNorm.includes('libertador')) {
-    const clamped = Math.max(1, Math.min(15000, numVal));
-    const r = clamped / 15000;
-    const lat = -34.5890 + r * (-34.5200 - -34.5890);
-    const lon = -58.3780 + r * (-58.4800 - -58.3780);
-    const sub = clamped <= 3000 ? 'Retiro / Recoleta, CABA' : (clamped <= 6000 ? 'Palermo / Las Cañitas, CABA' : (clamped <= 9000 ? 'Belgrano / Núñez, CABA' : 'Vicente López / San Isidro, PBA'));
-    return { lat: Number(lat.toFixed(6)), lng: Number(lon.toFixed(6)), address: `Av. del Libertador ${numVal}, ${sub}` };
+    const anchors = [
+      { num: 1, lat: -34.5910, lon: -58.3780, sub: 'Retiro, CABA' },
+      { num: 2000, lat: -34.5840, lon: -58.3920, sub: 'Recoleta (Museo Bellas Artes), CABA' },
+      { num: 3500, lat: -34.5780, lon: -58.4060, sub: 'Palermo Chico (Cnel. Díaz), CABA' },
+      { num: 4500, lat: -34.5710, lon: -58.4190, sub: 'Palermo (Hipódromo), CABA' },
+      { num: 6000, lat: -34.5600, lon: -58.4410, sub: 'Belgrano (Barrancas), CABA' },
+      { num: 7500, lat: -34.5450, lon: -58.4570, sub: 'Núñez (Estadio River Plate), CABA' },
+      { num: 8500, lat: -34.5320, lon: -58.4670, sub: 'Vicente López (General Paz), PBA' }
+    ];
+    const res = interpolateAvenueSegments(numVal, anchors);
+    return res ? { lat: res.lat, lng: res.lng, address: `Av. del Libertador ${numVal}, ${res.sub}` } : null;
   }
 
   return null;
