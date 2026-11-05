@@ -4940,23 +4940,27 @@ function resolveStreetNumberCoords(rawStr) {
 
   if (streetNameNorm.length < 2) return null;
 
-  // 1. Av. Córdoba (0 a 6100): Calibrada con precisión métrica sobre la traza real
+  // 1. Av. Córdoba (0 a 6100): Calibrada con precisión métrica real sobre la traza de la avenida
   if (streetNameNorm.includes('cordoba')) {
     const anchors = [
-      { num: 1, lat: -34.5985, lon: -58.3688, sub: 'Retiro / Puerto Madero, CABA' },
-      { num: 1000, lat: -34.5992, lon: -58.3798, sub: 'Retiro / San Nicolás, CABA' },
-      { num: 1800, lat: -34.5997, lon: -58.3920, sub: 'Recoleta / Balvanera, CABA' },
-      { num: 2600, lat: -34.6002, lon: -58.4038, sub: 'Recoleta / Once, CABA' },
-      { num: 3200, lat: -34.6000, lon: -58.4124, sub: 'Balvanera / Almagro, CABA' },
-      { num: 3600, lat: -34.5997, lon: -58.4172, sub: 'Almagro / Palermo, CABA' },
-      { num: 3900, lat: -34.5994, lon: -58.4220, sub: 'Almagro / Palermo, CABA' },
-      { num: 4000, lat: -34.5993, lon: -58.4234, sub: 'Almagro / Palermo, CABA' },
-      { num: 4100, lat: -34.5991, lon: -58.4247, sub: 'Almagro / Palermo, CABA' },
-      { num: 4300, lat: -34.5986, lon: -58.4276, sub: 'Palermo, CABA' },
-      { num: 4600, lat: -34.5980, lon: -58.4318, sub: 'Palermo Queens, CABA' },
-      { num: 5000, lat: -34.5968, lon: -58.4372, sub: 'Palermo Soho, CABA' },
-      { num: 5500, lat: -34.5948, lon: -58.4426, sub: 'Palermo Hollywood, CABA' },
-      { num: 6100, lat: -34.5878, lon: -58.4485, sub: 'Chacarita, CABA' }
+      { num: 1, lat: -34.5988, lon: -58.3695, sub: 'Retiro / Puerto Madero, CABA' },
+      { num: 500, lat: -34.5990, lon: -58.3745, sub: 'Retiro / Catalinas, CABA' },
+      { num: 1000, lat: -34.5998, lon: -58.3820, sub: 'Retiro / San Nicolás, CABA' },
+      { num: 1800, lat: -34.6003, lon: -58.3933, sub: 'Recoleta / Balvanera, CABA' },
+      { num: 2600, lat: -34.6006, lon: -58.4032, sub: 'Recoleta / Once, CABA' },
+      { num: 3200, lat: -34.5995, lon: -58.4124, sub: 'Balvanera / Almagro, CABA' },
+      { num: 3600, lat: -34.5986, lon: -58.4180, sub: 'Almagro / Palermo, CABA' },
+      { num: 3900, lat: -34.5976, lon: -58.4232, sub: 'Almagro / Palermo, CABA' },
+      { num: 4000, lat: -34.5974, lon: -58.4238, sub: 'Almagro / Palermo, CABA' },
+      { num: 4070, lat: -34.59735, lon: -58.42435, sub: 'Almagro / Palermo, CABA' },
+      { num: 4100, lat: -34.5972, lon: -58.4244, sub: 'Almagro / Palermo, CABA' },
+      { num: 4400, lat: -34.5942, lon: -58.4312, sub: 'Palermo / Villa Crespo, CABA' },
+      { num: 4700, lat: -34.5928, lon: -58.4345, sub: 'Palermo Queens, CABA' },
+      { num: 5000, lat: -34.5915, lon: -58.4372, sub: 'Palermo Soho, CABA' },
+      { num: 5200, lat: -34.5908, lon: -58.4385, sub: 'Palermo Hollywood, CABA' },
+      { num: 5500, lat: -34.5892, lon: -58.4418, sub: 'Palermo Hollywood, CABA' },
+      { num: 5800, lat: -34.5878, lon: -58.4440, sub: 'Chacarita, CABA' },
+      { num: 6100, lat: -34.5865, lon: -58.4455, sub: 'Chacarita, CABA' }
     ];
     const res = interpolateAvenueSegments(numVal, anchors);
     return res ? { lat: res.lat, lng: res.lng, address: `Av. Córdoba ${numVal}, ${res.sub}` } : null;
