@@ -1761,7 +1761,7 @@
         
         <!-- TAB 1: MIS DATOS -->
         <div class="p-tab-content active" id="tabProfileData">
-          <form id="passengerProfileForm" class="profile-form-grid">
+          <form id="passengerProfileForm" onsubmit="return window.handlePassengerProfileSave(event)" class="profile-form-grid">
             
             <!-- Foto de perfil personalizada / Subir desde celular -->
             <div class="custom-photo-upload-section" style="background: rgba(255,255,255,0.03); border: 1.5px dashed rgba(56,189,248,0.3); border-radius: 14px; padding: 14px; text-align: center;">
@@ -2578,10 +2578,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=117"></script>
+  <script src="sync.js?v=118"></script>
   
   <!-- App JS -->
-  <script src="app.js?v=117"></script>
+  <script src="app.js?v=118"></script>
 
   <!-- Inicializador Directo de Autocompletado de Direcciones & Auto-Purga de Caché -->
   <script>
@@ -2590,7 +2590,7 @@
       if ('serviceWorker' in navigator && window.caches) {
         caches.keys().then(function(keys) {
           keys.forEach(function(k) {
-            if (k !== 'rutaprivada-pwa-v117') {
+            if (k !== 'rutaprivada-pwa-v118') {
               caches.delete(k);
             }
           });
@@ -2638,7 +2638,7 @@
   <!-- PWA Service Worker Auto-Update -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=117').then(function(reg) {
+      navigator.serviceWorker.register('sw.js?v=118').then(function(reg) {
         reg.update();
       }).catch(function(){});
       navigator.serviceWorker.getRegistrations().then(function(registrations) {

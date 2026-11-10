@@ -3,7 +3,7 @@
  * Soporta instalación en Android, iOS y PC con carga instantánea y caché local
  */
 
-const CACHE_NAME = 'rutaprivada-pwa-v117';
+const CACHE_NAME = 'rutaprivada-pwa-v118';
 
 const STATIC_ASSETS = [
   './',
@@ -171,8 +171,8 @@ self.addEventListener('notificationclick', (event) => {
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ((client.url.includes('conductor.html') && targetUrl.includes('conductor')) ||
-            (client.url.includes('index.html') && targetUrl.includes('index')) ||
-            (client.url.includes('agenda.html') && targetUrl.includes('agenda'))) {
+          (client.url.includes('index.html') && targetUrl.includes('index')) ||
+          (client.url.includes('agenda.html') && targetUrl.includes('agenda'))) {
           if ('focus' in client) {
             client.postMessage({ type: 'NOTIFICATION_CLICKED', data: notifData });
             return client.focus();

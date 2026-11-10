@@ -275,6 +275,120 @@ window.handlePassengerLoginSubmit = async function(event) {
   return false;
 };
 
+window.handlePassengerProfileSave = function(event) {
+  if (event) {
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+  }
+
+  const nameEl = document.getElementById('profPassengerName');
+  const phoneEl = document.getElementById('profPassengerPhone');
+  const emailEl = document.getElementById('profPassengerEmail');
+
+  const nombre = nameEl ? nameEl.value.trim() : '';
+  const telefono = phoneEl ? phoneEl.value.trim() : '';
+  const email = emailEl ? emailEl.value.trim().toLowerCase() : '';
+
+  if (!nombre) {
+    if (typeof window.showToast === 'function') window.showToast('⚠️ Por favor ingresa tu Nombre y Apellido.');
+    if (nameEl) nameEl.focus();
+    return false;
+  }
+  if (!telefono || telefono.replace(/\D/g, '').length < 6) {
+    if (typeof window.showToast === 'function') window.showToast('⚠️ Por favor ingresa tu número de celular para que el chofer pueda contactarte.');
+    if (phoneEl) phoneEl.focus();
+    return false;
+  }
+
+  let session = (typeof window.getPassengerSession === 'function' ? window.getPassengerSession() : null) || {};
+  session.nombre = nombre;
+  session.telefono = telefono;
+  if (email) session.email = email;
+  if (!session.id) session.id = 'pass_' + Date.now();
+
+  // 1. Guardar en la sesión activa y persistirla
+  if (typeof window.savePassengerSession === 'function') {
+    window.savePassengerSession(session);
+  } else {
+    try {
+      const str = JSON.stringify(session);
+      localStorage.removeItem('rutaprivada_passenger_logged_out');
+      ['rutaprivada_passenger_auth_v1', 'rutaprivada_passenger_session_v1', 'rutaprivada_passenger_profile', 'rutaprivada_user_session'].forEach(k => {
+        try { localStorage.setItem(k, str); } catch(e){}
+        try { sessionStorage.setItem(k, str); } catch(e){}
+      });
+    } catch(e){}
+  }
+
+  // 2. Guardar en la base de usuarios registrados local (aislado cuenta por cuenta)
+  try {
+    const rawUsers = localStorage.getItem('rutaprivada_registered_passengers_v1');
+    const users = rawUsers ? JSON.parse(rawUsers) : [];
+    const cleanEmail = (session.email || '').toLowerCase();
+    const cleanPhone = (session.telefono || '').replace(/\D/g, '');
+
+    const idx = users.findIndex(u => 
+      (cleanEmail && u.email && u.email.toLowerCase() === cleanEmail) ||
+      (cleanPhone && cleanPhone.length >= 7 && u.telefono && u.telefono.replace(/\D/g, '') === cleanPhone) ||
+      (session.id && u.id && u.id === session.id)
+    );
+
+    if (idx >= 0) {
+      users[idx] = { ...users[idx], ...session, nombre, telefono, email, updatedAt: Date.now() };
+    } else {
+      users.push({ ...session, nombre, telefono, email, updatedAt: Date.now() });
+    }
+    localStorage.setItem('rutaprivada_registered_passengers_v1', JSON.stringify(users));
+  } catch(e) {}
+
+  // 3. Autocompletar de inmediato los campos de la solicitud de viaje (Paso 5)
+  const passNameInp = document.getElementById('passenger-name-input');
+  const passPhoneInp = document.getElementById('passenger-phone-input');
+  if (passNameInp) passNameInp.value = nombre;
+  if (passPhoneInp) passPhoneInp.value = telefono;
+
+  // 4. Actualizar variables de estado globales
+  if (window.state) {
+    window.state.passengerSession = session;
+    window.state.passengerName = nombre;
+    window.state.passengerPhone = telefono;
+    if (email) window.state.passengerEmail = email;
+  }
+
+  if (typeof window.syncPassengerSessionUI === 'function') {
+    window.syncPassengerSessionUI(session);
+  }
+  if (typeof window.renderPassengerProfileUI === 'function') {
+    window.renderPassengerProfileUI(session);
+  }
+
+  // 5. Cerrar modal de perfil
+  if (typeof window.closePassengerProfileModal === 'function') {
+    window.closePassengerProfileModal();
+  }
+
+  if (typeof window.showToast === 'function') {
+    window.showToast('✅ ¡Datos personales guardados con éxito!');
+  }
+
+  // 6. Sincronizar en la nube privada Firestore (colección 'pasajeros')
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const db = firebase.firestore();
+      const emailDocId = email ? email.replace(/[^a-z0-9_]/g, '_') : '';
+      const phoneDocId = telefono ? ('pass_' + telefono.replace(/\D/g, '')) : '';
+      const docId = emailDocId || phoneDocId || session.id;
+      const safePayload = { ...session };
+      delete safePayload.password;
+      if (docId) {
+        db.collection('pasajeros').doc(docId).set(safePayload, { merge: true }).catch(() => {});
+      }
+    }
+  } catch(e) {}
+
+  return false;
+};
+
 // ==========================================
 // CENTRO DE AYUDA Y SOPORTE PASAJERO (24/7)
 // ==========================================
@@ -1247,6 +1361,23 @@ window.handlePassengerLogout = function() {
     if (el) el.value = '';
   });
 
+  // Limpiar historial de viajes y tarjetas del usuario saliente (Privacidad total por cuenta)
+  window.__passengerTripsCache = [];
+  const historyList = document.getElementById('passengerHistoryListView');
+  if (historyList) {
+    historyList.innerHTML = `
+      <div style="text-align: center; padding: 36px 16px; color: #94a3b8;">
+        <div style="font-size: 2.8rem; margin-bottom: 10px;">📜</div>
+        <h4 style="color: #fff; font-size: 1rem; margin-bottom: 6px;">Sin historial de viajes</h4>
+        <p style="font-size: 0.8rem; line-height: 1.4;">Inicia sesión con tu cuenta para ver tu historial de traslados.</p>
+      </div>
+    `;
+  }
+  const historyDetail = document.getElementById('passengerHistoryDetailView');
+  if (historyDetail) { historyDetail.innerHTML = ''; historyDetail.classList.add('hidden'); }
+  const cardsContainer = document.getElementById('savedCardsListContainer');
+  if (cardsContainer) cardsContainer.innerHTML = '';
+
   // Actualizar UI completa a estado de sesión cerrada
   if (typeof renderPassengerProfileUI === 'function') {
     renderPassengerProfileUI(null);
@@ -1489,6 +1620,22 @@ window.getPassengerSession = function() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && (parsed.email || parsed.nombre || parsed.usuario || parsed.telefono || parsed.id)) {
+        // Enriquecer con datos del usuario registrado si existen (para no perder teléfono ni nombre)
+        try {
+          const rawReg = localStorage.getItem('rutaprivada_registered_passengers_v1');
+          if (rawReg) {
+            const regList = JSON.parse(rawReg);
+            const cleanE = (parsed.email || '').toLowerCase();
+            const matched = regList.find(r => (cleanE && r.email && r.email.toLowerCase() === cleanE) || (parsed.id && r.id === parsed.id));
+            if (matched) {
+              if (!parsed.telefono && matched.telefono) parsed.telefono = matched.telefono;
+              if ((!parsed.nombre || parsed.nombre === 'Pasajero') && matched.nombre) parsed.nombre = matched.nombre;
+              if (!parsed.avatar && matched.avatar) parsed.avatar = matched.avatar;
+              if (!parsed.medioPago && matched.medioPago) parsed.medioPago = matched.medioPago;
+            }
+          }
+        } catch(err) {}
+
         // Sesión válida encontrada: eliminar bandera de deslogueo residual
         try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(e){}
         if (window.state) {
@@ -1926,6 +2073,13 @@ async function goToWizardStep(step) {
   }
 
   if (step === 5) {
+    const session = typeof window.getPassengerSession === 'function' ? window.getPassengerSession() : null;
+    if (session) {
+      const nameInp = document.getElementById('passenger-name-input');
+      const phoneInp = document.getElementById('passenger-phone-input');
+      if (nameInp && session.nombre) nameInp.value = session.nombre;
+      if (phoneInp && session.telefono) phoneInp.value = session.telefono;
+    }
     if (typeof updateCalculation === 'function') {
       try { updateCalculation(); } catch(e){}
     }
