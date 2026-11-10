@@ -7874,6 +7874,9 @@ function initEventListeners() {
       e.preventDefault();
       e.stopPropagation();
       input.value = '';
+      input.removeAttribute('data-confirmed');
+      input.removeAttribute('data-confirmed-val');
+      input.removeAttribute('data-full-address');
       btn.classList.add('hidden');
       if (list) {
         list.innerHTML = '';
