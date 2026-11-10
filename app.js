@@ -1271,22 +1271,40 @@ window.loadPassengerProfileIntoForm = function() {
 };
 
 window.openPassengerProfileModal = function() {
-  const session = window.getPassengerSession();
-  if (!session) {
-    window.openPassengerAuthModal('login');
+  const session = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : null;
+  if (!session || (!session.nombre && !session.email && !session.usuario && !session.id && !session.telefono)) {
+    if (typeof window.openPassengerAuthModal === 'function') {
+      window.openPassengerAuthModal('login');
+    }
     return;
   }
 
-  window.loadPassengerProfileIntoForm();
-  window.renderSavedCardsUI();
-  if (typeof window.renderPassengerHistoryUI === 'function') {
-    try { window.renderPassengerHistoryUI(); } catch(e){}
+  try {
+    if (typeof window.loadPassengerProfileIntoForm === 'function') {
+      window.loadPassengerProfileIntoForm();
+    }
+    if (typeof window.renderPassengerProfileUI === 'function') {
+      window.renderPassengerProfileUI(session);
+    }
+    if (typeof window.syncPassengerSessionUI === 'function') {
+      window.syncPassengerSessionUI(session);
+    }
+    if (typeof window.renderSavedCardsUI === 'function') {
+      window.renderSavedCardsUI();
+    }
+    if (typeof window.renderPassengerHistoryUI === 'function') {
+      window.renderPassengerHistoryUI();
+    }
+  } catch(e) {
+    console.warn('Profile render non-critical warning:', e);
   }
 
   const modal = document.getElementById('modalPassengerProfile');
   if (modal) {
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
+  }
+  if (typeof window.switchPassengerProfileTab === 'function') {
     window.switchPassengerProfileTab('tabProfileData');
   }
 };
@@ -1391,9 +1409,9 @@ window.syncPassengerSessionUI = function(session) {
         headerSub.title = `Sesión activa como ${firstName}`;
       }
     }
+    const hasCustomPhoto = (typeof window.isCustomPassengerAvatar === 'function') ? window.isCustomPassengerAvatar(session.avatar) : Boolean(session.avatar && session.avatar.length > 20 && !session.avatar.includes('photo-1535713875002-d1d0cf377fde'));
     if (headerAvatar) {
-      const hasCustomPhoto = (typeof window.isCustomPassengerAvatar === 'function') ? window.isCustomPassengerAvatar(session.avatar) : Boolean(session.avatar && session.avatar.length > 20 && !session.avatar.includes('photo-1535713875002-d1d0cf377fde'));
-    if (headerAvatar) headerAvatar.src = hasCustomPhoto ? session.avatar : defaultAvatar;
+      headerAvatar.src = hasCustomPhoto ? session.avatar : defaultAvatar;
     }
 
     if (modalTitle) modalTitle.textContent = displayName;
@@ -1828,24 +1846,7 @@ window.switchPassengerAuthTab = function(tab) {
   }
 };
 
-window.openPassengerProfileModal = function() {
-  const session = window.getPassengerSession();
-  if (!session || (!session.nombre && !session.usuario && !session.email && !session.telefono && !session.id)) {
-    window.openPassengerAuthModal('login');
-    return;
-  }
-
-  if (typeof renderPassengerProfileUI === 'function') renderPassengerProfileUI(session);
-  if (typeof window.syncPassengerSessionUI === 'function') window.syncPassengerSessionUI(session);
-  if (typeof renderPassengerHistoryUI === 'function') renderPassengerHistoryUI();
-  if (typeof renderSavedCardsUI === 'function') renderSavedCardsUI();
-  const modal = document.getElementById('modalPassengerProfile');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.style.display = 'flex';
-  }
-};
-
+// Delegado a window.openPassengerProfileModal unificado
 window.closePassengerProfileModal = function() {
   const modal = document.getElementById('modalPassengerProfile');
   if (modal) {
@@ -11575,18 +11576,18 @@ if (btnRecenterPassengerMap) {
           headerSub.title = `Sesión activa como ${shortName}`;
         }
       }
+      const hasPhoto = (typeof window.isCustomPassengerAvatar === 'function') ? window.isCustomPassengerAvatar(user.avatar) : Boolean(user.avatar && user.avatar.length > 20 && !user.avatar.includes('photo-1535713875002-d1d0cf377fde'));
+
       if (headerPassengerAvatar) {
-        const hasPhoto = (typeof window.isCustomPassengerAvatar === 'function') ? window.isCustomPassengerAvatar(user.avatar) : Boolean(user.avatar && user.avatar.length > 20 && !user.avatar.includes('photo-1535713875002-d1d0cf377fde'));
-      if (headerPassengerAvatar) headerPassengerAvatar.src = hasPhoto ? user.avatar : defaultAvatar;
-      if (profileModalHeaderAvatarImg) profileModalHeaderAvatarImg.src = hasPhoto ? user.avatar : defaultAvatar;
+        headerPassengerAvatar.src = hasPhoto ? user.avatar : defaultAvatar;
+      }
+      if (profileModalHeaderAvatarImg) {
+        profileModalHeaderAvatarImg.src = hasPhoto ? user.avatar : defaultAvatar;
       }
 
       // Pre-cargar datos en el modal de perfil de forma automática
       if (profileModalNameTitle) {
         profileModalNameTitle.textContent = displayName;
-      }
-      if (profileModalHeaderAvatarImg && user.avatar) {
-        profileModalHeaderAvatarImg.src = user.avatar;
       }
 
       if (profPassengerName) profPassengerName.value = user.nombre || user.usuario || '';
@@ -11661,19 +11662,8 @@ if (btnRecenterPassengerMap) {
     window.closePassengerAuthModal = closePassengerAuthModal;
 
     function openPassengerProfileModal() {
-      const session = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : getPassengerSession();
-      if (!session || (!session.nombre && !session.email && !session.usuario && !session.id && !session.telefono)) {
-        openPassengerAuthModal('login');
-        return;
-      }
-
-      renderPassengerProfileUI(session);
-      renderPassengerHistoryUI();
-      renderSavedCardsUI();
-      const modal = modalPassengerProfile || document.getElementById('modalPassengerProfile');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.style.display = 'flex';
+      if (typeof window.openPassengerProfileModal === 'function') {
+        window.openPassengerProfileModal();
       }
     }
     window.openPassengerProfileModal = openPassengerProfileModal;
