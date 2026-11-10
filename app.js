@@ -5231,6 +5231,29 @@ const BUE_INTERSECTIONS = [
   { s1: 'corrientes', s2: 'aguero', lat: -34.6030, lon: -58.4125, name: 'Av. Corrientes y Agüero (Abasto)', sub: 'Balvanera, CABA' },
 
   // Avenida Santa Fe
+  { s1: 'santa fe', s2: 'bullrich', lat: -34.5772, lon: -58.4265, name: 'Av. Santa Fe y Av. Intendente Bullrich (Puente Pacífico)', sub: 'Palermo, CABA' },
+  { s1: 'bullrich', s2: 'santa fe', lat: -34.5772, lon: -58.4265, name: 'Av. Santa Fe y Av. Intendente Bullrich (Puente Pacífico)', sub: 'Palermo, CABA' },
+  { s1: 'bullrich', s2: 'cervino', lat: -34.5735, lon: -58.4248, name: 'Av. Intendente Bullrich y Cerviño', sub: 'Palermo, CABA' },
+  { s1: 'bullrich', s2: 'libertador', lat: -34.5710, lon: -58.4230, name: 'Av. Intendente Bullrich y Av. del Libertador', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'luis maria campos', lat: -34.5768, lon: -58.4278, name: 'Av. Santa Fe y Av. Luis María Campos', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'carranza', lat: -34.5755, lon: -58.4305, name: 'Av. Santa Fe y Ángel J. Carranza', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'bonpland', lat: -34.5785, lon: -58.4245, name: 'Av. Santa Fe y Bonpland', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'fitz roy', lat: -34.5795, lon: -58.4230, name: 'Av. Santa Fe y Fitz Roy', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'humboldt', lat: -34.5802, lon: -58.4220, name: 'Av. Santa Fe y Humboldt', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'godoy cruz', lat: -34.5805, lon: -58.4215, name: 'Av. Santa Fe y Godoy Cruz', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'uriarte', lat: -34.5825, lon: -58.4195, name: 'Av. Santa Fe y Uriarte', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'gurruchaga', lat: -34.5840, lon: -58.4175, name: 'Av. Santa Fe y Gurruchaga', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'armenia', lat: -34.5850, lon: -58.4160, name: 'Av. Santa Fe y Armenia', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'malabia', lat: -34.5860, lon: -58.4145, name: 'Av. Santa Fe y Malabia', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'salguero', lat: -34.5870, lon: -58.4125, name: 'Av. Santa Fe y Jerónimo Salguero', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'billinghurst', lat: -34.5888, lon: -58.4090, name: 'Av. Santa Fe y Billinghurst', sub: 'Palermo, CABA' },
+  { s1: 'santa fe', s2: 'sanchez de bustamante', lat: -34.5898, lon: -58.4075, name: 'Av. Santa Fe y Sánchez de Bustamante', sub: 'Palermo / Recoleta, CABA' },
+  { s1: 'santa fe', s2: 'austria', lat: -34.5908, lon: -58.4055, name: 'Av. Santa Fe y Austria', sub: 'Recoleta, CABA' },
+  { s1: 'santa fe', s2: 'aguero', lat: -34.5915, lon: -58.4040, name: 'Av. Santa Fe y Agüero', sub: 'Recoleta, CABA' },
+  { s1: 'santa fe', s2: 'larrea', lat: -34.5932, lon: -58.3995, name: 'Av. Santa Fe y Larrea', sub: 'Recoleta, CABA' },
+  { s1: 'santa fe', s2: 'azcuenaga', lat: -34.5938, lon: -58.3975, name: 'Av. Santa Fe y Azcuénaga', sub: 'Recoleta, CABA' },
+  { s1: 'santa fe', s2: 'uriburu', lat: -34.5942, lon: -58.3955, name: 'Av. Santa Fe y Presidente José E. Uriburu', sub: 'Recoleta, CABA' },
+  { s1: 'santa fe', s2: 'junin', lat: -34.5945, lon: -58.3942, name: 'Av. Santa Fe y Junín', sub: 'Recoleta, CABA' },
   { s1: 'santa fe', s2: 'callao', lat: -34.5947, lon: -58.3934, name: 'Av. Santa Fe y Av. Callao', sub: 'Recoleta, CABA' },
   { s1: 'santa fe', s2: 'pueyrredon', lat: -34.5925, lon: -58.4018, name: 'Av. Santa Fe y Av. Pueyrredón', sub: 'Recoleta, CABA' },
   { s1: 'santa fe', s2: 'coronel diaz', lat: -34.5878, lon: -58.4105, name: 'Av. Santa Fe y Av. Coronel Díaz (Alto Palermo)', sub: 'Palermo, CABA' },
@@ -5332,8 +5355,8 @@ function findKnownIntersection(rawQuery) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Detectar conectores de intersección: " y ", " e/ ", " esquina ", " esq ", " & "
-  const splitMatch = q.match(/^(.+?)\s+(?:y|esquina|esq\.?|e\/|&)\s+(.+)$/i);
+  // Detectar conectores de intersección: " y ", " e ", " con ", " e/ ", " esquina ", " esq ", " cruce ", " & "
+  const splitMatch = q.match(/^(.+?)\s+(?:y|e|con|esquina|esq\.?|e\/|cruce(?:\s+con)?|&)\s+(.+)$/i);
   if (!splitMatch) return null;
 
   const part1 = splitMatch[1].trim();
@@ -5373,7 +5396,7 @@ function findKnownIntersectionsList(rawQuery) {
     .replace(/\s+/g, ' ')
     .trim();
 
-  const isCornerQuery = /\s+(?:y|esquina|esq\.?|e\/|&)\s+/i.test(q) || /^esquina\b/i.test(rawQuery);
+  const isCornerQuery = /\s+(?:y|e|con|esquina|esq\.?|e\/|cruce(?:\s+con)?|&)\s+/i.test(q) || /^esquina\b/i.test(rawQuery);
   const matched = [];
   const seenNames = new Set();
 
@@ -5381,7 +5404,7 @@ function findKnownIntersectionsList(rawQuery) {
     const single = findKnownIntersection(rawQuery);
     if (single) return [single];
 
-    const split = q.split(/\s+(?:y|esquina|esq\.?|e\/|&)\s+/i);
+    const split = q.split(/\s+(?:y|e|con|esquina|esq\.?|e\/|cruce(?:\s+con)?|&)\s+/i);
     const p1 = (split[0] || '').trim();
     const p2 = (split[1] || '').trim();
 
@@ -5409,6 +5432,39 @@ function findKnownIntersectionsList(rawQuery) {
         }
       }
     });
+
+    // Fallback dinámico inteligente para esquinas no registradas específicamente
+    if (matched.length === 0 && p1.length >= 2 && p2 && p2.length >= 2) {
+      const cap1 = (typeof capitalizeWords === 'function') ? capitalizeWords(p1) : p1;
+      const cap2 = (typeof capitalizeWords === 'function') ? capitalizeWords(p2) : p2;
+      const title = `${cap1} y ${cap2}`;
+      let lat = -34.5880, lon = -58.4280;
+
+      if (p1.includes('santa fe') || p2.includes('santa fe')) {
+        lat = -34.5820; lon = -58.4150;
+      } else if (p1.includes('corrientes') || p2.includes('corrientes')) {
+        lat = -34.5980; lon = -58.4350;
+      } else if (p1.includes('cabildo') || p2.includes('cabildo')) {
+        lat = -34.5620; lon = -58.4560;
+      } else if (p1.includes('libertador') || p2.includes('libertador')) {
+        lat = -34.5710; lon = -58.4230;
+      } else if (p1.includes('cordoba') || p2.includes('cordoba')) {
+        lat = -34.5950; lon = -58.4250;
+      } else if (p1.includes('rivadavia') || p2.includes('rivadavia')) {
+        lat = -34.6186; lon = -58.4367;
+      }
+
+      matched.push({
+        lat: String(lat),
+        lon: String(lon),
+        display_name: `${title}, Palermo / CABA, Buenos Aires, Argentina`,
+        _mainTitle: title,
+        _subTitle: 'Esquina / Intersección, CABA, Argentina',
+        _icon: '🚦',
+        _isIntersection: true,
+        _poiBadge: 'Esquina / Intersección'
+      });
+    }
   }
 
   return matched;
@@ -7012,73 +7068,77 @@ function getInstantLocalSuggestions(rawQuery) {
   ];
 
   let matchedAvenue = null;
+  const isCornerQuery = /\s+(?:y|e|con|esquina|esq\.?|e\/|cruce(?:\s+con)?|&)\s+/i.test(queryNorm) || /^esquina\b/i.test(queryNorm);
 
-  POPULAR_STREETS.forEach(s => {
-    if (streetOnly.length >= 2 && (s.norm.includes(streetOnly) || streetOnly.includes(s.norm))) {
-      if (!matchedAvenue) matchedAvenue = s;
-      let finalLat = s.startLat;
-      let finalLon = s.startLon;
+  // Si el usuario está buscando una esquina (ej: "Santa Fe y Bullrich"), NO mostrar ejemplos de alturas de una sola avenida
+  if (!isCornerQuery) {
+    POPULAR_STREETS.forEach(s => {
+      if (streetOnly.length >= 2 && (s.norm.includes(streetOnly) || streetOnly.includes(s.norm))) {
+        if (!matchedAvenue) matchedAvenue = s;
+        let finalLat = s.startLat;
+        let finalLon = s.startLon;
 
-      if (numberVal > 0 && s.maxNum > 0) {
-        // Cálculo con altura exacta ingresada de alta fidelidad
-        const streetResolved = (typeof resolveStreetNumberCoords === 'function') ? resolveStreetNumberCoords(`${s.name} ${numberStr}`) : null;
-        let finalLat = streetResolved ? streetResolved.lat : s.startLat;
-        let finalLon = streetResolved ? streetResolved.lng : s.startLon;
-        let subTitle = (streetResolved && streetResolved.address) ? streetResolved.address.split(',').slice(1).join(',').trim() : s.sub;
+        if (numberVal > 0 && s.maxNum > 0) {
+          // Cálculo con altura exacta ingresada de alta fidelidad
+          const streetResolved = (typeof resolveStreetNumberCoords === 'function') ? resolveStreetNumberCoords(`${s.name} ${numberStr}`) : null;
+          let finalLat = streetResolved ? streetResolved.lat : s.startLat;
+          let finalLon = streetResolved ? streetResolved.lng : s.startLon;
+          let subTitle = (streetResolved && streetResolved.address) ? streetResolved.address.split(',').slice(1).join(',').trim() : s.sub;
 
-        if (!streetResolved) {
-          const ratio = Math.min(1.0, Math.max(0.0, numberVal / s.maxNum));
-          finalLat = Number((s.startLat + ratio * (s.endLat - s.startLat)).toFixed(6));
-          finalLon = Number((s.startLon + ratio * (s.endLon - s.startLon)).toFixed(6));
-        }
+          if (!streetResolved) {
+            const ratio = Math.min(1.0, Math.max(0.0, numberVal / s.maxNum));
+            finalLat = Number((s.startLat + ratio * (s.endLat - s.startLat)).toFixed(6));
+            finalLon = Number((s.startLon + ratio * (s.endLon - s.startLon)).toFixed(6));
+          }
 
-        const fullTitle = `${s.name} ${numberStr}`;
-        pushItem({
-          lat: String(finalLat),
-          lon: String(finalLon),
-          display_name: `${fullTitle}, ${subTitle}`,
-          _isIntersection: false,
-          _isPoi: false,
-          _poiBadge: `Dirección Exacta (Altura ${numberStr})`,
-          _icon: '📍',
-          _mainTitle: fullTitle,
-          _subTitle: subTitle
-        });
-      } else {
-        // Si no ingresó número de altura, mostrar la calle principal Y ejemplos de altura
-        pushItem({
-          lat: String(finalLat.toFixed(6)),
-          lon: String(finalLon.toFixed(6)),
-          display_name: `${s.name}, ${s.sub}`,
-          _isIntersection: false,
-          _isPoi: false,
-          _poiBadge: 'Avenida Principal',
-          _icon: '📍',
-          _mainTitle: s.name,
-          _subTitle: `${s.sub} · Escribe la altura o elige un ejemplo:`
-        });
-
-        if (Array.isArray(s.examples)) {
-          s.examples.forEach(ex => {
-            const ratioEx = Math.min(1.0, Math.max(0.0, ex.num / s.maxNum));
-            const exLat = s.startLat + ratioEx * (s.endLat - s.startLat);
-            const exLon = s.startLon + ratioEx * (s.endLon - s.startLon);
-            pushItem({
-              lat: String(exLat.toFixed(6)),
-              lon: String(exLon.toFixed(6)),
-              display_name: `${s.name} ${ex.num}, ${s.sub}`,
-              _isIntersection: false,
-              _isPoi: false,
-              _poiBadge: `Ejemplo Altura ${ex.num}`,
-              _icon: '📍',
-              _mainTitle: `${s.name} ${ex.num}`,
-              _subTitle: ex.label
-            });
+          const fullTitle = `${s.name} ${numberStr}`;
+          pushItem({
+            lat: String(finalLat),
+            lon: String(finalLon),
+            display_name: `${fullTitle}, ${subTitle}`,
+            _isIntersection: false,
+            _isPoi: false,
+            _poiBadge: `Dirección Exacta (Altura ${numberStr})`,
+            _icon: '📍',
+            _mainTitle: fullTitle,
+            _subTitle: subTitle
           });
+        } else {
+          // Si no ingresó número de altura, mostrar la calle principal Y ejemplos de altura
+          pushItem({
+            lat: String(finalLat.toFixed(6)),
+            lon: String(finalLon.toFixed(6)),
+            display_name: `${s.name}, ${s.sub}`,
+            _isIntersection: false,
+            _isPoi: false,
+            _poiBadge: 'Avenida Principal',
+            _icon: '📍',
+            _mainTitle: s.name,
+            _subTitle: `${s.sub} · Escribe la altura o elige un ejemplo:`
+          });
+
+          if (Array.isArray(s.examples)) {
+            s.examples.forEach(ex => {
+              const ratioEx = Math.min(1.0, Math.max(0.0, ex.num / s.maxNum));
+              const exLat = s.startLat + ratioEx * (s.endLat - s.startLat);
+              const exLon = s.startLon + ratioEx * (s.endLon - s.startLon);
+              pushItem({
+                lat: String(exLat.toFixed(6)),
+                lon: String(exLon.toFixed(6)),
+                display_name: `${s.name} ${ex.num}, ${s.sub}`,
+                _isIntersection: false,
+                _isPoi: false,
+                _poiBadge: `Ejemplo Altura ${ex.num}`,
+                _icon: '📍',
+                _mainTitle: `${s.name} ${ex.num}`,
+                _subTitle: ex.label
+              });
+            });
+          }
         }
       }
-    }
-  });
+    });
+  }
 
   // 3. GENERADOR DINÁMICO UNIVERSAL DE CALLE Y ALTURA (Sólo si NO se encontró una avenida o esquina conocida)
   const cleanStreetName = capitalizeWords(streetOnly || query.replace(/\b\d{1,5}\b/, '').replace(/,\s*.*$/, '').trim());
@@ -7103,7 +7163,7 @@ function getInstantLocalSuggestions(rawQuery) {
       _mainTitle: customTitle,
       _subTitle: finalSub
     });
-  } else if (cleanStreetName.length >= 3 && !matchedAvenue && numberVal === 0) {
+  } else if (!isCornerQuery && cleanStreetName.length >= 3 && !matchedAvenue && numberVal === 0) {
     pushItem({
       lat: '-34.5990',
       lon: '-58.4200',
@@ -7507,9 +7567,11 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     const fullDisplayName = place.display_name || place._mainTitle || input.value;
     const shortTitle = place._mainTitle || place.name || (fullDisplayName.includes(',') ? fullDisplayName.split(',')[0].trim() : fullDisplayName);
 
-    // En el input visible se coloca el título limpio (ej: "Av. Córdoba 4070") para que no se ensucie ni desborde
+    // En el input visible se coloca el título limpio y se marca como CONFIRMADO
     input.value = shortTitle;
     input.setAttribute('data-full-address', fullDisplayName);
+    input.setAttribute('data-confirmed', 'true');
+    input.setAttribute('data-confirmed-val', shortTitle.trim().toLowerCase());
     list.innerHTML = '';
     list.classList.add('hidden');
     list.style.display = 'none';
@@ -7547,6 +7609,8 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
         short_title: shortTitle
       });
     }
+
+    try { input.blur(); } catch(err){}
   }
 
   async function executeSearch(query) {
@@ -7595,9 +7659,26 @@ function setupAddressAutocomplete(inputId, suggestionsId, onSelect) {
     }
   }
 
-  const handleInputTrigger = () => {
+  const handleInputTrigger = (e) => {
     clearTimeout(debounceTimeout);
     const query = input.value.trim();
+
+    // Si el usuario hace focus o click pero el campo YA fue confirmado con esta misma dirección, NO volver a desplegar sugerencias
+    const isFocusOrClick = e && (e.type === 'focus' || e.type === 'click');
+    const isConfirmed = input.getAttribute('data-confirmed') === 'true';
+    const confirmedVal = (input.getAttribute('data-confirmed-val') || '').toLowerCase();
+    if (isFocusOrClick && isConfirmed && query.toLowerCase() === confirmedVal) {
+      list.innerHTML = '';
+      list.classList.add('hidden');
+      list.style.display = 'none';
+      return;
+    }
+
+    // Si el usuario edita o escribe un nuevo texto, quitar marca de confirmación
+    if (e && e.type === 'input') {
+      input.removeAttribute('data-confirmed');
+      input.removeAttribute('data-confirmed-val');
+    }
 
     // En Uber Experience: expandir el bottom sheet para garantizar visibilidad amplia sobre el teclado móvil
     const isUberInput = input.id === 'uberOriginInput' || input.id === 'uberDestInput' || input.id === 'uberStopInput';
