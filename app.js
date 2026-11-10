@@ -275,6 +275,54 @@ window.handlePassengerLoginSubmit = async function(event) {
   return false;
 };
 
+// Avatar SVG predeterminado (elegante y neutral, sin foto de desconocidos)
+window.DEFAULT_PASSENGER_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 24 24' fill='%2394a3b8'><circle cx='12' cy='8' r='4'/><path d='M4 20c0-4 4-6 8-6s8 2 8 6v1H4v-1z'/></svg>";
+
+window.isCustomPassengerAvatar = function(avatar) {
+  if (!avatar || typeof avatar !== 'string') return false;
+  if (avatar.includes('photo-1535713875002-d1d0cf377fde')) return false;
+  return avatar.startsWith('data:image') || (avatar.startsWith('http') && avatar.length > 20);
+};
+
+// Compresor y redimensionador automático de fotos (optimiza cualquier imagen a ~15KB para evitar QuotaExceededError)
+window.compressAndResizeAvatar = function(file, maxWidth = 256, maxHeight = 256, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    if (!file) return reject(new Error('No se seleccionó ningún archivo.'));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Error al leer el archivo.'));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Error al decodificar la imagen.'));
+      img.onload = () => {
+        try {
+          const targetSize = Math.min(maxWidth, maxHeight);
+          const canvas = document.createElement('canvas');
+          canvas.width = targetSize;
+          canvas.height = targetSize;
+          const ctx = canvas.getContext('2d');
+          
+          let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
+          if (img.width > img.height) {
+            sWidth = img.height;
+            sx = (img.width - img.height) / 2;
+          } else if (img.height > img.width) {
+            sHeight = img.width;
+            sy = (img.height - img.width) / 2;
+          }
+          
+          ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetSize, targetSize);
+          const compressed = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressed);
+        } catch(err) {
+          reject(err);
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 window.handlePassengerProfileSave = function(event) {
   if (event) {
     if (typeof event.preventDefault === 'function') event.preventDefault();
@@ -284,6 +332,7 @@ window.handlePassengerProfileSave = function(event) {
   const nameEl = document.getElementById('profPassengerName');
   const phoneEl = document.getElementById('profPassengerPhone');
   const emailEl = document.getElementById('profPassengerEmail');
+  const modalAvatarImg = document.getElementById('profileModalAvatarImg');
 
   const nombre = nameEl ? nameEl.value.trim() : '';
   const telefono = phoneEl ? phoneEl.value.trim() : '';
@@ -294,17 +343,24 @@ window.handlePassengerProfileSave = function(event) {
     if (nameEl) nameEl.focus();
     return false;
   }
-  if (!telefono || telefono.replace(/\D/g, '').length < 6) {
-    if (typeof window.showToast === 'function') window.showToast('⚠️ Por favor ingresa tu número de celular para que el chofer pueda contactarte.');
+  if (telefono && telefono.replace(/\D/g, '').length < 6) {
+    if (typeof window.showToast === 'function') window.showToast('⚠️ El número de celular debe tener al menos 6 dígitos.');
     if (phoneEl) phoneEl.focus();
     return false;
   }
 
   let session = (typeof window.getPassengerSession === 'function' ? window.getPassengerSession() : null) || {};
   session.nombre = nombre;
-  session.telefono = telefono;
+  if (telefono) session.telefono = telefono;
   if (email) session.email = email;
   if (!session.id) session.id = 'pass_' + Date.now();
+
+  // Preservar avatar customizado o actualización en curso
+  if (modalAvatarImg && modalAvatarImg.src && modalAvatarImg.src.startsWith('data:image')) {
+    session.avatar = modalAvatarImg.src;
+  } else if (modalAvatarImg && modalAvatarImg.style.display === 'none') {
+    session.avatar = '';
+  }
 
   // 1. Guardar en la sesión activa y persistirla
   if (typeof window.savePassengerSession === 'function') {
@@ -333,10 +389,20 @@ window.handlePassengerProfileSave = function(event) {
       (session.id && u.id && u.id === session.id)
     );
 
+    const mergedUser = {
+      ...(idx >= 0 ? users[idx] : {}),
+      ...session,
+      nombre,
+      telefono: telefono || (idx >= 0 && users[idx]?.telefono ? users[idx].telefono : ''),
+      email: email || (idx >= 0 && users[idx]?.email ? users[idx].email : ''),
+      avatar: session.avatar || (idx >= 0 && users[idx]?.avatar ? users[idx].avatar : ''),
+      updatedAt: Date.now()
+    };
+
     if (idx >= 0) {
-      users[idx] = { ...users[idx], ...session, nombre, telefono, email, updatedAt: Date.now() };
+      users[idx] = mergedUser;
     } else {
-      users.push({ ...session, nombre, telefono, email, updatedAt: Date.now() });
+      users.push(mergedUser);
     }
     localStorage.setItem('rutaprivada_registered_passengers_v1', JSON.stringify(users));
   } catch(e) {}
@@ -344,14 +410,14 @@ window.handlePassengerProfileSave = function(event) {
   // 3. Autocompletar de inmediato los campos de la solicitud de viaje (Paso 5)
   const passNameInp = document.getElementById('passenger-name-input');
   const passPhoneInp = document.getElementById('passenger-phone-input');
-  if (passNameInp) passNameInp.value = nombre;
-  if (passPhoneInp) passPhoneInp.value = telefono;
+  if (passNameInp && nombre) passNameInp.value = nombre;
+  if (passPhoneInp && telefono) passPhoneInp.value = telefono;
 
   // 4. Actualizar variables de estado globales
   if (window.state) {
     window.state.passengerSession = session;
     window.state.passengerName = nombre;
-    window.state.passengerPhone = telefono;
+    if (telefono) window.state.passengerPhone = telefono;
     if (email) window.state.passengerEmail = email;
   }
 
