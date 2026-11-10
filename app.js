@@ -1754,13 +1754,11 @@ let routeGlowPolyline = null;
 // ==========================================
 window.getPassengerSession = function() {
   try {
+    if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') {
+      return null;
+    }
     const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
-                localStorage.getItem('rutaprivada_passenger_auth_v1') || 
-                localStorage.getItem('rutaprivada_passenger_profile') ||
-                localStorage.getItem('rutaprivada_passenger_session') ||
-                localStorage.getItem('rutaprivada_user_session') ||
-                sessionStorage.getItem('rutaprivada_passenger_session_v1') ||
-                sessionStorage.getItem('rutaprivada_passenger_auth_v1');
+                localStorage.getItem('rutaprivada_passenger_auth_v1');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && (parsed.email || parsed.nombre || parsed.usuario || parsed.telefono || parsed.id)) {
@@ -1780,8 +1778,6 @@ window.getPassengerSession = function() {
           }
         } catch(err) {}
 
-        // Sesión válida encontrada: eliminar bandera de deslogueo residual
-        try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(e){}
         if (window.state) {
           window.state.passengerSession = parsed;
           if (parsed.nombre) window.state.passengerName = parsed.nombre;
@@ -1794,6 +1790,29 @@ window.getPassengerSession = function() {
   } catch(e) {}
 
   return null;
+};
+
+// Verificador oficial de sesión activa
+window.isPassengerLoggedIn = function() {
+  if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') return false;
+  const s = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : null;
+  return !!(s && (s.email || s.usuario || s.id || s.telefono));
+};
+
+// Guardián de autenticación obligatoria para solicitar viajes
+window.requirePassengerAuth = function(actionLabel = 'solicitar un traslado') {
+  if (!window.isPassengerLoggedIn()) {
+    if (typeof showToast === 'function') {
+      showToast(`🔒 Debes iniciar sesión o crear tu cuenta para ${actionLabel}.`);
+    } else {
+      alert(`🔒 Debes iniciar sesión o crear tu cuenta para ${actionLabel}.`);
+    }
+    if (typeof window.openPassengerAuthModal === 'function') {
+      window.openPassengerAuthModal('login');
+    }
+    return false;
+  }
+  return true;
 };
 
 // Saneamiento de seguridad: purgar credenciales en texto plano heredadas
@@ -1824,6 +1843,15 @@ try {
   const _earlySess = window.getPassengerSession();
   if (_earlySess && typeof window.syncPassengerSessionUI === 'function') {
     window.syncPassengerSessionUI(_earlySess);
+  } else {
+    // Si la sesión está cerrada o no existe, forzar apertura inmediata del modal de login
+    setTimeout(() => {
+      if (typeof window.isPassengerLoggedIn === 'function' && !window.isPassengerLoggedIn()) {
+        if (typeof window.openPassengerAuthModal === 'function') {
+          window.openPassengerAuthModal('login');
+        }
+      }
+    }, 120);
   }
 } catch(e) {}
 
@@ -1866,8 +1894,10 @@ window.openPassengerAuthModal = function(defaultTab = 'login') {
 
 window.closePassengerAuthModal = function(force = false) {
   if (!force) {
-    const session = typeof window.getPassengerSession === 'function' ? window.getPassengerSession() : null;
-    if (!session || (!session.nombre && !session.usuario && !session.email && !session.telefono && !session.id)) {
+    if (typeof window.isPassengerLoggedIn === 'function' && !window.isPassengerLoggedIn()) {
+      if (typeof showToast === 'function') {
+        showToast('🔒 Es obligatorio iniciar sesión o crear una cuenta para continuar.');
+      }
       return; // Obligatorio iniciar sesión o registrarse
     }
   }
@@ -2061,6 +2091,12 @@ window.toggleFareBreakdown = toggleFareBreakdown;
 
 async function goToWizardStep(step) {
   if (step < 1 || step > 5) return;
+
+  if (step > 1 && typeof window.requirePassengerAuth === 'function') {
+    if (!window.requirePassengerAuth('avanzar en la solicitud del traslado')) {
+      step = 1;
+    }
+  }
 
   const originInput = document.getElementById('origin-input');
   const destInput = document.getElementById('destination-input');
@@ -2282,6 +2318,10 @@ function selectTripMode(mode) {
 }
 
 async function handleStep1Next() {
+  if (typeof window.requirePassengerAuth === 'function' && !window.requirePassengerAuth('ver el mapa y solicitar tu traslado')) {
+    return;
+  }
+
   const originInput = document.getElementById('origin-input');
   const destInput = document.getElementById('destination-input');
   const stopInput = document.getElementById('stop-input');
@@ -9424,6 +9464,10 @@ if (btnRequestInapp) {
   btnRequestInapp.addEventListener('click', (e) => {
     e.preventDefault();
 
+    if (typeof window.requirePassengerAuth === 'function' && !window.requirePassengerAuth('solicitar el traslado')) {
+      return;
+    }
+
     const originVal = document.getElementById('origin-input') ? document.getElementById('origin-input').value.trim() : '';
     const destVal = document.getElementById('destination-input') ? document.getElementById('destination-input').value.trim() : '';
 
@@ -11518,17 +11562,18 @@ if (btnRecenterPassengerMap) {
     }
 
     function getPassengerSession() {
+      if (typeof window.getPassengerSession === 'function') {
+        return window.getPassengerSession();
+      }
       try {
+        if (localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') {
+          return null;
+        }
         const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
-                    localStorage.getItem('rutaprivada_passenger_auth_v1') || 
-                    localStorage.getItem('rutaprivada_passenger_profile') ||
-                    localStorage.getItem('rutaprivada_passenger_session') ||
-                    localStorage.getItem('rutaprivada_user_session') ||
-                    sessionStorage.getItem('rutaprivada_passenger_session_v1');
+                    localStorage.getItem('rutaprivada_passenger_auth_v1');
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && (parsed.email || parsed.nombre || parsed.usuario || parsed.telefono || parsed.id)) {
-            try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(e){}
             return parsed;
           }
         }
@@ -14035,6 +14080,10 @@ if (btnRecenterPassengerMap) {
   }
 
   function solicitarViajeUber() {
+    if (typeof window.requirePassengerAuth === 'function' && !window.requirePassengerAuth('solicitar un traslado')) {
+      return;
+    }
+
     const destInput = document.getElementById('uberDestInput');
     const originInput = document.getElementById('uberOriginInput');
     const stopInput = document.getElementById('uberStopInput');
@@ -14308,9 +14357,13 @@ if (btnRecenterPassengerMap) {
     try { initPwa(); } catch (e) { console.warn('PWA init:', e); }
     try { goToWizardStep(1); } catch (e) { console.warn('Wizard step 1:', e); }
     try {
-      const sess = window.getPassengerSession();
-      if (!sess || (!sess.nombre && !sess.email && !sess.usuario && !sess.id) || localStorage.getItem('rutaprivada_passenger_logged_out') === 'true') {
+      if (typeof window.isPassengerLoggedIn === 'function' && !window.isPassengerLoggedIn()) {
         window.openPassengerAuthModal('login');
+        setTimeout(() => {
+          if (!window.isPassengerLoggedIn() && typeof window.openPassengerAuthModal === 'function') {
+            window.openPassengerAuthModal('login');
+          }
+        }, 300);
       }
     } catch(e) {}
   }
