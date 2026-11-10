@@ -208,21 +208,25 @@
         }
         if (raw) {
           var u = JSON.parse(raw);
-          if (u && (u.email || u.nombre || u.usuario || u.telefono)) {
+          if (u && (u.email || u.nombre || u.usuario || u.telefono || u.id)) {
             try { localStorage.removeItem('rutaprivada_passenger_logged_out'); } catch(err){}
             var nameEl = document.getElementById('headerPassengerName');
             var subEl = document.querySelector('.passenger-status-sub');
             var avEl = document.getElementById('headerPassengerAvatar');
+            var uberAvEl = document.getElementById('uberHeaderAvatar');
             var shortName = u.nombre ? u.nombre.split(' ')[0] : (u.usuario || (u.email ? u.email.split('@')[0] : 'Pasajero'));
             if (nameEl) nameEl.textContent = shortName;
             if (subEl) {
               if (u.email) {
                 subEl.innerHTML = '<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">' + u.email + '</span>';
+              } else if (u.telefono) {
+                subEl.innerHTML = '<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">' + u.telefono + '</span>';
               } else {
                 subEl.innerHTML = '<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">Sesión Activa</span>';
               }
             }
-            if (avEl && u.avatar) avEl.src = u.avatar;
+            if (avEl && u.avatar && u.avatar.length > 10) avEl.src = u.avatar;
+            if (uberAvEl && u.avatar && u.avatar.length > 10) uberAvEl.src = u.avatar;
           }
         }
       } catch(e) {}

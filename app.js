@@ -11134,8 +11134,8 @@ if (btnRecenterPassengerMap) {
 
     function closePassengerAuthModal(force = false) {
       if (!force) {
-        const session = getPassengerSession();
-        if (!session || (!session.nombre && !session.email && !session.usuario && !session.id)) {
+        const session = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : getPassengerSession();
+        if (!session || (!session.nombre && !session.email && !session.usuario && !session.id && !session.telefono)) {
           return; // No cerrar sin sesión activa
         }
       }
@@ -11148,8 +11148,8 @@ if (btnRecenterPassengerMap) {
     window.closePassengerAuthModal = closePassengerAuthModal;
 
     function openPassengerProfileModal() {
-      const session = getPassengerSession();
-      if (!session || (!session.nombre && !session.email && !session.telefono)) {
+      const session = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : getPassengerSession();
+      if (!session || (!session.nombre && !session.email && !session.usuario && !session.id && !session.telefono)) {
         openPassengerAuthModal('login');
         return;
       }
@@ -11163,6 +11163,7 @@ if (btnRecenterPassengerMap) {
         modal.style.display = 'flex';
       }
     }
+    window.openPassengerProfileModal = openPassengerProfileModal;
     window.openPassengerProfileModal = openPassengerProfileModal;
 
     function closePassengerProfileModal() {
@@ -11478,31 +11479,32 @@ if (btnRecenterPassengerMap) {
           });
         }
 
-        // 3. Consultar rápidamente Firestore Cloud REST API con timeout para no congelar la UI
-        if (!user) {
+        // 3. Consultar Firestore Cloud SDK / Firestore REST API
+        if (!user && typeof firebase !== 'undefined' && firebase.firestore) {
           try {
+            const db = firebase.firestore();
             const docId = isEmail ? cleanIdentifier.replace(/[^a-z0-9_]/g, '_') : (cleanPhone ? ('pass_' + cleanPhone) : cleanIdentifier.replace(/[^a-z0-9_]/g, '_'));
-            const restResp = await fetchWithTimeout(
-              `https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/pasajeros/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`,
-              {},
-              1200
-            );
-            if (restResp && restResp.ok) {
-              const data = await restResp.json();
-              if (data && data.fields) {
-                user = {
-                  id: data.fields.id?.stringValue || ('pass_' + Date.now()),
-                  nombre: data.fields.nombre?.stringValue || (isEmail ? cleanIdentifier.split('@')[0] : rawIdentifier),
-                  usuario: rawIdentifier,
-                  telefono: data.fields.telefono?.stringValue || (cleanPhone ? rawIdentifier : ''),
-                  email: data.fields.email?.stringValue || (isEmail ? cleanIdentifier : ''),
-                  passwordHash: data.fields.passwordHash?.stringValue || '',
-                  password: data.fields.password?.stringValue || '',
-                  rating: data.fields.rating?.stringValue || '5.00'
-                };
+            
+            // A) Buscar por Document ID directo
+            let snap = await db.collection('pasajeros').doc(docId).get();
+            if (snap.exists) {
+              user = snap.data();
+            } else if (isEmail) {
+              // B) Buscar por campo email
+              const qSnap = await db.collection('pasajeros').where('email', '==', cleanIdentifier).limit(1).get();
+              if (!qSnap.empty) {
+                user = qSnap.docs[0].data();
+              }
+            } else if (cleanPhone) {
+              // C) Buscar por teléfono
+              const qSnap = await db.collection('pasajeros').where('telefono', '==', rawIdentifier).limit(1).get();
+              if (!qSnap.empty) {
+                user = qSnap.docs[0].data();
               }
             }
-          } catch(err) {}
+          } catch(err) {
+            console.warn('[Passenger Login] Firestore SDK check warning:', err);
+          }
         }
 
         // 4. Si el usuario existe: validar contraseña
@@ -11550,12 +11552,12 @@ if (btnRecenterPassengerMap) {
           };
         }
 
-        // Guardar y activar sesión permanentemente (igual que app del conductor)
+        // Guardar y activar sesión permanentemente (persistente ante recargas y navegación)
         try {
           localStorage.removeItem('rutaprivada_passenger_logged_out');
         } catch(e) {}
         savePassengerSession(user);
-        closePassengerAuthModal();
+        closePassengerAuthModal(true);
         renderPassengerProfileUI(user);
         if (typeof window.syncPassengerSessionUI === 'function') {
           window.syncPassengerSessionUI(user);
@@ -12029,7 +12031,7 @@ if (btnRecenterPassengerMap) {
     }
 
     // Helper de Historial de Viajes del Pasajero
-    function renderPassengerHistoryUI() {
+    async function renderPassengerHistoryUI() {
       const listView = document.getElementById('passengerHistoryListView');
       const detailView = document.getElementById('passengerHistoryDetailView');
       if (!listView) return;
@@ -12037,17 +12039,22 @@ if (btnRecenterPassengerMap) {
       if (detailView) detailView.classList.add('hidden');
       listView.classList.remove('hidden');
 
+      const session = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : null;
+      const userEmail = session && session.email ? session.email.toLowerCase() : '';
+      const userPhone = session && session.telefono ? session.telefono.replace(/\D/g, '') : '';
+      const userName = session && session.nombre ? session.nombre.toLowerCase() : '';
+
       let trips = [];
       try {
         const rawBookings = localStorage.getItem('rutaprivada_bookings_v1');
         if (rawBookings) {
           const all = JSON.parse(rawBookings);
-          trips = all.filter(t => t && (t.estado === 'completado' || t.estado === 'completada' || t.status === 'completado' || t.status === 'completada' || t.estado === 'en_curso' || t.estado === 'asignado'));
+          trips = all.filter(t => t && (t.estado === 'completado' || t.estado === 'completada' || t.status === 'completado' || t.status === 'completada' || t.estado === 'en_curso' || t.estado === 'asignado' || t.estado === 'aceptada' || t.estado === 'programado'));
         }
       } catch(e) {}
 
       try {
-        const passRes = loadPassengerReservations();
+        const passRes = (typeof loadPassengerReservations === 'function') ? loadPassengerReservations() : [];
         passRes.forEach(r => {
           if (r && !trips.some(t => t.id === r.id)) {
             trips.push(r);
@@ -12055,12 +12062,70 @@ if (btnRecenterPassengerMap) {
         });
       } catch(e) {}
 
+      // Sincronizar viajes de Firestore si SDK está activo
+      if (typeof firebase !== 'undefined' && firebase.firestore && (userEmail || userPhone)) {
+        try {
+          const db = firebase.firestore();
+          const queryPromises = [];
+          if (userEmail) {
+            queryPromises.push(db.collection('bookings').where('clientEmail', '==', userEmail).limit(20).get().catch(() => null));
+            queryPromises.push(db.collection('bookings').where('passengerEmail', '==', userEmail).limit(20).get().catch(() => null));
+          }
+          if (userPhone && userPhone.length >= 7) {
+            queryPromises.push(db.collection('bookings').where('clientPhone', '==', session.telefono).limit(20).get().catch(() => null));
+          }
+          const results = await Promise.all(queryPromises);
+          results.forEach(snap => {
+            if (snap && !snap.empty) {
+              snap.forEach(doc => {
+                const data = doc.data();
+                if (data) {
+                  data.id = data.id || doc.id;
+                  if (!trips.some(t => t.id === data.id)) {
+                    trips.push(data);
+                  }
+                }
+              });
+            }
+          });
+        } catch(err) {
+          console.warn('[Trip History] Firestore query warning:', err);
+        }
+      }
+
+      // Filtrar para el usuario activo si tiene email o teléfono
+      if (session && (userEmail || userPhone)) {
+        const userSpecific = trips.filter(t => {
+          const tEmail = (t.clientEmail || t.passengerEmail || (t.pasajero && t.pasajero.email) || '').toLowerCase();
+          const tPhone = (t.clientPhone || t.passengerPhone || (t.pasajero && t.pasajero.telefono) || '').replace(/\D/g, '');
+          const tName = (t.clientName || t.passengerName || (t.pasajero && t.pasajero.nombre) || '').toLowerCase();
+          return (userEmail && tEmail && tEmail === userEmail) ||
+                 (userPhone && tPhone && tPhone.includes(userPhone)) ||
+                 (!tEmail && !tPhone && userName && tName && tName.includes(userName)) ||
+                 (!tEmail && !tPhone && !tName);
+        });
+        if (userSpecific.length > 0) {
+          trips = userSpecific;
+        }
+      }
+
+      trips.sort((a, b) => {
+        const timeA = a.timestamp || (a.creadoEn ? new Date(a.creadoEn).getTime() : 0) || (a.fecha ? new Date(a.fecha).getTime() : 0);
+        const timeB = b.timestamp || (b.creadoEn ? new Date(b.creadoEn).getTime() : 0) || (b.fecha ? new Date(b.fecha).getTime() : 0);
+        return timeB - timeA;
+      });
+
+      window.__passengerTripsCache = trips;
+
       if (trips.length === 0) {
         listView.innerHTML = `
           <div style="text-align: center; padding: 36px 16px; color: #94a3b8;">
             <div style="font-size: 2.8rem; margin-bottom: 10px;">📜</div>
             <h4 style="color: #fff; font-size: 1rem; margin-bottom: 6px;">Sin historial de viajes aún</h4>
-            <p style="font-size: 0.8rem; line-height: 1.4; margin-bottom: 16px;">Aquí verás el detalle, comprobantes y recibos de todos tus traslados finalizados.</p>
+            <p style="font-size: 0.8rem; line-height: 1.4; margin-bottom: 16px;">Aquí verás el detalle, comprobantes y recibos de todos tus traslados finalizados o en curso.</p>
+            <button type="button" class="btn btn-primary" onclick="window.closePassengerProfileModal(); if(typeof goToWizardStep === 'function') goToWizardStep(1);" style="font-size: 0.85rem; padding: 10px 18px; border-radius: 10px;">
+              ⚡ Cotizar y Viajar Ahora
+            </button>
           </div>
         `;
         return;
@@ -12072,12 +12137,26 @@ if (btnRecenterPassengerMap) {
         const fecha = trip.fecha || trip.date || (trip.creadoEn ? new Date(trip.creadoEn).toLocaleDateString('es-AR') : '--');
         const hora = trip.hora || trip.time || (trip.creadoEn ? new Date(trip.creadoEn).toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' }) : '--');
         const driver = (trip.conductor && trip.conductor.nombre) || trip.driverAssigned || 'Chofer Ejecutivo';
+        const st = (trip.estado || trip.status || 'completado').toLowerCase();
+        let badgeColor = '#10b981';
+        let badgeBg = 'rgba(16, 185, 129, 0.15)';
+        let badgeLabel = 'Completado';
+        if (st === 'en_curso' || st === 'in_progress') {
+          badgeColor = '#38bdf8'; badgeBg = 'rgba(56, 189, 248, 0.15)'; badgeLabel = 'En Curso';
+        } else if (st === 'aceptada' || st === 'asignado' || st === 'programado') {
+          badgeColor = '#fbbf24'; badgeBg = 'rgba(251, 191, 36, 0.15)'; badgeLabel = 'Agendado';
+        } else if (st === 'cancelada' || st === 'cancelado') {
+          badgeColor = '#f87171'; badgeBg = 'rgba(248, 113, 113, 0.15)'; badgeLabel = 'Cancelado';
+        }
 
         return `
-          <div class="passenger-history-card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px;">
+          <div class="passenger-history-card" onclick="window.showPassengerTripDetail('${trip.id}')" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: all 0.2s ease;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px;">
               <span style="font-size: 0.8rem; color: #94a3b8;">📅 ${fecha} · 🕒 ${hora} hs</span>
-              <strong style="color: #38bdf8; font-size: 0.95rem;">$${total.toLocaleString('es-AR')}</strong>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; background: ${badgeBg}; color: ${badgeColor}; font-weight: 600;">${badgeLabel}</span>
+                <strong style="color: #38bdf8; font-size: 0.95rem;">$${total.toLocaleString('es-AR')}</strong>
+              </div>
             </div>
             <div style="font-size: 0.82rem; color: #e2e8f0; display: flex; flex-direction: column; gap: 4px;">
               <div style="display: flex; gap: 6px; align-items: center;">
@@ -12091,12 +12170,126 @@ if (btnRecenterPassengerMap) {
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; color: #94a3b8; background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 8px;">
               <span>🚖 ${driver}</span>
-              ${toll > 0 ? `<span style="color: #fbbf24;">(Inc. Peajes: $${toll.toLocaleString('es-AR')})</span>` : '<span>(Sin peajes)</span>'}
+              <span style="color: #38bdf8; font-weight: 600;">Ver recibo ›</span>
             </div>
           </div>
         `;
       }).join('');
     }
+    window.renderPassengerHistoryUI = renderPassengerHistoryUI;
+
+    window.showPassengerTripDetail = function(tripId) {
+      const listView = document.getElementById('passengerHistoryListView');
+      const detailView = document.getElementById('passengerHistoryDetailView');
+      if (!detailView || !listView) return;
+
+      const trips = window.__passengerTripsCache || [];
+      const trip = trips.find(t => String(t.id) === String(tripId));
+      if (!trip) {
+        if (typeof showToast === 'function') showToast('⚠️ No se encontró la información del viaje.');
+        return;
+      }
+
+      listView.classList.add('hidden');
+      detailView.classList.remove('hidden');
+
+      const total = Number(trip.precioEstimado || trip.precio || trip.totalFare || trip.monto || 0);
+      const toll = Number(trip.tollCost || trip.tollFare || trip.peajes || 0);
+      const baseFare = Math.max(0, total - toll);
+      const fecha = trip.fecha || trip.date || (trip.creadoEn ? new Date(trip.creadoEn).toLocaleDateString('es-AR') : '--');
+      const hora = trip.hora || trip.time || (trip.creadoEn ? new Date(trip.creadoEn).toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' }) : '--');
+      const driver = (trip.conductor && trip.conductor.nombre) || trip.driverAssigned || 'Daniel Pabón (Chofer Ejecutivo)';
+      const car = (trip.conductor && trip.conductor.auto) || trip.vehicleAssigned || 'Fiat Cronos';
+      const plate = (trip.conductor && trip.conductor.patente) || trip.plateAssigned || 'AE927CN';
+      const distance = trip.distancia || trip.distanceKm ? `${trip.distancia || trip.distanceKm} km` : '18 km';
+      const duration = trip.duracion || trip.durationMins ? `${trip.duracion || trip.durationMins} min` : '25 min';
+      const payMethod = trip.metodoPago || trip.medioPago || 'Efectivo / Transferencia';
+
+      detailView.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <button type="button" onclick="window.backToPassengerHistoryList()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+              ← Volver al Historial
+            </button>
+            <span style="font-size: 0.75rem; color: #94a3b8;">ID: #${String(trip.id).slice(-8)}</span>
+          </div>
+
+          <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px; padding: 16px; text-align: center;">
+            <span style="font-size: 0.78rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Importe Total Abonado</span>
+            <div style="color: #38bdf8; font-size: 2rem; font-weight: 800; margin: 4px 0;">$${total.toLocaleString('es-AR')}</div>
+            <span style="font-size: 0.75rem; color: #10b981; font-weight: 600;">✓ Recibo emitido correctamente</span>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">
+            <h5 style="color: #fff; margin: 0 0 10px 0; font-size: 0.85rem; font-weight: 600;">📍 Itinerario del Viaje</h5>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem;">
+              <div style="display: flex; gap: 8px;">
+                <span style="color: #34d399;">🟢</span>
+                <div>
+                  <strong style="color: #94a3b8; font-size: 0.72rem; display: block;">ORIGEN</strong>
+                  <span style="color: #f1f5f9;">${trip.origen || trip.pickupAddress || 'Origen'}</span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <span style="color: #38bdf8;">🏁</span>
+                <div>
+                  <strong style="color: #94a3b8; font-size: 0.72rem; display: block;">DESTINO</strong>
+                  <span style="color: #f1f5f9;">${trip.destino || trip.dropoffAddress || 'Destino'}</span>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.06); margin-top: 10px; padding-top: 8px; font-size: 0.76rem; color: #94a3b8;">
+              <span>📅 ${fecha} a las ${hora} hs</span>
+              <span>📏 ${distance} (${duration})</span>
+            </div>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">
+            <h5 style="color: #fff; margin: 0 0 10px 0; font-size: 0.85rem; font-weight: 600;">🚖 Conductor & Vehículo</h5>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="color: #fff; font-size: 0.85rem; display: block;">${driver}</strong>
+                <small style="color: #94a3b8; font-size: 0.76rem;">${car} · Patente: <span style="color: #fbbf24; font-weight: 700;">${plate}</span></small>
+              </div>
+              <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; font-weight: 700;">⭐ 5.00</span>
+            </div>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px;">
+            <h5 style="color: #fff; margin: 0 0 10px 0; font-size: 0.85rem; font-weight: 600;">🧾 Desglose del Precio</h5>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem; color: #cbd5e1;">
+              <div style="display: flex; justify-content: space-between;">
+                <span>Tarifa Base del Traslado:</span>
+                <span style="color: #fff;">$${baseFare.toLocaleString('es-AR')}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Peajes incluidos en ruta:</span>
+                <span style="color: #fbbf24;">$${toll.toLocaleString('es-AR')}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Medio de Pago:</span>
+                <span style="color: #38bdf8;">💳 ${payMethod}</span>
+              </div>
+              <div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 4px; padding-top: 6px; display: flex; justify-content: space-between; font-weight: 700; color: #fff;">
+                <span>Total Final:</span>
+                <span style="color: #38bdf8; font-size: 0.95rem;">$${total.toLocaleString('es-AR')}</span>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" onclick="if(typeof openPassengerReportModal === 'function') openPassengerReportModal('${trip.id}');" style="background: none; border: 1px solid rgba(248, 113, 113, 0.4); color: #fca5a5; padding: 8px 12px; border-radius: 8px; font-size: 0.78rem; cursor: pointer;">
+            ⚠️ Ayuda con este viaje / Reportar problema
+          </button>
+        </div>
+      `;
+    };
+
+    window.backToPassengerHistoryList = function() {
+      const listView = document.getElementById('passengerHistoryListView');
+      const detailView = document.getElementById('passengerHistoryDetailView');
+      if (detailView) detailView.classList.add('hidden');
+      if (listView) listView.classList.remove('hidden');
+    };
 
     // Pestañas del Modal de Perfil (Mis Datos | Medios de Pago | Historial de Viajes)
     window.switchPassengerProfileTab = function(targetId) {
