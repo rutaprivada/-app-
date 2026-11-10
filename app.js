@@ -47,6 +47,234 @@ window.togglePasswordVisibility = function(inputId, btn) {
   }
 };
 
+window.hashPassword = async function(str) {
+  if (!str) return '';
+  try {
+    if (window.crypto && window.crypto.subtle) {
+      const msgBuffer = new TextEncoder().encode(str);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch(e) {}
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+  }
+  return 'h_' + Math.abs(h);
+};
+
+window.handlePassengerLoginSubmit = async function(event) {
+  if (event) {
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+  }
+
+  const identifierInput = document.getElementById('loginPassengerIdentifier');
+  const passwordInput = document.getElementById('loginPassengerPassword');
+  const statusMsg = document.getElementById('loginPassengerStatusMsg');
+
+  function showFeedback(msg, isError = true) {
+    if (statusMsg) {
+      statusMsg.style.display = 'block';
+      statusMsg.style.background = isError ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)';
+      statusMsg.style.border = isError ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(16, 185, 129, 0.5)';
+      statusMsg.style.color = isError ? '#fca5a5' : '#6ee7b7';
+      statusMsg.innerHTML = msg;
+    }
+    if (typeof window.showToast === 'function') window.showToast(msg.replace(/<[^>]+>/g, ''));
+  }
+
+  const rawIdentifier = (identifierInput ? identifierInput.value : '').trim();
+  const password = (passwordInput ? passwordInput.value : '').trim();
+
+  if (!rawIdentifier || !password) {
+    showFeedback('⚠️ Por favor ingresa tu usuario, correo o teléfono y tu contraseña.');
+    if (!rawIdentifier && identifierInput) identifierInput.focus();
+    else if (passwordInput) passwordInput.focus();
+    return false;
+  }
+
+  const cleanIdentifier = rawIdentifier.toLowerCase();
+  const cleanPhone = rawIdentifier.replace(/\D/g, '');
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanIdentifier);
+  const enteredHash = await window.hashPassword(password);
+
+  // 1. Buscar en almacenamiento local de usuarios registrados
+  let user = null;
+  try {
+    const rawUsers = localStorage.getItem('rutaprivada_registered_passengers_v1');
+    const users = rawUsers ? JSON.parse(rawUsers) : [];
+    user = users.find(u => 
+      (u.email && u.email.toLowerCase() === cleanIdentifier) ||
+      (u.usuario && u.usuario.toLowerCase() === cleanIdentifier) ||
+      (u.nombre && u.nombre.toLowerCase() === cleanIdentifier) ||
+      (cleanPhone && cleanPhone.length >= 7 && u.telefono && u.telefono.replace(/\D/g, '').includes(cleanPhone))
+    );
+  } catch(e) {}
+
+  // 2. Buscar en sesiones previas o respaldos locales
+  if (!user) {
+    const sessionKeys = ['rutaprivada_passenger_auth_v1', 'rutaprivada_passenger_session_v1', 'rutaprivada_passenger_profile', 'rutaprivada_user_session', 'rutaprivada_profile'];
+    for (let k of sessionKeys) {
+      try {
+        const item = JSON.parse(localStorage.getItem(k) || '{}');
+        if (item && (
+          (item.email && item.email.toLowerCase() === cleanIdentifier) ||
+          (item.usuario && item.usuario.toLowerCase() === cleanIdentifier) ||
+          (item.nombre && item.nombre.toLowerCase() === cleanIdentifier) ||
+          (cleanPhone && cleanPhone.length >= 7 && item.telefono && item.telefono.replace(/\D/g, '').includes(cleanPhone))
+        )) {
+          user = item;
+          break;
+        }
+      } catch(e) {}
+    }
+  }
+
+  // 3. Consultar Firestore con timeout estricto de 1200ms para evitar cuelgues
+  if (!user && typeof firebase !== 'undefined' && firebase.firestore) {
+    try {
+      const db = firebase.firestore();
+      const docId = isEmail ? cleanIdentifier.replace(/[^a-z0-9_]/g, '_') : (cleanPhone ? ('pass_' + cleanPhone) : cleanIdentifier.replace(/[^a-z0-9_]/g, '_'));
+      const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 1200));
+      const fetchPromise = db.collection('pasajeros').doc(docId).get();
+      const snap = await Promise.race([fetchPromise, timeoutPromise]);
+      if (snap && snap.exists) {
+        user = snap.data();
+      }
+    } catch(err) {
+      console.warn('[Login] Error consultando Firestore:', err);
+    }
+  }
+
+  // 4. Validar o crear cuenta
+  if (user) {
+    const storedHash = user.passwordHash || (user.password ? await window.hashPassword(user.password) : '');
+    const hasPasswordSet = Boolean(storedHash || user.password);
+
+    if (hasPasswordSet) {
+      const isPasswordCorrect = (storedHash && storedHash === enteredHash) || (user.password && user.password === password);
+      if (!isPasswordCorrect) {
+        showFeedback('❌ Contraseña incorrecta. <a href="#" onclick="window.openPassengerPasswordResetModal(); return false;" style="color:#38bdf8; text-decoration:underline;">¿Olvidaste tu contraseña? Toca aquí</a>', true);
+        if (passwordInput) passwordInput.focus();
+        return false;
+      }
+      if (user.password) {
+        delete user.password;
+        user.passwordHash = enteredHash;
+      }
+    } else {
+      user.passwordHash = enteredHash;
+    }
+  } else {
+    // Auto-crear cuenta de forma transparente
+    const defaultName = isEmail 
+      ? cleanIdentifier.split('@')[0].replace(/[._-]/g, ' ') 
+      : rawIdentifier.replace(/[._-]/g, ' ');
+    const capitalizedName = defaultName.charAt(0).toUpperCase() + defaultName.slice(1);
+    user = {
+      id: 'pass_' + Date.now(),
+      nombre: capitalizedName,
+      usuario: rawIdentifier,
+      telefono: cleanPhone ? rawIdentifier : '',
+      email: isEmail ? cleanIdentifier : '',
+      passwordHash: enteredHash,
+      medioPago: 'efectivo',
+      rating: '5.00',
+      ratingCount: 1,
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+      fechaRegistro: new Date().toISOString(),
+      emailVerificado: true
+    };
+  }
+
+  // 5. Guardar sesión y activar en todos los storages
+  try {
+    delete user.password;
+    localStorage.removeItem('rutaprivada_passenger_logged_out');
+    const userStr = JSON.stringify(user);
+    ['rutaprivada_passenger_auth_v1', 'rutaprivada_passenger_session_v1', 'rutaprivada_passenger_profile', 'rutaprivada_user_session', 'rutaprivada_profile'].forEach(k => {
+      try { localStorage.setItem(k, userStr); } catch(e){}
+      try { sessionStorage.setItem(k, userStr); } catch(e){}
+    });
+    try {
+      document.cookie = `rutaprivada_passenger_session_v1=${encodeURIComponent(userStr)}; path=/; max-age=315360000; SameSite=Lax`;
+    } catch(e){}
+
+    // Guardar en lista de registrados
+    const rawUsers = localStorage.getItem('rutaprivada_registered_passengers_v1');
+    const users = rawUsers ? JSON.parse(rawUsers) : [];
+    const existingIdx = users.findIndex(u => (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase()) || (u.telefono && user.telefono && u.telefono.replace(/\D/g,'') === user.telefono.replace(/\D/g,'')));
+    if (existingIdx >= 0) users[existingIdx] = { ...users[existingIdx], ...user };
+    else users.push(user);
+    localStorage.setItem('rutaprivada_registered_passengers_v1', JSON.stringify(users));
+  } catch(e){}
+
+  // 6. Actualizar variables de estado
+  if (window.state) {
+    window.state.passengerSession = user;
+    window.state.passengerName = user.nombre;
+    window.state.passengerPhone = user.telefono;
+    window.state.passengerEmail = user.email;
+    window.state.passengerAvatar = user.avatar;
+  }
+
+  // 7. Actualizar interfaz directamente
+  const nameEl = document.getElementById('headerPassengerName');
+  const subEl = document.querySelector('.passenger-status-sub');
+  const avEl = document.getElementById('headerPassengerAvatar');
+  const uberAvEl = document.getElementById('uberHeaderAvatar');
+  const userEmail = (user.email || '').toLowerCase();
+  const displayName = user.nombre || user.usuario || (userEmail ? userEmail.split('@')[0] : 'Pasajero');
+  const shortName = displayName.split(' ')[0];
+
+  if (nameEl) nameEl.textContent = shortName;
+  if (subEl) {
+    if (userEmail) {
+      subEl.innerHTML = `<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">${userEmail}</span>`;
+      subEl.title = `Sesión activa: ${userEmail}`;
+    } else {
+      subEl.innerHTML = `<span style="color: #10b981; font-weight: 700;">●</span> <span style="color: #38bdf8;">Sesión Activa</span>`;
+      subEl.title = `Sesión activa como ${shortName}`;
+    }
+  }
+  if (avEl && user.avatar) avEl.src = user.avatar;
+  if (uberAvEl && user.avatar) uberAvEl.src = user.avatar;
+
+  // Actualizar modales de perfil e inputs de reserva
+  if (typeof window.syncPassengerSessionUI === 'function') window.syncPassengerSessionUI(user);
+  if (typeof window.renderPassengerProfileUI === 'function') window.renderPassengerProfileUI(user);
+
+  // Cerrar modal de autenticación
+  const authModal = document.getElementById('modalPassengerAuth');
+  if (authModal) {
+    authModal.classList.add('hidden');
+    authModal.style.display = 'none';
+  }
+
+  // Mostrar mensaje de éxito
+  if (typeof window.showToast === 'function') {
+    window.showToast(`👋 ¡Sesión iniciada con éxito! Bienvenido, ${shortName}.`);
+  }
+
+  // Sincronizar en segundo plano con Firestore
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const db = firebase.firestore();
+      const emailDocId = user.email ? user.email.toLowerCase().replace(/[^a-z0-9_]/g, '_') : '';
+      const phoneDocId = user.telefono ? ('pass_' + user.telefono.replace(/\D/g, '')) : '';
+      const userId = user.id || emailDocId || phoneDocId;
+      const safeUser = { ...user };
+      delete safeUser.password;
+      if (emailDocId) db.collection('pasajeros').doc(emailDocId).set(safeUser, { merge: true }).catch(() => {});
+      if (userId) db.collection('pasajeros').doc(userId).set(safeUser, { merge: true }).catch(() => {});
+    }
+  } catch(e) {}
+
+  return false;
+};
+
 // ==========================================
 // CENTRO DE AYUDA Y SOPORTE PASAJERO (24/7)
 // ==========================================
