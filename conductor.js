@@ -182,6 +182,36 @@ window.handleSendDriverResetCode = async function() {
         return;
     }
 
+    // Verificar si el chofer existe antes de enviar código de recuperación
+    let driverExists = false;
+    try {
+        const list = JSON.parse(localStorage.getItem('rutaprivada_registered_drivers_v1') || '[]');
+        const adminList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+        driverExists = (Array.isArray(list) && list.some(d => d && d.email && d.email.toLowerCase() === email)) ||
+                       (Array.isArray(adminList) && adminList.some(d => d && d.email && d.email.toLowerCase() === email));
+    } catch(e) {}
+
+    if (!driverExists && typeof firebase !== 'undefined' && firebase.firestore) {
+        try {
+            const db = firebase.firestore();
+            const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
+            const snap = await db.collection('conductores').doc(emailDocId).get();
+            if (snap && snap.exists) driverExists = true;
+            else {
+                const qSnap = await db.collection('conductores').where('email', '==', email).limit(1).get();
+                if (!qSnap.empty) driverExists = true;
+            }
+        } catch(e) {}
+    }
+
+    if (!driverExists) {
+        const notFoundMsg = '⚠️ No existe ninguna cuenta de chofer registrada con este correo. Por favor crea tu cuenta primero.';
+        if (typeof window.showDriverToast === 'function') window.showDriverToast(notFoundMsg);
+        else if (typeof showDriverToast === 'function') showDriverToast(notFoundMsg);
+        if (inputResetEmail) inputResetEmail.focus();
+        return;
+    }
+
     window._isSendingDriverResetCode = true;
     if (btnSend) {
         btnSend.disabled = true;
@@ -356,15 +386,20 @@ window.handleDriverPasswordResetSubmit = async function(e) {
             registered[idx].passwordHash = newHash;
             registered[idx].updatedAt = Date.now();
         } else {
+            let foundDriver = null;
+            try {
+                const adminList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+                foundDriver = adminList.find(d => d.email && d.email.toLowerCase() === email);
+            } catch(e) {}
             registered.push({
-                id: 'drv_' + Date.now(),
-                nombre: email.split('@')[0],
-                dni: '',
-                telefono: '',
+                id: foundDriver?.id || ('drv_' + Date.now()),
+                nombre: foundDriver?.nombre || email.split('@')[0],
+                dni: foundDriver?.dni || '',
+                telefono: foundDriver?.telefono || '',
                 email: email,
                 passwordHash: newHash,
-                estadoVerificacion: 'pendiente',
-                calificacion: 5.0,
+                estadoVerificacion: foundDriver?.estadoVerificacion || 'pendiente',
+                calificacion: foundDriver?.calificacion || 5.0,
                 updatedAt: Date.now()
             });
         }
@@ -6597,13 +6632,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function getRegisteredDriversList() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY_REGISTERED_DRIVERS);
-            return raw ? JSON.parse(raw) : [];
+            const list = raw ? JSON.parse(raw) : [];
+            const valid = Array.isArray(list) ? list.filter(d => d && d.email && d.email.includes('@')) : [];
+            if (Array.isArray(list) && valid.length !== list.length) {
+                try { localStorage.setItem(STORAGE_KEY_REGISTERED_DRIVERS, JSON.stringify(valid)); } catch(e){}
+            }
+            return valid;
         } catch(e) {
             return [];
         }
     }
 
     function saveDriverToRegisteredList(driver) {
+        if (!driver || !driver.email || !driver.email.includes('@')) return;
         const list = getRegisteredDriversList();
         const existingIdx = list.findIndex(d => (d.email && driver.email && d.email.toLowerCase() === driver.email.toLowerCase()) || (d.id && driver.id && d.id === driver.id));
         if (existingIdx >= 0) {
@@ -6624,7 +6665,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const raw = localStorage.getItem(STORAGE_KEY_DRIVER_AUTH);
             if (raw) {
                 const parsed = JSON.parse(raw);
-                if (parsed && (parsed.email || parsed.nombre || parsed.id)) return parsed;
+                if (parsed && parsed.email && parsed.email.includes('@')) return parsed;
+                // Si la sesión guardada no tiene correo válido registrado, descartarla
+                if (parsed && (!parsed.email || !parsed.email.includes('@'))) {
+                    localStorage.removeItem(STORAGE_KEY_DRIVER_AUTH);
+                }
             }
         } catch(e) {}
         return null;
@@ -6905,11 +6950,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const cleanIdentifier = email.toLowerCase();
+            const cleanPhone = email.replace(/\D/g, '');
             const enteredHash = await hashDriverPassword(pass);
             const list = getRegisteredDriversList();
 
-            // 1. Buscar en choferes guardados en este dispositivo
-            let driver = list.find(d => d.email && d.email.toLowerCase() === email);
+            // 1. Buscar en choferes guardados en este dispositivo por correo, DNI o teléfono
+            let driver = list.find(d => 
+                (d.email && d.email.toLowerCase() === cleanIdentifier) ||
+                (cleanPhone && cleanPhone.length >= 7 && d.dni && d.dni.replace(/\D/g, '') === cleanPhone) ||
+                (cleanPhone && cleanPhone.length >= 7 && d.telefono && d.telefono.replace(/\D/g, '').includes(cleanPhone))
+            );
 
             // 2. Si no está en este dispositivo, consultar en Firebase Firestore en la nube
             if (!driver && typeof firebase !== 'undefined') {
@@ -6977,9 +7028,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch(e) {}
             }
 
-            // VALIDACIÓN ESTRICTA DE EXISTENCIA DE CHOFER
+            // VALIDACIÓN ESTRICTA DE EXISTENCIA DE CHOFER (PROHIBIDO AUTO-CREAR CUENTAS)
             if (!driver) {
-                showDriverToast('⚠️ No existe ninguna cuenta de Chofer con este correo. Por favor crea tu cuenta primero.');
+                showDriverToast('⚠️ Esta cuenta de chofer no está registrada. Por favor dirígete a "Crear Cuenta".');
                 return;
             }
 
