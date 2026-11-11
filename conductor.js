@@ -8801,6 +8801,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const effectiveDriverEmail = extraParams.driverEmail || driverEmail || localStorage.getItem('rutaprivada_driver_email') || targetEmail;
         const computedReplyTo = extraParams.replyTo || (targetEmail === DRIVER_SUPPORT_EMAIL ? effectiveDriverEmail : DRIVER_SUPPORT_EMAIL);
 
+        const fullFormattedMessage = `📌 ${subjectText}\n\n${messageText}\n\nRef Ticket: #${extraParams.ticketId || 'SOP'}\nFecha y Hora: ${timeStr}\nCentral Choferes: ${DRIVER_SUPPORT_EMAIL}`;
+
         const payload = {
             service_id: 'service_ri00bk4',
             template_id: 'template_y849ceg',
@@ -8814,7 +8816,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 driver_phone: driverPhone || 'No informado',
                 driver_email: effectiveDriverEmail,
                 message: messageText,
-                passcode: messageText, // Garantiza que el reclamo completo se visualice en la plantilla
+                passcode: fullFormattedMessage, // Garantiza que el reclamo completo se visualice en la plantilla EmailJS
                 time: timeStr,
                 ticket_id: extraParams.ticketId || 'SOP-' + Date.now().toString().slice(-6),
                 category: extraParams.category || 'Atención Conductor 24/7',
@@ -8823,25 +8825,32 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
+            console.log('[EmailJS] Despachando correo soporte a:', targetEmail, 'Asunto:', subjectText);
             const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Origin': 'https://rutaprivada-app.firebaseapp.com'
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(payload)
             });
             if (!resp.ok) {
-                // Reintentar con servicio alternativo si responde error
+                const errTxt = await resp.text();
+                console.warn('[EmailJS] Reintento de servicio alternativo tras respuesta:', resp.status, errTxt);
                 payload.service_id = 'service_rutaprivada';
-                await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                const retryResp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
                     method: 'POST',
                     headers: { 
-                        'Content-Type': 'application/json',
-                        'Origin': 'https://rutaprivada-app.firebaseapp.com'
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(payload)
-                }).catch(() => {});
+                }).catch(() => null);
+                if (retryResp && retryResp.ok) {
+                    console.log('[EmailJS] Correo enviado exitosamente vía servicio alternativo.');
+                    return true;
+                }
+            } else {
+                console.log('[EmailJS] Correo enviado exitosamente a:', targetEmail);
+                return true;
             }
             return true;
         } catch(e) {
