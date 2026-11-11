@@ -2243,6 +2243,9 @@ async function goToWizardStep(step) {
       if (nameInp && session.nombre) nameInp.value = session.nombre;
       if (phoneInp && session.telefono) phoneInp.value = session.telefono;
     }
+    if (typeof updateAirportSectorVisibility === 'function') {
+      try { updateAirportSectorVisibility(); } catch(e){}
+    }
     if (typeof updateCalculation === 'function') {
       try { updateCalculation(); } catch(e){}
     }
@@ -2254,6 +2257,83 @@ async function goToWizardStep(step) {
     }
   }
 }
+
+// ==========================================
+// SECTORES DE AEROPUERTO (AEROPARQUE Y EZEIZA)
+// ==========================================
+window.isAeroparqueTrip = function() {
+  const orig = ((state.origin && state.origin.address) || document.getElementById('origin-input')?.value || '').toLowerCase();
+  const dest = ((state.destination && state.destination.address) || document.getElementById('destination-input')?.value || '').toLowerCase();
+  const stop = ((state.intermediateStop && state.intermediateStop.address) || document.getElementById('stop-input')?.value || '').toLowerCase();
+  const allText = `${orig} ${dest} ${stop}`;
+  return /aeroparque|jorge\s*newbery|\baep\b/i.test(allText);
+};
+
+window.isEzeizaTrip = function() {
+  const orig = ((state.origin && state.origin.address) || document.getElementById('origin-input')?.value || '').toLowerCase();
+  const dest = ((state.destination && state.destination.address) || document.getElementById('destination-input')?.value || '').toLowerCase();
+  const stop = ((state.intermediateStop && state.intermediateStop.address) || document.getElementById('stop-input')?.value || '').toLowerCase();
+  const allText = `${orig} ${dest} ${stop}`;
+  return /ezeiza|pistarini|\beze\b/i.test(allText);
+};
+
+window.selectAirportSector = function(airport, sector, btnEl) {
+  if (airport === 'aeroparque') {
+    const hiddenInput = document.getElementById('selected-aeroparque-sector');
+    const container = document.getElementById('aeroparque-sector-container');
+    if (container) {
+      container.classList.remove('airport-required-error');
+      container.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+    }
+    const isAlreadyActive = btnEl && btnEl.classList.contains('active');
+    document.querySelectorAll('#aeroparque-sector-buttons .btn-airport-sector').forEach(b => b.classList.remove('active'));
+    if (isAlreadyActive) {
+      if (hiddenInput) hiddenInput.value = '';
+    } else {
+      if (btnEl) btnEl.classList.add('active');
+      if (hiddenInput) hiddenInput.value = sector;
+    }
+  } else if (airport === 'ezeiza') {
+    const hiddenInput = document.getElementById('selected-ezeiza-sector');
+    const isAlreadyActive = btnEl && btnEl.classList.contains('active');
+    document.querySelectorAll('#ezeiza-sector-buttons .btn-airport-sector').forEach(b => b.classList.remove('active'));
+    if (isAlreadyActive) {
+      if (hiddenInput) hiddenInput.value = '';
+    } else {
+      if (btnEl) btnEl.classList.add('active');
+      if (hiddenInput) hiddenInput.value = sector;
+    }
+  }
+};
+
+window.updateAirportSectorVisibility = function() {
+  const aepCont = document.getElementById('aeroparque-sector-container');
+  const ezeCont = document.getElementById('ezeiza-sector-container');
+  const isAep = window.isAeroparqueTrip();
+  const isEze = window.isEzeizaTrip();
+
+  if (aepCont) {
+    if (isAep) {
+      aepCont.style.display = 'block';
+    } else {
+      aepCont.style.display = 'none';
+      const aepInput = document.getElementById('selected-aeroparque-sector');
+      if (aepInput) aepInput.value = '';
+      document.querySelectorAll('#aeroparque-sector-buttons .btn-airport-sector').forEach(b => b.classList.remove('active'));
+    }
+  }
+
+  if (ezeCont) {
+    if (isEze) {
+      ezeCont.style.display = 'block';
+    } else {
+      ezeCont.style.display = 'none';
+      const ezeInput = document.getElementById('selected-ezeiza-sector');
+      if (ezeInput) ezeInput.value = '';
+      document.querySelectorAll('#ezeiza-sector-buttons .btn-airport-sector').forEach(b => b.classList.remove('active'));
+    }
+  }
+};
 
 function updateStepDateTimeBadges() {
   const dateFormatted = (typeof formatDateWithWeekday === 'function' && state.date) ? formatDateWithWeekday(state.date) : 'Hoy';
@@ -8182,6 +8262,11 @@ function buildReservationMessage() {
   const isRound = state.extras.roundtrip ? ' • 🔁 Ida y Vuelta' : '';
   const isPet = state.extras.pet ? ' • 🐾 Mascota' : '';
 
+  const isAep = typeof window.isAeroparqueTrip === 'function' ? window.isAeroparqueTrip() : /aeroparque|jorge\s*newbery|\baep\b/i.test(originStr + ' ' + destStr);
+  const isEze = typeof window.isEzeizaTrip === 'function' ? window.isEzeizaTrip() : /ezeiza|pistarini|\beze\b/i.test(originStr + ' ' + destStr);
+  const aepSector = document.getElementById('selected-aeroparque-sector')?.value?.trim() || '';
+  const ezeSector = document.getElementById('selected-ezeiza-sector')?.value?.trim() || '';
+
   // Datos de Facturación
   const inv = typeof window.getInvoiceDetails === 'function' ? window.getInvoiceDetails() : (state.invoice || { type: 'none' });
 
@@ -8192,6 +8277,11 @@ function buildReservationMessage() {
   msg += `📍 *Origen:* ${originStr}\n`;
   if (stopStr) msg += `🛑 *Parada:* ${stopStr}\n`;
   msg += `🏁 *Destino:* ${destStr}\n`;
+  if (isAep && aepSector) {
+    msg += `🛫 *Sector Aeroparque:* ${aepSector}\n`;
+  } else if (isEze && ezeSector) {
+    msg += `🛬 *Sector Ezeiza:* ${ezeSector}\n`;
+  }
   msg += `💵 *Tarifa Cotizada:* ${formatMoney(state.totalPrice)} ${state.config.currency}${isRound}${isPet}\n`;
   if (inv && inv.type && inv.type !== 'none') {
     msg += `🧾 *Facturación:* Factura ${inv.type}`;
@@ -8235,6 +8325,21 @@ async function sendWhatsAppReservation() {
   if (!passPhone) {
     showToast('⚠️ Por favor ingresá el número de WhatsApp de contacto.');
     if (passPhoneInput) passPhoneInput.focus();
+    return;
+  }
+
+  // Validación de Aeroparque para WhatsApp
+  const isAepWhatsApp = typeof window.isAeroparqueTrip === 'function' ? window.isAeroparqueTrip() : /aeroparque|jorge\s*newbery|\baep\b/i.test(origVal + ' ' + destVal);
+  const aepSectorWhatsApp = document.getElementById('selected-aeroparque-sector')?.value?.trim() || '';
+  if (isAepWhatsApp && !aepSectorWhatsApp) {
+    const aepCont = document.getElementById('aeroparque-sector-container');
+    if (aepCont) {
+      aepCont.style.display = 'block';
+      aepCont.classList.add('airport-required-error');
+      aepCont.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => { aepCont.classList.remove('airport-required-error'); }, 2500);
+    }
+    showToast('⚠️ Por favor seleccioná el sector de Aeroparque antes de coordinar.');
     return;
   }
 
@@ -9523,6 +9628,33 @@ if (btnRequestInapp) {
       return;
     }
 
+    // Validación obligatoria de Sector de Aeroparque Jorge Newbery
+    const isAep = (typeof window.isAeroparqueTrip === 'function') ? window.isAeroparqueTrip() : /aeroparque|jorge\s*newbery|\baep\b/i.test(originVal + ' ' + destVal);
+    const aepSector = document.getElementById('selected-aeroparque-sector')?.value?.trim() || '';
+    const ezeSector = document.getElementById('selected-ezeiza-sector')?.value?.trim() || '';
+
+    if (isAep && !aepSector) {
+      const aepCont = document.getElementById('aeroparque-sector-container');
+      if (aepCont) {
+        aepCont.style.display = 'block';
+        aepCont.classList.add('airport-required-error');
+        aepCont.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => {
+          aepCont.classList.remove('airport-required-error');
+        }, 2500);
+      }
+      showToast('⚠️ Por favor seleccioná el sector de Aeroparque: Arribos Nacionales, Arribos Internacionales o Partidas.');
+      alert('⚠️ SECTOR DE AEROPARQUE OBLIGATORIO\n\nPara traslados con origen o destino en Aeroparque Jorge Newbery, es necesario seleccionar el sector:\n\n• Arribos Nacionales\n• Arribos Internacionales\n• Partidas\n\nPor favor seleccioná una opción para que el chofer sepa exactamente en qué sector esperarte.');
+      return;
+    }
+
+    let finalNotes = passNotes;
+    if (isAep && aepSector) {
+      finalNotes = `[Aeroparque: ${aepSector}] ${finalNotes}`.trim();
+    } else if (ezeSector) {
+      finalNotes = `[Ezeiza: ${ezeSector}] ${finalNotes}`.trim();
+    }
+
     // Validación de datos de facturación si solicitó factura
     const inv = typeof window.getInvoiceDetails === 'function' ? window.getInvoiceDetails() : (state.invoice || { type: 'none' });
     if (inv && inv.type && inv.type !== 'none') {
@@ -9645,7 +9777,9 @@ if (btnRequestInapp) {
         clientEmail: passEmail,
         customerEmail: passEmail,
         emailPasajero: passEmail,
-        notas: passNotes,
+        notas: finalNotes,
+        sectorAeroparque: (isAep && aepSector) ? aepSector : null,
+        sectorEzeiza: ezeSector || null,
         categoria: 'Sedán Ejecutivo',
         invoiceType: inv?.type || 'none',
         invoiceCuit: inv?.cuit || '',
@@ -9743,7 +9877,9 @@ if (btnRequestInapp) {
       clientEmail: passEmail,
       customerEmail: passEmail,
       emailPasajero: passEmail,
-      notas: passNotes,
+      notas: finalNotes,
+      sectorAeroparque: (isAep && aepSector) ? aepSector : null,
+      sectorEzeiza: ezeSector || null,
       categoria: 'Sedán Ejecutivo',
       invoiceType: inv?.type || 'none',
       invoiceCuit: inv?.cuit || '',
@@ -14117,6 +14253,20 @@ if (btnRecenterPassengerMap) {
       return;
     }
 
+    // Validación obligatoria de Sector de Aeroparque en vista Uber
+    const isAepUber = /aeroparque|jorge\s*newbery|\baep\b/i.test(orig + ' ' + dest);
+    let aepSectorUber = document.getElementById('selected-aeroparque-sector')?.value?.trim() || '';
+    if (isAepUber && !aepSectorUber) {
+      const choice = prompt('🛫 SECTOR OBLIGATORIO DE AEROPARQUE:\n\nIngresá el número correspondiente a tu sector:\n1 - Arribos Nacionales\n2 - Arribos Internacionales\n3 - Partidas', '1');
+      if (!choice) return;
+      if (choice.trim() === '1' || /nac/i.test(choice)) aepSectorUber = 'Arribos Nacionales';
+      else if (choice.trim() === '2' || /inter/i.test(choice)) aepSectorUber = 'Arribos Internacionales';
+      else if (choice.trim() === '3' || /part/i.test(choice)) aepSectorUber = 'Partidas';
+      else aepSectorUber = choice.trim();
+      const hiddenInput = document.getElementById('selected-aeroparque-sector');
+      if (hiddenInput) hiddenInput.value = aepSectorUber;
+    }
+
     const sess = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : {};
     const tripFare = Math.round(uberCalculatedBaseFare * uberCategoryMultiplier);
 
@@ -14132,6 +14282,8 @@ if (btnRecenterPassengerMap) {
       origen: orig,
       destino: dest,
       parada: stop || null,
+      sectorAeroparque: (isAepUber && aepSectorUber) ? aepSectorUber : null,
+      notas: (isAepUber && aepSectorUber) ? `[Aeroparque: ${aepSectorUber}]` : null,
       categoria: uberSelectedCategory,
       monto: tripFare,
       precio: tripFare,
