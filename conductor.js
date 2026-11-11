@@ -856,6 +856,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (specificRaw) {
                     const parsed = JSON.parse(specificRaw);
                     if (parsed && (parsed.id === drvId || (parsed.email && sessionInfo.email && parsed.email.toLowerCase() === sessionInfo.email.toLowerCase()))) {
+                        // REGLA ESTRICTA DE AISLAMIENTO: Si no tiene 9 documentos válidos, no puede estar aprobado
+                        const docsCount = Object.keys(parsed.docsImages || {}).filter(k => parsed.docsImages[k] && parsed.docsImages[k].length > 20).length;
+                        if (docsCount < 9 && parsed.estadoVerificacion === 'aprobado') {
+                            parsed.estadoVerificacion = 'pendiente';
+                            localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(parsed));
+                        }
                         return { ...getCleanDriverTemplate(drvId, sessionInfo), ...parsed, id: drvId };
                     }
                 }
@@ -870,10 +876,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentFleetDriver = getFleetDriverInfo();
     const initialDocs = loadDocsData();
     const isInitiallyApproved = Boolean(initialDocs && initialDocs.estadoVerificacion === 'aprobado');
+    const wasOnlineStored = localStorage.getItem('rutaprivada_driver_is_online') === 'true';
 
-    // ESTADO DEL CONDUCTOR (Offline por defecto si no está aprobado)
+    // ESTADO DEL CONDUCTOR (El chofer siempre decide cuándo conectarse; la aprobación quita el bloqueo pero no auto-conecta)
     const driverState = {
-        isOnline: isInitiallyApproved,
+        isOnline: isInitiallyApproved && wasOnlineStored,
         activeTrip: null,
         incomingTrip: null,
         availableTrips: [],
@@ -6103,13 +6110,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return updatedDocs;
         }
 
-        // Listener en tiempo real desde Firestore para aprobaciones/observaciones de administración
+        // Listener en tiempo real desde Firestore para aprobaciones/observaciones de administración (Aislamiento Total)
         function initDriverApprovalRealtimeListener() {
             const docs = loadDocsData();
-            const cleanDni = (docs.dni || driverState.info.dni || '').replace(/\D/g, '') || (docs.telefono || driverState.info.telefono || '').replace(/\D/g, '');
-            if (!cleanDni) return;
-
-            const docId = 'drv_' + cleanDni;
+            const activeId = getActiveDriverId();
+            const cleanEmail = (docs.email || driverState.info.email || '').toLowerCase().trim().replace(/[^a-z0-9]/gi, '_');
+            const docId = (activeId && activeId !== 'default') ? activeId : (cleanEmail ? ('drv_' + cleanEmail) : null);
+            if (!docId) return;
 
             if (typeof firebase !== 'undefined') {
                 try {
@@ -6122,6 +6129,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             const cloudData = doc.data();
                             if (cloudData && cloudData.estadoVerificacion) {
                                 const currentLocal = loadDocsData();
+                                const currentDocsCount = Object.keys(currentLocal.docsImages || {}).filter(k => currentLocal.docsImages[k] && currentLocal.docsImages[k].length > 20).length;
+
+                                // Bloqueo inviolable: Si no tiene 9 documentos subidos, NUNCA puede activarse como aprobado
+                                if (cloudData.estadoVerificacion === 'aprobado' && currentDocsCount < 9) {
+                                    console.warn('Bloqueo de seguridad: Se ignoró aprobación para cuenta con menos de 9 documentos.');
+                                    return;
+                                }
+
                                 if (currentLocal.estadoVerificacion !== cloudData.estadoVerificacion || currentLocal.observaciones !== cloudData.observaciones) {
                                     const prevStatus = currentLocal.estadoVerificacion;
                                     const prevObs = currentLocal.observaciones || '';
@@ -6164,9 +6179,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     const myDrvId = getActiveDriverId();
                     const currentLocal = loadDocsData();
                     const matchesMe = (data.id && myDrvId && myDrvId !== 'default' && data.id === myDrvId) ||
-                                      (data.email && currentLocal.email && data.email.toLowerCase() === currentLocal.email.toLowerCase());
+                                      (data.email && currentLocal.email && data.email.toLowerCase().trim() === currentLocal.email.toLowerCase().trim());
                     if (matchesMe && data.estadoVerificacion) {
-                        const currentLocal = loadDocsData();
+                        const currentDocsCount = Object.keys(currentLocal.docsImages || {}).filter(k => currentLocal.docsImages[k] && currentLocal.docsImages[k].length > 20).length;
+                        if (data.estadoVerificacion === 'aprobado' && currentDocsCount < 9) {
+                            console.warn('Bloqueo de seguridad RutaSync: Se ignora aprobación para cuenta sin 9 documentos completos.');
+                            return;
+                        }
                         const prevStatus = currentLocal.estadoVerificacion;
                         const prevObs = currentLocal.observaciones || '';
                         const newStatus = data.estadoVerificacion;
@@ -6827,9 +6846,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
                 }
                 const db = firebase.firestore();
-                const cleanDni = (driver.dni || '').replace(/\D/g, '') || String(Date.now());
-                const docId = driver.id || ('drv_' + cleanDni);
-                const emailDocId = (driver.email || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                const cleanEmail = (driver.email || '').toLowerCase().trim().replace(/[^a-z0-9]/gi, '_');
+                const docId = driver.id || (cleanEmail ? ('drv_' + cleanEmail) : ('drv_' + Date.now().toString(36)));
+                const emailDocId = cleanEmail ? ('drv_' + cleanEmail) : '';
                 
                 const cloudPayload = {
                     id: docId,
@@ -6853,10 +6872,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     updatedAt: Date.now()
                 };
 
-                // Guardar en colecciones conductores y drivers por ID y por email
+                // Guardar en colecciones conductores y drivers por ID aislado
                 db.collection('drivers').doc(docId).set(cloudPayload, { merge: true }).catch(() => {});
                 db.collection('conductores').doc(docId).set(cloudPayload, { merge: true }).catch(() => {});
-                if (emailDocId) {
+                if (emailDocId && emailDocId !== docId) {
                     db.collection('drivers').doc(emailDocId).set(cloudPayload, { merge: true }).catch(() => {});
                     db.collection('conductores').doc(emailDocId).set(cloudPayload, { merge: true }).catch(() => {});
                 }
@@ -6865,9 +6884,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sincronización mediante Firestore Cloud REST API
         try {
-            const cleanDni = (driver.dni || '').replace(/\D/g, '') || String(Date.now());
-            const docId = driver.id || ('drv_' + cleanDni);
-            const emailDocId = (driver.email || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            const cleanEmail = (driver.email || '').toLowerCase().trim().replace(/[^a-z0-9]/gi, '_');
+            const docId = driver.id || (cleanEmail ? ('drv_' + cleanEmail) : ('drv_' + Date.now().toString(36)));
+            const emailDocId = cleanEmail ? ('drv_' + cleanEmail) : '';
             const restFields = {
                 id: { stringValue: docId },
                 nombre: { stringValue: driver.nombre || 'Conductor' },
@@ -6878,11 +6897,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 estadoVerificacion: { stringValue: driver.estadoVerificacion || 'pendiente' },
                 updatedAt: { integerValue: String(Date.now()) }
             };
-            fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/conductores/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fields: restFields })
-            }).catch(() => {});
+            if (emailDocId) {
+                fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/conductores/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fields: restFields })
+                }).catch(() => {});
+            }
             fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -8377,15 +8398,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const actualDriverName = currentDocsData.nombre || driverState.info.nombre || 'Conductor Registrado';
                 const actualDriverPatente = currentDocsData.patente || driverState.info.patente || 'S/P';
                 const actualDriverPhone = currentDocsData.telefono || driverState.info.telefono || '';
-                const cleanDni = String(actualDriverDni).replace(/\D/g, '') || String(actualDriverPhone).replace(/\D/g, '');
+                const actualDriverEmail = currentDocsData.email || driverState.info.email || '';
+                const activeDrvId = getActiveDriverId();
+                const cleanEmail = actualDriverEmail.toLowerCase().trim().replace(/[^a-z0-9]/gi, '_');
+                const effectiveDriverId = (activeDrvId && activeDrvId !== 'default') ? activeDrvId : (cleanEmail ? ('drv_' + cleanEmail) : 'drv_conductor');
 
                 const rechargePayload = {
                     id: rechargeId,
-                    driverId: cleanDni ? 'drv_' + cleanDni : (actualDriverPhone || 'drv_conductor'),
+                    driverId: effectiveDriverId,
                     driverName: actualDriverName,
                     driverPatente: actualDriverPatente,
                     driverDni: actualDriverDni,
                     driverPhone: actualDriverPhone,
+                    driverEmail: actualDriverEmail,
                     monto: amount,
                     comprobante: refCode,
                     timestamp: Date.now(),
@@ -8789,7 +8814,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 driver_phone: driverPhone || 'No informado',
                 driver_email: effectiveDriverEmail,
                 message: messageText,
-                passcode: extraParams.passcode || subjectText.slice(0, 32),
+                passcode: messageText, // Garantiza que el reclamo completo se visualice en la plantilla
                 time: timeStr,
                 ticket_id: extraParams.ticketId || 'SOP-' + Date.now().toString().slice(-6),
                 category: extraParams.category || 'Atención Conductor 24/7',
@@ -8800,7 +8825,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Origin': 'https://rutaprivada-app.firebaseapp.com'
+                },
                 body: JSON.stringify(payload)
             });
             if (!resp.ok) {
@@ -8808,7 +8836,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload.service_id = 'service_rutaprivada';
                 await fetch('https://api.emailjs.com/api/v1.0/email/send', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Origin': 'https://rutaprivada-app.firebaseapp.com'
+                    },
                     body: JSON.stringify(payload)
                 }).catch(() => {});
             }
@@ -9235,12 +9266,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 2. Guardar en Firestore
             try {
-                if (typeof db !== 'undefined' && db.collection) {
-                    await db.collection('tickets_soporte').doc(ticketId).set(ticketPayload);
+                if (typeof firebase !== 'undefined') {
+                    if (!firebase.apps || !firebase.apps.length) {
+                        firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
+                    }
+                    const db = firebase.firestore();
+                    await db.collection('tickets_soporte').doc(ticketId).set(ticketPayload, { merge: true });
                 }
             } catch(err) {
                 console.warn('Firestore ticket error:', err);
             }
+
+            // Sincronización REST directa garantizada a Firestore
+            try {
+                fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/tickets_soporte/${ticketId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fields: {
+                            ticketId: { stringValue: ticketId },
+                            driverName: { stringValue: driverName },
+                            driverPhone: { stringValue: driverPhone },
+                            driverEmail: { stringValue: driverEmail },
+                            category: { stringValue: categoryText },
+                            tripId: { stringValue: tripId || 'N/A' },
+                            description: { stringValue: description },
+                            status: { stringValue: 'pendiente' },
+                            createdAt: { stringValue: new Date().toISOString() },
+                            timeStr: { stringValue: timeStr }
+                        }
+                    })
+                }).catch(() => {});
+            } catch(e) {}
+
+            // Emitir evento RutaSync en tiempo real para panel de administración
+            if (window.RutaSync) {
+                window.RutaSync.emit('NUEVO_TICKET_SOPORTE', ticketPayload);
+            }
+
+            // Actualizar vista de mis reclamos
+            renderDriverTicketsList();
 
             // 3. Añadir automáticamente la consulta al historial del Chat de Soporte
             try {
@@ -9282,7 +9347,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 driverEmail,
                 `[Comprobante #${ticketId}] Reclamo Registrado - RutaPrivada Soporte`,
                 emailBody,
-                { ticketId, category: categoryText, tripId, replyTo: DRIVER_SUPPORT_EMAIL, driverEmail }
+                { ticketId, category: categoryText, tripId, replyTo: DRIVER_SUPPORT_EMAIL, driverEmail, passcode: emailBody }
             );
 
             // Copia a Soporte Central (con reply-to hacia el conductor para respuesta directa)
@@ -9290,7 +9355,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 DRIVER_SUPPORT_EMAIL,
                 `[Reclamo #${ticketId}] ${categoryText} - ${driverName}`,
                 emailBody,
-                { ticketId, category: categoryText, tripId, replyTo: driverEmail, driverEmail }
+                { ticketId, category: categoryText, tripId, replyTo: driverEmail, driverEmail, passcode: emailBody }
             );
 
             // Restaurar estado del botón
@@ -9318,6 +9383,167 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
+    // HISTORIAL Y ESTADO DE RECLAMOS DEL CONDUCTOR EN TIEMPO REAL
+    // ==========================================
+    function getDriverTicketsList() {
+        const { driverEmail } = getDriverContactInfo();
+        const myEmail = (driverEmail || localStorage.getItem('rutaprivada_driver_email') || '').toLowerCase().trim();
+        let tickets = [];
+        try {
+            const raw = localStorage.getItem('rutaprivada_driver_tickets_v1');
+            if (raw) tickets = JSON.parse(raw);
+        } catch(e) {}
+        if (!Array.isArray(tickets)) tickets = [];
+        if (myEmail) {
+            return tickets.filter(t => !t.driverEmail || t.driverEmail.toLowerCase().trim() === myEmail);
+        }
+        return tickets;
+    }
+
+    function renderDriverTicketsList() {
+        const container = document.getElementById('driverTicketsListContainer');
+        const badgeCount = document.getElementById('badgeDriverTicketsCount');
+        const tickets = getDriverTicketsList();
+
+        if (badgeCount) {
+            if (tickets.length > 0) {
+                badgeCount.textContent = tickets.length;
+                badgeCount.style.display = 'inline-block';
+            } else {
+                badgeCount.style.display = 'none';
+            }
+        }
+
+        if (!container) return;
+
+        if (tickets.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 36px 16px; background: rgba(15, 23, 42, 0.6); border: 1px dashed rgba(255,255,255,0.12); border-radius: 12px;">
+                    <i class="fa-solid fa-clipboard-check" style="font-size: 2.2rem; color: #64748b; margin-bottom: 10px; display: block;"></i>
+                    <strong style="color: #cbd5e1; font-size: 0.95rem; display: block;">No tienes reclamos activos</strong>
+                    <p style="color: #64748b; font-size: 0.78rem; margin: 4px 0 0 0;">Cuando reportes una consulta o incidencia desde los temas de ayuda, podrás seguir su resolución aquí y por correo electrónico.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = tickets.map(t => {
+            const status = (t.status || 'pendiente').toLowerCase();
+            let statusBadge = '';
+            if (status === 'finalizado' || status === 'resuelto') {
+                statusBadge = '<span style="background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> Finalizado / Resuelto</span>';
+            } else if (status === 'en_proceso') {
+                statusBadge = '<span style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;"><i class="fa-solid fa-gears"></i> En Proceso</span>';
+            } else if (status === 'en_revision') {
+                statusBadge = '<span style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;"><i class="fa-solid fa-magnifying-glass"></i> En Revisión</span>';
+            } else {
+                statusBadge = '<span style="background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;"><i class="fa-regular fa-clock"></i> Pendiente</span>';
+            }
+
+            const adminResponseHtml = t.respuestaAdmin ? `
+                <div style="margin-top: 8px; padding: 8px 10px; background: rgba(30, 41, 59, 0.8); border-left: 3px solid #38bdf8; border-radius: 6px; font-size: 0.76rem; color: #e2e8f0;">
+                    <div style="font-weight: 700; color: #38bdf8; margin-bottom: 2px;"><i class="fa-solid fa-reply"></i> Respuesta de Soporte:</div>
+                    ${escapeHtml(t.respuestaAdmin)}
+                </div>
+            ` : '';
+
+            return `
+                <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                        <span style="font-size: 0.78rem; font-weight: 800; color: #fbbf24; letter-spacing: 0.5px;">#${escapeHtml(t.ticketId || '')}</span>
+                        ${statusBadge}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <strong style="color: #fff; font-size: 0.88rem;">${escapeHtml(t.category || 'Consulta General')}</strong>
+                        <span style="color: #64748b; font-size: 0.7rem;">${escapeHtml(t.timeStr || '')}</span>
+                    </div>
+                    ${t.tripId && t.tripId !== 'N/A' ? `<div style="font-size: 0.72rem; color: #94a3b8;"><i class="fa-solid fa-car-side"></i> Viaje: ${escapeHtml(t.tripId)}</div>` : ''}
+                    <div style="font-size: 0.8rem; color: #cbd5e1; background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 8px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;">${escapeHtml(t.description || '')}</div>
+                    ${adminResponseHtml}
+                </div>
+            `;
+        }).join('');
+    }
+
+    function openDriverTicketsListModal() {
+        renderDriverTicketsList();
+        const modal = document.getElementById('modalDriverTicketsList');
+        if (modal) {
+            modal.classList.add('active');
+            modal.style.display = 'flex';
+        }
+    }
+    window.openDriverTicketsListModal = openDriverTicketsListModal;
+
+    function closeDriverTicketsListModal() {
+        const modal = document.getElementById('modalDriverTicketsList');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+        }
+    }
+    window.closeDriverTicketsListModal = closeDriverTicketsListModal;
+
+    function initDriverTicketsRealtimeListener() {
+        const { driverEmail } = getDriverContactInfo();
+        const myEmail = (driverEmail || localStorage.getItem('rutaprivada_driver_email') || '').toLowerCase().trim();
+        if (!myEmail) return;
+
+        if (typeof firebase !== 'undefined') {
+            try {
+                if (!firebase.apps || !firebase.apps.length) {
+                    firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
+                }
+                const db = firebase.firestore();
+                db.collection('tickets_soporte')
+                  .where('driverEmail', '==', myEmail)
+                  .onSnapshot(snapshot => {
+                      if (!snapshot || snapshot.empty) return;
+                      let localTickets = [];
+                      try {
+                          localTickets = JSON.parse(localStorage.getItem('rutaprivada_driver_tickets_v1') || '[]');
+                      } catch(e) {}
+                      snapshot.forEach(doc => {
+                          const data = doc.data();
+                          const idx = localTickets.findIndex(t => t.ticketId === (data.ticketId || doc.id));
+                          if (idx >= 0) {
+                              localTickets[idx] = { ...localTickets[idx], ...data };
+                          } else {
+                              localTickets.unshift(data);
+                          }
+                      });
+                      localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(localTickets));
+                      renderDriverTicketsList();
+                  }, err => console.warn('Tickets snapshot error:', err));
+            } catch(e) {}
+        }
+
+        if (window.RutaSync) {
+            window.RutaSync.on('ESTADO_TICKET_ACTUALIZADO', (data) => {
+                if (!data || !data.ticketId) return;
+                let localTickets = [];
+                try {
+                    localTickets = JSON.parse(localStorage.getItem('rutaprivada_driver_tickets_v1') || '[]');
+                } catch(e) {}
+                const idx = localTickets.findIndex(t => t.ticketId === data.ticketId);
+                if (idx >= 0) {
+                    localTickets[idx].status = data.status || localTickets[idx].status;
+                    if (data.respuestaAdmin !== undefined) {
+                        localTickets[idx].respuestaAdmin = data.respuestaAdmin;
+                    }
+                    localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(localTickets));
+                    renderDriverTicketsList();
+                    if (typeof showDriverToast === 'function') {
+                        showDriverToast(`🔔 Reclamo #${data.ticketId} actualizado a: ${(data.status || '').replace('_', ' ').toUpperCase()}`);
+                    }
+                }
+            });
+        }
+    }
+    initDriverTicketsRealtimeListener();
+    renderDriverTicketsList();
+
+    // ==========================================
     // ANDROID NATIVE BACK BUTTON & MODAL/TAB HISTORY HANDLER (CONDUCTOR)
     // ==========================================
     function setupAndroidDriverBackButtonHandler() {
@@ -9329,7 +9555,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return true;
             }
 
-            // 0.05 Modal de Chat de Soporte Central
+            // 0.05 Modal de Historial de Reclamos
+            const modalTicketsList = document.getElementById('modalDriverTicketsList');
+            if (modalTicketsList && (modalTicketsList.classList.contains('active') || modalTicketsList.style.display === 'flex')) {
+                closeDriverTicketsListModal();
+                return true;
+            }
+
+            // 0.07 Modal de Chat de Soporte Central
             if (modalDriverSupportChat && (modalDriverSupportChat.classList.contains('active') || modalDriverSupportChat.style.display === 'flex')) {
                 closeDriverSupportChatModal();
                 return true;

@@ -689,15 +689,26 @@ class RutaSyncManager {
                     this.firestore.collection('live_trips').doc('chat_active').set(chatRecord).catch(() => {});
                     this.postFirestoreDocREST('live_trips', 'chat_active', chatRecord);
                 } else if (type === 'ESTADO_CONDUCTOR_ACTUALIZADO' || type === 'DOCUMENTOS_CONDUCTOR_ACTUALIZADOS') {
-                    if (safePayload && (safePayload.id || safePayload.dni)) {
-                        const cleanDni = String(safePayload.dni || '').replace(/\D/g, '');
-                        const drvDocId = String(safePayload.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
+                    if (safePayload && (safePayload.id || safePayload.email)) {
+                        const cleanEmail = (safePayload.email || '').toLowerCase().trim().replace(/[^a-z0-9]/gi, '_');
+                        const drvDocId = String(safePayload.id || (cleanEmail ? 'drv_' + cleanEmail : 'driver_local'));
                         this.firestore.collection('drivers').doc(drvDocId).set({
                             ...safePayload,
                             id: drvDocId,
                             actualizadoEn: now
                         }, { merge: true }).catch(() => {});
                     }
+                } else if (type === 'NUEVO_TICKET_SOPORTE' && safePayload && safePayload.ticketId) {
+                    this.firestore.collection('tickets_soporte').doc(String(safePayload.ticketId)).set({
+                        ...safePayload,
+                        timestamp: now
+                    }, { merge: true }).catch(() => {});
+                } else if (type === 'ESTADO_TICKET_ACTUALIZADO' && safePayload && safePayload.ticketId) {
+                    this.firestore.collection('tickets_soporte').doc(String(safePayload.ticketId)).set({
+                        status: safePayload.status,
+                        respuestaAdmin: safePayload.respuestaAdmin || '',
+                        updatedAt: now
+                    }, { merge: true }).catch(() => {});
                 } else if (type === 'SOLICITUD_RECARGA_SALDO' && safePayload && (safePayload.id || safePayload.comprobante)) {
                     const recId = String(safePayload.id || ('rec_' + now));
                     this.firestore.collection('wallet_recharges').doc(recId).set({
@@ -876,11 +887,19 @@ class RutaSyncManager {
             if (message.payload) {
                 try {
                     let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
-                    const cleanDni = String(message.payload.dni || '').replace(/\D/g, '');
-                    const docId = String(message.payload.id || (cleanDni ? 'drv_' + cleanDni : ''));
-                    const idx = driversList.findIndex(d => (d.id && docId && d.id === docId) || (d.dni && cleanDni && String(d.dni).replace(/\D/g, '') === cleanDni) || (d.nombre && message.payload.nombre && d.nombre.trim().toLowerCase() === message.payload.nombre.trim().toLowerCase()));
+                    const pEmail = (message.payload.email || '').toLowerCase().trim();
+                    const docId = String(message.payload.id || (pEmail ? 'drv_' + pEmail.replace(/[^a-z0-9]/gi, '_') : ''));
+                    // Búsqueda ESTRICTA por ID único o email. CERO cruce por DNI ni por nombre para garantizar aislamiento absoluto
+                    const idx = driversList.findIndex(d => {
+                        const dEmail = (d.email || '').toLowerCase().trim();
+                        return (d.id && docId && d.id === docId) || (dEmail && pEmail && dEmail === pEmail);
+                    });
                     if (idx >= 0) {
-                        driversList[idx] = { ...driversList[idx], ...message.payload, docsImages: Object.assign({}, driversList[idx].docsImages || {}, message.payload.docsImages || {}) };
+                        driversList[idx] = { 
+                            ...driversList[idx], 
+                            ...message.payload, 
+                            docsImages: Object.assign({}, driversList[idx].docsImages || {}, message.payload.docsImages || {}) 
+                        };
                     } else {
                         driversList.unshift(message.payload);
                     }
@@ -893,12 +912,42 @@ class RutaSyncManager {
                 try {
                     let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
                     const dId = String(message.payload.driverId);
-                    const cleanDni = String(message.payload.dni || '').replace(/\D/g, '');
-                    let target = driversList.find(d => d.id === dId || (cleanDni && d.dni && String(d.dni).replace(/\D/g, '') === cleanDni));
+                    const pEmail = (message.payload.email || '').toLowerCase().trim();
+                    let target = driversList.find(d => {
+                        const dEmail = (d.email || '').toLowerCase().trim();
+                        return (d.id && dId && d.id === dId) || (pEmail && dEmail && dEmail === pEmail);
+                    });
                     if (target) {
                         if (!target.docsImages) target.docsImages = {};
                         target.docsImages[message.payload.key] = message.payload.data;
                         localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
+                        window.dispatchEvent(new Event('storage'));
+                    }
+                } catch(e) {}
+            }
+        } else if (message.type === 'NUEVO_TICKET_SOPORTE') {
+            if (message.payload && message.payload.ticketId) {
+                try {
+                    let tickets = JSON.parse(localStorage.getItem('rutaprivada_driver_tickets_v1') || '[]');
+                    if (!tickets.some(t => t.ticketId === message.payload.ticketId)) {
+                        tickets.unshift(message.payload);
+                        localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(tickets));
+                        window.dispatchEvent(new Event('storage'));
+                    }
+                } catch(e) {}
+            }
+        } else if (message.type === 'ESTADO_TICKET_ACTUALIZADO') {
+            if (message.payload && message.payload.ticketId) {
+                try {
+                    let tickets = JSON.parse(localStorage.getItem('rutaprivada_driver_tickets_v1') || '[]');
+                    const idx = tickets.findIndex(t => t.ticketId === message.payload.ticketId);
+                    if (idx >= 0) {
+                        tickets[idx].status = message.payload.status || tickets[idx].status;
+                        if (message.payload.respuestaAdmin !== undefined) {
+                            tickets[idx].respuestaAdmin = message.payload.respuestaAdmin;
+                        }
+                        tickets[idx].updatedAt = Date.now();
+                        localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(tickets));
                         window.dispatchEvent(new Event('storage'));
                     }
                 } catch(e) {}

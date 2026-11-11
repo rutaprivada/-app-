@@ -537,13 +537,17 @@
         </section>
 
         <!-- SECCIONES / PESTAÑAS PRINCIPALES DEL PANEL -->
-        <div style="display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--admin-border); padding-bottom: 12px;">
+        <div style="display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--admin-border); padding-bottom: 12px; flex-wrap: wrap;">
             <button id="tabNavDrivers" class="admin-btn admin-btn-primary" style="padding: 10px 20px;">
                 <i class="fa-solid fa-id-card"></i> Validación de Documentos y Choferes
             </button>
             <button id="tabNavRecharges" class="admin-btn" style="padding: 10px 20px; position: relative;">
                 <i class="fa-solid fa-wallet"></i> Conciliación de Recargas y Saldo
                 <span id="badgePendingRechargesCount" style="display:none; margin-left: 6px; background: #ef4444; color: #fff; font-size: 0.7rem; padding: 2px 7px; border-radius: 10px; font-weight: 800;">0</span>
+            </button>
+            <button id="tabNavTickets" class="admin-btn" style="padding: 10px 20px; position: relative;">
+                <i class="fa-solid fa-headset"></i> Reclamos y Soporte de Choferes
+                <span id="badgePendingTicketsCount" style="display:none; margin-left: 6px; background: #eab308; color: #000; font-size: 0.7rem; padding: 2px 7px; border-radius: 10px; font-weight: 800;">0</span>
             </button>
         </div>
 
@@ -621,6 +625,49 @@
                     </thead>
                     <tbody id="rechargesTableBody">
                         <!-- Filas de recargas generadas por JS -->
+                    </tbody>
+                </table>
+            </section>
+        </div>
+
+        <!-- SECCIÓN 3: GESTIÓN DE RECLAMOS Y SOPORTE DE CHOFERES -->
+        <div id="sectionTicketsView" style="display: none;">
+            <div class="controls-row" style="margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-headset text-gold" style="font-size: 1.4rem;"></i>
+                    <div>
+                        <strong style="color: #fff; font-size: 1rem;">Mesa de Ayuda y Reclamos de Choferes</strong>
+                        <div style="font-size: 0.8rem; color: #94a3b8;">Recepción de incidencias, consultas y cambio de estado de tickets en tiempo real.</div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div class="filter-tabs" id="ticketFilterTabs">
+                        <button class="filter-tab-btn ticket-tab-btn active" data-status="todos">Todos</button>
+                        <button class="filter-tab-btn ticket-tab-btn" data-status="pendiente">⏳ Pendientes</button>
+                        <button class="filter-tab-btn ticket-tab-btn" data-status="en_revision">🔍 En Revisión</button>
+                        <button class="filter-tab-btn ticket-tab-btn" data-status="en_proceso">⚙️ En Proceso</button>
+                        <button class="filter-tab-btn ticket-tab-btn" data-status="finalizado">✅ Finalizados</button>
+                    </div>
+                    <button id="btnRefreshTickets" class="admin-btn">
+                        <i class="fa-solid fa-rotate"></i> Actualizar
+                    </button>
+                </div>
+            </div>
+
+            <section class="drivers-table-wrapper">
+                <table class="drivers-table">
+                    <thead>
+                        <tr>
+                            <th>Ticket / Fecha</th>
+                            <th>Conductor</th>
+                            <th>Categoría & Viaje</th>
+                            <th>Detalle del Reclamo</th>
+                            <th>Estado Actual</th>
+                            <th style="text-align: right;">Cambiar Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ticketsTableBody">
+                        <!-- Filas de tickets generadas por JS -->
                     </tbody>
                 </table>
             </section>
@@ -866,6 +913,15 @@
             const rechargesTableBody = document.getElementById('rechargesTableBody');
             const btnRefreshRecharges = document.getElementById('btnRefreshRecharges');
             const rechargeFilterTabs = document.querySelectorAll('.recharge-tab-btn');
+
+            // Elementos de Mesa de Ayuda / Reclamos de Choferes
+            const tabNavTickets = document.getElementById('tabNavTickets');
+            const sectionTicketsView = document.getElementById('sectionTicketsView');
+            const badgePendingTicketsCount = document.getElementById('badgePendingTicketsCount');
+            const ticketsTableBody = document.getElementById('ticketsTableBody');
+            const btnRefreshTickets = document.getElementById('btnRefreshTickets');
+            const ticketFilterTabs = document.querySelectorAll('.ticket-tab-btn');
+            let activeTicketFilter = 'todos';
 
             // Elementos de Métricas Conductores
             const metricTotalDrivers = document.getElementById('metricTotalDrivers');
@@ -1172,13 +1228,25 @@
                 if (view === 'recharges') {
                     if (sectionDriversView) sectionDriversView.style.display = 'none';
                     if (sectionRechargesView) sectionRechargesView.style.display = 'block';
+                    if (sectionTicketsView) sectionTicketsView.style.display = 'none';
                     if (tabNavDrivers) tabNavDrivers.classList.remove('admin-btn-primary');
+                    if (tabNavTickets) tabNavTickets.classList.remove('admin-btn-primary');
                     if (tabNavRecharges) tabNavRecharges.classList.add('admin-btn-primary');
                     loadRechargesData();
+                } else if (view === 'tickets') {
+                    if (sectionDriversView) sectionDriversView.style.display = 'none';
+                    if (sectionRechargesView) sectionRechargesView.style.display = 'none';
+                    if (sectionTicketsView) sectionTicketsView.style.display = 'block';
+                    if (tabNavDrivers) tabNavDrivers.classList.remove('admin-btn-primary');
+                    if (tabNavRecharges) tabNavRecharges.classList.remove('admin-btn-primary');
+                    if (tabNavTickets) tabNavTickets.classList.add('admin-btn-primary');
+                    loadTicketsData();
                 } else {
                     if (sectionDriversView) sectionDriversView.style.display = 'block';
                     if (sectionRechargesView) sectionRechargesView.style.display = 'none';
+                    if (sectionTicketsView) sectionTicketsView.style.display = 'none';
                     if (tabNavRecharges) tabNavRecharges.classList.remove('admin-btn-primary');
+                    if (tabNavTickets) tabNavTickets.classList.remove('admin-btn-primary');
                     if (tabNavDrivers) tabNavDrivers.classList.add('admin-btn-primary');
                     renderDriversTable();
                 }
@@ -1186,8 +1254,10 @@
 
             if (tabNavDrivers) tabNavDrivers.addEventListener('click', () => switchAdminView('drivers'));
             if (tabNavRecharges) tabNavRecharges.addEventListener('click', () => switchAdminView('recharges'));
+            if (tabNavTickets) tabNavTickets.addEventListener('click', () => switchAdminView('tickets'));
             if (cardMetricRecharges) cardMetricRecharges.addEventListener('click', () => switchAdminView('recharges'));
             if (btnRefreshRecharges) btnRefreshRecharges.addEventListener('click', () => loadRechargesData());
+            if (btnRefreshTickets) btnRefreshTickets.addEventListener('click', () => loadTicketsData());
 
             // Filtros de Recargas
             rechargeFilterTabs.forEach(btn => {
@@ -1196,6 +1266,16 @@
                     btn.classList.add('active');
                     activeRechargeFilter = btn.getAttribute('data-status') || 'todos';
                     loadRechargesData();
+                });
+            });
+
+            // Filtros de Tickets
+            ticketFilterTabs.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    ticketFilterTabs.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    activeTicketFilter = btn.getAttribute('data-status') || 'todos';
+                    renderTicketsTable();
                 });
             });
 
@@ -1218,6 +1298,7 @@
                 }
                 loadDriversData();
                 loadRechargesData();
+                loadTicketsData();
             }
 
             // Auto-desbloquear si ya inició sesión durante la sesión actual del navegador
@@ -1228,6 +1309,7 @@
                 }
                 loadDriversData();
                 loadRechargesData();
+                loadTicketsData();
             } else {
                 if (authModalOverlay) {
                     authModalOverlay.classList.add('active');
@@ -1590,6 +1672,9 @@
                                 loadRechargesData();
                             }, (err) => console.warn('Firestore recharges listener warning:', err));
 
+                            // 4. Escuchar Reclamos de Soporte en tiempo real
+                            initAdminTicketsRealtimeListener(db);
+
                         } catch(e) {
                             console.warn('Error setting up admin firestore sync:', e);
                         }
@@ -1776,6 +1861,14 @@
                                     modified = true;
                                 }
                             }
+
+                            // REGLA ESTRICTA DE SEGURIDAD: Si no tiene 9 documentos válidos, NUNCA puede estar aprobado
+                            const effectiveCount = d.docsImages ? Object.keys(d.docsImages).filter(k => d.docsImages[k] && d.docsImages[k].length > 20).length : (d.docsCount || 0);
+                            if (effectiveCount < 9 && d.estadoVerificacion === 'aprobado') {
+                                d.estadoVerificacion = 'pendiente';
+                                d.isApproved = false;
+                                modified = true;
+                            }
                             return d;
                         });
 
@@ -1821,6 +1914,14 @@
                     cloudDriversList.forEach(c => {
                         const email = (c.email || '').toLowerCase().trim();
                         const stableId = c.id || (email ? 'drv_' + email.replace(/[^a-z0-9]/gi, '_') : ('drv_' + Date.now().toString(36)));
+                        let cloudDocsCount = c.docsCount || (c.docsSummary ? Object.values(c.docsSummary).filter(Boolean).length : 0);
+                        if (c.docsImages) {
+                            cloudDocsCount = Object.keys(c.docsImages).filter(k => c.docsImages[k] && c.docsImages[k].length > 20).length;
+                        }
+                        let cloudStatus = c.estadoVerificacion || 'pendiente';
+                        if (cloudDocsCount < 9 && cloudStatus === 'aprobado') {
+                            cloudStatus = 'pendiente';
+                        }
 
                         drivers.push({
                             id: stableId,
@@ -1834,14 +1935,14 @@
                             color: c.color || 'Negro',
                             categoria: c.categoria || 'Sedán Estándar',
                             fotoPerfil: c.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                            estadoVerificacion: c.estadoVerificacion || 'pendiente',
+                            estadoVerificacion: cloudStatus,
                             isOnline: !!c.isOnline,
                             banco: c.banco || '',
                             cbu: c.cbu || '',
                             titularCuenta: c.titularCuenta || c.nombre || '',
                             docsImages: c.docsImages || {},
                             docsSummary: c.docsSummary || {},
-                            docsCount: c.docsCount || (c.docsSummary ? Object.values(c.docsSummary).filter(Boolean).length : 0),
+                            docsCount: cloudDocsCount,
                             observaciones: c.observaciones || '',
                             updatedAt: c.updatedAt || Date.now()
                         });
@@ -1866,6 +1967,11 @@
                         const mergedDocsImages = (specificDocs && specificDocs.docsImages) ? specificDocs.docsImages : (d.docsImages || {});
                         const actualDocsCount = Object.keys(mergedDocsImages).filter(k => mergedDocsImages[k] && mergedDocsImages[k].length > 20).length;
 
+                        let driverStatus = (specificDocs && specificDocs.estadoVerificacion) || d.estadoVerificacion || 'pendiente';
+                        if (actualDocsCount < 9 && driverStatus === 'aprobado') {
+                            driverStatus = 'pendiente';
+                        }
+
                         const driverDataObj = {
                             id: targetId,
                             nombre: (specificDocs && specificDocs.nombre) || driverName,
@@ -1878,7 +1984,7 @@
                             color: (specificDocs && specificDocs.color) || d.color || 'Negro',
                             categoria: (specificDocs && specificDocs.categoria) || d.categoria || 'Sedán Estándar',
                             fotoPerfil: (specificDocs && specificDocs.fotoPerfil) || d.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                            estadoVerificacion: (specificDocs && specificDocs.estadoVerificacion) || d.estadoVerificacion || 'pendiente',
+                            estadoVerificacion: driverStatus,
                             isOnline: !!d.isOnline,
                             banco: (specificDocs && specificDocs.banco) || d.banco || '',
                             cbu: (specificDocs && specificDocs.cbu) || d.cbu || '',
@@ -2807,11 +2913,259 @@
                 loadRechargesData();
             }
 
+            // ==========================================
+            // 10. GESTIÓN DE RECLAMOS Y TICKETS DE SOPORTE CHOFERES
+            // ==========================================
+            let currentTicketsList = [];
+
+            function loadTicketsData() {
+                let localTickets = [];
+                try {
+                    const raw = localStorage.getItem('rutaprivada_driver_tickets_v1');
+                    if (raw) localTickets = JSON.parse(raw);
+                } catch(e) {}
+                if (!Array.isArray(localTickets)) localTickets = [];
+                currentTicketsList = localTickets;
+
+                // Cargar desde Firestore SDK si está disponible
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                    try {
+                        const db = firebase.firestore();
+                        db.collection('tickets_soporte').get().then(snapshot => {
+                            if (!snapshot || snapshot.empty) return;
+                            const cloudMap = new Map();
+                            currentTicketsList.forEach(t => cloudMap.set(t.ticketId, t));
+                            snapshot.forEach(doc => {
+                                const data = doc.data();
+                                const tId = data.ticketId || doc.id;
+                                cloudMap.set(tId, { ...(cloudMap.get(tId) || {}), ...data, ticketId: tId });
+                            });
+                            currentTicketsList = Array.from(cloudMap.values());
+                            localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(currentTicketsList));
+                            renderTicketsTable();
+                        }).catch(e => console.warn('Firestore tickets get error:', e));
+                    } catch(e) {}
+                }
+
+                renderTicketsTable();
+            }
+
+            function renderTicketsTable() {
+                if (!ticketsTableBody) return;
+
+                // Actualizar contador pendiente
+                const pendingCount = currentTicketsList.filter(t => (t.status || 'pendiente').toLowerCase() === 'pendiente').length;
+                if (badgePendingTicketsCount) {
+                    if (pendingCount > 0) {
+                        badgePendingTicketsCount.textContent = pendingCount;
+                        badgePendingTicketsCount.style.display = 'inline-block';
+                    } else {
+                        badgePendingTicketsCount.style.display = 'none';
+                    }
+                }
+
+                // Filtrar según pestaña activa
+                let filtered = currentTicketsList;
+                if (activeTicketFilter !== 'todos') {
+                    filtered = currentTicketsList.filter(t => (t.status || 'pendiente').toLowerCase() === activeTicketFilter);
+                }
+
+                if (filtered.length === 0) {
+                    ticketsTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px; color: #94a3b8;">
+                                <i class="fa-solid fa-headset" style="font-size: 2rem; margin-bottom: 10px; display: block; color: #64748b;"></i>
+                                No hay reclamos registrados ${activeTicketFilter !== 'todos' ? `con estado "${activeTicketFilter}"` : 'por el momento'}.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                ticketsTableBody.innerHTML = filtered.map(t => {
+                    const status = (t.status || 'pendiente').toLowerCase();
+                    let statusBadge = '';
+                    if (status === 'finalizado') {
+                        statusBadge = '<span class="badge-status aprobado"><i class="fa-solid fa-check"></i> Finalizado</span>';
+                    } else if (status === 'en_proceso') {
+                        statusBadge = '<span class="badge-status" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4);"><i class="fa-solid fa-gears"></i> En Proceso</span>';
+                    } else if (status === 'en_revision') {
+                        statusBadge = '<span class="badge-status" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);"><i class="fa-solid fa-magnifying-glass"></i> En Revisión</span>';
+                    } else {
+                        statusBadge = '<span class="badge-status pendiente"><i class="fa-regular fa-clock"></i> Pendiente</span>';
+                    }
+
+                    const safeDesc = escapeHtml(t.description || '');
+                    const safeName = escapeHtml(t.driverName || 'Conductor');
+                    const safePhone = escapeHtml(t.driverPhone || '');
+                    const safeEmail = escapeHtml(t.driverEmail || '');
+                    const safeCategory = escapeHtml(t.category || 'General');
+                    const safeTicketId = escapeHtml(t.ticketId || '');
+                    const safeTrip = (t.tripId && t.tripId !== 'N/A') ? `<div style="font-size: 0.72rem; color: #94a3b8;"><i class="fa-solid fa-car-side"></i> Viaje: ${escapeHtml(t.tripId)}</div>` : '';
+                    const adminResp = t.respuestaAdmin ? `<div style="margin-top: 6px; padding: 6px 8px; background: rgba(30, 41, 59, 0.8); border-left: 2px solid #38bdf8; border-radius: 4px; font-size: 0.74rem; color: #7dd3fc;"><strong>Respuesta enviada:</strong> ${escapeHtml(t.respuestaAdmin)}</div>` : '';
+
+                    return `
+                        <tr>
+                            <td>
+                                <strong style="color: #fbbf24; font-size: 0.85rem;">#${safeTicketId}</strong>
+                                <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">${escapeHtml(t.timeStr || t.createdAt || '')}</div>
+                            </td>
+                            <td>
+                                <strong style="color: #fff; font-size: 0.88rem;">${safeName}</strong>
+                                <div style="font-size: 0.75rem; color: #94a3b8;"><i class="fa-solid fa-phone"></i> ${safePhone}</div>
+                                <div style="font-size: 0.73rem; color: #38bdf8;"><i class="fa-solid fa-envelope"></i> ${safeEmail}</div>
+                            </td>
+                            <td>
+                                <strong style="color: #cbd5e1; font-size: 0.84rem;">${safeCategory}</strong>
+                                ${safeTrip}
+                            </td>
+                            <td style="max-width: 320px;">
+                                <div style="font-size: 0.8rem; color: #e2e8f0; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 8px; white-space: pre-wrap; word-break: break-word; line-height: 1.4;">${safeDesc}</div>
+                                ${adminResp}
+                            </td>
+                            <td>
+                                ${statusBadge}
+                            </td>
+                            <td style="text-align: right;">
+                                <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+                                    <select onchange="window.adminChangeTicketStatus('${safeTicketId}', this.value)" style="background: #0f172a; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
+                                        <option value="pendiente" ${status === 'pendiente' ? 'selected' : ''}>⏳ Pendiente</option>
+                                        <option value="en_revision" ${status === 'en_revision' ? 'selected' : ''}>🔍 En Revisión</option>
+                                        <option value="en_proceso" ${status === 'en_proceso' ? 'selected' : ''}>⚙️ En Proceso</option>
+                                        <option value="finalizado" ${status === 'finalizado' ? 'selected' : ''}>✅ Finalizado</option>
+                                    </select>
+                                    <button type="button" onclick="window.adminReplyTicketPrompt('${safeTicketId}')" class="admin-btn" style="padding: 4px 8px; font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8;">
+                                        <i class="fa-solid fa-comment-dots"></i> Responder
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            window.adminChangeTicketStatus = function(ticketId, newStatus, customNote = '') {
+                const idx = currentTicketsList.findIndex(t => t.ticketId === ticketId);
+                if (idx < 0) return;
+
+                currentTicketsList[idx].status = newStatus;
+                if (customNote) currentTicketsList[idx].respuestaAdmin = customNote;
+                currentTicketsList[idx].updatedAt = Date.now();
+
+                try {
+                    localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(currentTicketsList));
+                } catch(e) {}
+
+                // Sincronizar en Firestore SDK
+                if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                    try {
+                        const db = firebase.firestore();
+                        const updateData = {
+                            status: newStatus,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        if (customNote) updateData.respuestaAdmin = customNote;
+                        db.collection('tickets_soporte').doc(ticketId).set(updateData, { merge: true }).catch(() => {});
+                    } catch(e) {}
+                }
+
+                // REST API directa garantizada
+                try {
+                    const fieldsObj = {
+                        status: { stringValue: newStatus },
+                        updatedAt: { integerValue: String(Date.now()) }
+                    };
+                    let urlPaths = 'updateMask.fieldPaths=status&updateMask.fieldPaths=updatedAt';
+                    if (customNote) {
+                        fieldsObj.respuestaAdmin = { stringValue: customNote };
+                        urlPaths += '&updateMask.fieldPaths=respuestaAdmin';
+                    }
+                    fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/tickets_soporte/${ticketId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4&${urlPaths}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fields: fieldsObj })
+                    }).catch(() => {});
+                } catch(e) {}
+
+                // Emitir en vivo por RutaSync
+                if (window.RutaSync) {
+                    window.RutaSync.emit('ESTADO_TICKET_ACTUALIZADO', {
+                        ticketId,
+                        status: newStatus,
+                        respuestaAdmin: customNote || currentTicketsList[idx].respuestaAdmin || ''
+                    });
+                }
+
+                renderTicketsTable();
+            };
+
+            window.adminReplyTicketPrompt = function(ticketId) {
+                const ticket = currentTicketsList.find(t => t.ticketId === ticketId);
+                if (!ticket) return;
+                const prevResp = ticket.respuestaAdmin || '';
+                const promptVal = prompt(`💬 Responder a reclamo #${ticketId} (${ticket.driverName}):\n\nIngresa la respuesta que verá el chofer en su app:`, prevResp);
+                if (promptVal !== null) {
+                    const statusVal = ticket.status === 'pendiente' ? 'en_proceso' : ticket.status;
+                    window.adminChangeTicketStatus(ticketId, statusVal, promptVal.trim());
+                }
+            };
+
+            // Escuchar tickets de soporte en tiempo real
+            function initAdminTicketsRealtimeListener(db) {
+                if (!db) return;
+                try {
+                    db.collection('tickets_soporte').onSnapshot(snapshot => {
+                        if (!snapshot || snapshot.empty) return;
+                        let localTickets = [];
+                        try {
+                            localTickets = JSON.parse(localStorage.getItem('rutaprivada_driver_tickets_v1') || '[]');
+                        } catch(e) {}
+                        snapshot.forEach(doc => {
+                            const data = doc.data();
+                            const tId = data.ticketId || doc.id;
+                            const idx = localTickets.findIndex(t => t.ticketId === tId);
+                            if (idx >= 0) {
+                                localTickets[idx] = { ...localTickets[idx], ...data };
+                            } else {
+                                localTickets.unshift({ ...data, ticketId: tId });
+                            }
+                        });
+                        currentTicketsList = localTickets;
+                        localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(localTickets));
+                        renderTicketsTable();
+                    }, err => console.warn('Admin tickets snapshot error:', err));
+                } catch(e) {}
+            }
+
+            if (window.RutaSync) {
+                window.RutaSync.on('NUEVO_TICKET_SOPORTE', (ticket) => {
+                    if (!ticket || !ticket.ticketId) return;
+                    if (!currentTicketsList.some(t => t.ticketId === ticket.ticketId)) {
+                        currentTicketsList.unshift(ticket);
+                        try {
+                            localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(currentTicketsList));
+                        } catch(e) {}
+                        renderTicketsTable();
+                    }
+                });
+
+                window.RutaSync.on('ESTADO_TICKET_ACTUALIZADO', (data) => {
+                    if (!data || !data.ticketId) return;
+                    const idx = currentTicketsList.findIndex(t => t.ticketId === data.ticketId);
+                    if (idx >= 0) {
+                        currentTicketsList[idx].status = data.status || currentTicketsList[idx].status;
+                        if (data.respuestaAdmin !== undefined) currentTicketsList[idx].respuestaAdmin = data.respuestaAdmin;
+                        renderTicketsTable();
+                    }
+                });
+            }
+
             // Evento de storage para sincronización instantánea entre pestañas
             window.addEventListener('storage', (e) => {
                 if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
                     loadDriversData();
                     loadRechargesData();
+                    loadTicketsData();
                     if (e && e.key && (e.key.startsWith('rutaprivada_driver_docs_') || e.key === 'rutaprivada_drivers_v1')) {
                         if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
                             openDocReviewModal(activeReviewDriver.id || activeReviewDriver.email);
