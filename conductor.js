@@ -487,6 +487,19 @@ window.closeDriverReportTicketModal = function() {
 };
 window.closeDriverTicketModal = window.closeDriverReportTicketModal;
 
+const TICKET_CATEGORIES_MAP = {
+    'tarifa': '🚗 Problema con tarifa o peajes',
+    'pasajero': '👤 Pasajero no se presentó (No-show)',
+    'pago': '💵 Problema con el cobro o transferencia',
+    'objeto': '🧳 Objeto olvidado en el vehículo',
+    'app': '📡 Error en la app o radar GPS',
+    'documentos': '📄 Dudas sobre vehículo / documentación',
+    'otro': '💬 Otra consulta general'
+};
+window.TICKET_CATEGORIES_MAP = TICKET_CATEGORIES_MAP;
+window.driverTicketDraftsByCategory = window.driverTicketDraftsByCategory || {};
+window.currentActiveTicketCategory = 'tarifa';
+
 window.openDriverTicketModal = function(preselectedCategory, defaultDescription) {
     const modal = document.getElementById('modalDriverReportTicket');
     if (modal) {
@@ -524,18 +537,39 @@ window.openDriverTicketModal = function(preselectedCategory, defaultDescription)
         const inputName = document.getElementById('ticketDriverName');
         const inputPhone = document.getElementById('ticketDriverPhone');
         const inputEmail = document.getElementById('ticketDriverEmail');
-        const selectCat = document.getElementById('ticketCategory');
+        const hiddenCat = document.getElementById('ticketCategory');
+        const displayCat = document.getElementById('ticketCategoryDisplayText');
         const inputDesc = document.getElementById('ticketDescription');
         const inputTripId = document.getElementById('ticketTripId');
 
+        // Determinar categoría fija
+        const catKey = (preselectedCategory && TICKET_CATEGORIES_MAP[preselectedCategory]) ? preselectedCategory : 'tarifa';
+        window.currentActiveTicketCategory = catKey;
+
+        if (hiddenCat) hiddenCat.value = catKey;
+        if (displayCat) displayCat.textContent = TICKET_CATEGORIES_MAP[catKey] || 'Consulta General';
+
+        // Cargar datos verificados no editables
         if (inputName) inputName.value = currentName || '';
         if (inputPhone) inputPhone.value = currentPhone || '';
         if (inputEmail) inputEmail.value = currentEmail || '';
-        if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
-        if (inputDesc && defaultDescription && !inputDesc.value) inputDesc.value = defaultDescription;
 
+        // Aislamiento del mensaje por sección/categoría
+        if (inputDesc) {
+            inputDesc.value = window.driverTicketDraftsByCategory[catKey] || defaultDescription || '';
+            if (!inputDesc._draftHandlerAttached) {
+                inputDesc._draftHandlerAttached = true;
+                inputDesc.addEventListener('input', () => {
+                    if (window.currentActiveTicketCategory) {
+                        window.driverTicketDraftsByCategory[window.currentActiveTicketCategory] = inputDesc.value;
+                    }
+                });
+            }
+        }
+
+        // Auto-completar ID de viaje activo si lo hay
         const activeTripObj = window.currentActiveTrip || (typeof driverState !== 'undefined' ? driverState.activeTrip : null);
-        if (inputTripId && activeTripObj && !inputTripId.value) {
+        if (inputTripId && !inputTripId.value && activeTripObj) {
             inputTripId.value = 'Viaje #' + (activeTripObj.id || activeTripObj.reservaId || 'En Curso');
         }
 
@@ -8607,16 +8641,44 @@ document.addEventListener('DOMContentLoaded', () => {
             const inputName = document.getElementById('ticketDriverName');
             const inputPhone = document.getElementById('ticketDriverPhone');
             const inputEmail = document.getElementById('ticketDriverEmail');
-            const selectCat = document.getElementById('ticketCategory');
+            const hiddenCat = document.getElementById('ticketCategory');
+            const displayCat = document.getElementById('ticketCategoryDisplayText');
             const inputDesc = document.getElementById('ticketDescription');
             const inputTripId = document.getElementById('ticketTripId');
 
+            // Determinar categoría fija
+            const catMap = window.TICKET_CATEGORIES_MAP || {
+                'tarifa': '🚗 Problema con tarifa o peajes',
+                'pasajero': '👤 Pasajero no se presentó (No-show)',
+                'pago': '💵 Problema con el cobro o transferencia',
+                'objeto': '🧳 Objeto olvidado en el vehículo',
+                'app': '📡 Error en la app o radar GPS',
+                'documentos': '📄 Dudas sobre vehículo / documentación',
+                'otro': '💬 Otra consulta general'
+            };
+            const catKey = (preselectedCategory && catMap[preselectedCategory]) ? preselectedCategory : 'tarifa';
+            window.currentActiveTicketCategory = catKey;
+
+            if (hiddenCat) hiddenCat.value = catKey;
+            if (displayCat) displayCat.textContent = catMap[catKey] || 'Consulta General';
+
+            // Cargar datos verificados no editables
             if (inputName) inputName.value = driverName || '';
             if (inputPhone) inputPhone.value = driverPhone || '';
             if (inputEmail) inputEmail.value = driverEmail || '';
-            if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
+
+            // Aislamiento estricto del mensaje por categoría
+            window.driverTicketDraftsByCategory = window.driverTicketDraftsByCategory || {};
             if (inputDesc) {
-                if (defaultDescription) inputDesc.value = defaultDescription;
+                inputDesc.value = window.driverTicketDraftsByCategory[catKey] || defaultDescription || '';
+                if (!inputDesc._draftHandlerAttached) {
+                    inputDesc._draftHandlerAttached = true;
+                    inputDesc.addEventListener('input', () => {
+                        if (window.currentActiveTicketCategory) {
+                            window.driverTicketDraftsByCategory[window.currentActiveTicketCategory] = inputDesc.value;
+                        }
+                    });
+                }
             }
 
             // Auto-completar ID de viaje activo si lo hay
