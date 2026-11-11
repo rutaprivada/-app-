@@ -586,34 +586,127 @@ window.openPassengerTicketCategory = function(catKey) {
   window.openPassengerTicketModal(catKey);
 };
 
+window.syncRouteOptionsUI = function() {
+  const stopToggleWrapper = document.getElementById('stop-toggle-wrapper');
+  const roundtripToggleWrapper = document.getElementById('roundtrip-toggle-wrapper');
+  const btnToggleRoundtrip = document.getElementById('btn-toggle-roundtrip');
+  const btnToggleRoundtripText = document.getElementById('btn-toggle-roundtrip-text');
+  const stopFieldWrap = document.getElementById('stop-field-wrap');
+
+  const hasStop = Boolean((window.state && window.state.hasIntermediateStop) || (stopFieldWrap && !stopFieldWrap.classList.contains('hidden') && stopFieldWrap.style.display !== 'none'));
+  const isRound = Boolean(window.state && window.state.extras && window.state.extras.roundtrip);
+
+  if (hasStop) {
+    // Si se eligió Parada Intermedia: ocultar ambos botones de la fila (el input de parada ya está abierto y tiene botón ✕ para quitarla)
+    if (stopToggleWrapper) {
+      stopToggleWrapper.classList.add('hidden');
+      stopToggleWrapper.style.display = 'none';
+    }
+    if (roundtripToggleWrapper) {
+      roundtripToggleWrapper.classList.add('hidden');
+      roundtripToggleWrapper.style.display = 'none';
+    }
+  } else if (isRound) {
+    // Si se eligió Ida y Vuelta: ocultar botón de Parada Intermedia para no llenar el cuadro de información
+    if (stopToggleWrapper) {
+      stopToggleWrapper.classList.add('hidden');
+      stopToggleWrapper.style.display = 'none';
+    }
+    if (roundtripToggleWrapper) {
+      roundtripToggleWrapper.classList.remove('hidden');
+      roundtripToggleWrapper.style.display = 'inline-flex';
+    }
+    if (btnToggleRoundtrip) {
+      btnToggleRoundtrip.classList.add('active');
+    }
+    if (btnToggleRoundtripText) {
+      btnToggleRoundtripText.innerHTML = 'Ida y Vuelta Activado (-15% Vuelta) <span style="margin-left: 5px; font-weight: 900; opacity: 0.85;">✕</span>';
+    }
+  } else {
+    // Ninguno seleccionado: mostrar ambos de forma limpia y elegante
+    if (stopToggleWrapper) {
+      stopToggleWrapper.classList.remove('hidden');
+      stopToggleWrapper.style.display = 'inline-flex';
+    }
+    if (roundtripToggleWrapper) {
+      roundtripToggleWrapper.classList.remove('hidden');
+      roundtripToggleWrapper.style.display = 'inline-flex';
+    }
+    if (btnToggleRoundtrip) {
+      btnToggleRoundtrip.classList.remove('active');
+    }
+    if (btnToggleRoundtripText) {
+      btnToggleRoundtripText.textContent = 'Ida y Vuelta (-15% Vuelta)';
+    }
+  }
+};
+
+window.toggleMainRoundtrip = function() {
+  if (!window.state) window.state = {};
+  if (!window.state.extras) window.state.extras = { roundtrip: false, pet: false };
+
+  const isCurrent = Boolean(window.state.extras.roundtrip);
+  const target = !isCurrent;
+  window.state.extras.roundtrip = target;
+
+  // Si se activa Ida y Vuelta, remover cualquier parada intermedia activa
+  if (target && window.state.hasIntermediateStop) {
+    if (typeof window.removeIntermediateStopField === 'function') {
+      window.removeIntermediateStopField();
+    }
+  }
+
+  // Sincronizar checkbox de extras en Paso 5
+  const chkRoundtrip = document.getElementById('extra-roundtrip');
+  if (chkRoundtrip) chkRoundtrip.checked = target;
+
+  window.syncRouteOptionsUI();
+
+  if (typeof updateCalculation === 'function') {
+    try { updateCalculation(); } catch(e){}
+  }
+  if (typeof checkAndRoute === 'function') {
+    try { checkAndRoute(); } catch(e){}
+  }
+
+  if (typeof window.showToast === 'function') {
+    if (target) {
+      window.showToast('🔄 Viaje Ida y Vuelta seleccionado: -15% de descuento en el regreso.');
+    } else {
+      window.showToast('ℹ️ Viaje Ida y Vuelta desactivado.');
+    }
+  }
+};
+
 window.toggleIntermediateStopField = function() {
   const stopFieldWrap = document.getElementById('stop-field-wrap');
-  const stopToggleWrapper = document.getElementById('stop-toggle-wrapper');
   const stopInput = document.getElementById('stop-input');
   if (stopFieldWrap) {
     stopFieldWrap.classList.remove('hidden');
     stopFieldWrap.style.display = 'flex';
   }
-  if (stopToggleWrapper) {
-    stopToggleWrapper.classList.add('hidden');
-    stopToggleWrapper.style.display = 'none';
+  if (window.state) {
+    window.state.hasIntermediateStop = true;
+    if (window.state.extras) window.state.extras.roundtrip = false;
   }
-  if (window.state) window.state.hasIntermediateStop = true;
+  const chkRoundtrip = document.getElementById('extra-roundtrip');
+  if (chkRoundtrip) chkRoundtrip.checked = false;
+
+  window.syncRouteOptionsUI();
+
+  if (typeof updateCalculation === 'function') {
+    try { updateCalculation(); } catch(e){}
+  }
   if (stopInput) setTimeout(() => stopInput.focus(), 100);
 };
 
 window.removeIntermediateStopField = function() {
   const stopFieldWrap = document.getElementById('stop-field-wrap');
-  const stopToggleWrapper = document.getElementById('stop-toggle-wrapper');
   const stopInput = document.getElementById('stop-input');
   const clearStop = document.getElementById('btn-clear-stop');
   if (stopFieldWrap) {
     stopFieldWrap.classList.add('hidden');
     stopFieldWrap.style.display = 'none';
-  }
-  if (stopToggleWrapper) {
-    stopToggleWrapper.classList.remove('hidden');
-    stopToggleWrapper.style.display = 'block';
   }
   if (stopInput) stopInput.value = '';
   if (clearStop) clearStop.classList.add('hidden');
@@ -624,8 +717,14 @@ window.removeIntermediateStopField = function() {
   if (typeof map !== 'undefined' && map && typeof stopMarker !== 'undefined' && stopMarker) {
     try { map.removeLayer(stopMarker); stopMarker = null; } catch(e){}
   }
+
+  window.syncRouteOptionsUI();
+
   if (typeof checkAndRoute === 'function') {
     try { checkAndRoute(); } catch(e){}
+  }
+  if (typeof updateCalculation === 'function') {
+    try { updateCalculation(); } catch(e){}
   }
 };
 
@@ -8403,35 +8502,35 @@ function initEventListeners() {
     });
   }
 
-  // 5. Botón para agregar y remover parada intermedia
+  // 5. Botón para agregar y remover parada intermedia / Ida y Vuelta
   const btnToggleStop = document.getElementById('btn-toggle-stop');
-  const stopFieldWrap = document.getElementById('stop-field-wrap');
-  const stopToggleWrapper = document.getElementById('stop-toggle-wrapper');
   const btnRemoveStop = document.getElementById('btn-remove-stop');
-  const stopInput = document.getElementById('stop-input');
+  const btnToggleRoundtrip = document.getElementById('btn-toggle-roundtrip');
 
   if (btnToggleStop) {
-    btnToggleStop.addEventListener('click', () => {
-      if (stopFieldWrap) stopFieldWrap.classList.remove('hidden');
-      if (stopToggleWrapper) stopToggleWrapper.classList.add('hidden');
-      state.hasIntermediateStop = true;
-      if (stopInput) setTimeout(() => stopInput.focus(), 150);
+    btnToggleStop.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (typeof window.toggleIntermediateStopField === 'function') {
+        window.toggleIntermediateStopField();
+      }
     });
   }
 
   if (btnRemoveStop) {
-    btnRemoveStop.addEventListener('click', () => {
-      if (stopFieldWrap) stopFieldWrap.classList.add('hidden');
-      if (stopToggleWrapper) stopToggleWrapper.classList.remove('hidden');
-      if (stopInput) stopInput.value = '';
-      const clearStop = document.getElementById('btn-clear-stop');
-      if (clearStop) clearStop.classList.add('hidden');
-      state.hasIntermediateStop = false;
-      state.intermediateStop = null;
-      if (map && stopMarker) {
-        try { map.removeLayer(stopMarker); stopMarker = null; } catch(e){}
+    btnRemoveStop.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (typeof window.removeIntermediateStopField === 'function') {
+        window.removeIntermediateStopField();
       }
-      checkAndRoute();
+    });
+  }
+
+  if (btnToggleRoundtrip) {
+    btnToggleRoundtrip.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (typeof window.toggleMainRoundtrip === 'function') {
+        window.toggleMainRoundtrip();
+      }
     });
   }
 
@@ -8440,6 +8539,9 @@ function initEventListeners() {
   if (chkRoundtrip) {
     chkRoundtrip.addEventListener('change', (e) => {
       state.extras.roundtrip = e.target.checked;
+      if (typeof window.syncRouteOptionsUI === 'function') {
+        window.syncRouteOptionsUI();
+      }
       updateCalculation();
     });
   }
@@ -8450,6 +8552,11 @@ function initEventListeners() {
       state.extras.pet = e.target.checked;
       updateCalculation();
     });
+  }
+
+  // Inicializar estado visual de opciones de ruta
+  if (typeof window.syncRouteOptionsUI === 'function') {
+    window.syncRouteOptionsUI();
   }
 
   // 7. Botón rápido para abrir perfil desde Paso 5
@@ -11274,7 +11381,12 @@ if (btnRecenterPassengerMap) {
     if (chkRoundtrip) chkRoundtrip.checked = false;
     if (chkPet) chkPet.checked = false;
 
-    // 7. Ocultar sección de parada intermedia
+    // 7. Sincronizar botones de opciones de ruta (Parada / Ida y Vuelta)
+    if (typeof window.syncRouteOptionsUI === 'function') {
+      window.syncRouteOptionsUI();
+    }
+
+    // 8. Ocultar sección de parada intermedia
     const stopFieldGroup = document.getElementById('stop-field-group');
     if (stopFieldGroup) stopFieldGroup.classList.add('hidden');
 

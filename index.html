@@ -655,13 +655,25 @@
               <button id="btn-use-location" class="location-btn" title="Usar mi ubicación actual">📍</button>
             </div>
 
-            <!-- Add Intermediate Stop Toggle Button -->
-            <div class="stop-toggle-wrapper" id="stop-toggle-wrapper">
-              <button type="button" id="btn-toggle-stop" onclick="toggleIntermediateStopField()"
-                class="btn-toggle-stop">
-                <span class="plus-icon">➕</span>
-                <span>Agregar Parada Intermedia (Opcional)</span>
-              </button>
+            <!-- Options Wrapper: Parada Intermedia & Ida y Vuelta -->
+            <div class="route-options-toggle-wrapper" id="route-options-toggle-wrapper">
+              <!-- Add Intermediate Stop Toggle Button -->
+              <div class="stop-toggle-wrapper" id="stop-toggle-wrapper">
+                <button type="button" id="btn-toggle-stop" onclick="toggleIntermediateStopField()"
+                  class="btn-toggle-stop" title="Añadir una parada intermedia en el recorrido">
+                  <span class="plus-icon">➕</span>
+                  <span>Agregar Parada Intermedia (Opcional)</span>
+                </button>
+              </div>
+
+              <!-- Ida y Vuelta Toggle Button -->
+              <div class="roundtrip-toggle-wrapper" id="roundtrip-toggle-wrapper">
+                <button type="button" id="btn-toggle-roundtrip" onclick="toggleMainRoundtrip()"
+                  class="btn-toggle-roundtrip" title="Viaje de Ida y Vuelta con descuento del 15% en el regreso">
+                  <span class="roundtrip-icon">🔄</span>
+                  <span id="btn-toggle-roundtrip-text">Ida y Vuelta (-15% Vuelta)</span>
+                </button>
+              </div>
             </div>
 
             <!-- Intermediate Stop (Optional) -->
@@ -1149,28 +1161,37 @@
               </div>
 
               <!-- Sector Aeroparque Jorge Newbery (OBLIGATORIO) -->
-              <div id="aeroparque-sector-container" class="field-item full-width" style="display: none; background: rgba(56, 189, 248, 0.08); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 12px; padding: 12px 14px; margin-top: 6px; margin-bottom: 8px; transition: all 0.3s ease;">
+              <div id="aeroparque-sector-container" class="field-item full-width"
+                style="display: none; background: rgba(56, 189, 248, 0.08); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 12px; padding: 12px 14px; margin-top: 6px; margin-bottom: 8px; transition: all 0.3s ease;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                  <label style="font-size: 0.85rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px; margin: 0;">
+                  <label
+                    style="font-size: 0.85rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px; margin: 0;">
                     <span>🛫</span> Sector Aeroparque Jorge Newbery
                   </label>
-                  <span id="aeroparque-required-badge" style="background: #ef4444; color: #ffffff; font-size: 0.65rem; font-weight: 800; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.5px; text-transform: uppercase;">
+                  <span id="aeroparque-required-badge"
+                    style="background: #ef4444; color: #ffffff; font-size: 0.65rem; font-weight: 800; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.5px; text-transform: uppercase;">
                     Obligatorio *
                   </span>
                 </div>
                 <p style="font-size: 0.78rem; color: #94a3b8; margin: 0 0 10px 0; line-height: 1.3;">
                   Seleccioná el sector para que el chofer sepa exactamente en qué punto buscarte o dejarte:
                 </p>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;" id="aeroparque-sector-buttons">
-                  <button type="button" class="btn-airport-sector" data-airport="aeroparque" data-sector="Arribos Nacionales" onclick="window.selectAirportSector('aeroparque', 'Arribos Nacionales', this)">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;"
+                  id="aeroparque-sector-buttons">
+                  <button type="button" class="btn-airport-sector" data-airport="aeroparque"
+                    data-sector="Arribos Nacionales"
+                    onclick="window.selectAirportSector('aeroparque', 'Arribos Nacionales', this)">
                     <span style="display:block; font-size:1.15rem; margin-bottom:2px;">🇦🇷</span>
                     <span>Arribos Nacionales</span>
                   </button>
-                  <button type="button" class="btn-airport-sector" data-airport="aeroparque" data-sector="Arribos Internacionales" onclick="window.selectAirportSector('aeroparque', 'Arribos Internacionales', this)">
+                  <button type="button" class="btn-airport-sector" data-airport="aeroparque"
+                    data-sector="Arribos Internacionales"
+                    onclick="window.selectAirportSector('aeroparque', 'Arribos Internacionales', this)">
                     <span style="display:block; font-size:1.15rem; margin-bottom:2px;">🌎</span>
                     <span>Arribos Internacionales</span>
                   </button>
-                  <button type="button" class="btn-airport-sector" data-airport="aeroparque" data-sector="Partidas" onclick="window.selectAirportSector('aeroparque', 'Partidas', this)">
+                  <button type="button" class="btn-airport-sector" data-airport="aeroparque" data-sector="Partidas"
+                    onclick="window.selectAirportSector('aeroparque', 'Partidas', this)">
                     <span style="display:block; font-size:1.15rem; margin-bottom:2px;">✈️</span>
                     <span>Partidas</span>
                   </button>
@@ -1179,12 +1200,15 @@
               </div>
 
               <!-- Sector Ezeiza (OPCIONAL) -->
-              <div id="ezeiza-sector-container" class="field-item full-width" style="display: none; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 12px; padding: 12px 14px; margin-top: 6px; margin-bottom: 8px; transition: all 0.3s ease;">
+              <div id="ezeiza-sector-container" class="field-item full-width"
+                style="display: none; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 12px; padding: 12px 14px; margin-top: 6px; margin-bottom: 8px; transition: all 0.3s ease;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                  <label style="font-size: 0.85rem; font-weight: 700; color: #c084fc; display: flex; align-items: center; gap: 6px; margin: 0;">
+                  <label
+                    style="font-size: 0.85rem; font-weight: 700; color: #c084fc; display: flex; align-items: center; gap: 6px; margin: 0;">
                     <span>🛬</span> Terminal / Sector en Ezeiza
                   </label>
-                  <span style="background: rgba(148, 163, 184, 0.2); color: #cbd5e1; font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.5px; text-transform: uppercase;">
+                  <span
+                    style="background: rgba(148, 163, 184, 0.2); color: #cbd5e1; font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.5px; text-transform: uppercase;">
                     Opcional
                   </span>
                 </div>
@@ -1192,11 +1216,21 @@
                   Opcional: Si conocés la terminal o vuelo, podés seleccionarla para agilizar el encuentro:
                 </p>
                 <div style="display: flex; flex-wrap: wrap; gap: 8px;" id="ezeiza-sector-buttons">
-                  <button type="button" class="btn-airport-sector ezeiza-btn" data-airport="ezeiza" data-sector="Terminal A" onclick="window.selectAirportSector('ezeiza', 'Terminal A', this)">Terminal A</button>
-                  <button type="button" class="btn-airport-sector ezeiza-btn" data-airport="ezeiza" data-sector="Terminal B" onclick="window.selectAirportSector('ezeiza', 'Terminal B', this)">Terminal B</button>
-                  <button type="button" class="btn-airport-sector ezeiza-btn" data-airport="ezeiza" data-sector="Terminal C" onclick="window.selectAirportSector('ezeiza', 'Terminal C', this)">Terminal C</button>
-                  <button type="button" class="btn-airport-sector ezeiza-btn" data-airport="ezeiza" data-sector="Partidas" onclick="window.selectAirportSector('ezeiza', 'Partidas', this)">Partidas</button>
-                  <button type="button" class="btn-airport-sector ezeiza-btn" data-airport="ezeiza" data-sector="Arribos" onclick="window.selectAirportSector('ezeiza', 'Arribos', this)">Arribos</button>
+                  <button type="button" class="btn-airport-sector ezeiza-btn" data-airport="ezeiza"
+                    data-sector="Terminal A" onclick="window.selectAirportSector('ezeiza', 'Terminal A', this)">Terminal
+                    A</button>
+                  <button type="button" class="btn-airport-sector ezeiza-btn" data-airport="ezeiza"
+                    data-sector="Terminal B" onclick="window.selectAirportSector('ezeiza', 'Terminal B', this)">Terminal
+                    B</button>
+                  <button type="button" class="btn-airport-sector ezeiza-btn" data-airport="ezeiza"
+                    data-sector="Terminal C" onclick="window.selectAirportSector('ezeiza', 'Terminal C', this)">Terminal
+                    C</button>
+                  <button type="button" class="btn-airport-sector ezeiza-btn" data-airport="ezeiza"
+                    data-sector="Partidas"
+                    onclick="window.selectAirportSector('ezeiza', 'Partidas', this)">Partidas</button>
+                  <button type="button" class="btn-airport-sector ezeiza-btn" data-airport="ezeiza"
+                    data-sector="Arribos"
+                    onclick="window.selectAirportSector('ezeiza', 'Arribos', this)">Arribos</button>
                 </div>
                 <input type="hidden" id="selected-ezeiza-sector" value="" />
               </div>
@@ -1212,12 +1246,16 @@
 
           <!-- Booking & Action Buttons -->
           <div class="quote-actions" style="margin-top: 15px;">
-            <button id="btn-request-inapp" class="btn btn-primary full-width btn-inapp-trip-action">
-              <span class="btn-icon" id="btn-request-inapp-icon">🚀</span>
-              <span class="btn-text">
-                <strong id="btn-request-inapp-title">SOLICITAR VIAJE</strong>
-                <small id="btn-request-inapp-subtitle">Búsqueda inmediata y seguimiento en tiempo real</small>
-              </span>
+            <button id="btn-request-inapp" class="btn btn-primary full-width btn-inapp-trip-action" type="button">
+              <div class="btn-inapp-trip-inner">
+                <div class="btn-inapp-title-line">
+                  <span class="btn-icon" id="btn-request-inapp-icon">🚀</span>
+                  <span class="btn-title-text" id="btn-request-inapp-title">SOLICITAR VIAJE</span>
+                </div>
+                <div class="btn-inapp-subtitle-line" id="btn-request-inapp-subtitle">
+                  Búsqueda inmediata y seguimiento en tiempo real
+                </div>
+              </div>
             </button>
 
             <div class="privacy-guarantee-note">
@@ -3040,10 +3078,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- Sync & Realtime -->
-    <script src="sync.js?v=134"></script>
+    <script src="sync.js?v=136"></script>
 
     <!-- App JS -->
-    <script src="app.js?v=134"></script>
+    <script src="app.js?v=136"></script>
 
     <!-- Inicializador Directo de Autocompletado de Direcciones & Auto-Purga de Caché -->
     <script>
@@ -3052,7 +3090,7 @@
         if ('serviceWorker' in navigator && window.caches) {
           caches.keys().then(function (keys) {
             keys.forEach(function (k) {
-              if (k !== 'rutaprivada-pwa-v134') {
+              if (k !== 'rutaprivada-pwa-v136') {
                 caches.delete(k);
               }
             });
@@ -3100,7 +3138,7 @@
     <!-- PWA Service Worker Auto-Update -->
     <script>
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js?v=134').then(function (reg) {
+        navigator.serviceWorker.register('sw.js?v=136').then(function (reg) {
           reg.update();
         }).catch(function () { });
         navigator.serviceWorker.getRegistrations().then(function (registrations) {
