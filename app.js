@@ -1271,7 +1271,22 @@ window.loadPassengerProfileIntoForm = function() {
 };
 
 window.openPassengerProfileModal = function() {
-  const session = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : null;
+  let session = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : null;
+  if (!session) {
+    try {
+      const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
+                  localStorage.getItem('rutaprivada_passenger_auth_v1') ||
+                  localStorage.getItem('rutaprivada_passenger_profile') ||
+                  localStorage.getItem('rutaprivada_user_session');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed.email || parsed.nombre || parsed.usuario || parsed.telefono || parsed.id)) {
+          session = parsed;
+        }
+      }
+    } catch(e) {}
+  }
+
   if (!session || (!session.nombre && !session.email && !session.usuario && !session.id && !session.telefono)) {
     if (typeof window.openPassengerAuthModal === 'function') {
       window.openPassengerAuthModal('login');
@@ -1758,7 +1773,9 @@ window.getPassengerSession = function() {
       return null;
     }
     const raw = localStorage.getItem('rutaprivada_passenger_session_v1') || 
-                localStorage.getItem('rutaprivada_passenger_auth_v1');
+                localStorage.getItem('rutaprivada_passenger_auth_v1') ||
+                localStorage.getItem('rutaprivada_passenger_profile') ||
+                localStorage.getItem('rutaprivada_user_session');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && (parsed.email || parsed.nombre || parsed.usuario || parsed.telefono || parsed.id)) {
@@ -8327,7 +8344,9 @@ function initEventListeners() {
   if (btnQuickProfile) {
     btnQuickProfile.addEventListener('click', (e) => {
       e.preventDefault();
-      if (typeof openPassengerProfileModal === 'function') {
+      if (typeof window.openPassengerProfileModal === 'function') {
+        window.openPassengerProfileModal();
+      } else if (typeof openPassengerProfileModal === 'function') {
         openPassengerProfileModal();
       }
     });
@@ -12103,25 +12122,13 @@ if (btnRecenterPassengerMap) {
     }
     window.closePassengerAuthModal = closePassengerAuthModal;
 
-    function openPassengerProfileModal() {
-      if (typeof window.openPassengerProfileModal === 'function') {
-        window.openPassengerProfileModal();
-      }
-    }
-    window.openPassengerProfileModal = openPassengerProfileModal;
-    window.openPassengerProfileModal = openPassengerProfileModal;
-
-    function closePassengerProfileModal() {
-      const modal = modalPassengerProfile || document.getElementById('modalPassengerProfile');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.style.display = 'none';
-      }
-    }
-    window.closePassengerProfileModal = closePassengerProfileModal;
-
     if (btnOpenPassengerProfile) {
-      btnOpenPassengerProfile.addEventListener('click', openPassengerProfileModal);
+      btnOpenPassengerProfile.addEventListener('click', (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (typeof window.openPassengerProfileModal === 'function') {
+          window.openPassengerProfileModal();
+        }
+      });
     }
 
     function switchAuthTab(tab) {
@@ -13285,6 +13292,13 @@ if (btnRecenterPassengerMap) {
     // Open Profile & Modals Listeners
     if (btnOpenPassengerProfile) {
       btnOpenPassengerProfile.addEventListener('click', () => window.openPassengerProfileModal());
+    }
+    const btnUberOpenProfile = document.getElementById('btnUberOpenProfile');
+    if (btnUberOpenProfile) {
+      btnUberOpenProfile.addEventListener('click', (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        window.openPassengerProfileModal();
+      });
     }
     const btnQuickOpenProfile = document.getElementById('btnQuickOpenProfile');
     if (btnQuickOpenProfile) {
