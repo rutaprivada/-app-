@@ -705,16 +705,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const raw = localStorage.getItem('rutaprivada_driver_auth_v1');
             if (raw) {
                 const parsed = JSON.parse(raw);
-                if (parsed) {
-                    // ID único por cuenta basado en email para garantizar separación absoluta de cuentas con mismo DNI
-                    if (parsed.email) {
-                        const cleanEmail = String(parsed.email).replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                        const cleanDni = parsed.dni ? String(parsed.dni).replace(/\D/g, '') : '';
-                        return cleanDni ? `drv_${cleanDni}_${cleanEmail}` : `drv_${cleanEmail}`;
-                    }
-                    if (parsed.id) return parsed.id;
-                    if (parsed.dni) return 'drv_' + String(parsed.dni).replace(/\D/g, '');
-                }
+                if (parsed && parsed.id) return parsed.id;
+                if (parsed && parsed.email) return 'drv_' + String(parsed.email).replace(/[^a-z0-9]/gi, '_').toLowerCase();
             }
         } catch(e) {}
         return 'default';
@@ -767,48 +759,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function loadDocsData() {
-        const drvId = getActiveDriverId();
-        let sessionInfo = {};
-        try {
-            const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
-            if (rawAuth) sessionInfo = JSON.parse(rawAuth);
-        } catch(e) {}
-
-        // 1. Cargar almacenamiento exclusivo e independiente de esta cuenta
-        if (drvId !== 'default') {
-            try {
-                const specificRaw = localStorage.getItem(`rutaprivada_driver_docs_${drvId}`);
-                if (specificRaw) {
-                    const parsed = JSON.parse(specificRaw);
-                    if (parsed && (parsed.nombre || parsed.dni || parsed.email)) return parsed;
-                }
-            } catch(e) {}
-        }
-
-        // 2. Solo leer rutaprivada_driver_docs_v1 si coincide estrictamente con ESTA cuenta
-        try {
-            const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed) {
-                    const matchesId = (drvId !== 'default' && parsed.id === drvId);
-                    const matchesEmail = sessionInfo.email && parsed.email && sessionInfo.email.toLowerCase() === parsed.email.toLowerCase();
-                    // NUNCA cruzar por DNI para que cuentas distintas del mismo titular permanezcan aisladas
-                    if (matchesId || matchesEmail) {
-                        return parsed;
-                    }
-                }
-            }
-        } catch(e) {}
-
-        // 3. Plantilla completamente limpia y en estado 'pendiente' para esta cuenta específica
-        const cleanDocs = {
-            id: drvId,
-            nombre: sessionInfo.nombre || 'Nuevo Chofer Partner',
+    function getCleanDriverTemplate(drvId, sessionInfo = {}) {
+        return {
+            id: drvId || sessionInfo.id || 'default',
+            nombre: sessionInfo.nombre || '',
             dni: sessionInfo.dni || '',
             telefono: sessionInfo.telefono || '',
             email: sessionInfo.email || '',
+            aceptaComunicaciones: true,
             autoMarcaModelo: '',
             patente: '',
             color: 'Negro',
@@ -817,21 +775,51 @@ document.addEventListener('DOMContentLoaded', () => {
             banco: '',
             alias: '',
             cbu: '',
-            titularCuenta: '',
+            titularCuenta: sessionInfo.nombre || '',
+            calificacion: 5.0,
             estadoVerificacion: 'pendiente',
             observaciones: '',
             docsImages: {},
             docsSummary: {},
-            docsCount: 0
+            docsCount: 0,
+            updatedAt: Date.now()
         };
+    }
 
-        if (drvId !== 'default') {
+    function loadDocsData() {
+        const drvId = getActiveDriverId();
+        let sessionInfo = {};
+        try {
+            const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
+            if (rawAuth) sessionInfo = JSON.parse(rawAuth);
+        } catch(e) {}
+
+        // 1. Prioridad: Almacenamiento estrictamente aislado por ID de chofer
+        if (drvId && drvId !== 'default') {
             try {
-                localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(cleanDocs));
+                const specificRaw = localStorage.getItem(`rutaprivada_driver_docs_${drvId}`);
+                if (specificRaw) {
+                    const parsed = JSON.parse(specificRaw);
+                    if (parsed && (parsed.id === drvId || !parsed.id)) {
+                        return { ...getCleanDriverTemplate(drvId, sessionInfo), ...parsed, id: drvId };
+                    }
+                }
             } catch(e) {}
         }
 
-        return cleanDocs;
+        // 2. Almacenamiento secundario / retrocompatibilidad solo si coincide el ID exacto
+        try {
+            const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.id && parsed.id === drvId) {
+                    return { ...getCleanDriverTemplate(drvId, sessionInfo), ...parsed, id: drvId };
+                }
+            }
+        } catch(e) {}
+
+        // 3. Plantilla limpia para chofer nuevo (sin mezclar documentos con otra cuenta con mismo DNI)
+        return getCleanDriverTemplate(drvId, sessionInfo);
     }
 
     const currentFleetDriver = getFleetDriverInfo();
@@ -5526,35 +5514,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const docInputBankHolder = document.getElementById('docInputBankHolder');
         const btnTogglePipMode = document.getElementById('btnTogglePipMode');
 
-        function loadDocsData() {
-            try {
-                const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    if (parsed && (parsed.nombre || parsed.dni || parsed.estadoVerificacion || parsed.email)) {
-                        return parsed;
-                    }
-                }
-            } catch(e) {}
-            return {
-                nombre: '',
-                dni: '',
-                telefono: '',
-                email: '',
-                aceptaComunicaciones: true,
-                autoMarcaModelo: '',
-                patente: '',
-                color: 'Negro',
-                categoria: 'Sedán Estándar',
-                fotoPerfil: '',
-                banco: '',
-                cbu: '',
-                titularCuenta: '',
-                estadoVerificacion: 'sin_subir',
-                observaciones: '',
-                docsImages: {}
-            };
-        }
+        // Delegar directamente al cargador con aislamiento estricto por cuenta de chofer
+        // (no sobreescribir con lector global no aislado de docs_v1)
 
         // Helper para comprimir imágenes de documentos antes de guardar en localStorage / Firestore (garantiza < 35KB por foto, 100% nítido)
         function readFileOrCompressImage(file) {
@@ -5895,16 +5856,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatedAt: Date.now()
             };
 
-            // Obtener el ID único y aislado para este conductor (nunca compartir por DNI)
-            let docId = getActiveDriverId();
+            // 1. Identificador único e inmutable para esta cuenta específica
+            let docId = updatedDocs.id || getActiveDriverId();
             if (!docId || docId === 'default') {
-                const cleanEmail = (updatedDocs.email || '').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '');
-                docId = cleanDni && cleanEmail ? `drv_${cleanDni}_${cleanEmail}` : (cleanEmail ? `drv_${cleanEmail}` : (`drv_${cleanDni || Date.now()}`));
+                const authSess = (typeof getDriverSession === 'function') ? getDriverSession() : null;
+                docId = (authSess && authSess.id) ? authSess.id : ('drv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7));
             }
             updatedDocs.id = docId;
 
-            // 1. Guardar localmente de forma estrictamente aislada por cuenta
+            // 2. Guardar localmente de forma estrictamente aislada por cuenta
             try {
                 localStorage.setItem(`rutaprivada_driver_docs_${docId}`, JSON.stringify(updatedDocs));
                 localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(updatedDocs));
@@ -5912,20 +5872,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch(e) {
                 console.warn('LocalStorage save warning:', e);
             }
-
-            // Actualizar en lista de conductores registrados
-            try {
-                let drvList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
-                const idx = drvList.findIndex(d => (d.id && d.id === docId) || (d.email && updatedDocs.email && d.email.toLowerCase() === updatedDocs.email.toLowerCase()));
-                if (idx >= 0) {
-                    drvList[idx] = { ...drvList[idx], ...updatedDocs, id: docId };
-                } else {
-                    drvList.push({ ...updatedDocs, id: docId });
-                }
-                localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(drvList));
-            } catch(e) {}
-
-            // 2. Sincronizar en tiempo real con Firebase Cloud Firestore
 
             // Resumen ligero de documentos subidos para el documento principal
             const docsUploadedSummary = {};
@@ -6050,10 +5996,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', mainDriverDoc);
             }
 
-            // 4. Actualizar lista en memoria
+            // 4. Actualizar lista en memoria sin colisionar con otras cuentas del mismo DNI
             try {
                 let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
-                const idx = driversList.findIndex(d => (d.dni && updatedDocs.dni && d.dni === updatedDocs.dni) || (d.id && d.id === updatedDocs.id) || d.nombre === updatedDocs.nombre);
+                const idx = driversList.findIndex(d => (d.id && updatedDocs.id && d.id === updatedDocs.id) || (d.email && updatedDocs.email && d.email.toLowerCase() === updatedDocs.email.toLowerCase()));
                 if (idx >= 0) {
                     driversList[idx] = { ...driversList[idx], ...updatedDocs, docsImages: Object.assign({}, driversList[idx].docsImages || {}, mergedDocsImages) };
                 } else {
@@ -6629,10 +6575,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             localStorage.removeItem('rutaprivada_driver_logged_out');
         } catch(e) {}
-        const cleanDni = driver.dni ? String(driver.dni).replace(/\D/g, '') : '';
-        const cleanEmail = driver.email ? String(driver.email).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') : '';
-        if (!driver.id || driver.id === 'drv_' + cleanDni) {
-            driver.id = cleanDni && cleanEmail ? `drv_${cleanDni}_${cleanEmail}` : (cleanEmail ? `drv_${cleanEmail}` : (cleanDni ? `drv_${cleanDni}` : `drv_${Date.now()}`));
+        if (!driver.id) {
+            driver.id = 'drv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
         }
         if (!driver.calificacion) driver.calificacion = 5.0;
 
@@ -6758,7 +6702,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
                 }
                 const db = firebase.firestore();
-                const docId = driver.id;
+                const cleanDni = (driver.dni || '').replace(/\D/g, '') || String(Date.now());
+                const docId = driver.id || ('drv_' + cleanDni);
                 const emailDocId = (driver.email || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
                 
                 const cloudPayload = {
@@ -6783,9 +6728,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     updatedAt: Date.now()
                 };
 
-                // Guardar en colección drivers por su ID único de cuenta
+                // Guardar en colecciones conductores y drivers por ID y por email
                 db.collection('drivers').doc(docId).set(cloudPayload, { merge: true }).catch(() => {});
+                db.collection('conductores').doc(docId).set(cloudPayload, { merge: true }).catch(() => {});
                 if (emailDocId) {
+                    db.collection('drivers').doc(emailDocId).set(cloudPayload, { merge: true }).catch(() => {});
                     db.collection('conductores').doc(emailDocId).set(cloudPayload, { merge: true }).catch(() => {});
                 }
             }
@@ -6793,7 +6740,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sincronización mediante Firestore Cloud REST API
         try {
-            const docId = driver.id;
+            const cleanDni = (driver.dni || '').replace(/\D/g, '') || String(Date.now());
+            const docId = driver.id || ('drv_' + cleanDni);
             const emailDocId = (driver.email || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
             const restFields = {
                 id: { stringValue: docId },
@@ -6805,13 +6753,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 estadoVerificacion: { stringValue: driver.estadoVerificacion || 'pendiente' },
                 updatedAt: { integerValue: String(Date.now()) }
             };
-            if (emailDocId) {
-                fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/conductores/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fields: restFields })
-                }).catch(() => {});
-            }
+            fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/conductores/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fields: restFields })
+            }).catch(() => {});
             fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -7066,44 +7012,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 1. Validar duplicados en almacenamiento local
+            // 1. Validar que no exista otra cuenta con el mismo correo electrónico
             const list = getRegisteredDriversList();
-            const cleanDni = dni.replace(/\D/g, '');
-            const alreadyExists = list.some(d => (d.email && d.email.toLowerCase() === email) || (d.dni && d.dni.replace(/\D/g, '') === cleanDni));
+            const alreadyExists = list.some(d => (d.email && d.email.toLowerCase() === email));
             if (alreadyExists) {
-                showDriverToast(`⚠️ Ya existe una cuenta de chofer registrada con este correo o DNI (${dni}). Por favor inicia sesión.`);
+                showDriverToast(`⚠️ Ya existe una cuenta de chofer registrada con este correo (${email}). Por favor inicia sesión.`);
                 switchDriverAuthTab('login');
                 const loginEmail = document.getElementById('loginDriverEmail');
                 if (loginEmail) loginEmail.value = email;
                 return;
             }
 
-            // 2. Validar duplicados en Firestore Cloud en tiempo real
-            if (typeof firebase !== 'undefined' && firebase.firestore) {
-                try {
-                    const db = firebase.firestore();
-                    const docId = 'drv_' + cleanDni;
-                    const snap = await db.collection('drivers').doc(docId).get();
-                    if (snap.exists) {
-                        showDriverToast(`⚠️ El DNI ${dni} ya se encuentra registrado en el sistema. Por favor inicia sesión.`);
-                        switchDriverAuthTab('login');
-                        const loginEmail = document.getElementById('loginDriverEmail');
-                        if (loginEmail) loginEmail.value = email;
-                        return;
-                    }
-                } catch(e) {}
-            }
-
             // Generar código de verificación de 6 dígitos
             const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
             const passwordHash = await hashDriverPassword(password);
+            const uniqueDriverId = 'drv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
 
-            const cleanEmailForId = email.replace(/[^a-z0-9_]/g, '_');
-            const driverUniqueId = cleanDni && cleanEmailForId ? `drv_${cleanDni}_${cleanEmailForId}` : (cleanEmailForId ? `drv_${cleanEmailForId}` : `drv_${cleanDni || Date.now()}`);
-
-            // Inicia estrictamente en estado PENDIENTE de aprobación
+            // Inicia estrictamente en estado PENDIENTE de aprobación y con ID único de cuenta
             pendingDriverRegistration = {
-                id: driverUniqueId,
+                id: uniqueDriverId,
                 nombre: name,
                 dni: dni,
                 telefono: phone,
@@ -7432,88 +7359,49 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        // 1. Polling directo vía Firestore REST (funciona siempre en celular/WebView)
+        // 1. Polling directo vía Firestore REST (estrictamente aislado por ID único de cuenta)
         const pollDriverStatusRest = async () => {
             try {
                 const localDocs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
-                if (!localDocs) return;
-                const cleanDni = (localDocs.dni || '').replace(/\D/g, '');
-                const cleanTel = (localDocs.telefono || '').replace(/\D/g, '');
-                const docId = localDocs.id || (cleanDni ? 'drv_' + cleanDni : (cleanTel ? 'drv_' + cleanTel : ''));
+                const docId = (localDocs && localDocs.id) || getActiveDriverId();
+                if (!docId || docId === 'default') return;
 
-                let matched = false;
-
-                // A. Consulta directa por ID de documento
-                if (docId) {
-                    try {
-                        const resp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
-                        if (resp.ok) {
-                            const json = await resp.json();
-                            if (json && json.fields) {
-                                const getStr = (f, def = '') => (json.fields[f] && json.fields[f].stringValue !== undefined) ? json.fields[f].stringValue : def;
-                                const status = getStr('estadoVerificacion', '');
-                                const obs = getStr('observaciones', '');
-                                if (status) {
-                                    processDriverUpdate(status, obs);
-                                    matched = true;
-                                }
+                // Consulta directa y exclusiva por el ID de esta cuenta
+                try {
+                    const resp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
+                    if (resp.ok) {
+                        const json = await resp.json();
+                        if (json && json.fields) {
+                            const getStr = (f, def = '') => (json.fields[f] && json.fields[f].stringValue !== undefined) ? json.fields[f].stringValue : def;
+                            const status = getStr('estadoVerificacion', '');
+                            const obs = getStr('observaciones', '');
+                            if (status) {
+                                processDriverUpdate(status, obs);
                             }
                         }
-                    } catch(e) {}
-                }
-
-                // B. Búsqueda por colección drivers si aún no coincide
-                if (!matched) {
-                    try {
-                        const allResp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
-                        if (allResp.ok) {
-                            const allJson = await allResp.json();
-                            if (allJson && allJson.documents && allJson.documents.length > 0) {
-                                allJson.documents.forEach(doc => {
-                                    const f = doc.fields || {};
-                                    const getStr = (key, def = '') => (f[key] && f[key].stringValue !== undefined) ? f[key].stringValue : def;
-                                    const dDni = (getStr('dni', '')).replace(/\D/g, '');
-                                    const dTel = (getStr('telefono', '')).replace(/\D/g, '');
-                                    const dName = (getStr('nombre', '')).trim().toLowerCase();
-                                    const localName = (localDocs.nombre || '').trim().toLowerCase();
-
-                                    if ((cleanDni && dDni && cleanDni === dDni) || (cleanTel && dTel && cleanTel === dTel) || (localName && dName && localName === dName)) {
-                                        const status = getStr('estadoVerificacion', '');
-                                        const obs = getStr('observaciones', '');
-                                        if (status) {
-                                            processDriverUpdate(status, obs);
-                                        }
-                                    }
-                                });
-                            }
-                        }
-                    } catch(e) {}
-                }
+                    }
+                } catch(e) {}
             } catch(e) {}
         };
 
         setInterval(pollDriverStatusRest, 3500);
         pollDriverStatusRest();
 
-        // 2. Listener en tiempo real vía Firestore SDK
+        // 2. Listener en tiempo real vía Firestore SDK (suscrito exclusivamente al ID de esta cuenta)
         if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
             try {
                 const db = firebase.firestore();
-                db.collection('drivers').onSnapshot(snapshot => {
-                    snapshot.docChanges().forEach(change => {
-                        const data = change.doc.data();
-                        if (!data) return;
-                        const localDocs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
-                        if (!localDocs) return;
-
-                        const cleanDniIncoming = (data.dni || data.id || '').replace(/\D/g, '');
-                        const cleanDniLocal = (localDocs.dni || '').replace(/\D/g, '');
-
-                        if ((cleanDniIncoming && cleanDniLocal && cleanDniIncoming === cleanDniLocal) || data.id === 'driver_local' || data.id === 'drv_' + cleanDniLocal) {
-                            processDriverUpdate(data.estadoVerificacion || data.estado, data.observaciones);
+                const drvId = getActiveDriverId();
+                if (drvId && drvId !== 'default') {
+                    db.collection('drivers').doc(drvId).onSnapshot(docSnap => {
+                        if (docSnap.exists) {
+                            const data = docSnap.data();
+                            if (data && (data.estadoVerificacion || data.estado)) {
+                                processDriverUpdate(data.estadoVerificacion || data.estado, data.observaciones || '');
+                            }
                         }
-                    });
-                }, err => console.warn('Firestore driver onSnapshot warn:', err));
+                    }, err => console.warn('Firestore driver onSnapshot warn:', err));
+                }
             } catch(e) {}
         }
     }
@@ -9371,7 +9259,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Registro y actualización de Service Worker para la PWA de Chofer
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js?v=129')
+            navigator.serviceWorker.register('sw.js?v=128')
                 .then(reg => {
                     reg.update().catch(() => {});
                 })

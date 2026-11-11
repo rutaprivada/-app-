@@ -127,6 +127,11 @@
                         <span class="stat-desc">Aceptación</span>
                     </div>
                 </div>
+
+                <!-- Botón de Conexión Rápida de 1 Toque -->
+                <button type="button" class="btn-quick-connect" id="btnQuickConnectOnline" onclick="if(typeof window.handleDriverToggleStatus === 'function') window.handleDriverToggleStatus();" style="width: 100%; margin-top: 18px; padding: 15px 22px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; border: none; border-radius: 14px; font-size: 1.05rem; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 18px rgba(16, 185, 129, 0.45); cursor: pointer; transition: all 0.2s ease;">
+                    <i class="fa-solid fa-power-off"></i> CONECTARME EN LÍNEA
+                </button>
             </section>
 
             <!-- ESTADO 2: EN LÍNEA / BUSCANDO -->
@@ -141,6 +146,11 @@
                 </div>
                 <h3 class="pulse-text" id="radarSearchingTitle">Buscando viajes cercanos...</h3>
                 <p class="radar-subtext" id="radarSearchingSubtext">Te notificaremos inmediatamente cuando un pasajero solicite un viaje en tu radio.</p>
+
+                <!-- Botón de Desconexión Rápida -->
+                <button type="button" class="btn-quick-disconnect" id="btnQuickDisconnectOffline" onclick="if(typeof window.handleDriverToggleStatus === 'function') window.handleDriverToggleStatus();" style="margin-top: 12px; margin-bottom: 6px; padding: 10px 20px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.45); border-radius: 12px; font-size: 0.88rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: all 0.2s ease;">
+                    <i class="fa-solid fa-power-off"></i> Desconectarme
+                </button>
                 
                 <!-- LISTA DE VIAJES DISPONIBLES / SUGERIDOS -->
                 <div class="available-trips-section" id="availableTripsSection" style="margin-top: 18px; width: 100%; text-align: left; display: none;">

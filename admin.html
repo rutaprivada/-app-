@@ -1420,7 +1420,7 @@
                                         updatedAt: getNum('updatedAt', Date.now())
                                     };
 
-                                    const matchIdx = cloudDriversList.findIndex(cd => cd.id === rd.id || (cd.dni && rd.dni && cd.dni === rd.dni));
+                                    const matchIdx = cloudDriversList.findIndex(cd => cd.id === rd.id);
                                     if (matchIdx >= 0) {
                                         cloudDriversList[matchIdx] = { 
                                             ...cloudDriversList[matchIdx], 
@@ -1778,17 +1778,11 @@
 
                 // B. Incorporar el Conductor Local Activo
                 if (activeDocs && (activeDocs.nombre || activeDocs.dni || (activeDocs.docsImages && Object.keys(activeDocs.docsImages).length > 0))) {
-                    const cleanLocalDni = String(activeDocs.dni || '').replace(/\D/g, '');
-                    const cleanLocalPhone = String(activeDocs.telefono || '').replace(/\D/g, '');
-                    const localStableId = activeDocs.id || (cleanLocalDni ? 'drv_' + cleanLocalDni : (cleanLocalPhone ? 'drv_' + cleanLocalPhone : 'drv_local_active'));
+                    const localStableId = activeDocs.id || (activeDocs.email ? 'drv_' + String(activeDocs.email).replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'drv_local_active');
 
                     const existingIdx = drivers.findIndex(d => {
                         if (d.id && localStableId && d.id === localStableId) return true;
-                        const dDni = String(d.dni || '').replace(/\D/g, '');
-                        if (cleanLocalDni && dDni && cleanLocalDni === dDni) return true;
-                        const dPhone = String(d.telefono || '').replace(/\D/g, '');
-                        if (cleanLocalPhone && dPhone && cleanLocalPhone === dPhone) return true;
-                        if (d.nombre && activeDocs.nombre && d.nombre.trim().toLowerCase() === activeDocs.nombre.trim().toLowerCase()) return true;
+                        if (d.email && activeDocs.email && d.email.trim().toLowerCase() === activeDocs.email.trim().toLowerCase()) return true;
                         return false;
                     });
 
@@ -2426,26 +2420,33 @@
                     localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(currentDrivers));
                 } catch(e) {}
 
-                // Si es el conductor local activo
+                const driverDocId = String(activeReviewDriver.id || (activeReviewDriver.email ? 'drv_' + String(activeReviewDriver.email).replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'driver_local'));
+
+                // Si es el conductor local activo en este navegador, actualizar su almacenamiento individual
                 try {
-                    const rawLocal = localStorage.getItem('rutaprivada_driver_docs_v1');
-                    if (rawLocal) {
-                        const docsObj = JSON.parse(rawLocal);
-                        docsObj.estadoVerificacion = newStatus;
-                        docsObj.observaciones = notesVal;
-                        localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(docsObj));
+                    const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
+                    if (rawAuth) {
+                        const sess = JSON.parse(rawAuth);
+                        if (sess && (sess.id === driverDocId || (sess.email && activeReviewDriver.email && sess.email.toLowerCase() === activeReviewDriver.email.toLowerCase()))) {
+                            const updatedDocsObj = {
+                                ...activeReviewDriver,
+                                estadoVerificacion: newStatus,
+                                observaciones: notesVal,
+                                updatedAt: Date.now()
+                            };
+                            localStorage.setItem(`rutaprivada_driver_docs_${driverDocId}`, JSON.stringify(updatedDocsObj));
+                            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(updatedDocsObj));
+                        }
                     }
                 } catch(e) {}
 
-                // Sincronizar con Firebase y RutaSync
-                const cleanDni = String(activeReviewDriver.dni || '').replace(/\D/g, '');
-                const driverDocId = String(activeReviewDriver.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
-                
+                // Sincronizar con Firebase y RutaSync de forma estrictamente individual
                 const driverPayload = {
                     ...activeReviewDriver,
                     id: driverDocId,
                     nombre: activeReviewDriver.nombre,
                     dni: activeReviewDriver.dni,
+                    email: activeReviewDriver.email || '',
                     estadoVerificacion: newStatus,
                     observaciones: notesVal,
                     updatedAt: Date.now()
