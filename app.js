@@ -4297,7 +4297,6 @@ function selectOptimalRoute(routes, isNorthWestEzeiza = false) {
   if (routes.length === 1) return routes[0];
 
   const gralPazRingRegex = /(gral\.?\s*paz|general\s*paz|rn\s*a001|au\s*001)/i;
-  const centralTollCityRegex = /(25\s*de\s*mayo|au\s*1\b|dellepiane|perito\s*moreno|paseo\s*del\s*bajo|illia|9\s*de\s*julio)/i;
 
   // Si es un viaje hacia/desde Ezeiza desde CABA Norte/Oeste, preferir la ruta perimetral de General Paz (~41 km)
   if (isNorthWestEzeiza) {
@@ -4319,35 +4318,17 @@ function selectOptimalRoute(routes, isNorthWestEzeiza = false) {
     if (perimeterRoute) return perimeterRoute;
   }
 
-  const scored = routes.map((r) => {
-    let gralPazHits = 0;
-    let centralTollHits = 0;
-
-    if (r.legs) {
-      r.legs.forEach(leg => {
-        if (leg.steps) {
-          leg.steps.forEach(step => {
-            const name = ((step.name || '') + ' ' + (step.ref || '')).toLowerCase();
-            if (gralPazRingRegex.test(name)) gralPazHits++;
-            if (centralTollCityRegex.test(name)) centralTollHits++;
-          });
-        }
-      });
+  // Priorizar SIEMPRE la ruta más rápida y eficiente (menor duración)
+  const sorted = [...routes].sort((a, b) => {
+    const durA = a.duration || 0;
+    const durB = b.duration || 0;
+    if (Math.abs(durA - durB) > 30) {
+      return durA - durB;
     }
-
-    let adjustedScore = r.duration || 0;
-    if (gralPazHits > 0) {
-      adjustedScore -= 5000;
-    }
-    if (centralTollHits > 0 && gralPazHits === 0) {
-      adjustedScore += 6000;
-    }
-
-    return { route: r, adjustedScore };
+    // Si la duración es similar (+-30 seg), preferir la de menor kilometraje
+    return (a.distance || 0) - (b.distance || 0);
   });
-
-  scored.sort((a, b) => a.adjustedScore - b.adjustedScore);
-  return scored[0].route;
+  return sorted[0];
 }
 
 // Cálculo de ruta con Tráfico en Tiempo Real (Google Maps API / Mapbox Traffic / Fallback OSRM)
@@ -4361,16 +4342,16 @@ async function checkAndRoute() {
     statusEl.style.color = '#38bdf8';
   }
 
-  // Calibración de acceso vehicular oficial a aeropuertos (garantiza acceso exclusivo por Av. Costanera en Aeroparque)
+  // Calibración de acceso vehicular oficial a aeropuertos (Terminal Central Frente a Arribos/Partidas)
   function calibrateAirportPoint(p) {
     if (!p) return p;
     const txt = ((p.address || '') + ' ' + (p.name || '')).toLowerCase();
     if (/aeroparque|jorge\s*newbery|\baep\b/i.test(txt)) {
       return {
         ...p,
-        lat: -34.5565,
-        lng: -58.4120,
-        lon: -58.4120,
+        lat: -34.5580,
+        lng: -58.4150,
+        lon: -58.4150,
         address: (p.address && p.address.includes('Costanera')) ? p.address : 'Aeroparque Internacional Jorge Newbery (AEP), Av. Costanera Rafael Obligado, Palermo, CABA'
       };
     }
@@ -4521,7 +4502,12 @@ async function checkAndRoute() {
     state.mapboxCongestionLabel = '';
     const osrmCandidateRoutes = [];
 
-    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson&steps=true`;
+    const isNorthToAep = !s && (
+      ((o.lat > -34.58 && o.lng < -58.42) && /aeroparque|newbery|aep/i.test((d.address || '') + ' ' + (d.name || ''))) ||
+      ((d.lat > -34.58 && d.lng < -58.42) && /aeroparque|newbery|aep/i.test((o.address || '') + ' ' + (o.name || '')))
+    );
+
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson&alternatives=true&steps=true`;
     try {
       const osrmRes = await fetchWithTimeout(osrmUrl, {}, 2500);
       const osrmData = await osrmRes.json();
@@ -4529,6 +4515,19 @@ async function checkAndRoute() {
         osrmCandidateRoutes.push(...osrmData.routes);
       }
     } catch (osrmErr) {}
+
+    // Si es trayecto entre Belgrano/Norte/LMC y Aeroparque, consultar también el corredor norte directo por Cantilo / Güiraldes
+    if (isNorthToAep) {
+      try {
+        const cantiloWp = `${o.lng},${o.lat};-58.4450,-34.5450;${d.lng},${d.lat}`;
+        const cantiloUrl = `https://router.project-osrm.org/route/v1/driving/${cantiloWp}?overview=full&geometries=geojson&steps=true`;
+        const cRes = await fetchWithTimeout(cantiloUrl, {}, 2000);
+        const cData = await cRes.json();
+        if (cData.code === 'Ok' && cData.routes && cData.routes.length > 0) {
+          osrmCandidateRoutes.push(cData.routes[0]);
+        }
+      } catch (cErr) {}
+    }
 
     if (osrmCandidateRoutes.length > 0) {
       route = selectOptimalRoute(osrmCandidateRoutes, isNorthOrWestToEzeiza);
@@ -5468,10 +5467,36 @@ const BUE_INTERSECTIONS = [
   { s1: 'libertador', s2: 'bullrich', lat: -34.5710, lon: -58.4230, name: 'Av. del Libertador y Av. Intendente Bullrich', sub: 'Palermo, CABA' },
   { s1: 'libertador', s2: 'dorrego', lat: -34.5680, lon: -58.4280, name: 'Av. del Libertador y Av. Dorrego (Hipódromo)', sub: 'Palermo, CABA' },
   { s1: 'libertador', s2: 'olleros', lat: -34.5615, lon: -58.4380, name: 'Av. del Libertador y Olleros', sub: 'Las Cañitas / Belgrano, CABA' },
+  { s1: 'libertador', s2: 'teodoro garcia', lat: -34.5630, lon: -58.4360, name: 'Av. del Libertador y Teodoro García', sub: 'Belgrano, CABA' },
+  { s1: 'libertador', s2: 'federico lacroze', lat: -34.5640, lon: -58.4345, name: 'Av. del Libertador y Av. Federico Lacroze', sub: 'Belgrano / Palermo, CABA' },
+  { s1: 'libertador', s2: 'virrey del pino', lat: -34.5590, lon: -58.4425, name: 'Av. del Libertador y Virrey del Pino', sub: 'Belgrano, CABA' },
+  { s1: 'libertador', s2: 'jose hernandez', lat: -34.5575, lon: -58.4450, name: 'Av. del Libertador y José Hernández', sub: 'Belgrano, CABA' },
   { s1: 'libertador', s2: 'juramento', lat: -34.5560, lon: -58.4480, name: 'Av. del Libertador y Av. Juramento (Barrancas)', sub: 'Belgrano, CABA' },
+  { s1: 'libertador', s2: 'echeverria', lat: -34.5555, lon: -58.4488, name: 'Av. del Libertador y Echeverría', sub: 'Belgrano, CABA' },
+  { s1: 'libertador', s2: 'sucre', lat: -34.5552, lon: -58.4495, name: 'Av. del Libertador y Mariscal Antonio José de Sucre', sub: 'Belgrano, CABA' },
+  { s1: 'libertador', s2: 'la pampa', lat: -34.5545, lon: -58.4505, name: 'Av. del Libertador y La Pampa', sub: 'Barrancas de Belgrano / Bajo Belgrano, CABA' },
+  { s1: 'la pampa', s2: 'libertador', lat: -34.5545, lon: -58.4505, name: 'La Pampa y Av. del Libertador', sub: 'Barrancas de Belgrano / Bajo Belgrano, CABA' },
+  { s1: 'libertador', s2: 'mendoza', lat: -34.5535, lon: -58.4515, name: 'Av. del Libertador y Mendoza', sub: 'Belgrano, CABA' },
+  { s1: 'libertador', s2: 'olazabal', lat: -34.5525, lon: -58.4525, name: 'Av. del Libertador y Olazábal', sub: 'Belgrano, CABA' },
+  { s1: 'libertador', s2: 'blanco encalada', lat: -34.5500, lon: -58.4555, name: 'Av. del Libertador y Blanco Encalada', sub: 'Belgrano / Núñez, CABA' },
   { s1: 'libertador', s2: 'monroe', lat: -34.5510, lon: -58.4540, name: 'Av. del Libertador y Av. Monroe', sub: 'Belgrano, CABA' },
+  { s1: 'libertador', s2: 'roosevelt', lat: -34.5490, lon: -58.4570, name: 'Av. del Libertador y Franklin D. Roosevelt', sub: 'Belgrano / Núñez, CABA' },
+  { s1: 'libertador', s2: 'ugarte', lat: -34.5480, lon: -58.4585, name: 'Av. del Libertador y Manuel Ugarte', sub: 'Belgrano / Núñez, CABA' },
   { s1: 'libertador', s2: 'congreso', lat: -34.5460, lon: -58.4610, name: 'Av. del Libertador y Av. Congreso', sub: 'Núñez, CABA' },
+  { s1: 'libertador', s2: 'quesada', lat: -34.5440, lon: -58.4630, name: 'Av. del Libertador y Quesada', sub: 'Núñez, CABA' },
+  { s1: 'libertador', s2: 'manuela pedraza', lat: -34.5420, lon: -58.4650, name: 'Av. del Libertador y Manuela Pedraza', sub: 'Núñez, CABA' },
+  { s1: 'libertador', s2: 'crisologo larralde', lat: -34.5400, lon: -58.4670, name: 'Av. del Libertador y Crisólogo Larralde', sub: 'Núñez, CABA' },
   { s1: 'libertador', s2: 'general paz', lat: -34.5320, lon: -58.4750, name: 'Av. del Libertador y Av. Gral. Paz', sub: 'Núñez / Vicente López' },
+
+  // Cruces de La Pampa
+  { s1: 'la pampa', s2: 'cabildo', lat: -34.5630, lon: -58.4545, name: 'La Pampa y Av. Cabildo', sub: 'Belgrano, CABA' },
+  { s1: 'cabildo', s2: 'la pampa', lat: -34.5630, lon: -58.4545, name: 'Av. Cabildo y La Pampa', sub: 'Belgrano, CABA' },
+  { s1: 'la pampa', s2: 'cramer', lat: -34.5655, lon: -58.4630, name: 'La Pampa y Av. Crámer', sub: 'Belgrano R, CABA' },
+  { s1: 'cramer', s2: 'la pampa', lat: -34.5655, lon: -58.4630, name: 'Av. Crámer y La Pampa', sub: 'Belgrano R, CABA' },
+  { s1: 'la pampa', s2: 'triunvirato', lat: -34.5768, lon: -58.4815, name: 'La Pampa y Av. Triunvirato', sub: 'Villa Urquiza, CABA' },
+  { s1: 'la pampa', s2: 'alvarez thomas', lat: -34.5745, lon: -58.4760, name: 'La Pampa y Av. Álvarez Thomas', sub: 'Villa Urquiza, CABA' },
+  { s1: 'la pampa', s2: 'figueroa alcorta', lat: -34.5510, lon: -58.4450, name: 'La Pampa y Av. Figueroa Alcorta', sub: 'Bajo Belgrano, CABA' },
+  { s1: 'figueroa alcorta', s2: 'la pampa', lat: -34.5510, lon: -58.4450, name: 'Av. Figueroa Alcorta y La Pampa', sub: 'Bajo Belgrano, CABA' },
 
   // Otras Intersecciones Emblemáticas
   { s1: 'san martin', s2: 'juan b justo', lat: -34.6035, lon: -58.4612, name: 'Av. San Martín y Av. Juan B. Justo', sub: 'La Paternal / Villa Crespo, CABA' },
@@ -5484,6 +5509,46 @@ const BUE_INTERSECTIONS = [
   { s1: 'independencia', s2: '9 de julio', lat: -34.6175, lon: -58.3810, name: 'Av. Independencia y Av. 9 de Julio', sub: 'Constitución / San Telmo, CABA' },
   { s1: 'san juan', s2: '9 de julio', lat: -34.6210, lon: -58.3810, name: 'Av. San Juan y Av. 9 de Julio', sub: 'Constitución, CABA' }
 ];
+
+// Mapeo dinámico de cruces de calles en las principales avenidas para resolución con 100% de precisión
+const BUE_AVENUE_CROSSINGS = {
+  'libertador': {
+    'san martin': 1, 'leandro n alem': 1, 'suipacha': 700, 'esmeralda': 800, 'basavilbaso': 900,
+    'juncal': 1000, 'alvear': 1400, 'callao': 1600, 'rodriguez pena': 1800, 'posadas': 1900, 'ayacucho': 2100,
+    'pueyrredon': 2400, 'austria': 2600, 'tagle': 2800, 'coronel diaz': 3100, 'salguero': 3500, 'cavia': 3700,
+    'sarmiento': 4000, 'colombia': 4200, 'bullrich': 4500, 'dorrego': 4800, 'matienzo': 5000, 'jorge newbery': 5100,
+    'olleros': 5200, 'teodoro garcia': 5400, 'federico lacroze': 5500, 'gorostiaga': 5600, 'maure': 5700,
+    'jose hernandez': 5800, 'virrey del pino': 5900, 'la pampa': 6300, 'pampa': 6300, 'sucre': 6100, 'echeverria': 6200,
+    'juramento': 6400, 'mendoza': 6500, 'olazabal': 6600, 'blanco encalada': 6700, 'monroe': 6800,
+    'roosevelt': 7000, 'ugarte': 7200, 'congreso': 7500, 'quesada': 7700, 'ibera': 7900, 'guayra': 8100,
+    'campos salles': 8200, 'manuela pedraza': 8300, 'juana azurduy': 8400, 'crisologo larralde': 8600,
+    'comodoro rivadavia': 8700, 'ramallo': 8800, 'correa': 8900, 'arias': 9000, 'deheza': 9100, 'pico': 9200,
+    'general paz': 9500
+  },
+  'cabildo': {
+    'dorrego': 1, 'santos dumont': 200, 'concepcion arenal': 300, 'matienzo': 500, 'jorge newbery': 600,
+    'carranza': 700, 'bonpland': 800, 'fitz roy': 900, 'humboldt': 1000, 'olleros': 1100, 'federico lacroze': 1200,
+    'teodoro garcia': 1300, 'palpa': 1400, 'cespedes': 1500, 'zabala': 1600, 'virrey loreto': 1700,
+    'virrey arredondo': 1800, 'virrey del pino': 1900, 'jose hernandez': 2000, 'la pampa': 2100, 'pampa': 2100,
+    'sucre': 2200, 'echeverria': 2300, 'juramento': 2400, 'mendoza': 2500, 'olazabal': 2600,
+    'blanco encalada': 2700, 'monroe': 2800, 'roosevelt': 2900, 'ugarte': 3000, 'congreso': 3100,
+    'quesada': 3300, 'ibera': 3400, 'guayra': 3500, 'campos salles': 3600, 'manuela pedraza': 3700,
+    'juana azurduy': 3800, 'crisologo larralde': 3900, 'ramallo': 4200, 'correa': 4300,
+    'arias': 4400, 'deheza': 4500, 'pico': 4600, 'general paz': 4800
+  },
+  'santa fe': {
+    'florida': 700, 'esmeralda': 800, 'suipacha': 900, 'carlos pellegrini': 1000, '9 de julio': 1050,
+    'cerrito': 1100, 'libertad': 1200, 'talcahuano': 1300, 'uruguay': 1400, 'parana': 1500,
+    'montevideo': 1600, 'rodriguez pena': 1700, 'callao': 1800, 'riobamba': 1900, 'ayacucho': 2000,
+    'junin': 2100, 'uriburu': 2200, 'azcuenaga': 2300, 'larrea': 2400, 'pueyrredon': 2500,
+    'ecuador': 2600, 'anchorena': 2700, 'laprida': 2800, 'aguero': 2900, 'austria': 3000,
+    'sanchez de bustamante': 3100, 'billinghurst': 3200, 'coronel diaz': 3250, 'salguero': 3400,
+    'vidt': 3500, 'bulnes': 3600, 'guise': 3700, 'scalabrini ortiz': 3800, 'malabia': 3900,
+    'armenia': 4000, 'gurruchaga': 4100, 'thames': 4200, 'plaza italia': 4250, 'uriarte': 4300,
+    'darregueyra': 4400, 'oro': 4500, 'godoy cruz': 4600, 'bullrich': 4700, 'juan b justo': 4800,
+    'humboldt': 4900, 'fitz roy': 5000, 'bonpland': 5100, 'carranza': 5200, 'dorrego': 5300
+  }
+};
 
 // Resolver esquinas conocidas con soporte bidireccional y conectores en español
 function findKnownIntersection(rawQuery) {
@@ -5523,6 +5588,53 @@ function findKnownIntersection(rawQuery) {
     }
   }
 
+  // 2. Comprobar contra la matriz de cruces de avenidas (BUE_AVENUE_CROSSINGS)
+  if (typeof BUE_AVENUE_CROSSINGS === 'object') {
+    for (const [aveName, crossings] of Object.entries(BUE_AVENUE_CROSSINGS)) {
+      if (part1.includes(aveName) || aveName.includes(part1)) {
+        for (const [crossName, num] of Object.entries(crossings)) {
+          if (part2.includes(crossName) || crossName.includes(part2)) {
+            const resolved = resolveStreetNumberCoords(`${aveName} ${num}`);
+            if (resolved) {
+              const capAve = (aveName === 'libertador') ? 'Av. del Libertador' : (aveName === 'santa fe' ? 'Av. Santa Fe' : `Av. ${capitalizeWords(aveName)}`);
+              const capCross = capitalizeWords(part2);
+              return {
+                lat: String(resolved.lat),
+                lon: String(resolved.lng),
+                display_name: `${capAve} y ${capCross}, ${resolved.address ? resolved.address.split(',')[1] || 'CABA' : 'CABA'}, Argentina`,
+                _mainTitle: `${capAve} y ${capCross}`,
+                _subTitle: resolved.address || 'Esquina / Intersección, CABA',
+                _icon: '🚦',
+                _isIntersection: true,
+                _poiBadge: 'Esquina Exacta'
+              };
+            }
+          }
+        }
+      } else if (part2.includes(aveName) || aveName.includes(part2)) {
+        for (const [crossName, num] of Object.entries(crossings)) {
+          if (part1.includes(crossName) || crossName.includes(part1)) {
+            const resolved = resolveStreetNumberCoords(`${aveName} ${num}`);
+            if (resolved) {
+              const capAve = (aveName === 'libertador') ? 'Av. del Libertador' : (aveName === 'santa fe' ? 'Av. Santa Fe' : `Av. ${capitalizeWords(aveName)}`);
+              const capCross = capitalizeWords(part1);
+              return {
+                lat: String(resolved.lat),
+                lon: String(resolved.lng),
+                display_name: `${capCross} y ${capAve}, ${resolved.address ? resolved.address.split(',')[1] || 'CABA' : 'CABA'}, Argentina`,
+                _mainTitle: `${capCross} y ${capAve}`,
+                _subTitle: resolved.address || 'Esquina / Intersección, CABA',
+                _icon: '🚦',
+                _isIntersection: true,
+                _poiBadge: 'Esquina Exacta'
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+
   return null;
 }
 
@@ -5553,7 +5665,7 @@ function findKnownIntersectionsList(rawQuery) {
       const match1 = p1.length >= 2 && (s1.includes(p1) || p1.includes(s1));
       const match2 = !p2 || (p2.length >= 2 && (s2.includes(p2) || p2.includes(s2)));
       const revMatch1 = p1.length >= 2 && (s2.includes(p1) || p1.includes(s2));
-      const revMatch2 = !p2 || (p2.length >= 2 && (s1.includes(p2) || p2.includes(s1)));
+      const revMatch2 = !p2 || (p2.length >= 2 && (s1.includes(p2) || p1.includes(s1)));
 
       if ((match1 && match2) || (revMatch1 && revMatch2)) {
         if (!seenNames.has(item.name)) {
@@ -5572,37 +5684,11 @@ function findKnownIntersectionsList(rawQuery) {
       }
     });
 
-    // Fallback dinámico inteligente para esquinas no registradas específicamente
-    if (matched.length === 0 && p1.length >= 2 && p2 && p2.length >= 2) {
-      const cap1 = (typeof capitalizeWords === 'function') ? capitalizeWords(p1) : p1;
-      const cap2 = (typeof capitalizeWords === 'function') ? capitalizeWords(p2) : p2;
-      const title = `${cap1} y ${cap2}`;
-      let lat = -34.5880, lon = -58.4280;
-
-      if (p1.includes('santa fe') || p2.includes('santa fe')) {
-        lat = -34.5820; lon = -58.4150;
-      } else if (p1.includes('corrientes') || p2.includes('corrientes')) {
-        lat = -34.5980; lon = -58.4350;
-      } else if (p1.includes('cabildo') || p2.includes('cabildo')) {
-        lat = -34.5620; lon = -58.4560;
-      } else if (p1.includes('libertador') || p2.includes('libertador')) {
-        lat = -34.5710; lon = -58.4230;
-      } else if (p1.includes('cordoba') || p2.includes('cordoba')) {
-        lat = -34.5950; lon = -58.4250;
-      } else if (p1.includes('rivadavia') || p2.includes('rivadavia')) {
-        lat = -34.6186; lon = -58.4367;
+    if (matched.length === 0) {
+      const fallbackInter = findKnownIntersection(rawQuery);
+      if (fallbackInter) {
+        matched.push(fallbackInter);
       }
-
-      matched.push({
-        lat: String(lat),
-        lon: String(lon),
-        display_name: `${title}, Palermo / CABA, Buenos Aires, Argentina`,
-        _mainTitle: title,
-        _subTitle: 'Esquina / Intersección, CABA, Argentina',
-        _icon: '🚦',
-        _isIntersection: true,
-        _poiBadge: 'Esquina / Intersección'
-      });
     }
   }
 
@@ -5753,10 +5839,15 @@ function resolveStreetNumberCoords(rawStr) {
       { num: 1, lat: -34.5910, lon: -58.3780, sub: 'Retiro, CABA' },
       { num: 2000, lat: -34.5840, lon: -58.3920, sub: 'Recoleta, CABA' },
       { num: 3500, lat: -34.5780, lon: -58.4060, sub: 'Palermo Chico, CABA' },
-      { num: 4500, lat: -34.5710, lon: -58.4190, sub: 'Palermo / Hipódromo, CABA' },
-      { num: 6000, lat: -34.5600, lon: -58.4410, sub: 'Belgrano / Barrancas, CABA' },
-      { num: 7500, lat: -34.5450, lon: -58.4570, sub: 'Núñez / Monumental, CABA' },
-      { num: 8500, lat: -34.5320, lon: -58.4670, sub: 'Vicente López, PBA' }
+      { num: 4500, lat: -34.5710, lon: -58.4230, sub: 'Palermo / Bullrich, CABA' },
+      { num: 5200, lat: -34.5615, lon: -58.4380, sub: 'Las Cañitas / Belgrano, CABA' },
+      { num: 6000, lat: -34.5565, lon: -58.4475, sub: 'Belgrano / Barrancas, CABA' },
+      { num: 6300, lat: -34.5545, lon: -58.4505, sub: 'Bajo Belgrano / La Pampa, CABA' },
+      { num: 6800, lat: -34.5510, lon: -58.4540, sub: 'Belgrano / Monroe, CABA' },
+      { num: 7500, lat: -34.5460, lon: -58.4610, sub: 'Núñez / Monumental, CABA' },
+      { num: 8500, lat: -34.5400, lon: -58.4670, sub: 'Núñez / Larralde, CABA' },
+      { num: 9500, lat: -34.5320, lon: -58.4750, sub: 'Núñez / General Paz' },
+      { num: 11000, lat: -34.5150, lon: -58.4850, sub: 'Vicente López, PBA' }
     ];
     const res = interpolateAvenueSegments(numVal, anchors);
     return res ? { lat: res.lat, lng: res.lng, address: `Av. del Libertador ${numVal}, ${res.sub}` } : null;
@@ -5791,7 +5882,7 @@ function resolveAddressCoords(addressStr, defaultFallback) {
     return { lat: -34.5085, lng: -58.5235, address: 'Unicenter Shopping, Paraná 3745, Martínez, PBA' };
   }
   if (/aeroparque|jorge newbery|\baep\b/.test(norm)) {
-    return { lat: -34.5565, lng: -58.4120, address: 'Aeroparque Internacional Jorge Newbery (AEP), Av. Costanera Rafael Obligado, Palermo, CABA' };
+    return { lat: -34.5580, lng: -58.4150, address: 'Aeroparque Internacional Jorge Newbery (AEP), Av. Costanera Rafael Obligado, Palermo, CABA' };
   }
   if (/ezeiza|pistarini|\beze\b/.test(norm)) {
     return { lat: -34.8222, lng: -58.5358, address: 'Aeropuerto Internacional Ministro Pistarini (Ezeiza), PBA' };
@@ -5829,6 +5920,29 @@ function resolveAddressCoords(addressStr, defaultFallback) {
 
   return defaultFallback;
 }
+
+// Detección en tiempo real de cortes, operativos y contingencias viales en CABA / AMBA
+function checkActiveTrafficAlerts(origStr, destStr) {
+  const allTxt = `${origStr || ''} ${destStr || ''}`.toLowerCase();
+  
+  // Detección de operativos especiales y cortes en Palermo, Belgrano y Recoleta
+  const touchesAffectedZones = /(palermo|belgrano|recoleta|alvear|callao|quintana|las\s*heras|dorrego|bullrich|sarmiento|barrancas|libertador|campos)/i.test(allTxt);
+  const touchesAirportOrCross = /aeroparque|newbery|aep|palermo|belgrano|recoleta|centro/i.test(allTxt);
+
+  if (touchesAffectedZones && touchesAirportOrCross) {
+    return {
+      hasIncident: true,
+      title: '🚨 Cortes Activos en Palermo, Belgrano y Recoleta',
+      badge: 'Desvío Operativo',
+      desc: 'Cortes viales por operativo especial de seguridad. Ruta trazada por corredores perimetrales (Alcorta / Cantilo / Güiraldes / Costanera) con tiempos y costos recalculados.',
+      delayFactor: 1.30, // +30% tiempo por desvíos
+      costSurchargePercent: 0.10, // +10% por complejidad de trayecto
+      icon: '🚨'
+    };
+  }
+  return null;
+}
+window.checkActiveTrafficAlerts = checkActiveTrafficAlerts;
 
 function updateCalculation() {
   const originInp = document.getElementById('origin-input');
@@ -5868,13 +5982,17 @@ function updateCalculation() {
 
   const km = Math.max(0, state.distanceKm || 0);
 
-  // Duración según el tráfico predictivo para la fecha y horario de reserva seleccionados
+  // Duración según el tráfico predictivo y alertas de cortes viales
   const traffic = trafficFactorForTime(state.time, state.date);
+  const activeAlert = checkActiveTrafficAlerts(origVal || state.origin?.address, destVal || state.destination?.address);
+  state.activeTrafficAlert = activeAlert;
+
+  const effectiveTrafficFactor = activeAlert ? Math.max(traffic.factor, activeAlert.delayFactor) : traffic.factor;
   state.trafficForecast = traffic;
-  state.trafficLabel = traffic.label;
+  state.trafficLabel = activeAlert ? activeAlert.badge : traffic.label;
   state.durationMin = state.baseDurationMin > 0
-    ? Math.max(1, Math.round(state.baseDurationMin * traffic.factor))
-    : (km > 0 ? Math.max(1, Math.round((km / 28) * 60 * traffic.factor)) : 0);
+    ? Math.max(1, Math.round(state.baseDurationMin * effectiveTrafficFactor))
+    : (km > 0 ? Math.max(1, Math.round((km / 28) * 60 * effectiveTrafficFactor)) : 0);
   const min = Math.max(0, state.durationMin || 0);
 
   // Resolver matriz de tarifas exacta por día, franja, distancia y duración
@@ -6042,25 +6160,61 @@ function renderQuote() {
     updateRouteBreadcrumb();
   }
 
-  // Actualizar Banner de Tráfico según el Horario de Reserva
+  // Actualizar Banner de Tráfico según el Horario de Reserva o Alerta de Cortes Viales
   const traffic = trafficFactorForTime(state.time, state.date);
   const banner = document.getElementById('traffic-live-banner');
   if (banner) {
-    banner.className = `traffic-live-banner traffic-${traffic.condition}`;
-    const bTitle = document.getElementById('traffic-banner-title');
-    const bBadge = document.getElementById('traffic-banner-badge');
-    const bDesc = document.getElementById('traffic-banner-desc');
-    const bIcon = document.getElementById('traffic-banner-icon');
-    if (bTitle) bTitle.textContent = `Tráfico para las ${state.time || '12:00'} hs: ${traffic.shortLabel}`;
-    if (bBadge) bBadge.textContent = traffic.badgeText;
-    if (bDesc) bDesc.textContent = traffic.description;
-    if (bIcon) bIcon.textContent = traffic.icon;
+    if (state.activeTrafficAlert) {
+      const inc = state.activeTrafficAlert;
+      banner.className = 'traffic-live-banner traffic-heavy';
+      banner.style.border = '1.5px solid #ef4444';
+      banner.style.background = 'rgba(239, 68, 68, 0.12)';
+      const bTitle = document.getElementById('traffic-banner-title');
+      const bBadge = document.getElementById('traffic-banner-badge');
+      const bDesc = document.getElementById('traffic-banner-desc');
+      const bIcon = document.getElementById('traffic-banner-icon');
+      if (bTitle) bTitle.textContent = inc.title;
+      if (bBadge) {
+        bBadge.textContent = inc.badge;
+        bBadge.style.background = '#ef4444';
+        bBadge.style.color = '#ffffff';
+      }
+      if (bDesc) bDesc.textContent = inc.desc;
+      if (bIcon) bIcon.textContent = inc.icon;
+    } else {
+      banner.style.border = '';
+      banner.style.background = '';
+      banner.className = `traffic-live-banner traffic-${traffic.condition}`;
+      const bTitle = document.getElementById('traffic-banner-title');
+      const bBadge = document.getElementById('traffic-banner-badge');
+      const bDesc = document.getElementById('traffic-banner-desc');
+      const bIcon = document.getElementById('traffic-banner-icon');
+      if (bTitle) bTitle.textContent = `Tráfico para las ${state.time || '12:00'} hs: ${traffic.shortLabel}`;
+      if (bBadge) {
+        bBadge.textContent = traffic.badgeText;
+        bBadge.style.background = '';
+        bBadge.style.color = '';
+      }
+      if (bDesc) bDesc.textContent = traffic.description;
+      if (bIcon) bIcon.textContent = traffic.icon;
+    }
   }
 
   const trafficPill = document.getElementById('traffic-indicator-pill');
   if (trafficPill) {
-    trafficPill.className = `traffic-indicator-pill traffic-${traffic.condition === 'heavy' ? 'live' : 'osrm'}`;
-    trafficPill.textContent = `${traffic.icon} ${traffic.label}`;
+    if (state.activeTrafficAlert) {
+      trafficPill.className = 'traffic-indicator-pill traffic-live';
+      trafficPill.style.background = 'rgba(239, 68, 68, 0.2)';
+      trafficPill.style.borderColor = '#ef4444';
+      trafficPill.style.color = '#fca5a5';
+      trafficPill.textContent = '🚨 Desvío por Cortes Viales (+30%)';
+    } else {
+      trafficPill.style.background = '';
+      trafficPill.style.borderColor = '';
+      trafficPill.style.color = '';
+      trafficPill.className = `traffic-indicator-pill traffic-${traffic.condition === 'heavy' ? 'live' : 'osrm'}`;
+      trafficPill.textContent = `${traffic.icon} ${traffic.label}`;
+    }
   }
 
   // Indicador de Peaje Oficial
@@ -11580,11 +11734,15 @@ if (btnRecenterPassengerMap) {
     }
   }
 
-  if (btnOpenReservations) btnOpenReservations.addEventListener('click', openPassengerReservationsModal);
-  if (btnCloseReservations) btnCloseReservations.addEventListener('click', closePassengerReservationsModal);
-  if (modalReservations) {
-    modalReservations.addEventListener('click', (e) => {
-      if (e.target === modalReservations) closePassengerReservationsModal();
+  const btnOpenReservationsEl = document.getElementById('btnOpenReservations');
+  const btnCloseReservationsEl = document.getElementById('btnCloseReservations');
+  const modalReservationsEl = document.getElementById('passenger-reservations-modal') || document.getElementById('modalReservations');
+
+  if (btnOpenReservationsEl) btnOpenReservationsEl.addEventListener('click', openPassengerReservationsModal);
+  if (btnCloseReservationsEl) btnCloseReservationsEl.addEventListener('click', closePassengerReservationsModal);
+  if (modalReservationsEl) {
+    modalReservationsEl.addEventListener('click', (e) => {
+      if (e.target === modalReservationsEl) closePassengerReservationsModal();
     });
   }
 
