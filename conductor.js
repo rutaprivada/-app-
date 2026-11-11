@@ -38,6 +38,42 @@ window.closeDriverProfileModal = function() {
     }
 };
 
+window.showDriverToast = function(msg) {
+    if (!msg) return;
+    let toast = document.getElementById('driverToastEl');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'driverToastEl';
+        toast.style.cssText = 'position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.95);color:#fff;padding:12px 20px;border-radius:30px;font-size:0.85rem;font-weight:600;box-shadow:0 10px 25px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);z-index:99999;pointer-events:none;transition:all 0.3s ease;opacity:0;';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(window._driverToastTimeout);
+    window._driverToastTimeout = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(10px)';
+    }, 3500);
+};
+
+window.hashDriverPassword = async function(str) {
+    if (!str) return '';
+    try {
+        if (window.crypto && window.crypto.subtle) {
+            const msgBuffer = new TextEncoder().encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+    } catch(e) {}
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+        h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+    }
+    return 'h_' + Math.abs(h);
+};
+
 window.openDriverHelpModal = function() {
     const modal = document.getElementById('modalDriverHelp');
     if (modal) {
@@ -124,15 +160,20 @@ window.closeDriverPasswordResetModal = function() {
         modal.classList.remove('active');
         modal.style.display = 'none';
     }
+    window._driverResetState = null;
+    try { localStorage.removeItem('rutaprivada_pending_driver_reset'); } catch(e) {}
 };
 
 window.handleSendDriverResetCode = async function() {
+    if (window._isSendingDriverResetCode) return;
     const inputResetEmail = document.getElementById('resetDriverEmail');
     const email = (inputResetEmail ? inputResetEmail.value : '').trim().toLowerCase();
     const btnSend = document.getElementById('btnSendDriverResetCode');
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        if (typeof showDriverToast === 'function') {
+        if (typeof window.showDriverToast === 'function') {
+            window.showDriverToast('⚠️ Por favor ingresa un correo electrónico válido.');
+        } else if (typeof showDriverToast === 'function') {
             showDriverToast('⚠️ Por favor ingresa un correo electrónico válido.');
         } else {
             alert('Por favor ingresa un correo electrónico válido.');
@@ -141,6 +182,7 @@ window.handleSendDriverResetCode = async function() {
         return;
     }
 
+    window._isSendingDriverResetCode = true;
     if (btnSend) {
         btnSend.disabled = true;
         btnSend.style.opacity = '0.7';
@@ -157,12 +199,17 @@ window.handleSendDriverResetCode = async function() {
         localStorage.setItem('rutaprivada_pending_driver_reset', JSON.stringify(window._driverResetState));
     } catch(e) {}
 
-    if (typeof showDriverToast === 'function') {
+    if (typeof window.showDriverToast === 'function') {
+        window.showDriverToast(`⏳ Enviando código de seguridad a ${email}...`);
+    } else if (typeof showDriverToast === 'function') {
         showDriverToast(`⏳ Enviando código de seguridad a ${email}...`);
     }
 
     const sectionOtp = document.getElementById('sectionDriverResetOtp');
-    if (sectionOtp) sectionOtp.style.display = 'flex';
+    if (sectionOtp) {
+        sectionOtp.style.display = 'flex';
+        sectionOtp.classList.remove('hidden');
+    }
     const inputCode = document.getElementById('inputDriverResetCode');
     if (inputCode) {
         inputCode.value = '';
@@ -188,28 +235,38 @@ window.handleSendDriverResetCode = async function() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        if (btnSend) {
-            btnSend.disabled = false;
-            btnSend.style.opacity = '1';
-            btnSend.textContent = 'Reenviar Código';
-        }
         if (resp && resp.ok) {
-            if (typeof showDriverToast === 'function') showDriverToast(`📨 ¡Código enviado con éxito a ${email}! Revisa tu buzón.`);
+            if (typeof window.showDriverToast === 'function') {
+                window.showDriverToast(`📨 ¡Código enviado con éxito a ${email}! Revisa tu buzón.`);
+            } else if (typeof showDriverToast === 'function') {
+                showDriverToast(`📨 ¡Código enviado con éxito a ${email}! Revisa tu buzón.`);
+            }
         } else {
-            if (typeof showDriverToast === 'function') showDriverToast(`📨 Código generado para ${email}. Revisa spam si no lo ves.`);
+            if (typeof window.showDriverToast === 'function') {
+                window.showDriverToast(`📨 Código generado para ${email}. Revisa spam si no lo ves.`);
+            } else if (typeof showDriverToast === 'function') {
+                showDriverToast(`📨 Código generado para ${email}. Revisa spam si no lo ves.`);
+            }
         }
     } catch(err) {
+        if (typeof window.showDriverToast === 'function') {
+            window.showDriverToast(`📨 Código generado para ${email}.`);
+        } else if (typeof showDriverToast === 'function') {
+            showDriverToast(`📨 Código generado para ${email}.`);
+        }
+    } finally {
+        window._isSendingDriverResetCode = false;
         if (btnSend) {
             btnSend.disabled = false;
             btnSend.style.opacity = '1';
             btnSend.textContent = 'Reenviar Código';
         }
-        if (typeof showDriverToast === 'function') showDriverToast(`📨 Código generado para ${email}.`);
     }
 };
 
 window.handleDriverPasswordResetSubmit = async function(e) {
     if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
 
     let state = window._driverResetState;
     if (!state) {
@@ -220,7 +277,9 @@ window.handleDriverPasswordResetSubmit = async function(e) {
     }
 
     if (!state || !state.code) {
-        if (typeof showDriverToast === 'function') {
+        if (typeof window.showDriverToast === 'function') {
+            window.showDriverToast('⚠️ Primero debes presionar "Enviar Código".');
+        } else if (typeof showDriverToast === 'function') {
             showDriverToast('⚠️ Primero debes presionar "Enviar Código".');
         } else {
             alert('Primero debes presionar "Enviar Código".');
@@ -228,11 +287,22 @@ window.handleDriverPasswordResetSubmit = async function(e) {
         return false;
     }
 
+    if (Date.now() > (state.expiresAt || 0)) {
+        if (typeof window.showDriverToast === 'function') {
+            window.showDriverToast('⌛ El código ha expirado. Por favor solicita uno nuevo.');
+        } else if (typeof showDriverToast === 'function') {
+            showDriverToast('⌛ El código ha expirado. Por favor solicita uno nuevo.');
+        }
+        return false;
+    }
+
     const inputCode = document.getElementById('inputDriverResetCode');
     const enteredCode = (inputCode ? inputCode.value : '').replace(/\D/g, '').trim();
 
-    if (enteredCode !== state.code) {
-        if (typeof showDriverToast === 'function') {
+    if (!enteredCode || enteredCode !== state.code) {
+        if (typeof window.showDriverToast === 'function') {
+            window.showDriverToast('❌ Código incorrecto. Revisa el correo recibido.');
+        } else if (typeof showDriverToast === 'function') {
             showDriverToast('❌ Código incorrecto. Revisa el correo recibido.');
         } else {
             alert('Código incorrecto. Revisa el correo recibido.');
@@ -247,7 +317,9 @@ window.handleDriverPasswordResetSubmit = async function(e) {
     const newPassConfirm = (inputNewPassConfirm ? inputNewPassConfirm.value : '').trim();
 
     if (!newPass || newPass.length < 8 || !/\d/.test(newPass)) {
-        if (typeof showDriverToast === 'function') {
+        if (typeof window.showDriverToast === 'function') {
+            window.showDriverToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
+        } else if (typeof showDriverToast === 'function') {
             showDriverToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
         } else {
             alert('La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
@@ -257,7 +329,9 @@ window.handleDriverPasswordResetSubmit = async function(e) {
     }
 
     if (newPass !== newPassConfirm) {
-        if (typeof showDriverToast === 'function') {
+        if (typeof window.showDriverToast === 'function') {
+            window.showDriverToast('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
+        } else if (typeof showDriverToast === 'function') {
             showDriverToast('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
         } else {
             alert('Las contraseñas no coinciden. Por favor verifícalas.');
@@ -266,59 +340,105 @@ window.handleDriverPasswordResetSubmit = async function(e) {
         return false;
     }
 
-    const email = state.email;
+    const email = (state.email || '').toLowerCase();
+    const newHash = (typeof window.hashDriverPassword === 'function')
+        ? await window.hashDriverPassword(newPass)
+        : (typeof hashDriverPassword === 'function')
+            ? await hashDriverPassword(newPass)
+            : 'h_' + Date.now();
 
+    // 1. Actualizar lista de choferes registrados en localStorage
     try {
-        let newHash = '';
-        try {
-            const msgBuffer = new TextEncoder().encode(newPass);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-            newHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-        } catch(e) {
-            let h = 0;
-            for (let i = 0; i < newPass.length; i++) h = Math.imul(31, h) + newPass.charCodeAt(i) | 0;
-            newHash = 'h_' + Math.abs(h);
-        }
-
         let registered = JSON.parse(localStorage.getItem('rutaprivada_registered_drivers_v1') || '[]');
-        const idx = registered.findIndex(d => d.email && d.email.toLowerCase() === email.toLowerCase());
+        const idx = registered.findIndex(d => d.email && d.email.toLowerCase() === email);
         if (idx >= 0) {
             delete registered[idx].password;
             registered[idx].passwordHash = newHash;
-            localStorage.setItem('rutaprivada_registered_drivers_v1', JSON.stringify(registered));
+            registered[idx].updatedAt = Date.now();
+        } else {
+            registered.push({
+                id: 'drv_' + Date.now(),
+                nombre: email.split('@')[0],
+                dni: '',
+                telefono: '',
+                email: email,
+                passwordHash: newHash,
+                estadoVerificacion: 'pendiente',
+                calificacion: 5.0,
+                updatedAt: Date.now()
+            });
         }
+        localStorage.setItem('rutaprivada_registered_drivers_v1', JSON.stringify(registered));
+    } catch(e) {}
 
+    // 2. Actualizar lista del panel admin
+    try {
         let driversList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
-        const dIdx = driversList.findIndex(d => d.email && d.email.toLowerCase() === email.toLowerCase());
+        const dIdx = driversList.findIndex(d => d.email && d.email.toLowerCase() === email);
         if (dIdx >= 0) {
             delete driversList[dIdx].password;
             driversList[dIdx].passwordHash = newHash;
             localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(driversList));
         }
+    } catch(e) {}
 
-        if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+    // 3. Actualizar sesión activa del chofer si coincide
+    try {
+        const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
+        if (rawAuth) {
+            const authDriver = JSON.parse(rawAuth);
+            if (authDriver && authDriver.email && authDriver.email.toLowerCase() === email) {
+                delete authDriver.password;
+                authDriver.passwordHash = newHash;
+                localStorage.setItem('rutaprivada_driver_auth_v1', JSON.stringify(authDriver));
+            }
+        }
+    } catch(e) {}
+
+    // 4. Actualizar en Firestore en ambas colecciones: 'conductores' y 'drivers'
+    try {
+        if (typeof firebase !== 'undefined' && firebase.firestore) {
             const db = firebase.firestore();
             const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
-            db.collection('conductores').doc(emailDocId).set({
-                email,
-                passwordHash: newHash,
-                updatedAt: new Date().toISOString()
-            }, { merge: true }).catch(() => {});
+            const patch = { email, passwordHash: newHash, updatedAt: new Date().toISOString() };
+            db.collection('conductores').doc(emailDocId).set(patch, { merge: true }).catch(() => {});
+            db.collection('drivers').doc(emailDocId).set(patch, { merge: true }).catch(() => {});
         }
     } catch(err) {}
 
+    // 5. Limpiar estado de reseteo
+    window._driverResetState = null;
+    try { localStorage.removeItem('rutaprivada_pending_driver_reset'); } catch(e) {}
+
+    // 6. Cerrar modal de recuperación
     window.closeDriverPasswordResetModal();
 
+    // 7. Pre-llenar campos de inicio de sesión
     const loginEmailInput = document.getElementById('loginDriverEmail');
     const loginPassInput = document.getElementById('loginDriverPassword');
     if (loginEmailInput) loginEmailInput.value = email;
     if (loginPassInput) loginPassInput.value = newPass;
 
-    if (typeof showDriverToast === 'function') {
-        showDriverToast('✅ ¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
+    // 8. Abrir modal de autenticación en la pestaña login
+    if (typeof window.showDriverAuthModal === 'function') {
+        window.showDriverAuthModal('login');
     } else {
-        alert('¡Contraseña actualizada con éxito! Ya puedes iniciar sesión con tu nueva contraseña.');
+        const modalAuth = document.getElementById('modalDriverAuth');
+        if (modalAuth) {
+            modalAuth.style.display = 'flex';
+            modalAuth.classList.add('active');
+        }
+        if (typeof window.switchDriverAuthTab === 'function') {
+            window.switchDriverAuthTab('login');
+        }
     }
+
+    if (typeof window.showDriverToast === 'function') {
+        window.showDriverToast('✅ ¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
+    } else if (typeof showDriverToast === 'function') {
+        showDriverToast('✅ ¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
+    }
+    if (typeof playAlertSound === 'function') playAlertSound('success');
 
     return false;
 };
@@ -585,9 +705,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const raw = localStorage.getItem('rutaprivada_driver_auth_v1');
             if (raw) {
                 const parsed = JSON.parse(raw);
-                if (parsed && parsed.id) return parsed.id;
-                if (parsed && parsed.dni) return 'drv_' + String(parsed.dni).replace(/\D/g, '');
-                if (parsed && parsed.email) return 'drv_' + String(parsed.email).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                if (parsed) {
+                    // ID único por cuenta basado en email para garantizar separación absoluta de cuentas con mismo DNI
+                    if (parsed.email) {
+                        const cleanEmail = String(parsed.email).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                        const cleanDni = parsed.dni ? String(parsed.dni).replace(/\D/g, '') : '';
+                        return cleanDni ? `drv_${cleanDni}_${cleanEmail}` : `drv_${cleanEmail}`;
+                    }
+                    if (parsed.id) return parsed.id;
+                    if (parsed.dni) return 'drv_' + String(parsed.dni).replace(/\D/g, '');
+                }
             }
         } catch(e) {}
         return 'default';
@@ -642,6 +769,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadDocsData() {
         const drvId = getActiveDriverId();
+        let sessionInfo = {};
+        try {
+            const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
+            if (rawAuth) sessionInfo = JSON.parse(rawAuth);
+        } catch(e) {}
+
+        // 1. Cargar almacenamiento exclusivo e independiente de esta cuenta
         if (drvId !== 'default') {
             try {
                 const specificRaw = localStorage.getItem(`rutaprivada_driver_docs_${drvId}`);
@@ -652,45 +786,36 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch(e) {}
         }
 
+        // 2. Solo leer rutaprivada_driver_docs_v1 si coincide estrictamente con ESTA cuenta
         try {
             const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
             if (raw) {
                 const parsed = JSON.parse(raw);
-                if (parsed && (parsed.nombre || parsed.dni || parsed.email)) {
-                    let sessionInfo = {};
-                    try {
-                        const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
-                        if (rawAuth) sessionInfo = JSON.parse(rawAuth);
-                    } catch(e) {}
-                    const matchesId = (drvId === 'default' && !sessionInfo.id) || (parsed.id && parsed.id === drvId) || (sessionInfo.id && parsed.id === sessionInfo.id);
-                    const matchesDni = sessionInfo.dni && parsed.dni && sessionInfo.dni.replace(/\D/g, '') === parsed.dni.replace(/\D/g, '');
-                    if (matchesId || matchesDni) {
+                if (parsed) {
+                    const matchesId = (drvId !== 'default' && parsed.id === drvId);
+                    const matchesEmail = sessionInfo.email && parsed.email && sessionInfo.email.toLowerCase() === parsed.email.toLowerCase();
+                    // NUNCA cruzar por DNI para que cuentas distintas del mismo titular permanezcan aisladas
+                    if (matchesId || matchesEmail) {
                         return parsed;
                     }
                 }
             }
         } catch(e) {}
 
-        // Plantilla limpia para chofer nuevo
-        let sessionInfo = {};
-        try {
-            const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
-            if (rawAuth) sessionInfo = JSON.parse(rawAuth);
-        } catch(e) {}
-
-        return {
-            id: sessionInfo.id || drvId,
-            nombre: sessionInfo.nombre || '',
+        // 3. Plantilla completamente limpia y en estado 'pendiente' para esta cuenta específica
+        const cleanDocs = {
+            id: drvId,
+            nombre: sessionInfo.nombre || 'Nuevo Chofer Partner',
             dni: sessionInfo.dni || '',
             telefono: sessionInfo.telefono || '',
             email: sessionInfo.email || '',
-            aceptaComunicaciones: true,
             autoMarcaModelo: '',
             patente: '',
             color: 'Negro',
             categoria: 'Sedán Estándar',
             fotoPerfil: '',
             banco: '',
+            alias: '',
             cbu: '',
             titularCuenta: '',
             estadoVerificacion: 'pendiente',
@@ -699,6 +824,14 @@ document.addEventListener('DOMContentLoaded', () => {
             docsSummary: {},
             docsCount: 0
         };
+
+        if (drvId !== 'default') {
+            try {
+                localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(cleanDocs));
+            } catch(e) {}
+        }
+
+        return cleanDocs;
     }
 
     const currentFleetDriver = getFleetDriverInfo();
@@ -740,20 +873,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showDriverToast(msg) {
-        let toast = document.getElementById('driverToastEl');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'driverToastEl';
-            toast.style.cssText = 'position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.95);color:#fff;padding:12px 20px;border-radius:30px;font-size:0.85rem;font-weight:600;box-shadow:0 10px 25px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);z-index:99999;pointer-events:none;transition:all 0.3s ease;opacity:0;';
-            document.body.appendChild(toast);
+        if (typeof window.showDriverToast === 'function') {
+            window.showDriverToast(msg);
+        } else {
+            let toast = document.getElementById('driverToastEl');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'driverToastEl';
+                toast.style.cssText = 'position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.95);color:#fff;padding:12px 20px;border-radius:30px;font-size:0.85rem;font-weight:600;box-shadow:0 10px 25px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);z-index:99999;pointer-events:none;transition:all 0.3s ease;opacity:0;';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = msg;
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(-50%) translateY(0)';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(-50%) translateY(10px)';
+            }, 3500);
         }
-        toast.textContent = msg;
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateX(-50%) translateY(0)';
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(-50%) translateY(10px)';
-        }, 3500);
     }
 
     /**
@@ -6716,6 +6853,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modalDriverAuth) modalDriverAuth.style.display = 'none';
     }
 
+    window.switchDriverAuthTab = switchDriverAuthTab;
+    window.showDriverAuthModal = showDriverAuthModal;
+    window.hideDriverAuthModal = hideDriverAuthModal;
+    window.getDriverSession = getDriverSession;
+    window.saveDriverSession = saveDriverSession;
+
     if (tabBtnDriverLogin) tabBtnDriverLogin.addEventListener('click', () => switchDriverAuthTab('login'));
     if (tabBtnDriverRegister) tabBtnDriverRegister.addEventListener('click', () => switchDriverAuthTab('register'));
 
@@ -7113,210 +7256,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ==========================================
-    // RECUPERACIÓN / CAMBIO DE CONTRASEÑA CHOFER
-    // ==========================================
-    let driverResetState = null;
-
-    window.closeDriverPasswordResetModal = function() {
-        const modal = document.getElementById('modalDriverPasswordReset');
-        if (modal) {
-            modal.style.display = 'none';
-            modal.classList.remove('active');
-        }
-        driverResetState = null;
-    };
-
-    window.handleForgotDriverPassword = function() {
-        const modal = document.getElementById('modalDriverPasswordReset');
-        if (!modal) return;
-        const inputLoginEmail = document.getElementById('loginDriverEmail');
-        const inputResetEmail = document.getElementById('resetDriverEmail');
-        const sectionOtp = document.getElementById('sectionDriverResetOtp');
-        const inputCode = document.getElementById('inputDriverResetCode');
-        const inputNewPass = document.getElementById('resetDriverNewPass');
-        const inputNewPassConfirm = document.getElementById('resetDriverNewPassConfirm');
-
-        if (sectionOtp) sectionOtp.style.display = 'none';
-        if (inputCode) inputCode.value = '';
-        if (inputNewPass) inputNewPass.value = '';
-        if (inputNewPassConfirm) inputNewPassConfirm.value = '';
-
-        if (inputResetEmail) {
-            const prefill = (inputLoginEmail ? inputLoginEmail.value : '').trim();
-            if (prefill) inputResetEmail.value = prefill;
-        }
-
-        modal.style.display = 'flex';
-        modal.classList.add('active');
-    };
-
+    // Unificación de Handlers para Recuperación de Contraseña Chofer
     const btnSendDriverResetCode = document.getElementById('btnSendDriverResetCode');
     if (btnSendDriverResetCode) {
-        btnSendDriverResetCode.addEventListener('click', async () => {
-            const inputResetEmail = document.getElementById('resetDriverEmail');
-            const email = (inputResetEmail ? inputResetEmail.value : '').trim().toLowerCase();
-
-            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                showDriverToast('⚠️ Ingresa un correo electrónico válido.');
-                if (inputResetEmail) inputResetEmail.focus();
-                return;
-            }
-
-            // Verificar si el chofer existe
-            const list = getRegisteredDriversList();
-            let driver = list.find(d => d.email && d.email.toLowerCase() === email);
-
-            // Consultar en Firestore si no está en local
-            if (!driver && typeof firebase !== 'undefined') {
-                try {
-                    const db = firebase.firestore();
-                    const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
-                    let snap = await db.collection('conductores').doc(emailDocId).get();
-                    if (snap.exists) driver = snap.data();
-                    if (!driver) {
-                        snap = await db.collection('drivers').doc(emailDocId).get();
-                        if (snap.exists) driver = snap.data();
-                    }
-                } catch(e) {}
-            }
-
-            // Fallback REST API
-            if (!driver) {
-                try {
-                    const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
-                    const restResp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/conductores/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`);
-                    if (restResp.ok) {
-                        const data = await restResp.json();
-                        if (data && data.fields) {
-                            driver = {
-                                id: data.fields.id?.stringValue || ('drv_' + emailDocId),
-                                nombre: data.fields.nombre?.stringValue || 'Conductor',
-                                email: data.fields.email?.stringValue || email
-                            };
-                        }
-                    }
-                } catch(e) {}
-            }
-
-            // Generar código OTP de 6 dígitos
-            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-            driverResetState = {
-                email,
-                code: otpCode,
-                driverObj: driver || { email, nombre: email.split('@')[0] },
-                expiresAt: Date.now() + 15 * 60 * 1000
-            };
-
-            btnSendDriverResetCode.disabled = true;
-            btnSendDriverResetCode.style.opacity = '0.7';
-            btnSendDriverResetCode.textContent = 'Enviando...';
-
-            showDriverToast(`⏳ Enviando código de seguridad a ${email}...`);
-
-            // Despacho de correo vía EmailJS
-            const sendResult = await sendEmailJsVerification(email, otpCode);
-            btnSendDriverResetCode.disabled = false;
-            btnSendDriverResetCode.style.opacity = '1';
-            btnSendDriverResetCode.textContent = 'Reenviar Código';
-
-            const sectionOtp = document.getElementById('sectionDriverResetOtp');
-            if (sectionOtp) sectionOtp.style.display = 'flex';
-            const inputCode = document.getElementById('inputDriverResetCode');
-            if (inputCode) {
-                inputCode.value = '';
-                setTimeout(() => inputCode.focus(), 250);
-            }
-
-            if (sendResult.success) {
-                showDriverToast(`📨 ¡Código de seguridad enviado con éxito a ${email}! Revisa tu correo.`);
-            } else {
-                showDriverToast(`📨 Código generado. Si no llega a tu correo ${email}, revisa spam o pulsa reenviar.`);
-            }
-        });
+        btnSendDriverResetCode.onclick = (e) => {
+            if (e && e.preventDefault) e.preventDefault();
+            window.handleSendDriverResetCode();
+        };
     }
 
     const formDriverPasswordReset = document.getElementById('formDriverPasswordReset');
     if (formDriverPasswordReset) {
-        formDriverPasswordReset.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!driverResetState) {
-                showDriverToast('⚠️ Primero debes solicitar el código a tu correo.');
-                return;
-            }
-
-            const inputCode = document.getElementById('inputDriverResetCode');
-            const enteredCode = (inputCode ? inputCode.value : '').replace(/\D/g, '').trim();
-
-            if (enteredCode !== driverResetState.code) {
-                showDriverToast('❌ Código de verificación incorrecto. Revisa el correo recibido.');
-                if (inputCode) inputCode.focus();
-                return;
-            }
-
-            const inputNewPass = document.getElementById('resetDriverNewPass');
-            const inputNewPassConfirm = document.getElementById('resetDriverNewPassConfirm');
-            const newPass = (inputNewPass ? inputNewPass.value : '').trim();
-            const newPassConfirm = (inputNewPassConfirm ? inputNewPassConfirm.value : '').trim();
-
-            if (!newPass || newPass.length < 8 || !/\d/.test(newPass)) {
-                showDriverToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
-                if (inputNewPass) inputNewPass.focus();
-                return;
-            }
-
-            if (newPass !== newPassConfirm) {
-                showDriverToast('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
-                if (inputNewPassConfirm) inputNewPassConfirm.focus();
-                return;
-            }
-
-            const newHash = await hashDriverPassword(newPass);
-            const email = driverResetState.email;
-
-            // Actualizar en localStorage sin almacenar password en texto plano
-            const list = getRegisteredDriversList();
-            let driverIdx = list.findIndex(d => d.email && d.email.toLowerCase() === email);
-            if (driverIdx >= 0) {
-                delete list[driverIdx].password;
-                list[driverIdx].passwordHash = newHash;
-                saveRegisteredDriversList(list);
-            } else {
-                const newDriver = {
-                    ...driverResetState.driverObj,
-                    email,
-                    passwordHash: newHash
-                };
-                delete newDriver.password;
-                list.push(newDriver);
-                saveRegisteredDriversList(list);
-            }
-
-            // Actualizar en Firestore si está disponible (únicamente passwordHash)
-            try {
-                if (typeof firebase !== 'undefined' && firebase.firestore) {
-                    const db = firebase.firestore();
-                    const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
-                    await db.collection('conductores').doc(emailDocId).set({
-                        email,
-                        passwordHash: newHash,
-                        updatedAt: new Date().toISOString()
-                    }, { merge: true });
-                }
-            } catch(e) {}
-
-            // Cerrar modal de reseteo
-            window.closeDriverPasswordResetModal();
-
-            // Pre-llenar en el formulario de inicio de sesión
-            const loginEmailInput = document.getElementById('loginDriverEmail');
-            const loginPassInput = document.getElementById('loginDriverPassword');
-            if (loginEmailInput) loginEmailInput.value = email;
-            if (loginPassInput) loginPassInput.value = newPass;
-
-            showDriverToast('✅ ¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
-            playAlertSound('success');
-        });
+        formDriverPasswordReset.onsubmit = (e) => {
+            if (e && e.preventDefault) e.preventDefault();
+            return window.handleDriverPasswordResetSubmit(e);
+        };
     }
 
     // Botón Cerrar Sesión Chofer
@@ -9396,7 +9350,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Registro y actualización de Service Worker para la PWA de Chofer
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js?v=128')
+            navigator.serviceWorker.register('sw.js?v=129')
                 .then(reg => {
                     reg.update().catch(() => {});
                 })
