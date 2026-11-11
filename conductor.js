@@ -5895,18 +5895,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatedAt: Date.now()
             };
 
-            // 1. Guardar localmente
+            // Obtener el ID único y aislado para este conductor (nunca compartir por DNI)
+            let docId = getActiveDriverId();
+            if (!docId || docId === 'default') {
+                const cleanEmail = (updatedDocs.email || '').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '');
+                docId = cleanDni && cleanEmail ? `drv_${cleanDni}_${cleanEmail}` : (cleanEmail ? `drv_${cleanEmail}` : (`drv_${cleanDni || Date.now()}`));
+            }
+            updatedDocs.id = docId;
+
+            // 1. Guardar localmente de forma estrictamente aislada por cuenta
             try {
+                localStorage.setItem(`rutaprivada_driver_docs_${docId}`, JSON.stringify(updatedDocs));
                 localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(updatedDocs));
                 window.dispatchEvent(new Event('storage'));
             } catch(e) {
                 console.warn('LocalStorage save warning:', e);
             }
 
+            // Actualizar en lista de conductores registrados
+            try {
+                let drvList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+                const idx = drvList.findIndex(d => (d.id && d.id === docId) || (d.email && updatedDocs.email && d.email.toLowerCase() === updatedDocs.email.toLowerCase()));
+                if (idx >= 0) {
+                    drvList[idx] = { ...drvList[idx], ...updatedDocs, id: docId };
+                } else {
+                    drvList.push({ ...updatedDocs, id: docId });
+                }
+                localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(drvList));
+            } catch(e) {}
+
             // 2. Sincronizar en tiempo real con Firebase Cloud Firestore
-            const cleanDni = (updatedDocs.dni || '').replace(/\D/g, '') || (updatedDocs.telefono || '').replace(/\D/g, '') || String(Date.now());
-            const docId = 'drv_' + cleanDni;
-            updatedDocs.id = docId;
 
             // Resumen ligero de documentos subidos para el documento principal
             const docsUploadedSummary = {};
