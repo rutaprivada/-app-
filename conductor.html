@@ -575,6 +575,24 @@
                 <span style="font-size: 0.75rem; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">
                     Canales de Atención Directa
                 </span>
+
+                <!-- Botón Principal: Chat en Vivo con Soporte (24/7) -->
+                <button type="button" id="btnHelpOpenSupportChat" onclick="openDriverSupportChatModal()" style="width: 100%; margin-bottom: 10px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.3) 100%); border: 1.5px solid rgba(16, 185, 129, 0.55); border-radius: 14px; padding: 13px 14px; text-align: left; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.15);">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.25rem; flex-shrink: 0; box-shadow: 0 3px 10px rgba(16, 185, 129, 0.4); position: relative;">
+                            <i class="fa-solid fa-comments"></i>
+                            <span class="chat-unread-dot hidden" id="supportChatUnreadBadge" style="position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: 800; border-radius: 10px; min-width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; padding: 0 4px; border: 2px solid #0f172a;">1</span>
+                        </div>
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <strong style="color: #fff; font-size: 0.95rem;">Chat en Vivo con Soporte 24/7</strong>
+                                <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #22c55e;"></span>
+                            </div>
+                            <span style="color: #a7f3d0; font-size: 0.74rem; font-weight: 600; display: block; margin-top: 2px;">Atención inmediata · Copia automática a tu email</span>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right" style="color: #10b981; font-size: 0.9rem;"></i>
+                </button>
                 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <!-- Botón Llamada Telefónica Central (1173738790) -->
@@ -758,6 +776,66 @@
             <button type="button" class="btn-cancel-trip full-width" id="btnCerrarAyudaSheet" onclick="closeDriverHelpModal()" style="width: 100%; border-radius: 12px; justify-content: center; padding: 11px; font-size: 0.92rem; margin-top: 6px;">
                 Cerrar Ayuda
             </button>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL / BOTTOM SHEET: CHAT EN VIVO CON SOPORTE CENTRAL 24/7
+         ========================================================= -->
+    <div class="driver-modal-overlay" id="modalDriverSupportChat" style="z-index: 10008;">
+        <div class="driver-modal-sheet" style="max-height: 92vh; height: 600px; display: flex; flex-direction: column; max-width: 500px; width: 100%; margin: 0 auto; padding: 16px;">
+            <!-- Header Chat Soporte -->
+            <div class="modal-sheet-header" style="display:flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.15rem; box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4); flex-shrink: 0;">
+                        <i class="fa-solid fa-headset"></i>
+                    </div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <h3 style="font-size: 1.05rem; color: #fff; font-weight: 800; margin: 0;">Soporte Central 24/7</h3>
+                            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e;" title="En línea"></span>
+                        </div>
+                        <small style="color: #94a3b8; font-size: 0.74rem;">RutaPrivada Asistencia Chofer</small>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button type="button" id="btnSendSupportChatEmailCopy" title="Enviar copia del chat por correo electrónico" onclick="window.sendDriverSupportChatCopy()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; border-radius: 8px; padding: 6px 10px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s;">
+                        <i class="fa-solid fa-envelope"></i> Copia Email
+                    </button>
+                    <button type="button" class="btn-close-modal" id="btnCloseDriverSupportChat" onclick="closeDriverSupportChatModal()" style="background:none; border:none; color:#94a3b8; font-size:1.4rem; cursor:pointer; padding: 2px 6px;">&times;</button>
+                </div>
+            </div>
+
+            <!-- Banner Informativo: Registro Oficial y Copia al Conductor -->
+            <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.22); border-radius: 10px; padding: 7px 12px; margin-bottom: 8px; font-size: 0.72rem; color: #86efac; display: flex; align-items: center; justify-content: space-between;">
+                <span style="display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-shield-halved text-emerald"></i>
+                    <span>Tus consultas se registran con copia de respaldo a tu email.</span>
+                </span>
+                <span id="supportChatDriverEmailPreview" style="color: #cbd5e1; font-weight: 700;"></span>
+            </div>
+
+            <!-- Chips de ayuda rápida -->
+            <div class="support-quick-chips" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 6px; -webkit-overflow-scrolling: touch;">
+                <button type="button" class="quick-chip-btn" onclick="window.sendSupportQuickMessage('Problema con tarifa o peajes en viaje reciente')">🚗 Tarifa/Peajes</button>
+                <button type="button" class="quick-chip-btn" onclick="window.sendSupportQuickMessage('El pasajero no se presentó en el punto de encuentro')">👤 Pasajero ausente</button>
+                <button type="button" class="quick-chip-btn" onclick="window.sendSupportQuickMessage('Inconveniente con cobro en efectivo / transferencia')">💵 Error de Cobro</button>
+                <button type="button" class="quick-chip-btn" onclick="window.sendSupportQuickMessage('Encontré un objeto olvidado en mi vehículo')">🧳 Objeto olvidado</button>
+                <button type="button" class="quick-chip-btn" onclick="window.sendSupportQuickMessage('Consulta sobre habilitación de legajo o documentación')">📄 Mi Legajo</button>
+            </div>
+
+            <!-- Lista de Mensajes del Chat de Soporte -->
+            <div class="chat-messages-container" id="driverSupportChatMessagesList" style="flex: 1; overflow-y: auto; padding: 10px 4px; display: flex; flex-direction: column; gap: 10px;">
+                <!-- Dinámico -->
+            </div>
+
+            <!-- Formulario de Envío de Mensaje -->
+            <form class="chat-input-form" id="driverSupportChatInputForm" onsubmit="window.handleDriverSupportChatSubmit(event)" style="display: flex; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <input type="text" id="driverSupportChatInputText" placeholder="Escribe tu mensaje a la Central de Soporte..." style="flex: 1; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 10px 14px; color: #fff; font-size: 0.88rem; outline: none;" required autocomplete="off" />
+                <button type="submit" id="btnSubmitSupportChatMsg" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff; border: none; border-radius: 12px; padding: 0 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4);">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </form>
         </div>
     </div>
 

@@ -2032,13 +2032,18 @@
                 style="background:#1e293b; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:10px 12px; border-radius:10px; width:100%;" />
             </div>
 
-            <div style="display: flex; gap: 10px; margin-top: 12px; align-items: center;">
+            <div style="display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap;">
               <button type="submit" class="btn btn-primary"
-                style="flex: 1; padding: 11px; font-size: 0.88rem; font-weight: 700; border-radius: 10px;">
+                style="flex: 1; min-width: 130px; padding: 11px; font-size: 0.88rem; font-weight: 700; border-radius: 10px;">
                 💾 Guardar Mi Perfil
               </button>
+              <button type="button" onclick="window.closePassengerProfileModal(); window.handleForgotPassengerPassword();"
+                style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.8rem; font-weight: 700; padding: 10px 12px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"
+                title="Cambiar contraseña de acceso">
+                🔑 Cambiar Contraseña
+              </button>
               <button type="button" id="btnLogoutPassenger" onclick="window.handlePassengerLogout()"
-                style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; font-size: 0.8rem; font-weight: 700; padding: 10px 14px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: all 0.2s;"
+                style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; font-size: 0.8rem; font-weight: 700; padding: 10px 12px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: all 0.2s;"
                 title="Cerrar sesión actual para ingresar con otra cuenta">
                 <i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión
               </button>
@@ -2392,7 +2397,7 @@
         contraseña.
       </p>
 
-      <form id="formPassengerPasswordReset" onsubmit="return window.handlePassengerPasswordResetSubmit(event)"
+      <form id="formPassengerPasswordReset" onsubmit="window.handlePassengerPasswordResetSubmit(event); return false;"
         style="display: flex; flex-direction: column; gap: 12px; text-align: left;">
         <div>
           <label for="resetPassengerEmail"

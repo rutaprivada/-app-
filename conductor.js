@@ -54,6 +54,30 @@ window.closeDriverHelpModal = function() {
     }
 };
 
+window.openDriverSupportChatModal = function() {
+    if (typeof window._internalOpenSupportChat === 'function') {
+        window._internalOpenSupportChat();
+    } else {
+        const modal = document.getElementById('modalDriverSupportChat');
+        if (modal) {
+            modal.classList.add('active');
+            modal.style.display = 'flex';
+        }
+    }
+};
+
+window.closeDriverSupportChatModal = function() {
+    if (typeof window._internalCloseSupportChat === 'function') {
+        window._internalCloseSupportChat();
+    } else {
+        const modal = document.getElementById('modalDriverSupportChat');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+        }
+    }
+};
+
 window.openDriverDocsModal = function() {
     const modal = document.getElementById('modalDriverDocs') || document.getElementById('driverDocsModal');
     if (modal) {
@@ -391,6 +415,78 @@ window.toggleDriverHelpAccordion = function(headerEl) {
     }
 };
 
+window.closeDriverStatusNoticeModal = function() {
+    const modal = document.getElementById('modalDriverStatusNotice');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+    }
+};
+
+window.openDriverStatusNoticeModal = function(status, obs) {
+    const modal = document.getElementById('modalDriverStatusNotice');
+    if (!modal) return;
+    const sheet = document.getElementById('modalDriverStatusNoticeSheet');
+    const iconWrap = document.getElementById('noticeModalIconWrap');
+    const icon = document.getElementById('noticeModalIcon');
+    const title = document.getElementById('noticeModalTitle');
+    const subtitle = document.getElementById('noticeModalSubtitle');
+    const obsBox = document.getElementById('noticeModalObsBox');
+    const obsText = document.getElementById('noticeModalObsText');
+    const btnAction = document.getElementById('btnNoticeModalAction');
+
+    if (status === 'aprobado') {
+        if (sheet) sheet.style.border = '1.5px solid rgba(16, 185, 129, 0.5)';
+        if (iconWrap) {
+            iconWrap.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.3) 100%)';
+            iconWrap.style.color = '#34d399';
+        }
+        if (icon) icon.className = 'fa-solid fa-circle-check';
+        if (title) title.textContent = '¡Cuenta Aprobada y Habilitada!';
+        if (subtitle) subtitle.textContent = 'El Administrador validó tus 9 documentos y vehículo con éxito. Ya puedes conectarte para recibir viajes.';
+        if (obsBox) obsBox.style.display = 'none';
+        if (btnAction) {
+            btnAction.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+            btnAction.style.color = '#fff';
+            btnAction.innerHTML = '<i class="fa-solid fa-power-off"></i> Conectar En Línea Ahora';
+            btnAction.onclick = () => {
+                window.closeDriverStatusNoticeModal();
+                if (typeof window.handleDriverToggleStatus === 'function') {
+                    window.handleDriverToggleStatus();
+                }
+            };
+        }
+    } else {
+        // Rechazado u Observado
+        if (sheet) sheet.style.border = '1.5px solid rgba(239, 68, 68, 0.5)';
+        if (iconWrap) {
+            iconWrap.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(185, 28, 28, 0.3) 100%)';
+            iconWrap.style.color = '#f87171';
+        }
+        if (icon) icon.className = 'fa-solid fa-triangle-exclamation';
+        if (title) title.textContent = 'Documentación Observada';
+        if (subtitle) subtitle.textContent = 'Tu cuenta es privada y personal. El Administrador ha revisado tu solicitud y dejó las siguientes observaciones:';
+        if (obsBox) {
+            obsBox.style.display = 'block';
+            if (obsText) obsText.textContent = obs || 'Faltan documentos obligatorios o la foto adjunta no es legible.';
+        }
+        if (btnAction) {
+            btnAction.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+            btnAction.style.color = '#fff';
+            btnAction.innerHTML = '<i class="fa-solid fa-file-pen"></i> Actualizar Documentos Ahora';
+            btnAction.onclick = () => {
+                window.closeDriverStatusNoticeModal();
+                if (typeof window.openDriverDocsModal === 'function') {
+                    window.openDriverDocsModal();
+                }
+            };
+        }
+    }
+
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+};
+
 window.handleDriverToggleStatus = function() {
     if (typeof window._internalDriverToggleStatus === 'function') {
         window._internalDriverToggleStatus();
@@ -401,7 +497,23 @@ window.handleDriverToggleStatus = function() {
         btn._handler();
         return;
     }
-    // Fallback directo e instantáneo si aún no se enlazó el handler interno
+    // Fallback: verificar aprobación antes de cambiar estado
+    let docs = null;
+    try {
+        const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
+        if (raw) docs = JSON.parse(raw);
+    } catch(e) {}
+    const isApproved = docs && docs.estadoVerificacion === 'aprobado';
+    if (!isApproved) {
+        const obs = (docs && docs.observaciones) ? docs.observaciones : '';
+        if (docs && docs.estadoVerificacion === 'rechazado') {
+            window.openDriverStatusNoticeModal('rechazado', obs);
+        } else {
+            alert('⏳ CUENTA EN PROCESO DE APROBACIÓN:\n\nTus documentos aún están siendo revisados por el Administrador. No puedes conectarte hasta que los 9 documentos sean validados.');
+        }
+        return;
+    }
+
     const isCurrentlyOnline = btn && btn.classList.contains('online');
     const newStatus = !isCurrentlyOnline;
     if (btn) {
@@ -2947,24 +3059,28 @@ document.addEventListener('DOMContentLoaded', () => {
         let docs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
         const statusVerif = (docs && docs.estadoVerificacion) ? docs.estadoVerificacion : 'pendiente';
 
-        if (statusVerif === 'rechazado') {
-            alert(`❌ DOCUMENTACIÓN RECHAZADA:\n\nEl Administrador indicó lo siguiente sobre tus documentos:\n\n"${docs.observaciones || 'Documentación incompleta o no cumple los requisitos'}"\n\nPor favor actualiza tus datos en la pestaña de documentación.`);
+        // REGLA COMERCIAL ESTRICTA: No permitir activación si algún documento no está validado
+        if (statusVerif !== 'aprobado') {
+            const obs = (docs && docs.observaciones) ? docs.observaciones : '';
+            if (statusVerif === 'rechazado') {
+                if (typeof window.openDriverStatusNoticeModal === 'function') {
+                    window.openDriverStatusNoticeModal('rechazado', obs);
+                } else {
+                    alert(`❌ DOCUMENTACIÓN RECHAZADA U OBSERVADA:\n\nEl Administrador indicó lo siguiente sobre tus documentos:\n\n"${obs || 'Falta adjuntar documentos obligatorios o no son legibles.'}"\n\nPor favor actualiza tus datos en tu perfil de chofer.`);
+                }
+            } else {
+                alert('⏳ DOCUMENTACIÓN EN REVISIÓN:\n\nTu documentación aún está en proceso de validación por el Administrador.\nNo puedes ponerte "EN LÍNEA" ni recibir viajes hasta que todos los 9 documentos requeridos estén verificados y tu cuenta aprobada.');
+            }
+
             const modalDocsUpload = document.getElementById('modalDocsUpload');
-            if (modalDocsUpload) {
+            if (modalDocsUpload && statusVerif === 'rechazado') {
                 if (typeof populateDocsForm === 'function') populateDocsForm();
                 modalDocsUpload.classList.add('active');
             }
             return;
-        } else if (statusVerif !== 'aprobado') {
-            // Auto-aprobar para permitir conexión inmediata sin bloqueo
-            try {
-                if (!docs) docs = { id: getActiveDriverId(), nombre: 'Chofer Partner' };
-                docs.estadoVerificacion = 'aprobado';
-                if (typeof saveDocsData === 'function') saveDocsData(docs);
-            } catch(e) {}
         }
 
-        // Poner en línea de inmediato para fluidez instantánea en la UI
+        // Poner en línea al instante para chofer validado
         setOnlineStatus(true);
         if (typeof showDriverToast === 'function') {
             showDriverToast('🟢 Conectado en línea. GPS activo en segundo plano.');
@@ -5790,18 +5906,34 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (cloudData && cloudData.estadoVerificacion) {
                                 const currentLocal = loadDocsData();
                                 if (currentLocal.estadoVerificacion !== cloudData.estadoVerificacion || currentLocal.observaciones !== cloudData.observaciones) {
+                                    const prevStatus = currentLocal.estadoVerificacion;
+                                    const prevObs = currentLocal.observaciones || '';
                                     currentLocal.estadoVerificacion = cloudData.estadoVerificacion;
                                     currentLocal.observaciones = cloudData.observaciones || '';
                                     try {
                                         localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(currentLocal));
+                                        const drvId = getActiveDriverId();
+                                        if (drvId && drvId !== 'default') {
+                                            localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(currentLocal));
+                                        }
+                                        window.dispatchEvent(new Event('storage'));
                                     } catch(e){}
                                     updateDocsStatusBanner(cloudData.estadoVerificacion);
                                     if (cloudData.estadoVerificacion === 'aprobado') {
                                         showDriverToast('🎉 ¡Tu cuenta y documentos fueron APROBADOS por Administración!');
                                         try { playAlertSound('success'); } catch(e){}
+                                        if (typeof window.openDriverStatusNoticeModal === 'function' && prevStatus !== 'aprobado') {
+                                            window.openDriverStatusNoticeModal('aprobado', '');
+                                        }
                                     } else if (cloudData.estadoVerificacion === 'rechazado') {
-                                        showDriverToast('⚠️ Tu documentación tiene observaciones. Toca el banner para revisar.');
+                                        showDriverToast('⚠️ Tu documentación tiene observaciones. Toca para revisar.');
                                         try { playAlertSound('urgent'); } catch(e){}
+                                        if (driverState.isOnline) {
+                                            setOnlineStatus(false);
+                                        }
+                                        if (typeof window.openDriverStatusNoticeModal === 'function' && (prevStatus !== 'rechazado' || prevObs !== (cloudData.observaciones || ''))) {
+                                            window.openDriverStatusNoticeModal('rechazado', cloudData.observaciones || '');
+                                        }
                                     }
                                 }
                             }
@@ -5817,12 +5949,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (dDni && dDni === cleanDni && data.estadoVerificacion) {
                         const currentLocal = loadDocsData();
                         if (currentLocal.estadoVerificacion !== data.estadoVerificacion || currentLocal.observaciones !== data.observaciones) {
+                            const prevStatus = currentLocal.estadoVerificacion;
+                            const prevObs = currentLocal.observaciones || '';
                             currentLocal.estadoVerificacion = data.estadoVerificacion;
                             currentLocal.observaciones = data.observaciones || '';
                             try {
                                 localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(currentLocal));
+                                const drvId = getActiveDriverId();
+                                if (drvId && drvId !== 'default') {
+                                    localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(currentLocal));
+                                }
+                                window.dispatchEvent(new Event('storage'));
                             } catch(e){}
                             updateDocsStatusBanner(data.estadoVerificacion);
+                            if (data.estadoVerificacion === 'aprobado') {
+                                showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por Administración!');
+                                try { playAlertSound('success'); } catch(e){}
+                                if (typeof window.openDriverStatusNoticeModal === 'function' && prevStatus !== 'aprobado') {
+                                    window.openDriverStatusNoticeModal('aprobado', '');
+                                }
+                            } else if (data.estadoVerificacion === 'rechazado') {
+                                showDriverToast('⚠️ Tu documentación tiene observaciones.');
+                                try { playAlertSound('urgent'); } catch(e){}
+                                if (driverState.isOnline) setOnlineStatus(false);
+                                if (typeof window.openDriverStatusNoticeModal === 'function' && (prevStatus !== 'rechazado' || prevObs !== (data.observaciones || ''))) {
+                                    window.openDriverStatusNoticeModal('rechazado', data.observaciones || '');
+                                }
+                            }
                         }
                     }
                 });
@@ -6018,15 +6171,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cleanDniLocal = (localDocs.dni || '').replace(/\D/g, '');
                 const cleanDniIncoming = (data.dni || data.id || '').replace(/\D/g, '');
                 
-                // Si la actualización corresponde a este chofer o es global
-                if (!cleanDniIncoming || !cleanDniLocal || cleanDniIncoming === cleanDniLocal || data.id === 'driver_local' || data.id === ('drv_' + cleanDniLocal)) {
+                // Si la actualización corresponde a este chofer de forma privada y exclusiva
+                if ((cleanDniIncoming && cleanDniLocal && cleanDniIncoming === cleanDniLocal) || data.id === 'driver_local' || data.id === ('drv_' + cleanDniLocal)) {
                     const newStatus = data.estadoVerificacion || data.estado || 'aprobado';
                     const prevStatus = localDocs.estadoVerificacion;
+                    const prevObs = localDocs.observaciones || '';
                     localDocs.estadoVerificacion = newStatus;
                     if (data.observaciones !== undefined) localDocs.observaciones = data.observaciones;
                     
                     try {
                         localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
+                        const drvId = getActiveDriverId();
+                        if (drvId && drvId !== 'default') {
+                            localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(localDocs));
+                        }
                         window.dispatchEvent(new Event('storage'));
                     } catch(e){}
                     
@@ -6036,16 +6194,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (newStatus === 'aprobado') {
                         showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el Administrador!');
                         try { playAlertSound('success'); } catch(e){}
-                        if (prevStatus !== 'aprobado') {
-                            alert('🎉 ¡ENHORABUENA!\n\nTu cuenta y documentación han sido APROBADAS por el Administrador de RutaPrivada.\n\nYa puedes presionar "ESTÁS EN LÍNEA" para conectarte y empezar a recibir viajes en tiempo real.');
+                        if (typeof window.openDriverStatusNoticeModal === 'function' && prevStatus !== 'aprobado') {
+                            window.openDriverStatusNoticeModal('aprobado', '');
                         }
                     } else if (newStatus === 'rechazado') {
                         showDriverToast('⚠️ Tu documentación fue observada o rechazada.');
                         if (driverState.isOnline) {
                             setOnlineStatus(false);
                         }
-                        if (prevStatus !== 'rechazado') {
-                            alert(`❌ DOCUMENTACIÓN OBSERVADA O RECHAZADA:\n\nEl Administrador ha indicado lo siguiente:\n\n"${data.observaciones || 'Documentación incompleta o ilegible'}"\n\nPor favor ingresa a tu perfil para corregir o subir nuevamente los documentos requeridos.`);
+                        if (typeof window.openDriverStatusNoticeModal === 'function' && (prevStatus !== 'rechazado' || prevObs !== (data.observaciones || ''))) {
+                            window.openDriverStatusNoticeModal('rechazado', data.observaciones || '');
                         }
                     }
                 }
@@ -7208,6 +7366,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 localDocs.observaciones = newObs;
                 try {
                     localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
+                    const drvId = getActiveDriverId();
+                    if (drvId && drvId !== 'default') {
+                        localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(localDocs));
+                    }
                     window.dispatchEvent(new Event('storage'));
                 } catch(e) {}
 
@@ -7217,12 +7379,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (newStatus === 'aprobado' && prevStatus !== 'aprobado') {
                     showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el Administrador!');
                     try { playAlertSound('success'); } catch(e){}
-                    alert('🎉 ¡ENHORABUENA!\n\nTu documentación y vehículo han sido APROBADOS por el Administrador de RutaPrivada.\n\nYa puedes presionar "ESTÁS EN LÍNEA" para conectarte y empezar a recibir viajes en tiempo real.');
+                    if (typeof window.openDriverStatusNoticeModal === 'function') {
+                        window.openDriverStatusNoticeModal('aprobado', '');
+                    } else {
+                        alert('🎉 ¡ENHORABUENA!\n\nTu documentación y vehículo han sido APROBADOS por el Administrador de RutaPrivada.\n\nYa puedes presionar "ESTÁS EN LÍNEA" para conectarte y empezar a recibir viajes en tiempo real.');
+                    }
                 } else if (newStatus === 'rechazado' && (prevStatus !== 'rechazado' || prevObs !== newObs)) {
                     showDriverToast('⚠️ Tu documentación fue observada o rechazada.');
                     if (driverState.isOnline) setOnlineStatus(false);
                     try { playAlertSound('chat'); } catch(e){}
-                    alert(`❌ DOCUMENTACIÓN OBSERVADA O RECHAZADA:\n\nEl Administrador indicó:\n\n"${newObs || 'Documentación incompleta o ilegible'}"\n\nPor favor actualiza o vuelve a subir los documentos requeridos en tu perfil.`);
+                    if (typeof window.openDriverStatusNoticeModal === 'function') {
+                        window.openDriverStatusNoticeModal('rechazado', newObs);
+                    } else {
+                        alert(`❌ DOCUMENTACIÓN OBSERVADA O RECHAZADA:\n\nEl Administrador indicó:\n\n"${newObs || 'Documentación incompleta o ilegible'}"\n\nPor favor actualiza o vuelve a subir los documentos requeridos en tu perfil.`);
+                    }
                 }
             }
         };
@@ -8457,7 +8627,338 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Envío del Formulario de Reclamo / Ticket In-App con Redirección al Correo
+    // =========================================================
+    // SERVICIO DE REGISTRO POR CORREO Y CHAT DE SOPORTE 24/7
+    // =========================================================
+    const modalDriverSupportChat = document.getElementById('modalDriverSupportChat');
+    const btnCloseDriverSupportChat = document.getElementById('btnCloseDriverSupportChat');
+    const driverSupportChatMessagesList = document.getElementById('driverSupportChatMessagesList');
+    const driverSupportChatInputForm = document.getElementById('driverSupportChatInputForm');
+    const driverSupportChatInputText = document.getElementById('driverSupportChatInputText');
+    const supportChatDriverEmailPreview = document.getElementById('supportChatDriverEmailPreview');
+    const supportChatUnreadBadge = document.getElementById('supportChatUnreadBadge');
+    let supportChatUnsub = null;
+
+    // Helper unificado para envío de correo real vía EmailJS (Chofer y Soporte)
+    async function sendSupportEmailDispatch(targetEmail, subjectText, messageText, extraParams = {}) {
+        const timeStr = new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+        const { driverName, driverPhone } = getDriverContactInfo();
+
+        const payload = {
+            service_id: 'service_ri00bk4',
+            template_id: 'template_y849ceg',
+            user_id: 'ai6WOsUzJaXx1st1E',
+            template_params: {
+                email: targetEmail,
+                to_email: targetEmail,
+                reply_to: 'soporte@rutaprivada.com',
+                subject: subjectText,
+                driver_name: driverName || 'Conductor Partner',
+                driver_phone: driverPhone || 'No informado',
+                driver_email: targetEmail,
+                message: messageText,
+                passcode: extraParams.passcode || subjectText.slice(0, 32),
+                time: timeStr,
+                ticket_id: extraParams.ticketId || 'SOP-' + Date.now().toString().slice(-6),
+                category: extraParams.category || 'Atención Conductor 24/7',
+                trip_id: extraParams.tripId || 'N/A'
+            }
+        };
+
+        try {
+            const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) {
+                // Reintentar con servicio alternativo si responde error
+                payload.service_id = 'service_rutaprivada';
+                await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).catch(() => {});
+            }
+            return true;
+        } catch(e) {
+            console.warn('Fallo de red en envío de copia de correo soporte:', e);
+            return false;
+        }
+    }
+    window.sendSupportEmailDispatch = sendSupportEmailDispatch;
+
+    function getSupportChatKey() {
+        const drvId = getActiveDriverId();
+        return 'rutaprivada_driver_support_chat_' + drvId;
+    }
+
+    function getLocalSupportMessages() {
+        try {
+            const raw = localStorage.getItem(getSupportChatKey());
+            if (raw) return JSON.parse(raw);
+        } catch(e) {}
+        return [];
+    }
+
+    function saveLocalSupportMessages(messages) {
+        try {
+            localStorage.setItem(getSupportChatKey(), JSON.stringify(messages));
+        } catch(e) {}
+    }
+
+    function renderDriverSupportChatMessages() {
+        if (!driverSupportChatMessagesList) return;
+        const messages = getLocalSupportMessages();
+        const { driverName } = getDriverContactInfo();
+
+        if (messages.length === 0) {
+            const welcomeMsg = {
+                id: 'welcome_' + Date.now(),
+                remitente: 'soporte',
+                texto: `¡Hola ${driverName || 'Partner'}! 👋 Te damos la bienvenida a la Central de Soporte Conductor 24/7 de RutaPrivada.\n\nEscribe tu consulta o reclamo abajo. Cada conversación queda guardada y puedes enviarte una copia a tu correo como comprobante oficial en cualquier momento.`,
+                time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs',
+                timestamp: Date.now()
+            };
+            messages.push(welcomeMsg);
+            saveLocalSupportMessages(messages);
+        }
+
+        driverSupportChatMessagesList.innerHTML = messages.map(msg => {
+            const isMine = msg.remitente === 'conductor' || msg.remitente === 'driver';
+            const senderLabel = isMine ? 'Tú' : '🛡️ Central de Soporte 24/7';
+            return `
+                <div class="chat-bubble ${isMine ? 'mine' : 'theirs'}" style="margin-bottom: 6px; max-width: 86%;">
+                    <div style="font-size: 0.68rem; font-weight: 700; color: ${isMine ? '#34d399' : '#38bdf8'}; margin-bottom: 2px;">
+                        ${senderLabel}
+                    </div>
+                    <div class="bubble-content" style="padding: 10px 14px; border-radius: 14px; font-size: 0.85rem; line-height: 1.4; word-break: break-word; white-space: pre-line; background: ${isMine ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#1e293b'}; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: ${isMine ? 'none' : '1px solid rgba(255,255,255,0.08)'};">
+                        ${escapeHtml(msg.texto)}
+                    </div>
+                    <div class="bubble-time" style="font-size: 0.64rem; color: #64748b; margin-top: 3px; display: flex; align-items: center; gap: 4px;">
+                        <span>${escapeHtml(msg.time || '')}</span>
+                        ${isMine ? '<i class="fa-solid fa-check-double text-emerald" style="font-size: 0.65rem;"></i>' : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        driverSupportChatMessagesList.scrollTop = driverSupportChatMessagesList.scrollHeight;
+    }
+
+    function openDriverSupportChatModal() {
+        if (!modalDriverSupportChat) return;
+        const { driverEmail } = getDriverContactInfo();
+        if (supportChatDriverEmailPreview) {
+            supportChatDriverEmailPreview.textContent = driverEmail ? `📧 ${driverEmail}` : '';
+        }
+        if (supportChatUnreadBadge) {
+            supportChatUnreadBadge.classList.add('hidden');
+        }
+
+        modalDriverSupportChat.style.display = 'flex';
+        modalDriverSupportChat.classList.add('active');
+        renderDriverSupportChatMessages();
+
+        if (driverSupportChatInputText) {
+            setTimeout(() => driverSupportChatInputText.focus(), 250);
+        }
+
+        // Listener en tiempo real con Firestore para respuestas del Administrador / Soporte
+        const drvId = getActiveDriverId();
+        if (typeof db !== 'undefined' && db.collection && !supportChatUnsub) {
+            try {
+                supportChatUnsub = db.collection('chat_soporte').doc(drvId).onSnapshot(docSnap => {
+                    if (docSnap.exists) {
+                        const data = docSnap.data();
+                        if (data && Array.isArray(data.mensajes) && data.mensajes.length > 0) {
+                            saveLocalSupportMessages(data.mensajes);
+                            renderDriverSupportChatMessages();
+                        }
+                    }
+                }, err => {
+                    console.warn('Firestore support chat listener error:', err);
+                });
+            } catch(e) {}
+        }
+    }
+    window.openDriverSupportChatModal = openDriverSupportChatModal;
+    window._internalOpenSupportChat = openDriverSupportChatModal;
+
+    function closeDriverSupportChatModal() {
+        if (!modalDriverSupportChat) return;
+        modalDriverSupportChat.classList.remove('active');
+        modalDriverSupportChat.style.display = 'none';
+        if (supportChatUnsub) {
+            try { supportChatUnsub(); } catch(e){}
+            supportChatUnsub = null;
+        }
+    }
+    window.closeDriverSupportChatModal = closeDriverSupportChatModal;
+    window._internalCloseSupportChat = closeDriverSupportChatModal;
+
+    if (modalDriverSupportChat) {
+        modalDriverSupportChat.addEventListener('click', (e) => {
+            if (e.target === modalDriverSupportChat) closeDriverSupportChatModal();
+        });
+    }
+    if (btnCloseDriverSupportChat) {
+        btnCloseDriverSupportChat.addEventListener('click', closeDriverSupportChatModal);
+    }
+
+    // Enviar mensaje en el Chat de Soporte
+    window.handleDriverSupportChatSubmit = async function(event) {
+        if (event) event.preventDefault();
+        if (!driverSupportChatInputText) return;
+        const text = driverSupportChatInputText.value.trim();
+        if (!text) return;
+
+        const { driverName, driverPhone, driverEmail } = getDriverContactInfo();
+        const drvId = getActiveDriverId();
+        const timeStr = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+
+        const newMsg = {
+            id: 'msg_' + Date.now(),
+            remitente: 'conductor',
+            texto: text,
+            time: timeStr,
+            timestamp: Date.now()
+        };
+
+        const currentMessages = getLocalSupportMessages();
+        currentMessages.push(newMsg);
+        saveLocalSupportMessages(currentMessages);
+        driverSupportChatInputText.value = '';
+        renderDriverSupportChatMessages();
+
+        // 1. Sincronizar en Firestore
+        try {
+            if (typeof db !== 'undefined' && db.collection) {
+                await db.collection('chat_soporte').doc(drvId).set({
+                    driverId: drvId,
+                    driverName: driverName || 'Conductor',
+                    driverPhone: driverPhone || '',
+                    driverEmail: driverEmail || '',
+                    ultimoMensaje: text,
+                    actualizadoEn: new Date().toISOString(),
+                    mensajes: currentMessages
+                }, { merge: true });
+            }
+        } catch(e) {
+            console.warn('Error guardando en Firestore chat soporte:', e);
+        }
+
+        // 2. Emitir evento por bus de sincronización
+        if (window.RutaSync) {
+            window.RutaSync.emit('SUPPORT_CHAT_MESSAGE', {
+                driverId: drvId,
+                driverName,
+                driverEmail,
+                mensaje: newMsg
+            });
+        }
+
+        // 3. Respuesta automática / acuse de recibo de la Central si es una consulta nueva
+        const isDriverConsecutive = currentMessages.filter(m => m.remitente === 'conductor').length <= 2;
+        if (isDriverConsecutive) {
+            setTimeout(() => {
+                const autoReply = {
+                    id: 'ack_' + Date.now(),
+                    remitente: 'soporte',
+                    texto: `Hemos recibido tu mensaje correctamente. Un operador de la Guardia de Soporte 24/7 está revisando tu caso.\n\nRecuerda que puedes tocar "Copia Email" en la barra superior para enviarte el comprobante de esta conversación a tu casilla de correo.`,
+                    time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs',
+                    timestamp: Date.now()
+                };
+                const updated = getLocalSupportMessages();
+                updated.push(autoReply);
+                saveLocalSupportMessages(updated);
+                renderDriverSupportChatMessages();
+            }, 1200);
+        }
+    };
+
+    // Envío rápido desde chips
+    window.sendSupportQuickMessage = function(text) {
+        if (driverSupportChatInputText) {
+            driverSupportChatInputText.value = text;
+            window.handleDriverSupportChatSubmit();
+        }
+    };
+
+    // Generar y enviar copia del chat completo por correo al conductor (y a soporte)
+    window.sendDriverSupportChatCopy = async function() {
+        const { driverName, driverPhone, driverEmail } = getDriverContactInfo();
+        const targetEmail = driverEmail || prompt('Ingresa tu correo electrónico para recibir la copia del chat:');
+        if (!targetEmail || !targetEmail.includes('@')) {
+            alert('Por favor ingresa un correo electrónico válido para enviarte la transcripción.');
+            return;
+        }
+
+        const messages = getLocalSupportMessages();
+        if (messages.length === 0) {
+            alert('Aún no tienes mensajes en la conversación para enviar.');
+            return;
+        }
+
+        const btnCopia = document.getElementById('btnSendSupportChatEmailCopy');
+        if (btnCopia) {
+            btnCopia.disabled = true;
+            btnCopia.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+        }
+
+        // Compilar transcripción completa y legible
+        const docs = (typeof loadDocsData === 'function') ? loadDocsData() : {};
+        const vehiculo = (docs.vehiculoModelo || 'Vehículo Partner') + (docs.vehiculoPatente ? ` [${docs.vehiculoPatente}]` : '');
+        const timeHeader = new Date().toLocaleString('es-AR', { dateStyle: 'full', timeStyle: 'short' });
+
+        let transcriptText = `CENTRAL DE ASISTENCIA Y SOPORTE RUTAPRIVADA (24/7)\n`;
+        transcriptText += `=====================================================\n`;
+        transcriptText += `REGISTRO OFICIAL Y TRANSCRIPCIÓN DE CHAT CON CONDUCTOR\n`;
+        transcriptText += `=====================================================\n`;
+        transcriptText += `CONDUCTOR: ${driverName || 'Partner'}\n`;
+        transcriptText += `TELÉFONO: ${driverPhone || 'No registrado'}\n`;
+        transcriptText += `CORREO: ${targetEmail}\n`;
+        transcriptText += `VEHÍCULO: ${vehiculo}\n`;
+        transcriptText += `FECHA DE EMISIÓN: ${timeHeader}\n`;
+        transcriptText += `=====================================================\n\n`;
+        transcriptText += `HISTORIAL COMPLETO DE MENSAJES:\n\n`;
+
+        messages.forEach((m, idx) => {
+            const sender = (m.remitente === 'conductor' || m.remitente === 'driver') ? (driverName || 'Conductor') : 'Central de Soporte';
+            transcriptText += `[${m.time || 'Hora N/D'}] ${sender.toUpperCase()}:\n`;
+            transcriptText += `${m.texto}\n\n`;
+        });
+
+        transcriptText += `-----------------------------------------------------\n`;
+        transcriptText += `Este correo certifica la comunicación mantenida en la aplicación oficial RutaPrivada.\n`;
+        transcriptText += `Guardia Central 24/7: 11 7373-8790 · soporte@rutaprivada.com`;
+
+        const subjectConductor = `[Registro Conductor] Transcripción de Chat con Soporte - ${driverName || 'Chofer'}`;
+        const subjectSoporte = `[Copia Chat Soporte] Transcripción de Conductor - ${driverName || 'Chofer'}`;
+
+        // 1. Envío de copia a la casilla del Conductor
+        const sentToDriver = await sendSupportEmailDispatch(targetEmail, subjectConductor, transcriptText, {
+            passcode: 'Chat Soporte Conductor'
+        });
+
+        // 2. Envío de respaldo a la Central
+        await sendSupportEmailDispatch('soporte@rutaprivada.com', subjectSoporte, transcriptText, {
+            passcode: 'Respaldo Central'
+        });
+
+        if (btnCopia) {
+            btnCopia.disabled = false;
+            btnCopia.innerHTML = '<i class="fa-solid fa-envelope"></i> Copia Email';
+        }
+
+        if (typeof showDriverToast === 'function') {
+            showDriverToast(`✅ Transcripción enviada a ${targetEmail}. Copia de respaldo registrada con éxito.`, 'success');
+        } else {
+            alert(`✅ Transcripción enviada con éxito.\n\nHemos despachado una copia completa de la conversación a tu correo:\n${targetEmail}\n\nTe servirá como constancia y respaldo oficial.`);
+        }
+    };
+
+    // Envío del Formulario de Reclamo / Ticket In-App con Notificación y Copia por Correo
     if (formDriverReportTicket) {
         formDriverReportTicket.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -8484,7 +8985,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnSubmitDriverTicket.style.opacity = '0.7';
             }
             if (txtBtnSubmitTicket) {
-                txtBtnSubmitTicket.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando Reclamo a Soporte...';
+                txtBtnSubmitTicket.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registrando Reclamo...';
             }
 
             const ticketPayload = {
@@ -8520,56 +9021,56 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn('Firestore ticket error:', err);
             }
 
-            // 3. Envío al Correo Electrónico de Soporte vía EmailJS con Reply-To al Chofer
+            // 3. Añadir automáticamente la consulta al historial del Chat de Soporte
             try {
-                const emailParams = {
-                    service_id: 'service_rutaprivada',
-                    template_id: 'template_y849ceg',
-                    user_id: 'ai6WOsUzJaXx1st1E',
-                    template_params: {
-                        subject: `[Reclamo Conductor #${ticketId}] ${categoryText} - ${driverName}`,
-                        to_email: 'soporte@rutaprivada.com',
-                        reply_to: driverEmail,
-                        driver_name: driverName,
-                        driver_phone: driverPhone,
-                        driver_email: driverEmail,
-                        ticket_id: ticketId,
-                        category: categoryText,
-                        trip_id: tripId || 'N/A',
-                        message: description,
-                        email: driverEmail,
-                        passcode: `Ticket #${ticketId}`,
-                        time: timeStr
-                    }
+                const chatMessages = getLocalSupportMessages();
+                const ticketMsg = {
+                    id: 'ticket_' + ticketId,
+                    remitente: 'conductor',
+                    texto: `📋 [TICKET #${ticketId} - ${categoryText}]\nViaje: ${tripId || 'N/A'}\n\n${description}`,
+                    time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs',
+                    timestamp: Date.now()
                 };
-
-                await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(emailParams)
-                }).catch(() => {});
-            } catch(err) {
-                console.warn('Email redirect error:', err);
-            }
-
-            // 4. Redirección al cliente de correo oficial con datos pre-cargados
-            try {
-                const mailSubject = encodeURIComponent(`[Reclamo Conductor #${ticketId}] ${categoryText} - ${driverName}`);
-                const mailBody = encodeURIComponent(`CENTRAL DE ASISTENCIA Y SOPORTE RUTAPRIVADA\n\n` +
-                    `==============================\n` +
-                    `TICKET ID: #${ticketId}\n` +
-                    `CONDUCTOR: ${driverName}\n` +
-                    `TELÉFONO: ${driverPhone}\n` +
-                    `CORREO: ${driverEmail}\n` +
-                    `CATEGORÍA: ${categoryText}\n` +
-                    `VIAJE RELACIONADO: ${tripId || 'N/A'}\n` +
-                    `FECHA Y HORA: ${timeStr}\n` +
-                    `==============================\n\n` +
-                    `DETALLE DEL RECLAMO / CONSULTA:\n${description}\n\n` +
-                    `---\n` +
-                    `Enviado desde App Conductor RutaPrivada (Soporte Operativo 24/7)`);
-                window.open(`mailto:soporte@rutaprivada.com?subject=${mailSubject}&body=${mailBody}`, '_blank');
+                chatMessages.push(ticketMsg);
+                saveLocalSupportMessages(chatMessages);
             } catch(e) {}
+
+            // 4. Envío de Copia de Respaldo por Correo al Conductor y a Soporte
+            const emailBody = `CENTRAL DE ASISTENCIA Y SOPORTE RUTAPRIVADA (24/7)\n` +
+                `=====================================================\n` +
+                `COMPROBANTE DE RECLAMO / REGISTRO OFICIAL\n` +
+                `=====================================================\n` +
+                `TICKET ID: #${ticketId}\n` +
+                `CONDUCTOR: ${driverName}\n` +
+                `TELÉFONO: ${driverPhone}\n` +
+                `CORREO: ${driverEmail}\n` +
+                `CATEGORÍA: ${categoryText}\n` +
+                `VIAJE ASOCIADO: ${tripId || 'N/A'}\n` +
+                `FECHA Y HORA: ${timeStr}\n` +
+                `=====================================================\n\n` +
+                `DETALLE DEL RECLAMO O CONSULTA:\n` +
+                `${description}\n\n` +
+                `-----------------------------------------------------\n` +
+                `Hola ${driverName},\n` +
+                `Hemos recibido tu reclamo en la Central. Este correo es tu constancia oficial.\n` +
+                `Puedes consultar el seguimiento o continuar la conversación desde el Chat de Soporte dentro de la App Conductor.\n` +
+                `Guardia Central 24/7: 11 7373-8790 · soporte@rutaprivada.com`;
+
+            // Copia al Conductor (Registro personal)
+            await sendSupportEmailDispatch(
+                driverEmail,
+                `[Comprobante #${ticketId}] Reclamo Registrado - RutaPrivada Soporte`,
+                emailBody,
+                { ticketId, category: categoryText, tripId }
+            );
+
+            // Copia a Soporte Central
+            await sendSupportEmailDispatch(
+                'soporte@rutaprivada.com',
+                `[Reclamo #${ticketId}] ${categoryText} - ${driverName}`,
+                emailBody,
+                { ticketId, category: categoryText, tripId }
+            );
 
             // Restaurar estado del botón
             if (btnSubmitDriverTicket) {
@@ -8580,17 +9081,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 txtBtnSubmitTicket.textContent = 'Enviar Reclamo a Soporte';
             }
 
-            // Cerrar modales y limpiar formulario
+            // Cerrar formulario y abrir directamente el Chat de Soporte con la consulta ya visible
             closeDriverTicketModal();
             closeDriverHelpModal();
             formDriverReportTicket.reset();
 
-            // Mensaje de éxito al chofer
+            // Notificación al chofer y transición sin salir de la app
             if (typeof showDriverToast === 'function') {
-                showDriverToast(`✅ Reclamo #${ticketId} enviado con éxito. La resolución te llegará a ${driverEmail}`, 'success');
-            } else {
-                alert(`✅ Reclamo #${ticketId} registrado con éxito.\n\nEl equipo de soporte revisará el caso y responderá directamente a tu correo electrónico:\n${driverEmail}`);
+                showDriverToast(`✅ Reclamo #${ticketId} registrado. Copia enviada a ${driverEmail}`, 'success');
             }
+
+            // Abrir automáticamente el Chat de Soporte para continuar el hilo
+            setTimeout(() => {
+                openDriverSupportChatModal();
+            }, 300);
         });
     }
 
@@ -8603,6 +9107,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const modalReset = document.getElementById('modalDriverPasswordReset');
             if (modalReset && (modalReset.classList.contains('active') || modalReset.style.display === 'flex')) {
                 if (typeof window.closeDriverPasswordResetModal === 'function') window.closeDriverPasswordResetModal();
+                return true;
+            }
+
+            // 0.05 Modal de Chat de Soporte Central
+            if (modalDriverSupportChat && (modalDriverSupportChat.classList.contains('active') || modalDriverSupportChat.style.display === 'flex')) {
+                closeDriverSupportChatModal();
                 return true;
             }
 
@@ -8735,7 +9245,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Registro y actualización de Service Worker para la PWA de Chofer
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js?v=107')
+            navigator.serviceWorker.register('sw.js?v=127')
                 .then(reg => {
                     reg.update().catch(() => {});
                 })
