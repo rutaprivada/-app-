@@ -146,7 +146,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=111" />
+  <link rel="stylesheet" href="styles.css?v=138" />
 </head>
 
 <body>
@@ -2555,10 +2555,12 @@
             <i class="fa-solid fa-headset" style="font-size: 1.2rem; color: #38bdf8;"></i>
             <div>
               <strong style="color: #fff; font-size: 0.92rem; display: block;">Central de Soporte Oficial</strong>
-              <span style="color: #94a3b8; font-size: 0.75rem;">Atención y resolución por correo: rutaprivadasoporte@gmail.com</span>
+              <span style="color: #94a3b8; font-size: 0.75rem;">Atención y resolución por correo:
+                rutaprivadasoporte@gmail.com</span>
             </div>
           </div>
-          <button type="button" onclick="if(typeof window.closePassengerSosModal==='function') window.closePassengerSosModal(); window.openPassengerTicketCategory('otro', 'Reporte desde Centro de Seguridad');"
+          <button type="button"
+            onclick="if(typeof window.closePassengerSosModal==='function') window.closePassengerSosModal(); window.openPassengerTicketCategory('otro', 'Reporte desde Centro de Seguridad');"
             style="width: 100%; border: none; box-sizing: border-box; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 10px; padding: 11px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px;">
             <i class="fa-solid fa-envelope"></i> Enviar Reporte a Soporte
           </button>
@@ -2583,10 +2585,10 @@
       </div>
     </div>
   </div>
-    <!-- =========================================================
+  <!-- =========================================================
        MODAL: CENTRO DE AYUDA Y SOPORTE PASAJERO (24/7)
        ========================================================= -->
-    <div id="modalPassengerHelp" class="modal-backdrop hidden" style="z-index: 10006;">
+  <div id="modalPassengerHelp" class="modal-backdrop hidden" style="z-index: 10006;">
       <div class="modal-dialog"
         style="max-width: 560px; background: #0f172a; border: 1.5px solid rgba(56, 189, 248, 0.35); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.85); overflow: hidden;">
         <div class="modal-header"
@@ -2594,9 +2596,8 @@
           <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-size: 1.5rem;">🎧</span>
             <div>
-              <h3 style="color: #fff; margin: 0; font-size: 1.15rem; font-weight: 700;">Centro de Ayuda y Soporte</h3>
-              <p style="color: #94a3b8; margin: 0; font-size: 0.76rem;">Preguntas frecuentes, desgloses operativos y
-                atención 24/7</p>
+              <h3 style="color: #fff; margin: 0; font-size: 1.12rem; font-weight: 700;">Centro de Ayuda y Soporte</h3>
+              <p style="color: #94a3b8; margin: 0; font-size: 0.74rem;">Canal oficial de atención: <strong style="color: #38bdf8;">rutaprivadasoporte@gmail.com</strong></p>
             </div>
           </div>
           <button type="button" onclick="window.closePassengerHelpModal()" class="modal-close"
@@ -2605,353 +2606,311 @@
 
         <div class="modal-body"
           style="padding: 16px 18px; max-height: 75vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
-          <!-- Banner WhatsApp Oficial Directo -->
-          <div
-            style="background: rgba(37, 211, 102, 0.08); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <i class="fa-brands fa-whatsapp" style="font-size: 1.5rem; color: #25d366;"></i>
+
+          <!-- Barra de Pestañas: Iniciar Reclamo vs Mis Reclamos -->
+          <div style="display: flex; gap: 8px;">
+            <button type="button" id="tabPassengerHelpHomeBtn" onclick="window.switchPassengerHelpSection('home')"
+              style="flex: 1; padding: 10px 12px; border-radius: 12px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; background: #0284c7; color: #fff; border: 1px solid #38bdf8; transition: all 0.2s;">
+              <i class="fa-solid fa-headset"></i> Ayuda & Reclamos
+            </button>
+            <button type="button" id="tabPassengerHelpTicketsBtn" onclick="window.switchPassengerHelpSection('tickets')"
+              style="flex: 1; padding: 10px 12px; border-radius: 12px; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.12); transition: all 0.2s;">
+              <i class="fa-solid fa-clipboard-list"></i> Mis Reclamos <span id="badgePassengerTicketsCount" style="display: none; background: #fbbf24; color: #0f172a; font-size: 0.68rem; font-weight: 900; border-radius: 20px; padding: 1px 7px;">0</span>
+            </button>
+          </div>
+
+          <!-- ================= SECCIÓN 1: HOME (ACCIONES DE RECLAMO + FAQ) ================= -->
+          <div id="passengerHelpHomeSection" style="display: flex; flex-direction: column; gap: 12px;">
+
+            <!-- Banner Informativo Oficial -->
+            <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 11px 14px; display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: #7dd3fc;">
+              <i class="fa-solid fa-envelope-circle-check" style="font-size: 1.35rem; color: #38bdf8; flex-shrink: 0;"></i>
               <div>
-                <strong style="color: #fff; font-size: 0.88rem; display: block;">Central de Operaciones 24/7</strong>
-                <small style="color: #94a3b8; font-size: 0.74rem;">Atención inmediata por WhatsApp (+54 9 11
-                  7373-8790)</small>
+                <strong style="color: #fff; display: block; font-size: 0.84rem;">Atención Exclusiva por Soporte Oficial</strong>
+                <span style="color: #94a3b8; font-size: 0.73rem;">Todo reporte se gestiona mediante ticket con respaldo y respuesta a tu correo electrónico registrado.</span>
               </div>
             </div>
-            <a href="https://wa.me/5491173738790?text=Hola%20Soporte%20RutaPrivada,%20necesito%20asistencia%20con%20mi%20traslado."
-              target="_blank"
-              style="background: #25d366; color: #0f172a; text-decoration: none; padding: 7px 13px; border-radius: 8px; font-weight: 800; font-size: 0.78rem; display: flex; align-items: center; gap: 5px; white-space: nowrap;">
-              Abrir WhatsApp
-            </a>
+
+            <!-- BOTONES PRIORITARIOS DE RECLAMO (IMPORTANTES) -->
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="color: #e2e8f0; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 2px;">
+                ¿Qué inconveniente deseas reportar?
+              </div>
+
+              <!-- 1. Problemas con el chofer -->
+              <div onclick="window.openPassengerTicketCategory('chofer', 'Problemas con el Chofer')"
+                style="background: rgba(15, 23, 42, 0.85); border: 1.5px solid rgba(245, 158, 11, 0.35); border-radius: 12px; padding: 12px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: border-color 0.2s;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span style="font-size: 1.5rem; background: rgba(245, 158, 11, 0.12); width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">🚗</span>
+                  <div>
+                    <strong style="color: #fff; font-size: 0.9rem; display: block;">Problemas con el Chofer</strong>
+                    <small style="color: #94a3b8; font-size: 0.73rem;">Conducta indebida, desvío injustificado, demoras o trato</small>
+                  </div>
+                </div>
+                <i class="fa-solid fa-chevron-right" style="color: #fbbf24; font-size: 0.85rem;"></i>
+              </div>
+
+              <!-- 2. Olvidaste un objeto -->
+              <div onclick="window.openPassengerTicketCategory('objeto', 'Objeto Olvidado en el Vehículo')"
+                style="background: rgba(15, 23, 42, 0.85); border: 1.5px solid rgba(239, 68, 68, 0.35); border-radius: 12px; padding: 12px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: border-color 0.2s;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span style="font-size: 1.5rem; background: rgba(239, 68, 68, 0.12); width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">🧳</span>
+                  <div>
+                    <strong style="color: #fff; font-size: 0.9rem; display: block;">¿Olvidaste un Objeto?</strong>
+                    <small style="color: #94a3b8; font-size: 0.73rem;">Reporte prioritario para localizar y recuperar pertenencias en el auto</small>
+                  </div>
+                </div>
+                <i class="fa-solid fa-chevron-right" style="color: #f87171; font-size: 0.85rem;"></i>
+              </div>
+
+              <!-- 3. Problemas con el cobro o pago -->
+              <div onclick="window.openPassengerTicketCategory('pago', 'Problemas con el Cobro / Pago')"
+                style="background: rgba(15, 23, 42, 0.85); border: 1.5px solid rgba(56, 189, 248, 0.35); border-radius: 12px; padding: 12px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: border-color 0.2s;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span style="font-size: 1.5rem; background: rgba(56, 189, 248, 0.12); width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">💳</span>
+                  <div>
+                    <strong style="color: #fff; font-size: 0.9rem; display: block;">Problemas con el Cobro o Pago</strong>
+                    <small style="color: #94a3b8; font-size: 0.73rem;">Cobro de más, tarifa incorrecta o error en transferencia</small>
+                  </div>
+                </div>
+                <i class="fa-solid fa-chevron-right" style="color: #38bdf8; font-size: 0.85rem;"></i>
+              </div>
+
+              <!-- 4. Otro reclamo o consulta general -->
+              <div onclick="window.openPassengerTicketCategory('otro', 'Otro Reclamo o Consulta General')"
+                style="background: rgba(15, 23, 42, 0.85); border: 1.5px solid rgba(168, 85, 247, 0.35); border-radius: 12px; padding: 12px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: border-color 0.2s;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <span style="font-size: 1.5rem; background: rgba(168, 85, 247, 0.12); width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">📝</span>
+                  <div>
+                    <strong style="color: #fff; font-size: 0.9rem; display: block;">Otro Reclamo o Consulta</strong>
+                    <small style="color: #94a3b8; font-size: 0.73rem;">Inquietudes operativas, facturación corporativa o reportes especiales</small>
+                  </div>
+                </div>
+                <i class="fa-solid fa-chevron-right" style="color: #c084fc; font-size: 0.85rem;"></i>
+              </div>
+            </div>
+
+            <!-- ACORDEÓN MAESTRO DE PREGUNTAS FRECUENTES (FAQ) -->
+            <div class="passenger-help-card" style="background: rgba(15, 23, 42, 0.75); border: 1.5px solid rgba(255,255,255,0.12); border-radius: 14px; overflow: hidden; margin-top: 4px;">
+              <div class="passenger-help-header-toggle" onclick="window.togglePassengerFaqMasterAccordion(this)"
+                style="padding: 13px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; background: rgba(255,255,255,0.02);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 1.3rem;">💡</span>
+                  <div>
+                    <strong style="color: #fff; font-size: 0.9rem; display: block;">Preguntas Frecuentes (FAQ)</strong>
+                    <small style="color: #94a3b8; font-size: 0.73rem;">Tarifas fijas, peajes incluidos, reservas, aeropuertos y equipaje</small>
+                  </div>
+                </div>
+                <i class="fa-solid fa-chevron-down toggle-icon" id="passengerFaqMasterIcon"
+                  style="color: #38bdf8; font-size: 0.9rem; transition: transform 0.25s;"></i>
+              </div>
+
+              <!-- CUERPO DESPLEGABLE DEL ACORDEÓN DE PREGUNTAS -->
+              <div id="passengerFaqMasterBody" style="display: none; padding: 12px 14px 16px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25); flex-direction: column; gap: 8px;">
+
+                <!-- Buscador en tiempo real de ayuda -->
+                <div style="position: relative; margin-bottom: 4px;">
+                  <input type="text" id="searchPassengerHelpInput" oninput="window.filterPassengerHelp(this.value)"
+                    placeholder="🔍 Buscar dudas (tarifas, peajes, vuelos, valijas, pagos...)"
+                    style="width: 100%; background: #162032; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px; padding: 9px 12px; font-size: 0.82rem; color: #fff; outline: none;" />
+                </div>
+
+                <div id="passengerHelpNoResults"
+                  style="display: none; text-align: center; padding: 18px 10px; color: #94a3b8;">
+                  <div style="font-size: 1.6rem; margin-bottom: 4px;">🔍</div>
+                  <p style="font-size: 0.82rem; margin: 0; color: #fff;">No encontramos resultados para tu búsqueda.</p>
+                  <small style="color: #64748b;">Puedes iniciar un reclamo formal desde los botones superiores.</small>
+                </div>
+
+                <!-- LISTADO DE PREGUNTAS EN ACORDEÓN INTERNO -->
+                <div id="passengerHelpCardsContainer" style="display: flex; flex-direction: column; gap: 7px;">
+
+                  <!-- 1. ¿Cómo se calcula la tarifa exacta? -->
+                  <div class="passenger-help-card" data-help-cat="tarifas"
+                    style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+                    <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
+                      style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.15rem;">💵</span>
+                        <div>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Cómo se calcula el costo de mi traslado?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">Sin tarifas dinámicas sorpresa por lluvia o alta demanda</small>
+                        </div>
+                      </div>
+                      <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
+                    </div>
+                    <div class="passenger-help-body"
+                      style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
+                      <p style="margin: 0 0 6px;">El sistema de RutaPrivada calcula el valor con total transparencia:</p>
+                      <ul style="margin: 0 0 6px 16px; padding: 0;">
+                        <li><strong>Tarifa Base fija:</strong> Según el tipo de trayecto y horario.</li>
+                        <li><strong>Kilómetros reales:</strong> Trazados por ruteo satelital más directo.</li>
+                        <li><strong>Garantía de precio fijo:</strong> La tarifa cotizada se mantiene sin aumentos sorpresivos.</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <!-- 2. ¿Los peajes están incluidos? -->
+                  <div class="passenger-help-card" data-help-cat="tarifas"
+                    style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+                    <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
+                      style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.15rem;">🛣️</span>
+                        <div>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Los peajes están incluidos en el precio?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">AUSA, Riccheri, Panamericana y autopistas</small>
+                        </div>
+                      </div>
+                      <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
+                    </div>
+                    <div class="passenger-help-body"
+                      style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
+                      <p style="margin: 0;"><strong>Sí, absolutamente.</strong> En RutaPrivada los peajes obligatorios de la ruta se detectan e incluyen en la cotización inicial. No deberás abonar ningún extra en cabinas.</p>
+                    </div>
+                  </div>
+
+                  <!-- 3. Anticipación de reservas -->
+                  <div class="passenger-help-card" data-help-cat="reservas"
+                    style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+                    <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
+                      style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.15rem;">📅</span>
+                        <div>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Con cuánta anticipación puedo programar mi viaje?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">Inmediatos o agendados hasta con 30 días de antelación</small>
+                        </div>
+                      </div>
+                      <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
+                    </div>
+                    <div class="passenger-help-body"
+                      style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
+                      <p style="margin: 0;">Puedes solicitar viajes en vivo inmediatos o reservar con antelación seleccionando fecha y hora en el paso de cotización.</p>
+                    </div>
+                  </div>
+
+                  <!-- 4. Aeropuertos y seguimiento de vuelos -->
+                  <div class="passenger-help-card" data-help-cat="reservas"
+                    style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+                    <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
+                      style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.15rem;">✈️</span>
+                        <div>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Hacen seguimiento de vuelos en Ezeiza o Aeroparque?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">Monitoreo satelital y tiempo de espera de cortesía</small>
+                        </div>
+                      </div>
+                      <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
+                    </div>
+                    <div class="passenger-help-body"
+                      style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
+                      <p style="margin: 0;"><strong>Sí.</strong> En traslados desde aeropuertos el chofer monitorea el estado del vuelo y cuentas con hasta 45 minutos de cortesía en arribos internacionales y 30 minutos en nacionales.</p>
+                    </div>
+                  </div>
+
+                  <!-- 5. Equipaje y valijas -->
+                  <div class="passenger-help-card" data-help-cat="viaje"
+                    style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+                    <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
+                      style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.15rem;">🧳</span>
+                        <div>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Cuánto equipaje puedo llevar?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">Capacidad de baúl y valijas estándar</small>
+                        </div>
+                      </div>
+                      <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
+                    </div>
+                    <div class="passenger-help-body"
+                      style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
+                      <p style="margin: 0;">Todos los vehículos ejecutivos de la flota cuentan con baúles amplios y limpios. En sedanes entran 2 valijas grandes más carry-ons.</p>
+                    </div>
+                  </div>
+
+                  <!-- 6. Viajes con mascotas -->
+                  <div class="passenger-help-card" data-help-cat="viaje"
+                    style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+                    <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
+                      style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.15rem;">🐾</span>
+                        <div>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Puedo viajar con mi mascota?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">Traslado Pet Friendly seguro y habilitado</small>
+                        </div>
+                      </div>
+                      <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
+                    </div>
+                    <div class="passenger-help-body"
+                      style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
+                      <p style="margin: 0;"><strong>Sí.</strong> Recuerda marcar el adicional "Mascota" al cotizar para despachar un vehículo acondicionado con manta o canil.</p>
+                    </div>
+                  </div>
+
+                  <!-- 7. Medios de pago -->
+                  <div class="passenger-help-card" data-help-cat="pagos"
+                    style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+                    <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
+                      style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.15rem;">💳</span>
+                        <div>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Cuáles son los medios de pago aceptados?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">Efectivo, transferencias y tarjetas</small>
+                        </div>
+                      </div>
+                      <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
+                    </div>
+                    <div class="passenger-help-body"
+                      style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
+                      <p style="margin: 0;">Aceptamos efectivo exacto al chofer, transferencias instantáneas (Alias/CVU) y pagos con tarjeta de débito/crédito.</p>
+                    </div>
+                  </div>
+
+                  <!-- 8. Cancelaciones y reprogramaciones -->
+                  <div class="passenger-help-card" data-help-cat="reservas"
+                    style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+                    <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
+                      style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.15rem;">🔄</span>
+                        <div>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Puedo cancelar o reprogramar mi reserva?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">Políticas sin costo con aviso previo</small>
+                        </div>
+                      </div>
+                      <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
+                    </div>
+                    <div class="passenger-help-body"
+                      style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
+                      <p style="margin: 0;">Puedes cancelar o reprogramar tu viaje con hasta 2 horas de anticipación sin ningún tipo de penalidad ni recargo.</p>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+
           </div>
 
-          <!-- Buscador en tiempo real de ayuda -->
-          <div style="position: relative;">
-            <input type="text" id="searchPassengerHelpInput" oninput="window.filterPassengerHelp(this.value)"
-              placeholder="🔍 Buscar dudas (tarifas, peajes, vuelos, valijas, pagos...)"
-              style="width: 100%; background: #162032; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; color: #fff; outline: none;" />
-          </div>
-
-          <!-- Chips de Filtro por Categorías -->
-          <div style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;">
-            <button type="button" class="p-help-tab-chip" onclick="window.switchPassengerHelpTab('all', this)"
-              style="background: #38bdf8; color: #0f172a; border: 1px solid #38bdf8; border-radius: 20px; padding: 5px 12px; font-size: 0.74rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-              Todas
-            </button>
-            <button type="button" class="p-help-tab-chip" onclick="window.switchPassengerHelpTab('tarifas', this)"
-              style="background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 5px 12px; font-size: 0.74rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-              Tarifas y Peajes
-            </button>
-            <button type="button" class="p-help-tab-chip" onclick="window.switchPassengerHelpTab('reservas', this)"
-              style="background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 5px 12px; font-size: 0.74rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-              Reservas y Vuelos
-            </button>
-            <button type="button" class="p-help-tab-chip" onclick="window.switchPassengerHelpTab('pagos', this)"
-              style="background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 5px 12px; font-size: 0.74rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-              Medios de Pago
-            </button>
-            <button type="button" class="p-help-tab-chip" onclick="window.switchPassengerHelpTab('viaje', this)"
-              style="background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 5px 12px; font-size: 0.74rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-              Equipaje y Vehículo
-            </button>
-            <button type="button" class="p-help-tab-chip" onclick="window.switchPassengerHelpTab('reclamos', this)"
-              style="background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 5px 12px; font-size: 0.74rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-              Reclamos y Objetos
-            </button>
-          </div>
-
-          <div id="passengerHelpNoResults"
-            style="display: none; text-align: center; padding: 24px 10px; color: #94a3b8;">
-            <div style="font-size: 2rem; margin-bottom: 6px;">🔍</div>
-            <p style="font-size: 0.85rem; margin: 0; color: #fff;">No encontramos resultados para tu búsqueda.</p>
-            <small style="color: #64748b;">Prueba con otra palabra o consulta directo por WhatsApp.</small>
-          </div>
-
-          <!-- LISTADO DE PREGUNTAS CON DESGLOSE ACORDEÓN -->
-          <div id="passengerHelpCardsContainer" style="display: flex; flex-direction: column; gap: 8px;">
-
-            <!-- 1. ¿Cómo se calcula la tarifa exacta? -->
-            <div class="passenger-help-card" data-help-cat="tarifas"
-              style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: border-color 0.2s;">
-              <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
-                style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 1.25rem;">💵</span>
-                  <div>
-                    <strong style="color: #fff; font-size: 0.88rem; display: block;">¿Cómo se calcula el costo de mi
-                      traslado?</strong>
-                    <small style="color: #94a3b8; font-size: 0.72rem;">Sin tarifas dinámicas sorpresa por lluvia o
-                      demanda</small>
-                  </div>
-                </div>
-                <i class="fa-solid fa-chevron-down toggle-icon"
-                  style="color: #38bdf8; font-size: 0.85rem; transition: transform 0.25s;"></i>
-              </div>
-              <div class="passenger-help-body"
-                style="display: none; padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                <p style="margin: 0 0 8px;">El sistema de RutaPrivada calcula el valor con total transparencia:</p>
-                <ul style="margin: 0 0 10px 18px; padding: 0;">
-                  <li><strong>Tarifa Base fija:</strong> Según el tipo de trayecto y categoría.</li>
-                  <li><strong>Kilómetros reales:</strong> Trazados por el motor de ruteo satelital más directo.</li>
-                  <li><strong>Peajes oficiales incluidos:</strong> Se detectan los peajes obligatorios según el horario
-                    del viaje (pico / no pico).</li>
-                  <li><strong>Garantía de precio fijo:</strong> La tarifa cotizada se mantiene sin aumentos imprevistos
-                    por congestión vehicular habitual.</li>
-                </ul>
-              </div>
+          <!-- ================= SECCIÓN 2: MIS RECLAMOS Y CASOS ================= -->
+          <div id="passengerHelpTicketsSection" style="display: none; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+              <span style="font-size: 0.8rem; color: #94a3b8; font-weight: 700;">Historial de Casos Radicados</span>
+              <button type="button" onclick="if(typeof window.renderPassengerTicketsList==='function') window.renderPassengerTicketsList();"
+                style="background: none; border: none; color: #38bdf8; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
+                <i class="fa-solid fa-rotate"></i> Actualizar
+              </button>
             </div>
 
-            <!-- 2. ¿Los peajes están incluidos? -->
-            <div class="passenger-help-card" data-help-cat="tarifas"
-              style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: border-color 0.2s;">
-              <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
-                style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 1.25rem;">🛣️</span>
-                  <div>
-                    <strong style="color: #fff; font-size: 0.88rem; display: block;">¿Los peajes están incluidos en el
-                      precio?</strong>
-                    <small style="color: #94a3b8; font-size: 0.72rem;">AUSA, Riccheri, Panamericana y autopistas</small>
-                  </div>
-                </div>
-                <i class="fa-solid fa-chevron-down toggle-icon"
-                  style="color: #38bdf8; font-size: 0.85rem; transition: transform 0.25s;"></i>
-              </div>
-              <div class="passenger-help-body"
-                style="display: none; padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                <p style="margin: 0 0 8px;"><strong>Sí, absolutamente.</strong> A diferencia de otras apps donde los
-                  peajes se suman al finalizar el viaje, en RutaPrivada los peajes obligatorios de la ruta se detectan e
-                  incluyen en la cotización inicial.</p>
-                <p style="margin: 0;">No deberás pagar ningún extra al conductor en las cabinas de peaje.</p>
-              </div>
+            <!-- Contenedor dinámico de tickets -->
+            <div id="passengerTicketsListContainer" style="display: flex; flex-direction: column; gap: 10px; min-height: 140px;">
+              <!-- Se inyecta dinámicamente con renderPassengerTicketsList() -->
             </div>
-
-            <!-- 3. Anticipación de reservas -->
-            <div class="passenger-help-card" data-help-cat="reservas"
-              style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: border-color 0.2s;">
-              <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
-                style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 1.25rem;">📅</span>
-                  <div>
-                    <strong style="color: #fff; font-size: 0.88rem; display: block;">¿Con cuánta anticipación puedo
-                      programar mi viaje?</strong>
-                    <small style="color: #94a3b8; font-size: 0.72rem;">Viajes inmediatos o agendados hasta 30 días
-                      antes</small>
-                  </div>
-                </div>
-                <i class="fa-solid fa-chevron-down toggle-icon"
-                  style="color: #38bdf8; font-size: 0.85rem; transition: transform 0.25s;"></i>
-              </div>
-              <div class="passenger-help-body"
-                style="display: none; padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                <p style="margin: 0 0 8px;">Puedes solicitar tu viaje de dos maneras:</p>
-                <ul style="margin: 0 0 10px 18px; padding: 0;">
-                  <li><strong>Viaje Inmediato:</strong> El chofer asignado más cercano se desplaza a tu origen (tiempo
-                    estimado: 15 a 25 min según tráfico).</li>
-                  <li><strong>Viaje Programado:</strong> Puedes elegir fecha y hora exacta con días o semanas de
-                    anticipación, ideal para salidas a Ezeiza, Aeroparque o eventos corporativos.</li>
-                </ul>
-              </div>
-            </div>
-
-            <!-- 4. Demoras en vuelos (Ezeiza / Aeroparque) -->
-            <div class="passenger-help-card" data-help-cat="reservas"
-              style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: border-color 0.2s;">
-              <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
-                style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 1.25rem;">✈️</span>
-                  <div>
-                    <strong style="color: #fff; font-size: 0.88rem; display: block;">¿Qué sucede si mi vuelo se demora o
-                      aterriza tarde?</strong>
-                    <small style="color: #94a3b8; font-size: 0.72rem;">Monitoreo en vivo de vuelos en EZE y AEP</small>
-                  </div>
-                </div>
-                <i class="fa-solid fa-chevron-down toggle-icon"
-                  style="color: #38bdf8; font-size: 0.85rem; transition: transform 0.25s;"></i>
-              </div>
-              <div class="passenger-help-body"
-                style="display: none; padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                <p style="margin: 0 0 8px;">Si indicas tu número de vuelo en las notas al reservar, la central y tu
-                  chofer asignado monitorean en tiempo real el estado de arribo del avión en Aeropuertos Argentina 2000.
-                </p>
-                <p style="margin: 0;">El chofer ajusta automáticamente su horario de llegada al hall de arribos sin
-                  cobrar tiempo de espera por demoras habituales de pista.</p>
-              </div>
-            </div>
-
-            <!-- 5. Medios de pago aceptados -->
-            <div class="passenger-help-card" data-help-cat="pagos"
-              style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: border-color 0.2s;">
-              <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
-                style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 1.25rem;">💳</span>
-                  <div>
-                    <strong style="color: #fff; font-size: 0.88rem; display: block;">¿Qué medios de pago puedo
-                      utilizar?</strong>
-                    <small style="color: #94a3b8; font-size: 0.72rem;">Efectivo, Transferencia, Mercado Pago y
-                      Tarjetas</small>
-                  </div>
-                </div>
-                <i class="fa-solid fa-chevron-down toggle-icon"
-                  style="color: #38bdf8; font-size: 0.85rem; transition: transform 0.25s;"></i>
-              </div>
-              <div class="passenger-help-body"
-                style="display: none; padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                <p style="margin: 0 0 8px;">Aceptamos las principales formas de pago en Argentina:</p>
-                <ul style="margin: 0 0 10px 18px; padding: 0;">
-                  <li><strong>Efectivo:</strong> Abonas el importe exacto al chofer al finalizar el traslado.</li>
-                  <li><strong>Transferencia Bancaria Inmediata:</strong> Vía CBU / Alias oficial al iniciar o terminar
-                    el trayecto.</li>
-                  <li><strong>Mercado Pago:</strong> Mediante código QR o link de cobro.</li>
-                  <li><strong>Tarjetas guardadas:</strong> Puedes vincular tus tarjetas de crédito o débito desde la
-                    pestaña "Medios de Pago" de tu perfil.</li>
-                </ul>
-              </div>
-            </div>
-
-            <!-- 6. Factura A y B -->
-            <div class="passenger-help-card" data-help-cat="pagos"
-              style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: border-color 0.2s;">
-              <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
-                style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 1.25rem;">🧾</span>
-                  <div>
-                    <strong style="color: #fff; font-size: 0.88rem; display: block;">¿Puedo solicitar Factura A o B para
-                      mi empresa?</strong>
-                    <small style="color: #94a3b8; font-size: 0.72rem;">Comprobantes fiscales oficiales para
-                      reintegro</small>
-                  </div>
-                </div>
-                <i class="fa-solid fa-chevron-down toggle-icon"
-                  style="color: #38bdf8; font-size: 0.85rem; transition: transform 0.25s;"></i>
-              </div>
-              <div class="passenger-help-body"
-                style="display: none; padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                <p style="margin: 0 0 8px;"><strong>Sí.</strong> Emitimos factura electrónica oficial de AFIP (Factura A
-                  con CUIT o Factura B para consumidor final).</p>
-                <p style="margin: 0 0 10px;">Solo debes solicitarla a través de nuestro WhatsApp oficial o pulsando el
-                  botón a continuación indicando tu número de CUIT o DNI.</p>
-                <button type="button" onclick="window.openPassengerTicketCategory('factura')"
-                  style="width: 100%; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; border-radius: 8px; padding: 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer;">
-                  Solicitar Factura Fiscal ➔
-                </button>
-              </div>
-            </div>
-
-            <!-- 7. Equipaje y Valijas -->
-            <div class="passenger-help-card" data-help-cat="viaje"
-              style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: border-color 0.2s;">
-              <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
-                style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 1.25rem;">🧳</span>
-                  <div>
-                    <strong style="color: #fff; font-size: 0.88rem; display: block;">¿Cuánto equipaje puedo llevar en el
-                      vehículo?</strong>
-                    <small style="color: #94a3b8; font-size: 0.72rem;">Capacidad de baúl y bultos de mano</small>
-                  </div>
-                </div>
-                <i class="fa-solid fa-chevron-down toggle-icon"
-                  style="color: #38bdf8; font-size: 0.85rem; transition: transform 0.25s;"></i>
-              </div>
-              <div class="passenger-help-body"
-                style="display: none; padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                <p style="margin: 0 0 8px;">Nuestros vehículos sedán ejecutivos cuentan con baúl generoso con capacidad
-                  para:</p>
-                <ul style="margin: 0 0 10px 18px; padding: 0;">
-                  <li>Hasta <strong>2 valijas grandes (23 kg)</strong> o 3 carry-on.</li>
-                  <li>Bolsos de mano y mochilas en el habitáculo.</li>
-                </ul>
-                <p style="margin: 0;">Si viajas con equipaje voluminoso adicional (cajas, instrumentos, cochecitos),
-                  indícalo en las notas de tu reserva para prever el espacio adecuado.</p>
-              </div>
-            </div>
-
-            <!-- 8. Cancelaciones o Modificaciones -->
-            <div class="passenger-help-card" data-help-cat="reservas"
-              style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: border-color 0.2s;">
-              <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
-                style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 1.25rem;">🔄</span>
-                  <div>
-                    <strong style="color: #fff; font-size: 0.88rem; display: block;">¿Cómo cancelo o modifico mi viaje
-                      programado?</strong>
-                    <small style="color: #94a3b8; font-size: 0.72rem;">Cancelación sin costo con aviso previo</small>
-                  </div>
-                </div>
-                <i class="fa-solid fa-chevron-down toggle-icon"
-                  style="color: #38bdf8; font-size: 0.85rem; transition: transform 0.25s;"></i>
-              </div>
-              <div class="passenger-help-body"
-                style="display: none; padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                <p style="margin: 0 0 8px;">Puedes cancelar o reprogramar tu viaje sin penalización alguna notificando a
-                  la central con al menos <strong>2 horas de anticipación</strong> al horario pactado.</p>
-                <p style="margin: 0;">Puedes hacerlo desde el botón <em>"Mis Reservas"</em> en la cabecera o
-                  directamente por WhatsApp con el equipo de soporte.</p>
-              </div>
-            </div>
-
-            <!-- 9. Objetos Olvidados -->
-            <div class="passenger-help-card" data-help-cat="reclamos"
-              style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: border-color 0.2s;">
-              <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
-                style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 1.25rem;">🔍</span>
-                  <div>
-                    <strong style="color: #fff; font-size: 0.88rem; display: block;">¿Olvidaste un objeto en el
-                      vehículo?</strong>
-                    <small style="color: #94a3b8; font-size: 0.72rem;">Celulares, llaves, abrigos o
-                      documentación</small>
-                  </div>
-                </div>
-                <i class="fa-solid fa-chevron-down toggle-icon"
-                  style="color: #38bdf8; font-size: 0.85rem; transition: transform 0.25s;"></i>
-              </div>
-              <div class="passenger-help-body"
-                style="display: none; padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                <p style="margin: 0 0 8px;">Nuestros choferes revisan el habitáculo al finalizar cada viaje. Cualquier
-                  pertenencia olvidada queda bajo custodia segura de la central.</p>
-                <p style="margin: 0 0 10px;">Contáctanos de inmediato por WhatsApp o pulsa a continuación para coordinar
-                  la restitución:</p>
-                <button type="button" onclick="window.openPassengerTicketCategory('objeto')"
-                  style="width: 100%; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 8px; padding: 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer;">
-                  Reportar Objeto Olvidado ➔
-                </button>
-              </div>
-            </div>
-
-            <!-- 10. Reclamo de Tarifa / Chofer -->
-            <div class="passenger-help-card" data-help-cat="reclamos"
-              style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; transition: border-color 0.2s;">
-              <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
-                style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 1.25rem;">⚠️</span>
-                  <div>
-                    <strong style="color: #fff; font-size: 0.88rem; display: block;">Problema con el chofer, ruta o
-                      cobro indebido</strong>
-                    <small style="color: #94a3b8; font-size: 0.72rem;">Revisión inmediata por auditoría de
-                      operaciones</small>
-                  </div>
-                </div>
-                <i class="fa-solid fa-chevron-down toggle-icon"
-                  style="color: #38bdf8; font-size: 0.85rem; transition: transform 0.25s;"></i>
-              </div>
-              <div class="passenger-help-body"
-                style="display: none; padding: 10px 14px 14px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                <p style="margin: 0 0 8px;">Si experimentaste un cobro diferente a la cotización o una conducta
-                  inapropiada por parte del conductor, eleva tu reporte para auditoría:</p>
-                <button type="button" onclick="window.openPassengerTicketCategory('tarifa')"
-                  style="width: 100%; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; border-radius: 8px; padding: 8px; font-weight: 700; font-size: 0.78rem; cursor: pointer;">
-                  Cargar Reclamo Formal ➔
-                </button>
-              </div>
-            </div>
-
           </div>
 
         </div>
@@ -2969,16 +2928,37 @@
           <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-size: 1.4rem;">📝</span>
             <div>
-              <h3 style="color: #fff; margin: 0; font-size: 1.1rem; font-weight: 700;">Cargar Reclamo a Soporte</h3>
-              <p style="color: #94a3b8; margin: 0; font-size: 0.75rem;">Resolución directa con el equipo central</p>
+              <h3 style="color: #fff; margin: 0; font-size: 1.1rem; font-weight: 700;">Radicar Reclamo a Soporte</h3>
+              <p style="color: #94a3b8; margin: 0; font-size: 0.74rem;">Resolución oficial: <strong style="color: #38bdf8;">rutaprivadasoporte@gmail.com</strong></p>
             </div>
           </div>
           <button type="button" onclick="window.closePassengerTicketModal()" class="modal-close"
             style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer;">&times;</button>
         </div>
 
+        <div style="background: rgba(56, 189, 248, 0.08); border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding: 10px 18px; font-size: 0.76rem; color: #7dd3fc; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-envelope-circle-check" style="color: #38bdf8; font-size: 1.1rem; flex-shrink: 0;"></i>
+          <span>Copia oficial: Tu reclamo se enviará a tu correo y a la Central de Soporte para su respuesta directa por email.</span>
+        </div>
+
         <form id="formPassengerReportTicket"
           style="padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+
+          <!-- Categoría Bloqueada (Preseleccionada) -->
+          <div>
+            <label style="color: #94a3b8; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Tema del Reclamo (Fijado)</label>
+            <div style="position: relative;">
+              <select id="ticketPassengerCategory" required
+                style="width: 100%; background: rgba(15, 23, 42, 0.95); border: 1.5px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 800; padding: 10px 36px 10px 12px; border-radius: 10px; font-size: 0.86rem; pointer-events: none; cursor: not-allowed; -webkit-appearance: none; -moz-appearance: none; appearance: none;">
+                <option value="chofer">🚗 Problemas con el Chofer</option>
+                <option value="objeto">🧳 Objeto Olvidado en el Vehículo</option>
+                <option value="pago">💳 Problemas con el Cobro / Pago</option>
+                <option value="otro">📝 Otro Reclamo o Consulta General</option>
+              </select>
+              <i class="fa-solid fa-lock" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 0.85rem;" title="Tema fijado desde Ayuda"></i>
+            </div>
+          </div>
+
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
               <label
@@ -2996,32 +2976,17 @@
             </div>
           </div>
 
-          <div>
-            <label
-              style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Correo
-              Electrónico de Contacto *</label>
-            <input type="email" id="ticketPassengerEmail" required
-              style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 9px; font-size: 0.85rem; outline: none;" />
-          </div>
-
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div>
               <label
-                style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Motivo
-                / Categoría</label>
-              <select id="ticketPassengerCategory"
-                style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 10px; border-radius: 9px; font-size: 0.82rem; outline: none;">
-                <option value="tarifa">🚗 Problema con Viaje / Tarifa</option>
-                <option value="objeto">🧳 Objeto Olvidado</option>
-                <option value="factura">💳 Facturación / Pago</option>
-                <option value="seguridad">🛡️ Seguridad / Conductor</option>
-                <option value="otro">📝 Consulta General</option>
-              </select>
+                style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Correo
+                Electrónico *</label>
+              <input type="email" id="ticketPassengerEmail" required
+                style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 9px; font-size: 0.85rem; outline: none;" />
             </div>
             <div>
               <label
-                style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">ID /
-                Fecha de Viaje</label>
+                style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">ID / Fecha de Viaje</label>
               <input type="text" id="ticketPassengerTripId" placeholder="Ej: Viaje de Hoy o #1234"
                 style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 9px 12px; border-radius: 9px; font-size: 0.85rem; outline: none;" />
             </div>
@@ -3030,9 +2995,9 @@
           <div>
             <label
               style="color: #e2e8f0; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Descripción
-              del Inconveniente o Detalle *</label>
-            <textarea id="ticketPassengerDescription" rows="3" required
-              placeholder="Describe lo ocurrido con el mayor detalle posible para brindarte una solución ágil..."
+              detallada del Reclamo *</label>
+            <textarea id="ticketPassengerDescription" rows="4" required
+              placeholder="Describe lo sucedido con el mayor detalle posible para brindarte una respuesta ágil..."
               style="width: 100%; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 10px 12px; border-radius: 9px; font-size: 0.85rem; outline: none; resize: vertical;"></textarea>
           </div>
 
@@ -3042,7 +3007,7 @@
               Cancelar
             </button>
             <button type="submit" id="btnSubmitPassengerTicket"
-              style="flex: 2; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; border-radius: 10px; padding: 11px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              style="flex: 2; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none; color: #fff; border-radius: 10px; padding: 11px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);">
               <span id="txtBtnSubmitPassengerTicket">🚀 Enviar Reclamo a Soporte</span>
             </button>
           </div>
@@ -3051,102 +3016,102 @@
     </div>
 
     <!-- Toast Notification -->
-    <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden"></div>
 
-    <!-- Print Only Template -->
-    <div id="print-voucher" class="print-voucher-template">
-      <div class="print-header">
-        <h2>RutaPrivada | Comprobante de Cotización</h2>
-        <p>Servicio de Traslados Privados y Chofer Ejecutivo</p>
-      </div>
-      <div class="print-body" id="print-content-body">
-        <!-- Injected dynamically on print -->
-      </div>
-      <div class="print-footer">
-        <p>Cotización generada el <span id="print-date"></span>. Tarifa garantizada según ruta y horario seleccionado.
-        </p>
-      </div>
+  <!-- Print Only Template -->
+  <div id="print-voucher" class="print-voucher-template">
+    <div class="print-header">
+      <h2>RutaPrivada | Comprobante de Cotización</h2>
+      <p>Servicio de Traslados Privados y Chofer Ejecutivo</p>
     </div>
+    <div class="print-body" id="print-content-body">
+      <!-- Injected dynamically on print -->
+    </div>
+    <div class="print-footer">
+      <p>Cotización generada el <span id="print-date"></span>. Tarifa garantizada según ruta y horario seleccionado.
+      </p>
+    </div>
+  </div>
 
-    <!-- Firebase App, Cloud Firestore & Storage SDKs (Compat) -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <!-- Firebase App, Cloud Firestore & Storage SDKs (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
-    <!-- Leaflet JS for Maps -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet JS for Maps -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Sync & Realtime -->
-    <script src="sync.js?v=137"></script>
+  <!-- Sync & Realtime -->
+  <script src="sync.js?v=138"></script>
 
-    <!-- App JS -->
-    <script src="app.js?v=137"></script>
+  <!-- App JS -->
+  <script src="app.js?v=138"></script>
 
-    <!-- Inicializador Directo de Autocompletado de Direcciones & Auto-Purga de Caché -->
-    <script>
-      (function () {
-        // 1. Limpieza de cachés de service workers obsoletos
-        if ('serviceWorker' in navigator && window.caches) {
-          caches.keys().then(function (keys) {
-            keys.forEach(function (k) {
-              if (k !== 'rutaprivada-pwa-v137') {
-                caches.delete(k);
-              }
-            });
-          }).catch(function () { });
-        }
-
-        // 2. Activación directa de autocompletado en campos de origen y destino
-        function initDirectAutocomplete() {
-          if (typeof window.setupAddressAutocomplete === 'function') {
-            window.setupAddressAutocomplete('origin-input', 'origin-suggestions', function (place) {
-              if (typeof setOrigin === 'function') setOrigin(place.lat, place.lon, place.display_name);
-            });
-            window.setupAddressAutocomplete('destination-input', 'destination-suggestions', function (place) {
-              if (typeof setDestination === 'function') setDestination(place.lat, place.lon, place.display_name);
-            });
-            window.setupAddressAutocomplete('stop-input', 'stop-suggestions', function (place) {
-              if (typeof setIntermediateStop === 'function') setIntermediateStop(place.lat, place.lon, place.display_name);
-            });
-            window.setupAddressAutocomplete('uberOriginInput', 'uberOriginSuggestions', function (place) {
-              var pLat = parseFloat(place.lat), pLon = parseFloat(place.lon);
-              if (typeof uberCurrentCoords !== 'undefined') uberCurrentCoords = [pLat, pLon];
-              if (typeof updateUberPassengerMarker === 'function') updateUberPassengerMarker(pLat, pLon);
-              if (typeof state !== 'undefined') state.origin = { lat: pLat, lng: pLon, address: place.display_name };
-            });
-            window.setupAddressAutocomplete('uberDestInput', 'uberDestSuggestions', function (place) {
-              var dLat = parseFloat(place.lat), dLon = parseFloat(place.lon);
-              if (typeof state !== 'undefined') state.destination = { lat: dLat, lng: dLon, address: place.display_name };
-              if (typeof trazarRutaUberMap === 'function') trazarRutaUberMap([dLat, dLon], place.display_name);
-              if (typeof calcularTarifasCategoriasUber === 'function') calcularTarifasCategoriasUber(place.display_name);
-            });
-          }
-        }
-
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initDirectAutocomplete);
-        } else {
-          initDirectAutocomplete();
-        }
-        window.addEventListener('load', initDirectAutocomplete);
-        setTimeout(initDirectAutocomplete, 200);
-        setTimeout(initDirectAutocomplete, 800);
-      })();
-    </script>
-
-    <!-- PWA Service Worker Auto-Update -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js?v=137').then(function (reg) {
-          reg.update();
-        }).catch(function () { });
-        navigator.serviceWorker.getRegistrations().then(function (registrations) {
-          registrations.forEach(function (reg) {
-            reg.update();
+  <!-- Inicializador Directo de Autocompletado de Direcciones & Auto-Purga de Caché -->
+  <script>
+    (function () {
+      // 1. Limpieza de cachés de service workers obsoletos
+      if ('serviceWorker' in navigator && window.caches) {
+        caches.keys().then(function (keys) {
+          keys.forEach(function (k) {
+            if (k !== 'rutaprivada-pwa-v137') {
+              caches.delete(k);
+            }
           });
-        });
+        }).catch(function () { });
       }
-    </script>
+
+      // 2. Activación directa de autocompletado en campos de origen y destino
+      function initDirectAutocomplete() {
+        if (typeof window.setupAddressAutocomplete === 'function') {
+          window.setupAddressAutocomplete('origin-input', 'origin-suggestions', function (place) {
+            if (typeof setOrigin === 'function') setOrigin(place.lat, place.lon, place.display_name);
+          });
+          window.setupAddressAutocomplete('destination-input', 'destination-suggestions', function (place) {
+            if (typeof setDestination === 'function') setDestination(place.lat, place.lon, place.display_name);
+          });
+          window.setupAddressAutocomplete('stop-input', 'stop-suggestions', function (place) {
+            if (typeof setIntermediateStop === 'function') setIntermediateStop(place.lat, place.lon, place.display_name);
+          });
+          window.setupAddressAutocomplete('uberOriginInput', 'uberOriginSuggestions', function (place) {
+            var pLat = parseFloat(place.lat), pLon = parseFloat(place.lon);
+            if (typeof uberCurrentCoords !== 'undefined') uberCurrentCoords = [pLat, pLon];
+            if (typeof updateUberPassengerMarker === 'function') updateUberPassengerMarker(pLat, pLon);
+            if (typeof state !== 'undefined') state.origin = { lat: pLat, lng: pLon, address: place.display_name };
+          });
+          window.setupAddressAutocomplete('uberDestInput', 'uberDestSuggestions', function (place) {
+            var dLat = parseFloat(place.lat), dLon = parseFloat(place.lon);
+            if (typeof state !== 'undefined') state.destination = { lat: dLat, lng: dLon, address: place.display_name };
+            if (typeof trazarRutaUberMap === 'function') trazarRutaUberMap([dLat, dLon], place.display_name);
+            if (typeof calcularTarifasCategoriasUber === 'function') calcularTarifasCategoriasUber(place.display_name);
+          });
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDirectAutocomplete);
+      } else {
+        initDirectAutocomplete();
+      }
+      window.addEventListener('load', initDirectAutocomplete);
+      setTimeout(initDirectAutocomplete, 200);
+      setTimeout(initDirectAutocomplete, 800);
+    })();
+  </script>
+
+  <!-- PWA Service Worker Auto-Update -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js?v=137').then(function (reg) {
+        reg.update();
+      }).catch(function () { });
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        registrations.forEach(function (reg) {
+          reg.update();
+        });
+      });
+    }
+  </script>
 </body>
 
 </html>

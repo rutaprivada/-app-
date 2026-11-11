@@ -460,6 +460,144 @@ window.handlePassengerProfileSave = function(event) {
 // ==========================================
 // CENTRO DE AYUDA Y SOPORTE PASAJERO (24/7)
 // ==========================================
+
+// ==========================================
+// MÉTODOS DE AYUDA Y GESTIÓN DE RECLAMOS PASAJERO
+// ==========================================
+window.togglePassengerFaqMasterAccordion = function() {
+  const body = document.getElementById('passengerFaqMasterBody');
+  const icon = document.getElementById('passengerFaqMasterIcon');
+  if (!body) return;
+  const isHidden = (body.style.display === 'none') || (window.getComputedStyle(body).display === 'none');
+  if (isHidden) {
+    body.style.display = 'flex';
+    if (icon) icon.style.transform = 'rotate(180deg)';
+  } else {
+    body.style.display = 'none';
+    if (icon) icon.style.transform = 'rotate(0deg)';
+  }
+};
+
+window.switchPassengerHelpSection = function(section) {
+  const homeSec = document.getElementById('passengerHelpHomeSection');
+  const ticketsSec = document.getElementById('passengerHelpTicketsSection');
+  const tabHome = document.getElementById('tabHelpHomeBtn');
+  const tabTickets = document.getElementById('tabHelpTicketsBtn');
+
+  if (section === 'tickets') {
+    if (homeSec) homeSec.style.display = 'none';
+    if (ticketsSec) ticketsSec.style.display = 'block';
+    if (tabHome) {
+      tabHome.style.background = 'transparent';
+      tabHome.style.color = '#94a3b8';
+    }
+    if (tabTickets) {
+      tabTickets.style.background = '#0284c7';
+      tabTickets.style.color = '#ffffff';
+    }
+    if (typeof window.renderPassengerTicketsList === 'function') {
+      window.renderPassengerTicketsList();
+    }
+  } else {
+    if (homeSec) homeSec.style.display = 'block';
+    if (ticketsSec) ticketsSec.style.display = 'none';
+    if (tabHome) {
+      tabHome.style.background = '#0284c7';
+      tabHome.style.color = '#ffffff';
+    }
+    if (tabTickets) {
+      tabTickets.style.background = 'transparent';
+      tabTickets.style.color = '#94a3b8';
+    }
+  }
+};
+
+window.renderPassengerTicketsList = function() {
+  const container = document.getElementById('passengerTicketsListContainer');
+  const badge = document.getElementById('badgePassengerTicketsCount');
+  let list = [];
+  try {
+    list = JSON.parse(localStorage.getItem('rutaprivada_passenger_tickets_v1') || '[]');
+  } catch(e) { list = []; }
+
+  if (badge) {
+    badge.textContent = list.length;
+    badge.style.display = list.length > 0 ? 'inline-block' : 'none';
+  }
+
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: #94a3b8;">
+        <i class="fa-solid fa-clipboard-list" style="font-size: 2.2rem; color: #475569; margin-bottom: 12px; display: block;"></i>
+        <h4 style="color: #cbd5e1; margin-bottom: 6px;">No tienes reclamos registrados</h4>
+        <p style="font-size: 0.85rem; max-width: 360px; margin: 0 auto 16px; line-height: 1.4;">
+          Si tuviste algún inconveniente con un chofer, cobro u objeto extraviado, inicia un reclamo desde la pestaña Ayuda.
+        </p>
+        <button type="button" onclick="window.switchPassengerHelpSection('home')" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 700; padding: 8px 16px; border-radius: 8px; cursor: pointer;">
+          <i class="fa-solid fa-arrow-left"></i> Ir al Centro de Ayuda
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list.map(t => {
+    const status = (t.status || 'pendiente').toLowerCase();
+    let statusBadge = '';
+    if (status === 'finalizado') {
+      statusBadge = '<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:700; background:rgba(34,197,94,0.2); color:#4ade80; border:1px solid rgba(34,197,94,0.4);"><i class="fa-solid fa-check"></i> Finalizado</span>';
+    } else if (status === 'en_proceso') {
+      statusBadge = '<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:700; background:rgba(168,85,247,0.2); color:#c084fc; border:1px solid rgba(168,85,247,0.4);"><i class="fa-solid fa-gears"></i> En Proceso</span>';
+    } else if (status === 'en_revision') {
+      statusBadge = '<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:700; background:rgba(56,189,248,0.2); color:#38bdf8; border:1px solid rgba(56,189,248,0.4);"><i class="fa-solid fa-magnifying-glass"></i> En Revisión</span>';
+    } else {
+      statusBadge = '<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:700; background:rgba(245,158,11,0.2); color:#fbbf24; border:1px solid rgba(245,158,11,0.4);"><i class="fa-regular fa-clock"></i> Pendiente</span>';
+    }
+
+    const adminResponseHtml = t.respuestaAdmin ? `
+      <div style="margin-top: 10px; padding: 10px 12px; background: rgba(2, 132, 199, 0.15); border-left: 3px solid #38bdf8; border-radius: 8px;">
+        <div style="font-size: 0.78rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <i class="fa-solid fa-shield-halved"></i> Respuesta Oficial de Administración:
+        </div>
+        <p style="margin: 0; font-size: 0.82rem; color: #f1f5f9; line-height: 1.45; white-space: pre-wrap;">${t.respuestaAdmin}</p>
+        <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">
+          <i class="fa-solid fa-envelope"></i> Copia enviada a tu correo registrado (${t.passengerEmail || 'registrado'}).
+        </div>
+      </div>
+    ` : `
+      <div style="margin-top: 8px; font-size: 0.73rem; color: #94a3b8; display: flex; align-items: center; gap: 5px;">
+        <i class="fa-solid fa-hourglass-half" style="color: #fbbf24;"></i> Un asesor de soporte responderá este reclamo a tu correo <strong>${t.passengerEmail || 'registrado'}</strong>.
+      </div>
+    `;
+
+    return `
+      <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 800; color: #38bdf8; font-size: 0.95rem;">#${t.ticketId || ''}</span>
+              <span style="background: rgba(255,255,255,0.08); color: #cbd5e1; font-size: 0.75rem; padding: 2px 7px; border-radius: 6px;">${t.category || 'General'}</span>
+            </div>
+            <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">
+              <i class="fa-regular fa-calendar"></i> ${t.timeStr || t.createdAt || ''}
+              ${t.tripId && t.tripId !== 'N/A' ? ` · <i class="fa-solid fa-car"></i> ${t.tripId}` : ''}
+            </div>
+          </div>
+          <div>${statusBadge}</div>
+        </div>
+
+        <div style="background: rgba(0, 0, 0, 0.25); border-radius: 8px; padding: 10px; font-size: 0.82rem; color: #e2e8f0; line-height: 1.45; white-space: pre-wrap;">
+          ${t.description || ''}
+        </div>
+
+        ${adminResponseHtml}
+      </div>
+    `;
+  }).join('');
+};
+
 window.openPassengerHelpModal = function() {
   const modal = document.getElementById('modalPassengerHelp');
   if (modal) {
@@ -13563,6 +13701,37 @@ if (btnRecenterPassengerMap) {
       });
     }
 
+    // Escucha en tiempo real de tickets de soporte para el pasajero
+    try {
+      if (typeof firebase !== 'undefined' && firebase.firestore) {
+        firebase.firestore().collection('tickets_soporte').onSnapshot(snap => {
+          let updated = false;
+          let currentList = JSON.parse(localStorage.getItem('rutaprivada_passenger_tickets_v1') || '[]');
+          snap.docChanges().forEach(change => {
+            const data = change.doc.data();
+            const tId = data.ticketId || change.doc.id;
+            const isPassenger = (data.role === 'pasajero') || String(tId).startsWith('PAS-');
+            if (isPassenger) {
+              const idx = currentList.findIndex(t => t.ticketId === tId);
+              if (idx >= 0) {
+                currentList[idx] = { ...currentList[idx], ...data, ticketId: tId };
+                updated = true;
+              } else if (change.type === 'added') {
+                currentList.unshift({ ...data, ticketId: tId });
+                updated = true;
+              }
+            }
+          });
+          if (updated) {
+            localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(currentList));
+            if (typeof window.renderPassengerTicketsList === 'function') {
+              window.renderPassengerTicketsList();
+            }
+          }
+        }, err => console.warn('Snapshot passenger tickets error:', err));
+      }
+    } catch(err) {}
+
     const btnUberHelp = document.getElementById('btnUberHelp');
     if (btnUberHelp) {
       btnUberHelp.addEventListener('click', (e) => {
@@ -13597,15 +13766,16 @@ if (btnRecenterPassengerMap) {
           return;
         }
 
-        const ticketId = 'TCK-P-' + Date.now().toString().slice(-6);
+        const ticketId = 'PAS-' + Math.floor(100000 + Math.random() * 900000);
         const timeStr = new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+        const PASSENGER_SUPPORT_EMAIL = 'rutaprivadasoporte@gmail.com';
 
         if (btnSubmit) {
           btnSubmit.disabled = true;
           btnSubmit.style.opacity = '0.7';
         }
         if (txtBtn) {
-          txtBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando Reclamo...';
+          txtBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registrando Reclamo...';
         }
 
         const payload = {
@@ -13618,11 +13788,12 @@ if (btnRecenterPassengerMap) {
           description,
           role: 'pasajero',
           status: 'pendiente',
+          supportEmail: PASSENGER_SUPPORT_EMAIL,
           createdAt: new Date().toISOString(),
           timeStr
         };
 
-        // 1. Guardar local
+        // 1. Guardar localmente
         try {
           const list = JSON.parse(localStorage.getItem('rutaprivada_passenger_tickets_v1') || '[]');
           list.unshift(payload);
@@ -13638,7 +13809,14 @@ if (btnRecenterPassengerMap) {
           console.warn('Firestore ticket err:', err);
         }
 
-        // 3. Envío EmailJS
+        // 3. Notificar via RutaSync
+        try {
+          if (window.RutaSync && typeof window.RutaSync.emit === 'function') {
+            window.RutaSync.emit('NUEVO_TICKET_SOPORTE', payload);
+          }
+        } catch(err) {}
+
+        // 4. Envío EmailJS
         try {
           const emailParams = {
             service_id: 'service_rutaprivada',
@@ -13646,7 +13824,7 @@ if (btnRecenterPassengerMap) {
             user_id: 'ai6WOsUzJaXx1st1E',
             template_params: {
               subject: `[Reclamo Pasajero #${ticketId}] ${catText} - ${name}`,
-              to_email: 'soporte@rutaprivada.com',
+              to_email: PASSENGER_SUPPORT_EMAIL,
               reply_to: email,
               passenger_name: name,
               passenger_phone: phone,
@@ -13667,23 +13845,24 @@ if (btnRecenterPassengerMap) {
           }).catch(() => {});
         } catch(err) {}
 
-        // 4. Redirección directa al cliente de correo con datos pre-cargados
+        // 5. Redirección a cliente de correo oficial con respaldo a Central y al Pasajero
         try {
           const mailSubject = encodeURIComponent(`[Reclamo Pasajero #${ticketId}] ${catText} - ${name}`);
           const mailBody = encodeURIComponent(`CENTRAL DE ASISTENCIA Y RECLAMOS RUTAPRIVADA\n\n` +
             `==============================\n` +
-            `TICKET ID: #${ticketId}\n` +
+            `NÚMERO DE RECLAMO: #${ticketId}\n` +
             `PASAJERO: ${name}\n` +
-            `TELÉFONO: ${phone}\n` +
-            `CORREO: ${email}\n` +
-            `CATEGORÍA: ${catText}\n` +
-            `VIAJE RELACIONADO: ${tripId || 'N/A'}\n` +
+            `TELÉFONO DE CONTACTO: ${phone}\n` +
+            `CORREO REGISTRADO: ${email}\n` +
+            `MOTIVO / CATEGORÍA: ${catText}\n` +
+            `VIAJE ASOCIADO: ${tripId || 'N/A'}\n` +
             `FECHA Y HORA: ${timeStr}\n` +
+            `CENTRAL DE RESOLUCIÓN: ${PASSENGER_SUPPORT_EMAIL}\n` +
             `==============================\n\n` +
-            `DETALLE DEL RECLAMO / INCONVENIENTE:\n${description}\n\n` +
+            `DETALLE DEL RECLAMO:\n${description}\n\n` +
             `---\n` +
-            `Enviado desde App Pasajero RutaPrivada (Soporte 24/7)`);
-          window.open(`mailto:soporte@rutaprivada.com?subject=${mailSubject}&body=${mailBody}`, '_blank');
+            `(Se enviará copia tanto a la Administración como a tu correo para seguimiento y respuesta oficial)`);
+          window.open(`mailto:${PASSENGER_SUPPORT_EMAIL}?cc=${encodeURIComponent(email)}&subject=${mailSubject}&body=${mailBody}`, '_blank');
         } catch(e) {}
 
         if (btnSubmit) {
@@ -13696,6 +13875,15 @@ if (btnRecenterPassengerMap) {
 
         window.closePassengerTicketModal();
         formTicket.reset();
+
+        // Mostrar lista actualizada de reclamos en el Centro de Ayuda
+        if (typeof window.renderPassengerTicketsList === 'function') {
+          window.renderPassengerTicketsList();
+        }
+        window.openPassengerHelpModal();
+        if (typeof window.switchPassengerHelpSection === 'function') {
+          window.switchPassengerHelpSection('tickets');
+        }
 
         if (typeof showToast === 'function') {
           showToast(`✅ Reclamo #${ticketId} enviado con éxito. La resolución te llegará a ${email}`);
@@ -14313,7 +14501,7 @@ if (btnRecenterPassengerMap) {
         if (typeof window.openPassengerSosModal === 'function') {
           window.openPassengerSosModal();
         } else {
-          alert('🛡️ CENTRO DE SEGURIDAD RUTAPRIVADA\n\nLínea Directa de Asistencia 24/7:\n+54 9 11 7373-8790\nEmergencias Policiales: 911');
+          alert('🛡️ CENTRO DE SEGURIDAD RUTAPRIVADA\n\nSoporte Oficial 24/7:\nrutaprivadasoporte@gmail.com\nEmergencias Policiales: 911');
         }
       });
     }

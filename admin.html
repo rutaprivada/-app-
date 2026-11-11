@@ -641,12 +641,19 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <div class="filter-tabs" id="ticketFilterTabs">
-                        <button class="filter-tab-btn ticket-tab-btn active" data-status="todos">Todos</button>
-                        <button class="filter-tab-btn ticket-tab-btn" data-status="pendiente">⏳ Pendientes</button>
-                        <button class="filter-tab-btn ticket-tab-btn" data-status="en_revision">🔍 En Revisión</button>
-                        <button class="filter-tab-btn ticket-tab-btn" data-status="en_proceso">⚙️ En Proceso</button>
-                        <button class="filter-tab-btn ticket-tab-btn" data-status="finalizado">✅ Finalizados</button>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+                        <div class="filter-tabs" id="ticketFilterTabs">
+                            <button class="filter-tab-btn ticket-tab-btn active" data-status="todos">Todos los Estados</button>
+                            <button class="filter-tab-btn ticket-tab-btn" data-status="pendiente">⏳ Pendientes</button>
+                            <button class="filter-tab-btn ticket-tab-btn" data-status="en_revision">🔍 En Revisión</button>
+                            <button class="filter-tab-btn ticket-tab-btn" data-status="en_proceso">⚙️ En Proceso</button>
+                            <button class="filter-tab-btn ticket-tab-btn" data-status="finalizado">✅ Finalizados</button>
+                        </div>
+                        <div class="filter-tabs" id="ticketRoleFilterTabs">
+                            <button class="filter-tab-btn ticket-role-tab-btn active" data-role="todos">👥 Todos los Roles</button>
+                            <button class="filter-tab-btn ticket-role-tab-btn" data-role="pasajero">👤 Pasajeros (#PAS)</button>
+                            <button class="filter-tab-btn ticket-role-tab-btn" data-role="conductor">🚗 Conductores (#TCK)</button>
+                        </div>
                     </div>
                     <button id="btnRefreshTickets" class="admin-btn">
                         <i class="fa-solid fa-rotate"></i> Actualizar
@@ -932,6 +939,7 @@
             const btnRefreshTickets = document.getElementById('btnRefreshTickets');
             const ticketFilterTabs = document.querySelectorAll('.ticket-tab-btn');
             let activeTicketFilter = 'todos';
+            let activeTicketRoleFilter = 'todos';
 
             // Elementos de Métricas Conductores
             const metricTotalDrivers = document.getElementById('metricTotalDrivers');
@@ -2962,14 +2970,20 @@
             let currentTicketsList = [];
 
             function loadTicketsData() {
-                let localTickets = [];
+                let driverTickets = [];
+                let passengerTickets = [];
                 try {
-                    const raw = localStorage.getItem('rutaprivada_driver_tickets_v1');
-                    if (raw) localTickets = JSON.parse(raw);
+                    const rawD = localStorage.getItem('rutaprivada_driver_tickets_v1');
+                    if (rawD) driverTickets = JSON.parse(rawD);
                 } catch(e) {}
-                if (!Array.isArray(localTickets)) localTickets = [];
+                try {
+                    const rawP = localStorage.getItem('rutaprivada_passenger_tickets_v1');
+                    if (rawP) passengerTickets = JSON.parse(rawP);
+                } catch(e) {}
+                if (!Array.isArray(driverTickets)) driverTickets = [];
+                if (!Array.isArray(passengerTickets)) passengerTickets = [];
 
-                // Asegurar los reclamos cargados por el chofer
+                // Asegurar los reclamos cargados
                 const knownSeedTickets = [
                     {
                         ticketId: 'TCK-416105',
@@ -2980,6 +2994,7 @@
                         tripId: 'N/A',
                         description: 'hola encontre un parguaas en el auto',
                         status: 'pendiente',
+                        role: 'conductor',
                         createdAt: '2026-11-11T16:46:00.000Z',
                         timeStr: '11/11/26, 4:46 p. m.'
                     },
@@ -2992,43 +3007,39 @@
                         tripId: 'N/A',
                         description: 'no me pagaron el peaje por el paso del bajo',
                         status: 'pendiente',
+                        role: 'conductor',
                         createdAt: '2026-11-11T15:45:00.000Z',
                         timeStr: '11/11/26, 3:45 p. m.'
                     }
                 ];
 
                 knownSeedTickets.forEach(seed => {
-                    const existing = localTickets.find(t => t.ticketId === seed.ticketId);
-                    if (!existing) {
-                        localTickets.push(seed);
-                    }
+                    const existing = driverTickets.find(t => t.ticketId === seed.ticketId);
+                    if (!existing) driverTickets.push(seed);
                 });
 
-                currentTicketsList = localTickets;
-                try {
-                    localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(currentTicketsList));
-                } catch(e) {}
+                const mergedMap = new Map();
+                [...driverTickets, ...passengerTickets].forEach(t => {
+                    if (t && t.ticketId) mergedMap.set(t.ticketId, t);
+                });
+                currentTicketsList = Array.from(mergedMap.values());
 
                 // Cargar desde Firestore SDK si está disponible
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
                         const db = firebase.firestore();
-                        // Persistir los reclamos en Firestore para que viajen a todos los dispositivos
                         knownSeedTickets.forEach(seed => {
                             db.collection('tickets_soporte').doc(seed.ticketId).set(seed, { merge: true }).catch(() => {});
                         });
 
                         db.collection('tickets_soporte').get().then(snapshot => {
                             if (!snapshot || snapshot.empty) return;
-                            const cloudMap = new Map();
-                            currentTicketsList.forEach(t => cloudMap.set(t.ticketId, t));
                             snapshot.forEach(doc => {
                                 const data = doc.data();
                                 const tId = data.ticketId || doc.id;
-                                cloudMap.set(tId, { ...(cloudMap.get(tId) || {}), ...data, ticketId: tId });
+                                mergedMap.set(tId, { ...(mergedMap.get(tId) || {}), ...data, ticketId: tId });
                             });
-                            currentTicketsList = Array.from(cloudMap.values());
-                            localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(currentTicketsList));
+                            currentTicketsList = Array.from(mergedMap.values());
                             renderTicketsTable();
                         }).catch(e => console.warn('Firestore tickets get error:', e));
                     } catch(e) {}
@@ -3051,10 +3062,16 @@
                     }
                 }
 
-                // Filtrar según pestaña activa
+                // Filtrar según estado y rol
                 let filtered = currentTicketsList;
                 if (activeTicketFilter !== 'todos') {
-                    filtered = currentTicketsList.filter(t => (t.status || 'pendiente').toLowerCase() === activeTicketFilter);
+                    filtered = filtered.filter(t => (t.status || 'pendiente').toLowerCase() === activeTicketFilter);
+                }
+                if (activeTicketRoleFilter !== 'todos') {
+                    filtered = filtered.filter(t => {
+                        const isPas = (t.role === 'pasajero') || String(t.ticketId || '').startsWith('PAS-');
+                        return activeTicketRoleFilter === 'pasajero' ? isPas : !isPas;
+                    });
                 }
 
                 if (filtered.length === 0) {
@@ -3062,7 +3079,7 @@
                         <tr>
                             <td colspan="6" style="text-align: center; padding: 40px; color: #94a3b8;">
                                 <i class="fa-solid fa-headset" style="font-size: 2rem; margin-bottom: 10px; display: block; color: #64748b;"></i>
-                                No hay reclamos registrados ${activeTicketFilter !== 'todos' ? `con estado "${activeTicketFilter}"` : 'por el momento'}.
+                                No hay reclamos registrados con los filtros seleccionados.
                             </td>
                         </tr>
                     `;
@@ -3071,6 +3088,8 @@
 
                 ticketsTableBody.innerHTML = filtered.map(t => {
                     const status = (t.status || 'pendiente').toLowerCase();
+                    const isPassenger = (t.role === 'pasajero') || String(t.ticketId || '').startsWith('PAS-');
+                    
                     let statusBadge = '';
                     if (status === 'finalizado') {
                         statusBadge = '<span class="badge-status aprobado"><i class="fa-solid fa-check"></i> Finalizado</span>';
@@ -3082,25 +3101,32 @@
                         statusBadge = '<span class="badge-status pendiente"><i class="fa-regular fa-clock"></i> Pendiente</span>';
                     }
 
+                    const roleBadge = isPassenger
+                        ? '<span style="display:inline-block; padding:2px 7px; font-size:0.7rem; font-weight:700; border-radius:4px; background:rgba(56,189,248,0.2); color:#38bdf8; border:1px solid rgba(56,189,248,0.4); margin-bottom:4px;"><i class="fa-solid fa-user"></i> Pasajero</span>'
+                        : '<span style="display:inline-block; padding:2px 7px; font-size:0.7rem; font-weight:700; border-radius:4px; background:rgba(251,191,36,0.2); color:#fbbf24; border:1px solid rgba(251,191,36,0.4); margin-bottom:4px;"><i class="fa-solid fa-car"></i> Conductor</span>';
+
                     const safeDesc = escapeHtml(t.description || '');
-                    const safeName = escapeHtml(t.driverName || 'Conductor');
-                    const safePhone = escapeHtml(t.driverPhone || '');
-                    const safeEmail = escapeHtml(t.driverEmail || '');
+                    const safeName = escapeHtml(t.passengerName || t.driverName || (isPassenger ? 'Pasajero' : 'Conductor'));
+                    const safePhone = escapeHtml(t.passengerPhone || t.driverPhone || 'Sin teléfono');
+                    const safeEmail = escapeHtml(t.passengerEmail || t.driverEmail || 'Sin correo');
                     const safeCategory = escapeHtml(t.category || 'General');
                     const safeTicketId = escapeHtml(t.ticketId || '');
+                    const supportInbox = isPassenger ? 'rutaprivadasoporte@gmail.com' : 'rutaprivadadrivers@gmail.com';
                     const safeTrip = (t.tripId && t.tripId !== 'N/A') ? `<div style="font-size: 0.72rem; color: #94a3b8;"><i class="fa-solid fa-car-side"></i> Viaje: ${escapeHtml(t.tripId)}</div>` : '';
                     const adminResp = t.respuestaAdmin ? `<div style="margin-top: 6px; padding: 6px 8px; background: rgba(30, 41, 59, 0.8); border-left: 2px solid #38bdf8; border-radius: 4px; font-size: 0.74rem; color: #7dd3fc;"><strong>Respuesta enviada:</strong> ${escapeHtml(t.respuestaAdmin)}</div>` : '';
 
                     return `
                         <tr>
                             <td>
-                                <strong style="color: #fbbf24; font-size: 0.85rem;">#${safeTicketId}</strong>
+                                ${roleBadge}
+                                <div><strong style="color: #fbbf24; font-size: 0.88rem;">#${safeTicketId}</strong></div>
                                 <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">${escapeHtml(t.timeStr || t.createdAt || '')}</div>
                             </td>
                             <td>
                                 <strong style="color: #fff; font-size: 0.88rem;">${safeName}</strong>
                                 <div style="font-size: 0.75rem; color: #94a3b8;"><i class="fa-solid fa-phone"></i> ${safePhone}</div>
                                 <div style="font-size: 0.73rem; color: #38bdf8;"><i class="fa-solid fa-envelope"></i> ${safeEmail}</div>
+                                <div style="font-size: 0.69rem; color: #64748b; margin-top: 2px;"><i class="fa-solid fa-inbox"></i> Central: ${supportInbox}</div>
                             </td>
                             <td>
                                 <strong style="color: #cbd5e1; font-size: 0.84rem;">${safeCategory}</strong>
@@ -3122,7 +3148,7 @@
                                         <option value="finalizado" ${status === 'finalizado' ? 'selected' : ''}>✅ Finalizado</option>
                                     </select>
                                     <button type="button" onclick="window.adminReplyTicketPrompt('${safeTicketId}')" class="admin-btn" style="padding: 4px 8px; font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8;">
-                                        <i class="fa-solid fa-comment-dots"></i> Responder
+                                        <i class="fa-solid fa-reply"></i> Responder
                                     </button>
                                 </div>
                             </td>
@@ -3139,8 +3165,19 @@
                 if (customNote) currentTicketsList[idx].respuestaAdmin = customNote;
                 currentTicketsList[idx].updatedAt = Date.now();
 
+                const isPassenger = (currentTicketsList[idx].role === 'pasajero') || String(ticketId).startsWith('PAS-');
+                const storeKey = isPassenger ? 'rutaprivada_passenger_tickets_v1' : 'rutaprivada_driver_tickets_v1';
                 try {
-                    localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(currentTicketsList));
+                    let specificList = JSON.parse(localStorage.getItem(storeKey) || '[]');
+                    const sIdx = specificList.findIndex(t => t.ticketId === ticketId);
+                    if (sIdx >= 0) {
+                        specificList[sIdx].status = newStatus;
+                        if (customNote) specificList[sIdx].respuestaAdmin = customNote;
+                        specificList[sIdx].updatedAt = Date.now();
+                    } else {
+                        specificList.unshift(currentTicketsList[idx]);
+                    }
+                    localStorage.setItem(storeKey, JSON.stringify(specificList));
                 } catch(e) {}
 
                 // Sincronizar en Firestore SDK
@@ -3189,11 +3226,23 @@
             window.adminReplyTicketPrompt = function(ticketId) {
                 const ticket = currentTicketsList.find(t => t.ticketId === ticketId);
                 if (!ticket) return;
+                const isPassenger = (ticket.role === 'pasajero') || String(ticketId).startsWith('PAS-');
+                const userName = ticket.passengerName || ticket.driverName || (isPassenger ? 'Pasajero' : 'Conductor');
+                const userEmail = ticket.passengerEmail || ticket.driverEmail || '';
+                const supportEmail = isPassenger ? 'rutaprivadasoporte@gmail.com' : 'rutaprivadadrivers@gmail.com';
+                const roleLabel = isPassenger ? 'el pasajero' : 'el chofer';
+
                 const prevResp = ticket.respuestaAdmin || '';
-                const promptVal = prompt(`💬 Responder a reclamo #${ticketId} (${ticket.driverName}):\n\nIngresa la respuesta que verá el chofer en su app:`, prevResp);
-                if (promptVal !== null) {
+                const promptVal = prompt(`💬 Responder a reclamo #${ticketId} (${userName}):\n\nIngresa la respuesta oficial que verá ${roleLabel} en su app:\n(También podrás enviarle copia directa por correo)`, prevResp);
+                if (promptVal !== null && promptVal.trim()) {
                     const statusVal = ticket.status === 'pendiente' ? 'en_proceso' : ticket.status;
                     window.adminChangeTicketStatus(ticketId, statusVal, promptVal.trim());
+
+                    if (userEmail && confirm(`¿Deseas abrir tu correo oficial para enviar esta resolución directamente a ${userEmail}?`)) {
+                        const mailSubject = encodeURIComponent(`[Resolución Reclamo #${ticketId}] ${ticket.category || 'Soporte RutaPrivada'}`);
+                        const mailBody = encodeURIComponent(`Hola ${userName},\n\nTe escribimos desde la Administración de RutaPrivada en referencia a tu reclamo #${ticketId} (${ticket.category || 'Atención al Cliente'}).\n\nRESOLUCIÓN DE LA CENTRAL:\n${promptVal.trim()}\n\nAnte cualquier duda puedes responder directamente a este correo.\n\nAtentamente,\nEquipo de Soporte Oficial RutaPrivada\n${supportEmail}`);
+                        window.open(`mailto:${userEmail}?subject=${mailSubject}&body=${mailBody}`, '_blank');
+                    }
                 }
             };
 

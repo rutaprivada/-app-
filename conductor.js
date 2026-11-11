@@ -8898,20 +8898,20 @@ document.addEventListener('DOMContentLoaded', () => {
             transcriptText += `CANAL DE RESOLUCIÓN POR CORREO ELECTRÓNICO:\n`;
             transcriptText += `• Equipo de Soporte: Responda a este correo para enviar instrucciones y resolución directa al chofer.\n`;
             transcriptText += `• Conductor (${driverName || 'Partner'}): Puedes responder directamente a este correo para aportar fotos, comprobantes o más detalles.\n`;
-            transcriptText += `Guardia Operativa 24/7: 11 7373-8790 · soporte@rutaprivada.com`;
+            transcriptText += `Central de Conductores RutaPrivada: rutaprivadadrivers@gmail.com`;
 
             const subjectConductor = `[Ticket #${ticketId}] Tu consulta en Soporte - Copia de Registro RutaPrivada`;
             const subjectSoporte = `[Ticket #${ticketId}] Consulta Conductor - ${driverName || 'Chofer'}`;
 
             // 1. Envío automático al Conductor (Reply-To -> Soporte)
             await sendSupportEmailDispatch(targetEmail, subjectConductor, transcriptText, {
-                replyTo: 'soporte@rutaprivada.com',
+                replyTo: DRIVER_SUPPORT_EMAIL,
                 ticketId,
                 driverEmail: targetEmail
             });
 
             // 2. Envío automático a Soporte Central (Reply-To -> Conductor)
-            await sendSupportEmailDispatch('soporte@rutaprivada.com', subjectSoporte, transcriptText, {
+            await sendSupportEmailDispatch(DRIVER_SUPPORT_EMAIL, subjectSoporte, transcriptText, {
                 replyTo: targetEmail,
                 ticketId,
                 driverEmail: targetEmail
@@ -9183,7 +9183,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         transcriptText += `-----------------------------------------------------\n`;
         transcriptText += `Este correo certifica la comunicación mantenida en la aplicación oficial RutaPrivada.\n`;
-        transcriptText += `Guardia Central 24/7: 11 7373-8790 · soporte@rutaprivada.com`;
+        transcriptText += `Central de Conductores RutaPrivada: rutaprivadadrivers@gmail.com`;
 
         const subjectConductor = `[Registro Conductor] Transcripción de Chat con Soporte - ${driverName || 'Chofer'}`;
         const subjectSoporte = `[Copia Chat Soporte] Transcripción de Conductor - ${driverName || 'Chofer'}`;
@@ -9194,7 +9194,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // 2. Envío de respaldo a la Central
-        await sendSupportEmailDispatch('soporte@rutaprivada.com', subjectSoporte, transcriptText, {
+        await sendSupportEmailDispatch(DRIVER_SUPPORT_EMAIL, subjectSoporte, transcriptText, {
             passcode: 'Respaldo Central'
         });
 

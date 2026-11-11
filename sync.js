@@ -928,18 +928,25 @@ class RutaSyncManager {
         } else if (message.type === 'NUEVO_TICKET_SOPORTE') {
             if (message.payload && message.payload.ticketId) {
                 try {
-                    let tickets = JSON.parse(localStorage.getItem('rutaprivada_driver_tickets_v1') || '[]');
+                    const isPassenger = (message.payload.role === 'pasajero') || String(message.payload.ticketId).startsWith('PAS-');
+                    const storeKey = isPassenger ? 'rutaprivada_passenger_tickets_v1' : 'rutaprivada_driver_tickets_v1';
+                    let tickets = JSON.parse(localStorage.getItem(storeKey) || '[]');
                     if (!tickets.some(t => t.ticketId === message.payload.ticketId)) {
                         tickets.unshift(message.payload);
-                        localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(tickets));
+                        localStorage.setItem(storeKey, JSON.stringify(tickets));
                         window.dispatchEvent(new Event('storage'));
+                        if (isPassenger && typeof window.renderPassengerTicketsList === 'function') {
+                            window.renderPassengerTicketsList();
+                        }
                     }
                 } catch(e) {}
             }
         } else if (message.type === 'ESTADO_TICKET_ACTUALIZADO') {
             if (message.payload && message.payload.ticketId) {
                 try {
-                    let tickets = JSON.parse(localStorage.getItem('rutaprivada_driver_tickets_v1') || '[]');
+                    const isPassenger = (message.payload.role === 'pasajero') || String(message.payload.ticketId).startsWith('PAS-');
+                    const storeKey = isPassenger ? 'rutaprivada_passenger_tickets_v1' : 'rutaprivada_driver_tickets_v1';
+                    let tickets = JSON.parse(localStorage.getItem(storeKey) || '[]');
                     const idx = tickets.findIndex(t => t.ticketId === message.payload.ticketId);
                     if (idx >= 0) {
                         tickets[idx].status = message.payload.status || tickets[idx].status;
@@ -947,8 +954,11 @@ class RutaSyncManager {
                             tickets[idx].respuestaAdmin = message.payload.respuestaAdmin;
                         }
                         tickets[idx].updatedAt = Date.now();
-                        localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(tickets));
+                        localStorage.setItem(storeKey, JSON.stringify(tickets));
                         window.dispatchEvent(new Event('storage'));
+                        if (isPassenger && typeof window.renderPassengerTicketsList === 'function') {
+                            window.renderPassengerTicketsList();
+                        }
                     }
                 } catch(e) {}
             }
