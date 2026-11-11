@@ -15,7 +15,9 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
@@ -40,20 +42,25 @@ public class BackgroundLocationService extends Service implements LocationListen
     private static final String CHANNEL_ID = "rp_driver_location_channel";
     private static final int NOTIFICATION_ID = 99881;
     private static final String FIREBASE_API_KEY = "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4";
+    private static final String PREFS_NAME = "RP_DriverLocationPrefs";
 
     private LocationManager locationManager;
     private PowerManager.WakeLock wakeLock;
     private ExecutorService networkExecutor;
+    private Handler heartbeatHandler;
+    private Runnable heartbeatRunnable;
 
     private String currentDriverId = "default";
     private String currentDriverName = "Chofer Partner";
     private String currentActiveTripId = "";
     private long lastHttpSendTime = 0;
+    private Location lastKnownLocation = null;
 
     @Override
     public void onCreate() {
         super.onCreate();
         networkExecutor = Executors.newSingleThreadExecutor();
+        heartbeatHandler = new Handler(Looper.getMainLooper());
         createNotificationChannel();
 
         PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -63,6 +70,7 @@ public class BackgroundLocationService extends Service implements LocationListen
         }
 
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        restoreLastKnownLocationFromPrefs();
     }
 
     @Override
@@ -79,6 +87,7 @@ public class BackgroundLocationService extends Service implements LocationListen
                 if (intent.hasExtra("activeTripId")) {
                     currentActiveTripId = intent.getStringExtra("activeTripId");
                     Log.d(TAG, "Active trip updated in background service: " + currentActiveTripId);
+                    updateForegroundNotification();
                 }
                 return START_STICKY;
             }
@@ -100,14 +109,22 @@ public class BackgroundLocationService extends Service implements LocationListen
 
     private void startTracking() {
         if (wakeLock != null && !wakeLock.isHeld()) {
-            wakeLock.acquire(12 * 60 * 60 * 1000L); // Max 12 hours safety timeout
+            try {
+                wakeLock.acquire(12 * 60 * 60 * 1000L); // Max 12 hours timeout
+            } catch (Exception e) {
+                Log.w(TAG, "WakeLock acquire error", e);
+            }
         }
 
         Notification notification = buildForegroundNotification();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
-        } else {
-            startForeground(NOTIFICATION_ID, notification);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "startForeground error", e);
         }
 
         if (locationManager != null) {
@@ -116,6 +133,21 @@ public class BackgroundLocationService extends Service implements LocationListen
 
             if (hasFine || hasCoarse) {
                 try {
+                    // Try to get instant cached location from providers
+                    Location bestLastLoc = null;
+                    if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                        bestLastLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                    }
+                    if (bestLastLoc == null && locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                        bestLastLoc = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                    }
+                    if (bestLastLoc != null) {
+                        lastKnownLocation = bestLastLoc;
+                        saveLastKnownLocationToPrefs(bestLastLoc);
+                        onLocationChanged(bestLastLoc);
+                    }
+
+                    // Register continuous updates
                     if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 2.0f, this);
                     }
@@ -128,11 +160,40 @@ public class BackgroundLocationService extends Service implements LocationListen
             }
         }
 
-        // Send initial online heartbeat
-        sendLocationToFirestore(null, true);
+        // Send initial heartbeat
+        sendLocationToFirestore(lastKnownLocation, true);
+
+        // Start periodic heartbeat every 15 seconds to ensure driver remains marked online when stationary
+        startHeartbeatTimer();
+    }
+
+    private void startHeartbeatTimer() {
+        stopHeartbeatTimer();
+        heartbeatRunnable = new Runnable() {
+            @Override
+            public void run() {
+                long now = System.currentTimeMillis();
+                // If no update was sent in the last 14 seconds, send stationary heartbeat
+                if (now - lastHttpSendTime >= 14000) {
+                    lastHttpSendTime = now;
+                    sendLocationToFirestore(lastKnownLocation, true);
+                }
+                heartbeatHandler.postDelayed(this, 15000);
+            }
+        };
+        heartbeatHandler.postDelayed(heartbeatRunnable, 15000);
+    }
+
+    private void stopHeartbeatTimer() {
+        if (heartbeatHandler != null && heartbeatRunnable != null) {
+            heartbeatHandler.removeCallbacks(heartbeatRunnable);
+            heartbeatRunnable = null;
+        }
     }
 
     private void stopTracking() {
+        stopHeartbeatTimer();
+
         if (locationManager != null) {
             try {
                 locationManager.removeUpdates(this);
@@ -140,7 +201,7 @@ public class BackgroundLocationService extends Service implements LocationListen
         }
 
         // Send offline status to Firestore
-        sendLocationToFirestore(null, false);
+        sendLocationToFirestore(lastKnownLocation, false);
         currentActiveTripId = "";
 
         if (wakeLock != null && wakeLock.isHeld()) {
@@ -155,6 +216,8 @@ public class BackgroundLocationService extends Service implements LocationListen
     @Override
     public void onLocationChanged(Location location) {
         if (location == null) return;
+        lastKnownLocation = location;
+        saveLastKnownLocationToPrefs(location);
 
         double lat = location.getLatitude();
         double lng = location.getLongitude();
@@ -164,7 +227,7 @@ public class BackgroundLocationService extends Service implements LocationListen
         // 1. Deliver immediately to MainActivity / WebView if active
         MainActivity.onNativeLocationUpdate(lat, lng, bearing, speedKmh);
 
-        // 2. Throttle background HTTP writes to every 3.5 seconds to conserve battery and Firestore quotas
+        // 2. Throttle background HTTP writes to every 3.5 seconds
         long now = System.currentTimeMillis();
         if (now - lastHttpSendTime >= 3500) {
             lastHttpSendTime = now;
@@ -204,10 +267,9 @@ public class BackgroundLocationService extends Service implements LocationListen
                 // Update driver_locations/{driverId}
                 String urlStr = "https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/driver_locations/"
                         + safeDriverId + "?key=" + FIREBASE_API_KEY;
-
                 patchHttpJson(urlStr, root.toString());
 
-                // Also update legacy single-doc bridge for backward compatibility
+                // Update legacy single-doc bridge for backward compatibility
                 String legacyUrl = "https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/driver_location?key=" + FIREBASE_API_KEY;
                 patchHttpJson(legacyUrl, root.toString());
 
@@ -244,10 +306,11 @@ public class BackgroundLocationService extends Service implements LocationListen
         try {
             URL url = new URL(urlString);
             conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST"); // Use POST with X-HTTP-Method-Override: PATCH for REST compatibility
+            conn.setRequestMethod("POST");
             conn.setRequestProperty("X-HTTP-Method-Override", "PATCH");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
             conn.setRequestProperty("Accept", "application/json");
+            conn.setUseCaches(false);
             conn.setConnectTimeout(6000);
             conn.setReadTimeout(6000);
             conn.setDoOutput(true);
@@ -265,6 +328,13 @@ public class BackgroundLocationService extends Service implements LocationListen
         }
     }
 
+    private void updateForegroundNotification() {
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.notify(NOTIFICATION_ID, buildForegroundNotification());
+        }
+    }
+
     private Notification buildForegroundNotification() {
         Intent launchIntent = new Intent(this, MainActivity.class);
         launchIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -276,9 +346,13 @@ public class BackgroundLocationService extends Service implements LocationListen
 
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, launchIntent, flags);
 
+        boolean hasActiveTrip = currentActiveTripId != null && !currentActiveTripId.isEmpty();
+        String title = hasActiveTrip ? "RutaPrivada Chofer · Viaje en Curso" : "RutaPrivada Chofer · En Línea";
+        String content = hasActiveTrip ? "Transmitiendo recorrido en tiempo real al pasajero" : "Transmitiendo ubicación GPS y recibiendo viajes";
+
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("RutaPrivada Chofer · En Línea")
-                .setContentText("Transmitiendo ubicación GPS y recibiendo viajes")
+                .setContentTitle(title)
+                .setContentText(content)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -294,7 +368,7 @@ public class BackgroundLocationService extends Service implements LocationListen
                     "RutaPrivada Chofer - Servicio de Rastreo GPS",
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Mantiene activa la geolocalización continua del chofer en segundo plano para Uber/Cabify dispatch.");
+            channel.setDescription("Mantiene activa la geolocalización continua del chofer en segundo plano.");
             channel.setShowBadge(false);
 
             NotificationManager manager = getSystemService(NotificationManager.class);
@@ -302,6 +376,33 @@ public class BackgroundLocationService extends Service implements LocationListen
                 manager.createNotificationChannel(channel);
             }
         }
+    }
+
+    private void saveLastKnownLocationToPrefs(Location loc) {
+        if (loc == null) return;
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit()
+                    .putString("lat", String.valueOf(loc.getLatitude()))
+                    .putString("lng", String.valueOf(loc.getLongitude()))
+                    .putLong("time", loc.getTime())
+                    .apply();
+        } catch (Exception ignored) {}
+    }
+
+    private void restoreLastKnownLocationFromPrefs() {
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            String latStr = prefs.getString("lat", null);
+            String lngStr = prefs.getString("lng", null);
+            if (latStr != null && lngStr != null) {
+                Location loc = new Location("prefs");
+                loc.setLatitude(Double.parseDouble(latStr));
+                loc.setLongitude(Double.parseDouble(lngStr));
+                loc.setTime(prefs.getLong("time", System.currentTimeMillis()));
+                lastKnownLocation = loc;
+            }
+        } catch (Exception ignored) {}
     }
 
     @Override

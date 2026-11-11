@@ -2693,12 +2693,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeTripId = (driverState.activeTrip && driverState.activeTrip.id) ? driverState.activeTrip.id : '';
 
         // 1. Conexión con Foreground Service Nativo de Android (APK instalada)
-        if (window.AndroidDriverBridge && typeof window.AndroidDriverBridge.startBackgroundLocation === 'function') {
+        if (window.AndroidDriverBridge) {
+            // Solicitar exención de ahorro de batería (Doze mode) para que no suspenda con pantalla apagada
             try {
-                window.AndroidDriverBridge.startBackgroundLocation(drvId, drvName, activeTripId);
-                console.log('Foreground Service Nativo de Android iniciado para:', drvId);
-            } catch(e) {
-                console.warn('Native background service start warning:', e);
+                if (typeof window.AndroidDriverBridge.isBatteryOptimizationIgnored === 'function' &&
+                    !window.AndroidDriverBridge.isBatteryOptimizationIgnored() &&
+                    typeof window.AndroidDriverBridge.requestBatteryExemption === 'function') {
+                    window.AndroidDriverBridge.requestBatteryExemption();
+                }
+            } catch(e) {}
+
+            if (typeof window.AndroidDriverBridge.startBackgroundLocation === 'function') {
+                try {
+                    window.AndroidDriverBridge.startBackgroundLocation(drvId, drvName, activeTripId);
+                    console.log('Foreground Service Nativo de Android iniciado para:', drvId);
+                } catch(e) {
+                    console.warn('Native background service start warning:', e);
+                }
             }
         }
 
@@ -2738,8 +2749,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         stopGlobalGpsWatch();
 
+        let consecutiveGpsErrors = 0;
+
         globalDriverGpsWatchId = navigator.geolocation.watchPosition(
             (pos) => {
+                consecutiveGpsErrors = 0;
                 const lat = pos.coords.latitude;
                 const lng = pos.coords.longitude;
                 const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
@@ -2771,19 +2785,27 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             (err) => {
                 console.warn('Fallo de señal GPS del Chofer:', err);
-                if (driverState.isOnline) {
-                    if (err.code === 1) { // PERMISSION_DENIED
-                        alert('⚠️ PERMISO DE UBICACIÓN REQUERIDO:\n\nPara ponerte EN LÍNEA y recibir viajes, debes conceder el permiso de Ubicación.\n\nVe a Ajustes de tu teléfono > Aplicaciones > RutaPrivada Chofer > Permisos > Ubicación > Permitir siempre.');
-                        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation) {
-                            try { window.Capacitor.Plugins.Geolocation.requestPermissions(); } catch(e){}
-                        }
-                    } else {
-                        alert('⚠️ GPS DESCONECTADO O SIN SEÑAL:\n\nVerifica que la ubicación/GPS de tu celular esté encendida para recibir viajes ejecutivos.');
+                if (!driverState.isOnline) return;
+
+                if (err.code === 1) { // PERMISSION_DENIED
+                    alert('⚠️ PERMISO DE UBICACIÓN REQUERIDO:\n\nPara ponerte EN LÍNEA y recibir viajes, debes conceder el permiso de Ubicación.\n\nVe a Ajustes de tu teléfono > Aplicaciones > RutaPrivada Chofer > Permisos > Ubicación > Permitir siempre.');
+                    if (window.AndroidDriverBridge && typeof window.AndroidDriverBridge.requestLocationPermissions === 'function') {
+                        try { window.AndroidDriverBridge.requestLocationPermissions(); } catch(e){}
+                    } else if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation) {
+                        try { window.Capacitor.Plugins.Geolocation.requestPermissions(); } catch(e){}
                     }
                     setOnlineStatus(false);
+                } else {
+                    // Tolerancia a fallos momentáneos (túneles, puentes, pérdida temporal de satélites)
+                    consecutiveGpsErrors++;
+                    if (consecutiveGpsErrors >= 5 && !window.AndroidDriverBridge) {
+                        if (typeof showDriverToast === 'function') {
+                            showDriverToast('⚠️ Señal GPS débil o reconectando...', 'warning');
+                        }
+                    }
                 }
             },
-            { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+            { enableHighAccuracy: true, maximumAge: 1500, timeout: 12000 }
         );
     }
 
