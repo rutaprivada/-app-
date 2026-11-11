@@ -6629,9 +6629,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             localStorage.removeItem('rutaprivada_driver_logged_out');
         } catch(e) {}
-        if (!driver.id) {
-            const cleanDni = driver.dni ? String(driver.dni).replace(/\D/g, '') : '';
-            driver.id = cleanDni ? ('drv_' + cleanDni) : ('drv_' + Date.now());
+        const cleanDni = driver.dni ? String(driver.dni).replace(/\D/g, '') : '';
+        const cleanEmail = driver.email ? String(driver.email).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') : '';
+        if (!driver.id || driver.id === 'drv_' + cleanDni) {
+            driver.id = cleanDni && cleanEmail ? `drv_${cleanDni}_${cleanEmail}` : (cleanEmail ? `drv_${cleanEmail}` : (cleanDni ? `drv_${cleanDni}` : `drv_${Date.now()}`));
         }
         if (!driver.calificacion) driver.calificacion = 5.0;
 
@@ -6757,8 +6758,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
                 }
                 const db = firebase.firestore();
-                const cleanDni = (driver.dni || '').replace(/\D/g, '') || String(Date.now());
-                const docId = driver.id || ('drv_' + cleanDni);
+                const docId = driver.id;
                 const emailDocId = (driver.email || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
                 
                 const cloudPayload = {
@@ -6783,11 +6783,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     updatedAt: Date.now()
                 };
 
-                // Guardar en colecciones conductores y drivers por ID y por email
+                // Guardar en colección drivers por su ID único de cuenta
                 db.collection('drivers').doc(docId).set(cloudPayload, { merge: true }).catch(() => {});
-                db.collection('conductores').doc(docId).set(cloudPayload, { merge: true }).catch(() => {});
                 if (emailDocId) {
-                    db.collection('drivers').doc(emailDocId).set(cloudPayload, { merge: true }).catch(() => {});
                     db.collection('conductores').doc(emailDocId).set(cloudPayload, { merge: true }).catch(() => {});
                 }
             }
@@ -6795,8 +6793,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sincronización mediante Firestore Cloud REST API
         try {
-            const cleanDni = (driver.dni || '').replace(/\D/g, '') || String(Date.now());
-            const docId = driver.id || ('drv_' + cleanDni);
+            const docId = driver.id;
             const emailDocId = (driver.email || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
             const restFields = {
                 id: { stringValue: docId },
@@ -6808,11 +6805,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 estadoVerificacion: { stringValue: driver.estadoVerificacion || 'pendiente' },
                 updatedAt: { integerValue: String(Date.now()) }
             };
-            fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/conductores/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fields: restFields })
-            }).catch(() => {});
+            if (emailDocId) {
+                fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/conductores/${emailDocId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fields: restFields })
+                }).catch(() => {});
+            }
             fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -7099,9 +7098,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
             const passwordHash = await hashDriverPassword(password);
 
+            const cleanEmailForId = email.replace(/[^a-z0-9_]/g, '_');
+            const driverUniqueId = cleanDni && cleanEmailForId ? `drv_${cleanDni}_${cleanEmailForId}` : (cleanEmailForId ? `drv_${cleanEmailForId}` : `drv_${cleanDni || Date.now()}`);
+
             // Inicia estrictamente en estado PENDIENTE de aprobación
             pendingDriverRegistration = {
-                id: 'drv_' + dni.replace(/\D/g, ''),
+                id: driverUniqueId,
                 nombre: name,
                 dni: dni,
                 telefono: phone,
