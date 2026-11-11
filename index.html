@@ -146,7 +146,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=139" />
+  <link rel="stylesheet" href="styles.css?v=140" />
 </head>
 
 <body>
@@ -698,7 +698,7 @@
 
             <!-- Swap Button -->
             <div class="swap-wrapper">
-              <button id="btn-swap-route" class="swap-btn" title="Invertir origen y destino">⇅</button>
+              <button type="button" id="btn-swap-route" onclick="window.swapRouteInputs(event)" class="swap-btn" title="Invertir origen y destino">⇅</button>
             </div>
 
             <!-- Destination -->
@@ -2943,18 +2943,29 @@
         <form id="formPassengerReportTicket"
           style="padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
 
-          <!-- Categoría Bloqueada (Preseleccionada) -->
+          <!-- Tipo de Consulta o Solicitud -->
           <div>
-            <label style="color: #94a3b8; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Tema del Reclamo (Fijado)</label>
+            <label id="lblTicketCategory" style="color: #94a3b8; font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 4px;">Tipo de Consulta o Solicitud *</label>
             <div style="position: relative;">
               <select id="ticketPassengerCategory" required
-                style="width: 100%; background: rgba(15, 23, 42, 0.95); border: 1.5px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 800; padding: 10px 36px 10px 12px; border-radius: 10px; font-size: 0.86rem; pointer-events: none; cursor: not-allowed; -webkit-appearance: none; -moz-appearance: none; appearance: none;">
-                <option value="chofer">🚗 Problemas con el Chofer</option>
-                <option value="objeto">🧳 Objeto Olvidado en el Vehículo</option>
-                <option value="pago">💳 Problemas con el Cobro / Pago</option>
-                <option value="otro">📝 Otro Reclamo o Consulta General</option>
+                style="width: 100%; background: rgba(15, 23, 42, 0.95); border: 1.5px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 800; padding: 10px 36px 10px 12px; border-radius: 10px; font-size: 0.86rem; -webkit-appearance: none; -moz-appearance: none; appearance: none; cursor: pointer;">
+                <optgroup label="📅 Gestión de Reservas Programadas">
+                  <option value="res_cancel_2h">⏱️ Cancelar reserva (a menos de 2 horas de su inicio)</option>
+                  <option value="res_modify_err">✏️ Error o dificultad al modificar itinerario / paradas</option>
+                  <option value="res_schedule_change">🕒 Cambio urgente de horario o fecha de reserva</option>
+                  <option value="res_driver_query">🚗 Consulta sobre el chofer asignado a mi reserva</option>
+                  <option value="res_fare_diff">💳 Duda sobre tarifa o cotización de la reserva</option>
+                  <option value="res_other">📋 Otra consulta sobre mi reserva programada</option>
+                </optgroup>
+                <optgroup label="🛡️ Reclamos de Viajes y Chofer">
+                  <option value="chofer">🚗 Problemas con el Chofer (conducta, ruta, demora)</option>
+                  <option value="objeto">🧳 Objeto Olvidado en el Vehículo</option>
+                  <option value="pago">💳 Problemas con el Cobro / Facturación</option>
+                  <option value="otro">📝 Otra Consulta o Reclamo General</option>
+                </optgroup>
               </select>
-              <i class="fa-solid fa-lock" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 0.85rem;" title="Tema fijado desde Ayuda"></i>
+              <i id="ticketCategoryLockIcon" class="fa-solid fa-lock" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 0.85rem; display: none;" title="Motivo fijado"></i>
+              <i id="ticketCategoryDropdownIcon" class="fa-solid fa-chevron-down" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #38bdf8; font-size: 0.8rem; pointer-events: none;"></i>
             </div>
           </div>
 
@@ -3041,10 +3052,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=139"></script>
+  <script src="sync.js?v=140"></script>
 
   <!-- App JS -->
-  <script src="app.js?v=139"></script>
+  <script src="app.js?v=140"></script>
 
   <!-- Inicializador Directo de Autocompletado de Direcciones & Auto-Purga de Caché -->
   <script>

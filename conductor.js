@@ -2923,7 +2923,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         const localBookings = getStoredBookings().filter(b => !isTestBooking(b));
                         const map = new Map();
                         localBookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
-                        cloudBookings.forEach(b => { if (b && b.id) map.set(b.id, b); });
+                        cloudBookings.forEach(b => {
+                            if (b && b.id) {
+                                const prev = map.get(b.id) || {};
+                                map.set(b.id, { ...prev, ...b });
+                            }
+                        });
 
                         const unified = Array.from(map.values()).sort((a, b) => {
                             const dateA = a.date || a.pickupDate || '';
@@ -5302,6 +5307,36 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             renderReservas();
             playAlertSound('incoming');
+        });
+
+        window.RutaSync.on('RESERVA_ACTUALIZADA', (reserva) => {
+            if (!reserva || !reserva.id) return;
+            let bookings = getStoredBookings();
+            const idx = bookings.findIndex(b => b.id === reserva.id);
+            const driverName = (driverState.info && driverState.info.nombre) || 'Daniel Pabon';
+            const wasAssigned = idx >= 0 && (
+                bookings[idx].status === 'aceptada' ||
+                bookings[idx].estado === 'aceptada' ||
+                bookings[idx].driverAssigned === driverName
+            );
+
+            if (idx >= 0) {
+                bookings[idx] = { ...bookings[idx], ...reserva };
+            } else {
+                bookings.unshift(reserva);
+            }
+            saveStoredBookings(bookings);
+            renderReservas();
+
+            const newFare = Number(reserva.precioEstimado || reserva.precio || reserva.totalFare || 0).toLocaleString('es-AR');
+            if (wasAssigned) {
+                playAlertSound('incoming');
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
+                alert(`⚠️ ITINERARIO DE RESERVA MODIFICADO POR EL PASAJERO\n\nEl pasajero ha modificado su reserva agendada #${String(reserva.id).slice(-6)}:\n\n• Origen: ${reserva.origen}\n• Destino: ${reserva.destino}\n• Nueva Tarifa: ${newFare}\n\nRevisa la Hoja de Ruta para confirmar tu disponibilidad con el nuevo itinerario.`);
+                showDriverToast(`🔔 Reserva de ${reserva.hora} hs modificada: ${newFare}.`);
+            } else {
+                showDriverToast(`🔔 Reserva #${String(reserva.id).slice(-6)} actualizada: ${newFare}.`);
+            }
         });
 
         window.RutaSync.on('RESERVA_ACEPTADA', () => {

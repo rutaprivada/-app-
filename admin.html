@@ -331,6 +331,22 @@
             font-weight: 700;
         }
 
+        .badge-tab-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            border-radius: 9px;
+            font-size: 0.68rem;
+            font-weight: 800;
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
         .badge-status.pendiente {
             background: rgba(245, 158, 11, 0.15);
             color: #fbbf24;
@@ -648,11 +664,11 @@
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <div class="filter-tabs" id="driverTicketFilterTabs">
-                        <button class="filter-tab-btn driver-ticket-tab-btn active" data-status="todos">Todos</button>
-                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="pendiente">⏳ Pendientes</button>
-                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="en_revision">🔍 En Revisión</button>
-                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="en_proceso">⚙️ En Proceso</button>
-                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="finalizado">✅ Finalizados</button>
+                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="todos">Todos <span class="badge-tab-count" id="badgeDriverCount_todos">0</span></button>
+                        <button class="filter-tab-btn driver-ticket-tab-btn active" data-status="pendiente">⏳ Pendientes <span class="badge-tab-count" id="badgeDriverCount_pendiente" style="background:#eab308; color:#000;">0</span></button>
+                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="en_revision">🔍 En Revisión <span class="badge-tab-count" id="badgeDriverCount_en_revision">0</span></button>
+                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="en_proceso">⚙️ En Proceso <span class="badge-tab-count" id="badgeDriverCount_en_proceso">0</span></button>
+                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="finalizado">✅ Finalizados <span class="badge-tab-count" id="badgeDriverCount_finalizado">0</span></button>
                     </div>
                     <button id="btnRefreshDriverTickets" class="admin-btn">
                         <i class="fa-solid fa-rotate"></i> Actualizar
@@ -693,11 +709,11 @@
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <div class="filter-tabs" id="passengerTicketFilterTabs">
-                        <button class="filter-tab-btn passenger-ticket-tab-btn active" data-status="todos">Todos</button>
-                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="pendiente">⏳ Pendientes</button>
-                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="en_revision">🔍 En Revisión</button>
-                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="en_proceso">⚙️ En Proceso</button>
-                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="finalizado">✅ Finalizados</button>
+                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="todos">Todos <span class="badge-tab-count" id="badgePassengerCount_todos">0</span></button>
+                        <button class="filter-tab-btn passenger-ticket-tab-btn active" data-status="pendiente">⏳ Pendientes <span class="badge-tab-count" id="badgePassengerCount_pendiente" style="background:#38bdf8; color:#000;">0</span></button>
+                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="en_revision">🔍 En Revisión <span class="badge-tab-count" id="badgePassengerCount_en_revision">0</span></button>
+                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="en_proceso">⚙️ En Proceso <span class="badge-tab-count" id="badgePassengerCount_en_proceso">0</span></button>
+                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="finalizado">✅ Finalizados <span class="badge-tab-count" id="badgePassengerCount_finalizado">0</span></button>
                     </div>
                     <button id="btnRefreshPassengerTickets" class="admin-btn">
                         <i class="fa-solid fa-rotate"></i> Actualizar
@@ -949,11 +965,15 @@
         document.addEventListener('DOMContentLoaded', () => {
             const ADMIN_PIN_SECRET = '4824';
             let currentDrivers = [];
+            let currentDriverTickets = [];
+            let currentPassengerTickets = [];
             let activeReviewDriver = null;
             let cloudRechargesList = [];
             let cloudDriversList = [];
             let activeFilter = 'todos';
             let activeRechargeFilter = 'todos';
+            let activeDriverTicketFilter = 'pendiente';
+            let activePassengerTicketFilter = 'pendiente';
             let docValidationState = [];
 
             // Elementos DOM Principales
@@ -982,7 +1002,6 @@
             const driverTicketsTableBody = document.getElementById('driverTicketsTableBody');
             const btnRefreshDriverTickets = document.getElementById('btnRefreshDriverTickets');
             const driverTicketFilterTabs = document.querySelectorAll('.driver-ticket-tab-btn');
-            let activeDriverTicketFilter = 'todos';
 
             // Elementos de Mesa de Ayuda / Reclamos de Pasajeros
             const tabNavPassengerTickets = document.getElementById('tabNavPassengerTickets');
@@ -991,7 +1010,6 @@
             const passengerTicketsTableBody = document.getElementById('passengerTicketsTableBody');
             const btnRefreshPassengerTickets = document.getElementById('btnRefreshPassengerTickets');
             const passengerTicketFilterTabs = document.querySelectorAll('.passenger-ticket-tab-btn');
-            let activePassengerTicketFilter = 'todos';
 
             // Elementos de Métricas Conductores
             const metricTotalDrivers = document.getElementById('metricTotalDrivers');
@@ -1312,10 +1330,18 @@
                 } else if (view === 'driver_tickets') {
                     if (sectionDriverTicketsView) sectionDriverTicketsView.style.display = 'block';
                     if (tabNavDriverTickets) tabNavDriverTickets.classList.add('admin-btn-primary');
+                    activeDriverTicketFilter = 'pendiente';
+                    driverTicketFilterTabs.forEach(b => {
+                        b.classList.toggle('active', (b.getAttribute('data-status') || '') === 'pendiente');
+                    });
                     loadDriverTicketsData();
                 } else if (view === 'passenger_tickets') {
                     if (sectionPassengerTicketsView) sectionPassengerTicketsView.style.display = 'block';
                     if (tabNavPassengerTickets) tabNavPassengerTickets.classList.add('admin-btn-primary');
+                    activePassengerTicketFilter = 'pendiente';
+                    passengerTicketFilterTabs.forEach(b => {
+                        b.classList.toggle('active', (b.getAttribute('data-status') || '') === 'pendiente');
+                    });
                     loadPassengerTicketsData();
                 } else {
                     if (sectionDriversView) sectionDriversView.style.display = 'block';
@@ -2137,17 +2163,17 @@
             // 5. RENDERIZAR TABLA DE CONDUCTORES
             function renderDriversTable() {
                 if (!driversTableBody) return;
-                const searchTerm = adminSearchInput ? adminSearchInput.value.toLowerCase().trim() : '';
+                const searchTerm = (adminSearchInput && adminSearchInput.value) ? String(adminSearchInput.value).toLowerCase().trim() : '';
 
                 const filtered = currentDrivers.filter(d => {
-                    const status = (d.estadoVerificacion || 'pendiente').toLowerCase();
+                    const status = String(d.estadoVerificacion || 'pendiente').toLowerCase();
                     const matchesFilter = (activeFilter === 'todos') || (status === activeFilter);
                     
-                    const name = (d.nombre || '').toLowerCase();
-                    const plate = (d.patente || '').toLowerCase();
-                    const phone = (d.telefono || '').toLowerCase();
-                    const dni = (d.dni || '').toLowerCase();
-                    const email = (d.email || '').toLowerCase();
+                    const name = String(d.nombre || '').toLowerCase();
+                    const plate = String(d.patente || '').toLowerCase();
+                    const phone = String(d.telefono || '').toLowerCase();
+                    const dni = String(d.dni || '').toLowerCase();
+                    const email = String(d.email || '').toLowerCase();
 
                     const matchesSearch = !searchTerm || name.includes(searchTerm) || plate.includes(searchTerm) || phone.includes(searchTerm) || dni.includes(searchTerm) || email.includes(searchTerm);
 
@@ -2167,11 +2193,13 @@
                 }
 
                 driversTableBody.innerHTML = filtered.map(d => {
-                    const status = (d.estadoVerificacion || 'pendiente').toLowerCase();
+                    const status = String(d.estadoVerificacion || 'pendiente').toLowerCase();
                     const statusLabel = status === 'aprobado' ? '✓ Aprobado' : (status === 'rechazado' ? '✕ Rechazado' : '⏱️ Pendiente');
                     const bankName = d.banco || 'Mercado Pago';
                     const cbuShort = d.cbu ? (d.cbu.substring(0, 10) + '...') : 'Sin CBU';
-                    const holderMatch = Boolean(d.titularCuenta && d.nombre && (d.titularCuenta.toLowerCase().trim() === d.nombre.toLowerCase().trim() || d.titularCuenta.toLowerCase().includes(d.nombre.toLowerCase()) || d.nombre.toLowerCase().includes(d.titularCuenta.toLowerCase())));
+                    const holderName = String(d.titularCuenta || '').toLowerCase().trim();
+                    const dName = String(d.nombre || '').toLowerCase().trim();
+                    const holderMatch = Boolean(holderName && dName && (holderName === dName || holderName.includes(dName) || dName.includes(holderName)));
                     const safeId = String(d.id || d.dni || d.nombre);
                     const docsCount = d.docsCount || (d.docsSummary ? Object.values(d.docsSummary).filter(Boolean).length : (d.docsImages ? Object.keys(d.docsImages).filter(k => d.docsImages[k] && d.docsImages[k].length > 20).length : 0));
 

@@ -825,6 +825,10 @@ class RutaSyncManager {
             if (message.payload && message.payload.id) {
                 this.guardarReservaEnAgenda(message.payload);
             }
+        } else if (message.type === 'RESERVA_ACTUALIZADA' || message.type === 'RESERVA_MODIFICADA') {
+            if (message.payload && message.payload.id) {
+                this.guardarOActualizarReserva(message.payload);
+            }
         } else if (message.type === 'RESERVA_ACEPTADA') {
             if (message.payload && message.payload.reservaId) {
                 this.actualizarReservaLocal(message.payload.reservaId, {
@@ -1162,6 +1166,63 @@ class RutaSyncManager {
             if (this.firestore) {
                 this.firestore.collection('fleet_bookings').doc(completedBooking.id).set(completedBooking).catch(() => {});
             }
+        } catch(e) {}
+    }
+
+    guardarOActualizarReserva(reserva) {
+        try {
+            let distanceKm = Number(reserva.distanceKm) || 0;
+            if (!distanceKm && reserva.distancia) {
+                const match = String(reserva.distancia).replace(',', '.').match(/([\d\.]+)/);
+                if (match) distanceKm = parseFloat(match[1]) || 0;
+            }
+            const tollFare = Number(reserva.tollFare || reserva.peajes || 0) || 0;
+            const fuelCostEst = Number(reserva.fuelCostEst) || Math.round(distanceKm * 210);
+
+            const enriched = {
+                ...reserva,
+                distanceKm: distanceKm,
+                tollFare: tollFare,
+                peajes: tollFare,
+                fuelCostEst: fuelCostEst,
+                modificadoEn: reserva.modificadoEn || Date.now(),
+                fueModificada: true
+            };
+
+            // Actualizar en bookings de chofer / agenda
+            let bookings = [];
+            try {
+                const raw = localStorage.getItem('rutaprivada_bookings_v1');
+                if (raw) bookings = JSON.parse(raw);
+            } catch(e) {}
+
+            const idx = bookings.findIndex(b => b.id === enriched.id);
+            if (idx >= 0) {
+                bookings[idx] = { ...bookings[idx], ...enriched };
+            } else {
+                bookings.unshift(enriched);
+            }
+            localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(bookings));
+
+            // Actualizar en reservas de pasajero
+            try {
+                let pResList = JSON.parse(localStorage.getItem('rutaprivada_passenger_reservations') || '[]');
+                const pIdx = pResList.findIndex(r => r.id === enriched.id);
+                if (pIdx >= 0) {
+                    pResList[pIdx] = { ...pResList[pIdx], ...enriched };
+                } else {
+                    pResList.unshift(enriched);
+                }
+                localStorage.setItem('rutaprivada_passenger_reservations', JSON.stringify(pResList));
+            } catch(e) {}
+
+            // Firestore
+            if (this.firestore) {
+                this.firestore.collection('bookings').doc(enriched.id).set(enriched, { merge: true }).catch(() => {});
+                this.firestore.collection('fleet_bookings').doc(enriched.id).set(enriched, { merge: true }).catch(() => {});
+            }
+
+            window.dispatchEvent(new Event('storage'));
         } catch(e) {}
     }
 

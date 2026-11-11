@@ -1,5 +1,136 @@
 
 // ==========================================
+// SINCRONIZACIÓN MAESTRA DE RELOJ Y HORARIO (PASO 4)
+// ==========================================
+window.syncAlarmClockDisplay = function(timeStr, dateStr) {
+  const curTodayStr = formatDateToString(new Date());
+  const targetDate = dateStr || state.date || curTodayStr;
+  const minAllowed = (typeof getMinAllowedTimeForDate === 'function') ? getMinAllowedTimeForDate(targetDate) : 0;
+
+  let h = 12;
+  let m = 0;
+
+  if (timeStr && timeStr.includes(':')) {
+    const parts = timeStr.split(':').map(Number);
+    h = isNaN(parts[0]) ? 12 : parts[0];
+    m = isNaN(parts[1]) ? 0 : parts[1];
+  } else if (targetDate === curTodayStr && minAllowed > 0) {
+    h = Math.floor(minAllowed / 60) % 24;
+    m = minAllowed % 60;
+  }
+
+  // Si es para hoy, no permitir que sea inferior al mínimo de 50 minutos
+  if (targetDate === curTodayStr && (h * 60 + m) < minAllowed) {
+    h = Math.floor(minAllowed / 60) % 24;
+    m = minAllowed % 60;
+  }
+
+  if (m >= 60) {
+    h = (h + 1) % 24;
+    m = 0;
+  }
+
+  const hStr = String(h).padStart(2, '0');
+  const mStr = String(m).padStart(2, '0');
+  const full24 = `${hStr}:${mStr}`;
+
+  state.time = full24;
+  state.date = targetDate;
+
+  const alarmH = document.getElementById('alarm-hour-display');
+  const alarmM = document.getElementById('alarm-min-display');
+  if (alarmH) alarmH.textContent = hStr;
+  if (alarmM) alarmM.textContent = mStr;
+
+  const timeInput = document.getElementById('trip-time');
+  if (timeInput) timeInput.value = full24;
+
+  const selectH = document.getElementById('select-hour');
+  const selectM = document.getElementById('select-minute');
+  if (selectH) selectH.value = hStr;
+  if (selectM) selectM.value = mStr;
+
+  const highlight = document.getElementById('selected-time-highlight');
+  if (highlight) {
+    const slotTag = h < 12 ? 'Mañana' : (h < 20 ? 'Tarde' : 'Noche');
+    highlight.textContent = `${full24} hs`;
+  }
+
+  const btnAm = document.getElementById('btn-alarm-am');
+  const btnPm = document.getElementById('btn-alarm-pm');
+  if (btnAm && btnPm) {
+    if (h >= 12) {
+      btnPm.classList.add('active');
+      btnAm.classList.remove('active');
+    } else {
+      btnAm.classList.add('active');
+      btnPm.classList.remove('active');
+    }
+  }
+
+  document.querySelectorAll('.matrix-pill').forEach(pill => {
+    pill.classList.toggle('active', pill.getAttribute('data-time') === full24);
+  });
+
+  if (typeof updateStepDateTimeBadges === 'function') updateStepDateTimeBadges();
+  if (typeof evaluateTimeRate === 'function') evaluateTimeRate(full24, targetDate);
+  if (typeof updateStep5ActionButton === 'function') updateStep5ActionButton();
+  if (typeof updateCalculation === 'function') updateCalculation();
+};
+
+
+// ==========================================
+// INTERCAMBIO DE ORIGEN Y DESTINO
+// ==========================================
+window.swapRouteInputs = function(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  const originInput = document.getElementById('origin-input');
+  const destInput = document.getElementById('destination-input');
+  const btnSwap = document.getElementById('btn-swap-route');
+  if (!originInput || !destInput) return;
+
+  const oldOriginVal = originInput.value;
+  const oldDestVal = destInput.value;
+
+  originInput.value = oldDestVal;
+  destInput.value = oldOriginVal;
+
+  const clearOrig = document.getElementById('btn-clear-origin');
+  const clearDest = document.getElementById('btn-clear-destination');
+  if (clearOrig) clearOrig.classList.toggle('hidden', !originInput.value);
+  if (clearDest) clearDest.classList.toggle('hidden', !destInput.value);
+
+  const oldOriginState = state.origin ? { ...state.origin } : (oldOriginVal ? { address: oldOriginVal, name: oldOriginVal } : null);
+  const oldDestState = state.destination ? { ...state.destination } : (oldDestVal ? { address: oldDestVal, name: oldDestVal } : null);
+
+  state.origin = oldDestState ? { ...oldDestState, address: originInput.value, name: originInput.value } : (originInput.value ? { address: originInput.value, name: originInput.value } : null);
+  state.destination = oldOriginState ? { ...oldOriginState, address: destInput.value, name: destInput.value } : (destInput.value ? { address: destInput.value, name: destInput.value } : null);
+
+  if (state.origin && state.origin.lat && state.origin.lng && typeof setOrigin === 'function') {
+    try { setOrigin(state.origin.lat, state.origin.lng, state.origin.address); } catch(err) {}
+  }
+  if (state.destination && state.destination.lat && state.destination.lng && typeof setDestination === 'function') {
+    try { setDestination(state.destination.lat, state.destination.lng, state.destination.address); } catch(err) {}
+  }
+
+  if (typeof updateRouteBreadcrumb === 'function') {
+    try { updateRouteBreadcrumb(); } catch(err) {}
+  }
+  if (typeof checkAndRoute === 'function') {
+    try { checkAndRoute(); } catch(err) {}
+  }
+
+  if (btnSwap) {
+    btnSwap.style.transition = 'transform 0.3s ease';
+    btnSwap.style.transform = 'rotate(180deg)';
+    setTimeout(() => { if (btnSwap) btnSwap.style.transform = 'rotate(0deg)'; }, 350);
+  }
+
+  if (typeof showToast === 'function') showToast('🔄 Origen y destino intercambiados');
+};
+
+
+// ==========================================
 // REGLAS Y RESTRICCIONES DE RESERVAS
 // ==========================================
 function isAirportOrBusTerminal(locationText) {
@@ -739,17 +870,38 @@ window.switchPassengerHelpTab = function(category, btnEl) {
   if (noRes) noRes.style.display = matches === 0 ? 'block' : 'none';
 };
 
-window.openPassengerTicketModal = function(category) {
+window.openPassengerTicketModal = function(preselectedCategory, defaultDescription, isLocked = false, tripRef = '') {
   const modal = document.getElementById('modalPassengerReportTicket');
   if (modal) {
     modal.classList.remove('hidden');
     modal.classList.add('active');
     modal.style.display = 'flex';
   }
-  if (category) {
-    const catSelect = document.getElementById('ticketPassengerCategory');
-    if (catSelect) catSelect.value = category;
+
+  const catSelect = document.getElementById('ticketPassengerCategory');
+  const lockIcon = document.getElementById('ticketCategoryLockIcon');
+  const dropIcon = document.getElementById('ticketCategoryDropdownIcon');
+  const lblCat = document.getElementById('lblTicketCategory');
+
+  if (catSelect) {
+    if (preselectedCategory) {
+      catSelect.value = preselectedCategory;
+    }
+    if (isLocked) {
+      catSelect.style.pointerEvents = 'none';
+      catSelect.style.cursor = 'not-allowed';
+      if (lockIcon) lockIcon.style.display = 'block';
+      if (dropIcon) dropIcon.style.display = 'none';
+      if (lblCat) lblCat.textContent = 'Tipo de Consulta o Solicitud (Fijado)';
+    } else {
+      catSelect.style.pointerEvents = 'auto';
+      catSelect.style.cursor = 'pointer';
+      if (lockIcon) lockIcon.style.display = 'none';
+      if (dropIcon) dropIcon.style.display = 'block';
+      if (lblCat) lblCat.textContent = 'Tipo de Consulta o Solicitud *';
+    }
   }
+
   const session = typeof window.getPassengerSession === 'function' ? window.getPassengerSession() : null;
   if (session) {
     const nameInp = document.getElementById('ticketPassengerName');
@@ -758,6 +910,22 @@ window.openPassengerTicketModal = function(category) {
     if (nameInp && !nameInp.value) nameInp.value = session.nombre || '';
     if (phoneInp && !phoneInp.value) phoneInp.value = session.telefono || '';
     if (emailInp && !emailInp.value) emailInp.value = session.email || '';
+  }
+
+  const tripInp = document.getElementById('ticketPassengerTripId');
+  if (tripInp) {
+    if (tripRef) {
+      tripInp.value = tripRef;
+    } else if (!tripInp.value) {
+      const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
+      if (activeTrip) tripInp.value = 'Viaje #' + (activeTrip.id || 'Activo');
+    }
+  }
+
+  const descInp = document.getElementById('ticketPassengerDescription');
+  if (descInp) {
+    if (defaultDescription) descInp.value = defaultDescription;
+    setTimeout(() => descInp.focus(), 250);
   }
 };
 
@@ -772,7 +940,7 @@ window.closePassengerTicketModal = function() {
 
 window.openPassengerTicketCategory = function(catKey) {
   window.closePassengerHelpModal();
-  window.openPassengerTicketModal(catKey);
+  window.openPassengerTicketModal(catKey, '', true);
 };
 
 window.syncRouteOptionsUI = function() {
@@ -2361,49 +2529,7 @@ window.closePassengerHelpModal = function() {
   }
 };
 
-window.openPassengerTicketModal = function(preselectedCategory, defaultDescription) {
-  const modal = document.getElementById('modalPassengerReportTicket');
-  if (modal) {
-    const session = window.getPassengerSession ? window.getPassengerSession() : null;
-    const inputName = document.getElementById('ticketPassengerName');
-    const inputPhone = document.getElementById('ticketPassengerPhone');
-    const inputEmail = document.getElementById('ticketPassengerEmail');
-    const selectCat = document.getElementById('ticketPassengerCategory');
-    const inputTrip = document.getElementById('ticketPassengerTripId');
-    const inputDesc = document.getElementById('ticketPassengerDescription');
-
-    if (session) {
-      if (inputName && !inputName.value) inputName.value = session.nombre || '';
-      if (inputPhone && !inputPhone.value) inputPhone.value = session.telefono || '';
-      if (inputEmail && !inputEmail.value) inputEmail.value = session.email || '';
-    }
-
-    if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
-    if (inputDesc && defaultDescription && !inputDesc.value) inputDesc.value = defaultDescription;
-
-    const activeTrip = window.RutaSync ? window.RutaSync.obtenerViajeActivo() : null;
-    if (inputTrip && activeTrip && !inputTrip.value) {
-      inputTrip.value = 'Viaje #' + (activeTrip.id || 'Activo');
-    }
-
-    modal.classList.remove('hidden');
-    modal.style.display = 'flex';
-    if (inputDesc) setTimeout(() => inputDesc.focus(), 250);
-  }
-};
-
-window.closePassengerTicketModal = function() {
-  const modal = document.getElementById('modalPassengerReportTicket');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.style.display = 'none';
-  }
-};
-
-window.openPassengerTicketCategory = function(catKey) {
-  window.closePassengerHelpModal();
-  window.openPassengerTicketModal(catKey);
-};
+// Modal de tickets y categoría gestionados por la definición maestra global
 
 // togglePassengerHelpAccordion ya se encuentra definido globalmente para el centro de ayuda
 
@@ -2642,7 +2768,9 @@ async function goToWizardStep(step) {
   }
 
   if (step === 4) {
-    if (typeof renderAlarmClock === 'function') {
+    if (typeof window.syncAlarmClockDisplay === 'function') {
+      try { window.syncAlarmClockDisplay(state.time, state.date); } catch(e){}
+    } else if (typeof renderAlarmClock === 'function') {
       try { renderAlarmClock(); } catch(e){}
     }
     if (typeof updateCalculation === 'function') {
@@ -4317,10 +4445,14 @@ function selectDateFromCalendar(dateStr) {
   updateDateDisplay();
   renderUpcomingDaysStrip();
   renderCustomCalendar();
-  evaluateTimeRate(state.time, state.date);
-  updateStepDateTimeBadges();
-  updateStep5ActionButton();
-  updateCalculation();
+  if (typeof window.syncAlarmClockDisplay === 'function') {
+    window.syncAlarmClockDisplay(state.time, state.date);
+  } else {
+    evaluateTimeRate(state.time, state.date);
+    updateStepDateTimeBadges();
+    updateStep5ActionButton();
+    updateCalculation();
+  }
 }
 
 function renderCustomCalendar() {
@@ -8731,29 +8863,8 @@ function initEventListeners() {
   // 4. Botón Intercambiar Origen y Destino (⇅)
   const btnSwap = document.getElementById('btn-swap-route');
   if (btnSwap) {
-    btnSwap.addEventListener('click', () => {
-      const originInput = document.getElementById('origin-input');
-      const destInput = document.getElementById('destination-input');
-      if (!originInput || !destInput) return;
-
-      const tempVal = originInput.value;
-      originInput.value = destInput.value;
-      destInput.value = tempVal;
-
-      const clearOrig = document.getElementById('btn-clear-origin');
-      const clearDest = document.getElementById('btn-clear-destination');
-      if (clearOrig) clearOrig.classList.toggle('hidden', !originInput.value);
-      if (clearDest) clearDest.classList.toggle('hidden', !destInput.value);
-
-      const tempOrigin = state.origin;
-      state.origin = state.destination;
-      state.destination = tempOrigin;
-
-      if (state.origin) setOrigin(state.origin.lat, state.origin.lng, state.origin.address || originInput.value);
-      if (state.destination) setDestination(state.destination.lat, state.destination.lng, state.destination.address || destInput.value);
-      
-      checkAndRoute();
-      showToast('🔄 Origen y destino intercambiados');
+    btnSwap.addEventListener('click', (e) => {
+      window.swapRouteInputs(e);
     });
   }
 
@@ -10473,6 +10584,18 @@ if (btnRequestInapp) {
           window.RutaSync.emit('RESERVA_CREADA', reservaData);
         }
       }
+
+      // Guardar en agenda global / conductor (rutaprivada_bookings_v1)
+      try {
+        let bList = JSON.parse(localStorage.getItem('rutaprivada_bookings_v1') || '[]');
+        const bIdx = bList.findIndex(b => b.id === targetId);
+        if (bIdx >= 0) {
+          bList[bIdx] = { ...bList[bIdx], ...reservaData };
+        } else {
+          bList.unshift(reservaData);
+        }
+        localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(bList));
+      } catch(e) {}
 
       // Guardar en reservas de pasajero
       try {
@@ -12259,9 +12382,12 @@ if (btnRecenterPassengerMap) {
     reservationsListContainer.querySelectorAll('.btn-passenger-support-res').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
+        const list = loadPassengerReservations();
+        const item = list.find(r => r.id === id);
+        const refStr = item ? `Reserva #${String(id).slice(-6)} (${item.fecha || ''} ${item.hora || ''} hs)` : `Reserva #${String(id).slice(-6)}`;
         closePassengerReservationsModal();
         if (typeof window.openPassengerTicketModal === 'function') {
-          window.openPassengerTicketModal('general', `Consulta sobre mi reserva #${String(id).slice(-6)}`);
+          window.openPassengerTicketModal('res_cancel_2h', `Solicitud respecto a mi reserva #${String(id).slice(-6)}:`, false, refStr);
         }
       });
     });
