@@ -118,17 +118,18 @@ class RutaSyncManager {
 
     obtenerDriverIdLocal() {
         try {
+            const authRaw = localStorage.getItem('rutaprivada_driver_auth_v1');
+            if (authRaw) {
+                const a = JSON.parse(authRaw);
+                if (a && a.id) return String(a.id);
+                if (a && a.email) return 'drv_' + String(a.email).toLowerCase().replace(/[^a-z0-9]/gi, '_');
+            }
             const raw = localStorage.getItem('rutaprivada_driver_profile');
             if (raw) {
                 const p = JSON.parse(raw);
                 if (p && p.id) return String(p.id);
+                if (p && p.email) return 'drv_' + String(p.email).toLowerCase().replace(/[^a-z0-9]/gi, '_');
                 if (p && p.dni) return 'drv_' + String(p.dni).replace(/\D/g, '');
-            }
-            const docsRaw = localStorage.getItem('rutaprivada_driver_docs_v1');
-            if (docsRaw) {
-                const d = JSON.parse(docsRaw);
-                if (d && d.id) return String(d.id);
-                if (d && d.dni) return 'drv_' + String(d.dni).replace(/\D/g, '');
             }
         } catch(e){}
         return this.deviceId;
@@ -1863,8 +1864,8 @@ class RutaSyncManager {
 
     guardarDocumentosConductor(docsData) {
         if (!docsData) return;
-        const cleanDni = String(docsData.dni || '').replace(/\D/g, '');
-        const driverId = String(docsData.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
+        const email = (docsData.email || '').toLowerCase().trim();
+        const driverId = String(docsData.id || (email ? 'drv_' + email.replace(/[^a-z0-9]/gi, '_') : 'driver_local'));
         const payload = {
             ...docsData,
             id: driverId,
@@ -1872,7 +1873,7 @@ class RutaSyncManager {
         };
 
         try {
-            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(payload));
+            localStorage.setItem(`rutaprivada_driver_docs_${driverId}`, JSON.stringify(payload));
         } catch(e){}
 
         if (this.firestore) {
@@ -2265,20 +2266,6 @@ class RutaSyncManager {
     // ==========================================
     // GESTIÓN Y SINCRONIZACIÓN DE DOCUMENTACIÓN
     // ==========================================
-    guardarDocumentosConductor(driverData) {
-        if (!driverData) return;
-        try {
-            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(driverData));
-        } catch(e){}
-
-        if (this.firestore) {
-            const cleanDni = String(driverData.dni || '').replace(/\D/g, '') || 'chofer_actual';
-            const docId = String(driverData.id || ('drv_' + cleanDni));
-            this.firestore.collection('drivers').doc(docId).set(driverData, { merge: true }).catch(() => {});
-        }
-
-        this.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driverData);
-    }
 }
 
 // Instancia global (soportando ambas variantes de mayúsculas/minúsculas)

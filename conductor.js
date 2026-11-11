@@ -473,7 +473,8 @@ window.openDriverTicketModal = function(preselectedCategory, defaultDescription)
 
         if (!currentName || !currentPhone || !currentEmail) {
             try {
-                const rawDocs = localStorage.getItem('rutaprivada_driver_docs_v1');
+                const drvId = (typeof getActiveDriverId === 'function') ? getActiveDriverId() : 'default';
+                const rawDocs = (drvId && drvId !== 'default') ? localStorage.getItem(`rutaprivada_driver_docs_${drvId}`) : null;
                 if (rawDocs) {
                     const docs = JSON.parse(rawDocs);
                     if (docs) {
@@ -562,18 +563,15 @@ window.openDriverStatusNoticeModal = function(status, obs) {
             iconWrap.style.color = '#34d399';
         }
         if (icon) icon.className = 'fa-solid fa-circle-check';
-        if (title) title.textContent = '¡Cuenta Aprobada y Habilitada!';
-        if (subtitle) subtitle.textContent = 'El Administrador validó tus 9 documentos y vehículo con éxito. Ya puedes conectarte para recibir viajes en tiempo real.';
+        if (title) title.textContent = '¡Cuenta Aprobada!';
+        if (subtitle) subtitle.textContent = 'El Administrador validó tu documentación con éxito. El bloqueo ha sido removido y puedes conectarte cuando tú decidas presionando "CONECTARME EN LÍNEA".';
         if (obsBox) obsBox.style.display = 'none';
         if (btnAction) {
             btnAction.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
             btnAction.style.color = '#fff';
-            btnAction.innerHTML = '<i class="fa-solid fa-power-off"></i> Conectar En Línea Ahora';
+            btnAction.innerHTML = '<i class="fa-solid fa-check"></i> Entendido';
             btnAction.onclick = () => {
                 window.closeDriverStatusNoticeModal();
-                if (typeof window.handleDriverToggleStatus === 'function') {
-                    window.handleDriverToggleStatus();
-                }
             };
         }
     } else if (status === 'pendiente' || status === 'sin_subir') {
@@ -641,7 +639,8 @@ window.handleDriverToggleStatus = function() {
     // Fallback: verificar aprobación antes de cambiar estado
     let docs = null;
     try {
-        const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
+        const drvId = (typeof getActiveDriverId === 'function') ? getActiveDriverId() : 'default';
+        const raw = (drvId && drvId !== 'default') ? localStorage.getItem(`rutaprivada_driver_docs_${drvId}`) : null;
         if (raw) docs = JSON.parse(raw);
     } catch(e) {}
     const isApproved = docs && docs.estadoVerificacion === 'aprobado';
@@ -705,8 +704,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const raw = localStorage.getItem('rutaprivada_driver_auth_v1');
             if (raw) {
                 const parsed = JSON.parse(raw);
-                if (parsed && parsed.id) return parsed.id;
-                if (parsed && parsed.email) return 'drv_' + String(parsed.email).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                if (parsed) {
+                    if (parsed.email) {
+                        return 'drv_' + String(parsed.email).toLowerCase().trim().replace(/[^a-z0-9]/gi, '_');
+                    }
+                    if (parsed.id) return parsed.id;
+                }
             }
         } catch(e) {}
         return 'default';
@@ -716,8 +719,10 @@ document.addEventListener('DOMContentLoaded', () => {
         let docs = null;
         const drvId = getActiveDriverId();
         try {
-            const rawDocs = (drvId !== 'default') ? (localStorage.getItem(`rutaprivada_driver_docs_${drvId}`) || localStorage.getItem('rutaprivada_driver_docs_v1')) : localStorage.getItem('rutaprivada_driver_docs_v1');
-            if (rawDocs) docs = JSON.parse(rawDocs);
+            if (drvId !== 'default') {
+                const rawDocs = localStorage.getItem(`rutaprivada_driver_docs_${drvId}`);
+                if (rawDocs) docs = JSON.parse(rawDocs);
+            }
         } catch(e) {}
 
         const defaultPhoto = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
@@ -794,31 +799,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (rawAuth) sessionInfo = JSON.parse(rawAuth);
         } catch(e) {}
 
-        // 1. Prioridad: Almacenamiento estrictamente aislado por ID de chofer
+        // 1. Almacenamiento estrictamente aislado por ID único de chofer
         if (drvId && drvId !== 'default') {
             try {
                 const specificRaw = localStorage.getItem(`rutaprivada_driver_docs_${drvId}`);
                 if (specificRaw) {
                     const parsed = JSON.parse(specificRaw);
-                    if (parsed && (parsed.id === drvId || !parsed.id)) {
+                    if (parsed && (parsed.id === drvId || (parsed.email && sessionInfo.email && parsed.email.toLowerCase() === sessionInfo.email.toLowerCase()))) {
                         return { ...getCleanDriverTemplate(drvId, sessionInfo), ...parsed, id: drvId };
                     }
                 }
             } catch(e) {}
         }
 
-        // 2. Almacenamiento secundario / retrocompatibilidad solo si coincide el ID exacto
-        try {
-            const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed && parsed.id && parsed.id === drvId) {
-                    return { ...getCleanDriverTemplate(drvId, sessionInfo), ...parsed, id: drvId };
-                }
-            }
-        } catch(e) {}
-
-        // 3. Plantilla limpia para chofer nuevo (sin mezclar documentos con otra cuenta con mismo DNI)
+        // 2. Si no tiene documentos propios, NUNCA leer los de otra cuenta ni compartir datos.
+        // Se devuelve una plantilla limpia exclusiva para este chofer nuevo.
         return getCleanDriverTemplate(drvId, sessionInfo);
     }
 
@@ -5436,7 +5431,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDriverProfileInfo() {
         let docs = null;
         try {
-            const raw = localStorage.getItem('rutaprivada_driver_docs_v1');
+            const drvId = (typeof getActiveDriverId === 'function') ? getActiveDriverId() : 'default';
+            const raw = (drvId && drvId !== 'default') ? localStorage.getItem(`rutaprivada_driver_docs_${drvId}`) : null;
             if (raw) docs = JSON.parse(raw);
         } catch(e) {}
 
@@ -5867,7 +5863,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // 2. Guardar localmente de forma estrictamente aislada por cuenta
             try {
                 localStorage.setItem(`rutaprivada_driver_docs_${docId}`, JSON.stringify(updatedDocs));
-                localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(updatedDocs));
                 window.dispatchEvent(new Event('storage'));
             } catch(e) {
                 console.warn('LocalStorage save warning:', e);
@@ -5920,10 +5915,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     const db = firebase.firestore();
 
-                    // 1. Guardar de inmediato datos principales del chofer en Firestore (super ligero, siempre exitoso)
-                    db.collection('drivers').doc(docId).set(mainDriverDoc, { merge: true }).then(() => {
-                        console.log('✓ Perfil de conductor sincronizado con Firestore:', docId);
-                    }).catch(err => console.warn('Error guardando chofer en Firestore SDK:', err));
+                    // 1. Guardar de inmediato datos principales y documentos del chofer en Firestore
+                    const fullCloudDocWithImages = {
+                        ...mainDriverDoc,
+                        docsImages: mergedDocsImages
+                    };
+                    db.collection('drivers').doc(docId).set(fullCloudDocWithImages, { merge: true }).then(() => {
+                        console.log('✓ Perfil y documentos de conductor sincronizados con Firestore:', docId);
+                    }).catch(err => {
+                        console.warn('Error guardando chofer completo en Firestore SDK, reintentando liviano:', err);
+                        db.collection('drivers').doc(docId).set(mainDriverDoc, { merge: true }).catch(e => console.warn(e));
+                    });
 
                     // 2. Guardar cada documento individualmente en subcolección (cada uno con su propio límite de 1MB)
                     for (const [docKey, docData] of Object.entries(mergedDocsImages)) {
@@ -5991,9 +5993,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch(e) {}
 
-            // 3. Emitir evento por bus sync para recepción inmediata en Admin
+            // 3. Emitir evento por bus sync para recepción inmediata en Admin con todas las fotos e imágenes
             if (window.RutaSync) {
-                window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', mainDriverDoc);
+                const livePayload = { ...mainDriverDoc, docsImages: mergedDocsImages };
+                window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', livePayload);
+                window.RutaSync.emit('DOCUMENTO_CONDUCTOR_SUBIDO', { driverId: docId, ...livePayload });
             }
 
             // 4. Actualizar lista en memoria sin colisionar con otras cuentas del mismo DNI
@@ -6042,7 +6046,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                     currentLocal.estadoVerificacion = cloudData.estadoVerificacion;
                                     currentLocal.observaciones = cloudData.observaciones || '';
                                     try {
-                                        localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(currentLocal));
                                         const drvId = getActiveDriverId();
                                         if (drvId && drvId !== 'default') {
                                             localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(currentLocal));
@@ -6076,8 +6079,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.RutaSync) {
                 window.RutaSync.on('ESTADO_CONDUCTOR_ACTUALIZADO', (data) => {
                     if (!data) return;
-                    const dDni = (data.dni || '').replace(/\D/g, '');
-                    if (dDni && dDni === cleanDni && data.estadoVerificacion) {
+                    const myDrvId = getActiveDriverId();
+                    const currentLocal = loadDocsData();
+                    const matchesMe = (data.id && myDrvId && myDrvId !== 'default' && data.id === myDrvId) ||
+                                      (data.email && currentLocal.email && data.email.toLowerCase() === currentLocal.email.toLowerCase());
+                    if (matchesMe && data.estadoVerificacion) {
                         const currentLocal = loadDocsData();
                         const prevStatus = currentLocal.estadoVerificacion;
                         const prevObs = currentLocal.observaciones || '';
@@ -6088,7 +6094,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentLocal.estadoVerificacion = newStatus;
                             currentLocal.observaciones = newObs;
                             try {
-                                localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(currentLocal));
                                 const drvId = getActiveDriverId();
                                 if (drvId && drvId !== 'default') {
                                     localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(currentLocal));
@@ -6297,26 +6302,53 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Escuchar cambios de estado desde el panel de administración
+        // Escuchar cambios de estado desde el panel de administración de forma estrictamente aislada por cuenta
         window.addEventListener('storage', (e) => {
-            if (e.key === 'rutaprivada_driver_docs_v1' || e.key === 'rutaprivada_drivers_v1') {
+            const myDrvId = getActiveDriverId();
+            if (!myDrvId || myDrvId === 'default') return;
+
+            if (e.key === `rutaprivada_driver_docs_${myDrvId}`) {
                 const fresh = loadDocsData();
-                updateDocsStatusBanner(fresh.estadoVerificacion || 'aprobado');
-                if (fresh.estadoVerificacion === 'aprobado') {
-                    showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el administrador!');
-                }
+                updateDocsStatusBanner(fresh.estadoVerificacion || 'pendiente');
+                renderDriverProfileInfo();
+            } else if (e.key === 'rutaprivada_drivers_v1') {
+                try {
+                    const list = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+                    const myAuth = (typeof getDriverSession === 'function') ? getDriverSession() : null;
+                    const myEmail = myAuth && myAuth.email ? myAuth.email.toLowerCase().trim() : '';
+                    const myInfo = list.find(d => (d.id && d.id === myDrvId) || (d.email && myEmail && d.email.toLowerCase().trim() === myEmail));
+                    if (myInfo && myInfo.estadoVerificacion) {
+                        const localDocs = loadDocsData();
+                        if (localDocs.estadoVerificacion !== myInfo.estadoVerificacion) {
+                            const prevStatus = localDocs.estadoVerificacion;
+                            localDocs.estadoVerificacion = myInfo.estadoVerificacion;
+                            localDocs.observaciones = myInfo.observaciones || '';
+                            localStorage.setItem(`rutaprivada_driver_docs_${myDrvId}`, JSON.stringify(localDocs));
+                            updateDocsStatusBanner(myInfo.estadoVerificacion);
+                            renderDriverProfileInfo();
+                            if (myInfo.estadoVerificacion === 'aprobado' && prevStatus !== 'aprobado') {
+                                showDriverToast('🎉 ¡Tu cuenta ha sido APROBADA por el Administrador!');
+                                try { playAlertSound('success'); } catch(e){}
+                                if (typeof window.openDriverStatusNoticeModal === 'function') {
+                                    window.openDriverStatusNoticeModal('aprobado', '');
+                                }
+                            }
+                        }
+                    }
+                } catch(err) {}
             }
         });
 
         if (window.RutaSync) {
             window.RutaSync.on('ESTADO_CONDUCTOR_ACTUALIZADO', (data) => {
                 if (!data) return;
+                const myDrvId = getActiveDriverId();
                 const localDocs = loadDocsData();
-                const cleanDniLocal = (localDocs.dni || '').replace(/\D/g, '');
-                const cleanDniIncoming = (data.dni || data.id || '').replace(/\D/g, '');
+                const matchesMe = (data.id && myDrvId && myDrvId !== 'default' && data.id === myDrvId) ||
+                                  (data.email && localDocs.email && data.email.toLowerCase() === localDocs.email.toLowerCase());
                 
-                // Si la actualización corresponde a este chofer de forma privada y exclusiva
-                if ((cleanDniIncoming && cleanDniLocal && cleanDniIncoming === cleanDniLocal) || data.id === 'driver_local' || data.id === ('drv_' + cleanDniLocal)) {
+                // Si la actualización corresponde a este chofer de forma privada y exclusiva por ID
+                if (matchesMe) {
                     const newStatus = data.estadoVerificacion || data.estado || 'aprobado';
                     const prevStatus = localDocs.estadoVerificacion;
                     const prevObs = localDocs.observaciones || '';
@@ -6327,7 +6359,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         localDocs.observaciones = newObs;
                         
                         try {
-                            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
                             const drvId = getActiveDriverId();
                             if (drvId && drvId !== 'default') {
                                 localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(localDocs));
@@ -6542,7 +6573,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function saveDriverToRegisteredList(driver) {
         const list = getRegisteredDriversList();
-        const existingIdx = list.findIndex(d => (d.email && driver.email && d.email.toLowerCase() === driver.email.toLowerCase()) || (d.dni && driver.dni && d.dni === driver.dni));
+        const existingIdx = list.findIndex(d => (d.email && driver.email && d.email.toLowerCase() === driver.email.toLowerCase()) || (d.id && driver.id && d.id === driver.id));
         if (existingIdx >= 0) {
             list[existingIdx] = { ...list[existingIdx], ...driver };
         } else {
@@ -6575,7 +6606,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             localStorage.removeItem('rutaprivada_driver_logged_out');
         } catch(e) {}
-        if (!driver.id) {
+        const cleanEmail = (driver.email || '').toLowerCase().trim();
+        if (cleanEmail) {
+            driver.id = 'drv_' + cleanEmail.replace(/[^a-z0-9]/gi, '_');
+        } else if (!driver.id) {
             driver.id = 'drv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
         }
         if (!driver.calificacion) driver.calificacion = 5.0;
@@ -6657,7 +6691,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             localStorage.setItem(`rutaprivada_driver_docs_${driver.id}`, JSON.stringify(driverDocs));
-            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(driverDocs));
         } catch(e) {}
 
         saveDriverToRegisteredList(driver);
@@ -7322,7 +7355,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 localDocs.estadoVerificacion = newStatus;
                 localDocs.observaciones = newObs;
                 try {
-                    localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(localDocs));
                     const drvId = getActiveDriverId();
                     if (drvId && drvId !== 'default') {
                         localStorage.setItem(`rutaprivada_driver_docs_${drvId}`, JSON.stringify(localDocs));
@@ -7359,9 +7391,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        let restBackoffUntil = 0;
         // 1. Polling directo vía Firestore REST (estrictamente aislado por ID único de cuenta)
         const pollDriverStatusRest = async () => {
             try {
+                if (Date.now() < restBackoffUntil) return;
                 const localDocs = (typeof loadDocsData === 'function') ? loadDocsData() : null;
                 const docId = (localDocs && localDocs.id) || getActiveDriverId();
                 if (!docId || docId === 'default') return;
@@ -7369,6 +7403,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Consulta directa y exclusiva por el ID de esta cuenta
                 try {
                     const resp = await fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${docId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' });
+                    if (resp.status === 429) {
+                        restBackoffUntil = Date.now() + 30000; // pausa 30s ante saturación de cuota REST
+                        return;
+                    }
                     if (resp.ok) {
                         const json = await resp.json();
                         if (json && json.fields) {
@@ -7384,7 +7422,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch(e) {}
         };
 
-        setInterval(pollDriverStatusRest, 3500);
+        setInterval(pollDriverStatusRest, 10000);
         pollDriverStatusRest();
 
         // 2. Listener en tiempo real vía Firestore SDK (suscrito exclusivamente al ID de esta cuenta)

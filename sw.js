@@ -3,7 +3,7 @@
  * Soporta instalación en Android, iOS y PC con carga instantánea y caché local
  */
 
-const CACHE_NAME = 'rutaprivada-pwa-v130';
+const CACHE_NAME = 'rutaprivada-pwa-v132';
 
 const STATIC_ASSETS = [
   './',

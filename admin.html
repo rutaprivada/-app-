@@ -989,15 +989,15 @@
                 });
             }
 
-            // Guardar conductor actualizado y sincronizar con Firestore y LocalStorage
+            // Guardar conductor actualizado y sincronizar con Firestore y LocalStorage de forma estrictamente individual
             function saveUpdatedDriverToStorage(driverData) {
                 if (!driverData) return;
-                const cleanDni = String(driverData.dni || '').replace(/\D/g, '');
-                const docId = String(driverData.id || (cleanDni ? 'drv_' + cleanDni : 'driver_local'));
+                const email = (driverData.email || '').toLowerCase().trim();
+                const docId = String(driverData.id || (email ? 'drv_' + email.replace(/[^a-z0-9]/gi, '_') : 'driver_local'));
                 driverData.id = docId;
                 driverData.updatedAt = Date.now();
 
-                const idx = currentDrivers.findIndex(d => (d.id && d.id === docId) || (d.dni && driverData.dni && String(d.dni).replace(/\D/g, '') === cleanDni) || (d.nombre && driverData.nombre && d.nombre.trim().toLowerCase() === String(driverData.nombre).trim().toLowerCase()));
+                const idx = currentDrivers.findIndex(d => (d.id && d.id === docId) || (d.email && email && d.email.toLowerCase() === email));
                 if (idx >= 0) {
                     currentDrivers[idx] = { ...currentDrivers[idx], ...driverData };
                 } else {
@@ -1006,18 +1006,7 @@
 
                 try {
                     localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(currentDrivers));
-                } catch(e) {}
-
-                try {
-                    const rawLocal = localStorage.getItem('rutaprivada_driver_docs_v1');
-                    if (rawLocal) {
-                        const docsObj = JSON.parse(rawLocal);
-                        const localDni = String(docsObj.dni || '').replace(/\D/g, '');
-                        if (!cleanDni || localDni === cleanDni || docsObj.nombre === driverData.nombre) {
-                            const merged = { ...docsObj, ...driverData };
-                            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(merged));
-                        }
-                    }
+                    localStorage.setItem(`rutaprivada_driver_docs_${docId}`, JSON.stringify(driverData));
                 } catch(e) {}
 
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
@@ -1331,16 +1320,27 @@
                             if (subSnap && !subSnap.empty) {
                                 let subDocsCount = 0;
                                 if (!drv.docsImages) drv.docsImages = {};
+                                let hasNew = false;
                                 subSnap.forEach(sDoc => {
                                     const sData = sDoc.data();
                                     if (sData && sData.data && sData.data.length > 20) {
-                                        drv.docsImages[sDoc.id] = sData.data;
+                                        if (!drv.docsImages[sDoc.id] || drv.docsImages[sDoc.id] !== sData.data) {
+                                            drv.docsImages[sDoc.id] = sData.data;
+                                            hasNew = true;
+                                        }
                                         subDocsCount++;
                                     }
                                 });
                                 if (subDocsCount > (drv.docsCount || 0)) {
                                     drv.docsCount = subDocsCount;
+                                    hasNew = true;
+                                }
+                                if (hasNew) {
                                     loadDriversData();
+                                    if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver && activeReviewDriver.id === drvId) {
+                                        activeReviewDriver.docsImages = Object.assign({}, activeReviewDriver.docsImages || {}, drv.docsImages);
+                                        openDocReviewModal(drvId);
+                                    }
                                 }
                             }
                         }).catch(() => {});
@@ -1368,9 +1368,15 @@
                     fetchDriversFromFirestoreRest();
                 };
 
+                let restDriversBackoff = 0;
                 fetchDriversFromFirestoreRest = async () => {
+                    if (Date.now() < restDriversBackoff) return;
                     try {
                         const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+                        if (resp.status === 429) {
+                            restDriversBackoff = Date.now() + 30000;
+                            return;
+                        }
                         if (resp.ok) {
                             const data = await resp.json();
                             if (data && data.documents && data.documents.length > 0) {
@@ -1432,8 +1438,9 @@
                                         cloudDriversList.unshift(rd);
                                     }
 
-                                    // Si no tiene conteo de documentos, consultar subcolección REST
-                                    if (rd.docsCount === 0 && dId) {
+                                    // Si no tiene conteo de documentos, consultar subcolección REST (con flag para no saturar)
+                                    if (rd.docsCount === 0 && dId && !rd._subdocsFetched) {
+                                        rd._subdocsFetched = true;
                                         fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${dId}/documents?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' })
                                             .then(r => r.json())
                                             .then(subRes => {
@@ -1538,13 +1545,25 @@
                             fetchDriversFromFirestore(db);
                             fetchRechargesFromFirestore(db);
 
-                            // 2. Escuchar Conductores en tiempo real
+                            // 2. Escuchar Conductores y sus documentos en tiempo real
                             db.collection('drivers').onSnapshot((snapshot) => {
+                                const prevDocsMap = {};
+                                if (Array.isArray(cloudDriversList)) {
+                                    cloudDriversList.forEach(c => {
+                                        if (c.id && c.docsImages) prevDocsMap[c.id] = c.docsImages;
+                                    });
+                                }
                                 cloudDriversList = [];
                                 snapshot.forEach(doc => {
                                     if (doc.exists) {
                                         const d = doc.data();
                                         d.id = d.id || doc.id;
+                                        if (!d.docsImages && prevDocsMap[d.id]) {
+                                            d.docsImages = prevDocsMap[d.id];
+                                        }
+                                        if (d.docsImages && (!d.docsCount || d.docsCount === 0)) {
+                                            d.docsCount = Object.keys(d.docsImages).filter(k => d.docsImages[k] && d.docsImages[k].length > 20).length;
+                                        }
                                         if (!d.docsCount && d.docsSummary) {
                                             d.docsCount = Object.values(d.docsSummary).filter(Boolean).length;
                                         }
@@ -1554,7 +1573,7 @@
                                 loadDriversData();
                                 checkSubcollectionsForDrivers(db);
                                 if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
-                                    openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
+                                    openDocReviewModal(activeReviewDriver.id);
                                 }
                             }, (err) => console.warn('Firestore admin listener warning:', err));
 
@@ -1582,11 +1601,11 @@
 
                 attachListener();
 
-                // Polling REST global incondicional cada 3 segundos
+                // Polling REST periódico como respaldo de seguridad (cada 15 segundos)
                 setInterval(() => {
                     if (typeof fetchDriversFromFirestoreRest === 'function') fetchDriversFromFirestoreRest();
                     if (typeof fetchRechargesFromFirestoreRest === 'function') fetchRechargesFromFirestoreRest();
-                }, 3000);
+                }, 15000);
             }
 
             initFirestoreRealtimeSync();
@@ -1637,11 +1656,14 @@
                     if (updatedDriver) {
                         try {
                             let localList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
-                            const cleanDni = String(updatedDriver.dni || '').replace(/\D/g, '');
-                            const docId = String(updatedDriver.id || (cleanDni ? 'drv_' + cleanDni : ''));
-                            const idx = localList.findIndex(d => (d.id && docId && d.id === docId) || (d.dni && cleanDni && String(d.dni).replace(/\D/g, '') === cleanDni) || (d.nombre && updatedDriver.nombre && d.nombre.trim().toLowerCase() === updatedDriver.nombre.trim().toLowerCase()));
+                            const docId = String(updatedDriver.id || '');
+                            const idx = localList.findIndex(d => (d.id && docId && d.id === docId) || (d.email && updatedDriver.email && d.email.toLowerCase() === updatedDriver.email.toLowerCase()));
                             if (idx >= 0) {
-                                localList[idx] = { ...localList[idx], ...updatedDriver, docsImages: Object.assign({}, localList[idx].docsImages || {}, updatedDriver.docsImages || {}) };
+                                localList[idx] = { 
+                                    ...localList[idx], 
+                                    ...updatedDriver, 
+                                    docsImages: Object.assign({}, localList[idx].docsImages || {}, updatedDriver.docsImages || {}) 
+                                };
                             } else {
                                 localList.unshift(updatedDriver);
                             }
@@ -1649,10 +1671,13 @@
                         } catch(e) {}
 
                         if (Array.isArray(cloudDriversList)) {
-                            const cleanDni = String(updatedDriver.dni || '').replace(/\D/g, '');
-                            const cIdx = cloudDriversList.findIndex(c => (c.id && updatedDriver.id && c.id === updatedDriver.id) || (c.dni && cleanDni && String(c.dni).replace(/\D/g, '') === cleanDni) || (c.nombre && updatedDriver.nombre && c.nombre.trim().toLowerCase() === updatedDriver.nombre.trim().toLowerCase()));
+                            const cIdx = cloudDriversList.findIndex(c => (c.id && updatedDriver.id && c.id === updatedDriver.id) || (c.email && updatedDriver.email && c.email.toLowerCase() === updatedDriver.email.toLowerCase()));
                             if (cIdx >= 0) {
-                                cloudDriversList[cIdx] = { ...cloudDriversList[cIdx], ...updatedDriver };
+                                cloudDriversList[cIdx] = { 
+                                    ...cloudDriversList[cIdx], 
+                                    ...updatedDriver,
+                                    docsImages: Object.assign({}, cloudDriversList[cIdx].docsImages || {}, updatedDriver.docsImages || {})
+                                };
                             } else {
                                 cloudDriversList.unshift(updatedDriver);
                             }
@@ -1661,36 +1686,35 @@
 
                     loadDriversData();
                     if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
-                        const activeDni = String(activeReviewDriver.dni || '').replace(/\D/g, '');
-                        const updatedDni = updatedDriver ? String(updatedDriver.dni || '').replace(/\D/g, '') : '';
-                        if (!updatedDriver || !updatedDni || activeDni === updatedDni || activeReviewDriver.id === updatedDriver.id || activeReviewDriver.nombre === updatedDriver.nombre) {
-                            openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
+                        if (updatedDriver && activeReviewDriver.id === updatedDriver.id) {
+                            activeReviewDriver.docsImages = Object.assign({}, activeReviewDriver.docsImages || {}, updatedDriver.docsImages || {});
+                            openDocReviewModal(activeReviewDriver.id);
                         }
                     }
                 });
 
                 window.RutaSync.on('DOCUMENTO_CONDUCTOR_SUBIDO', (docPayload) => {
-                    if (docPayload && docPayload.key && docPayload.data) {
-                        const cleanDni = String(docPayload.dni || '').replace(/\D/g, '');
-                        const driverId = String(docPayload.driverId || (cleanDni ? 'drv_' + cleanDni : ''));
-
-                        let target = currentDrivers.find(d => (d.id && driverId && d.id === driverId) || (d.dni && cleanDni && String(d.dni).replace(/\D/g, '') === cleanDni));
+                    if (docPayload) {
+                        const driverId = String(docPayload.driverId || docPayload.id || '');
+                        let target = currentDrivers.find(d => (d.id && driverId && d.id === driverId) || (d.email && docPayload.email && d.email.toLowerCase() === docPayload.email.toLowerCase()));
                         if (target) {
                             if (!target.docsImages) target.docsImages = {};
-                            target.docsImages[docPayload.key] = docPayload.data;
-                            if (docPayload.key === 'foto' || docPayload.key === 'fotoPerfil') {
-                                target.fotoPerfil = docPayload.data;
+                            if (docPayload.key && docPayload.data) {
+                                target.docsImages[docPayload.key] = docPayload.data;
                             }
-                            if (!target.docsSummary) target.docsSummary = {};
-                            target.docsSummary[docPayload.key] = true;
-                            target.docsCount = Object.values(target.docsSummary).filter(Boolean).length;
+                            if (docPayload.docsImages && typeof docPayload.docsImages === 'object') {
+                                Object.assign(target.docsImages, docPayload.docsImages);
+                            }
+                            if (docPayload.key === 'foto' || docPayload.key === 'fotoPerfil' || docPayload.fotoPerfil) {
+                                target.fotoPerfil = docPayload.data || docPayload.fotoPerfil || target.fotoPerfil;
+                            }
+                            target.docsCount = Object.keys(target.docsImages).filter(k => target.docsImages[k] && target.docsImages[k].length > 20).length;
 
                             try {
                                 let localList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
-                                const idx = localList.findIndex(d => (d.id && target.id && d.id === target.id) || (d.dni && cleanDni && String(d.dni).replace(/\D/g, '') === cleanDni));
+                                const idx = localList.findIndex(d => (d.id && target.id && d.id === target.id) || (d.email && target.email && d.email.toLowerCase() === target.email.toLowerCase()));
                                 if (idx >= 0) {
                                     localList[idx].docsImages = Object.assign({}, localList[idx].docsImages || {}, target.docsImages);
-                                    localList[idx].docsSummary = Object.assign({}, localList[idx].docsSummary || {}, target.docsSummary);
                                     localList[idx].docsCount = target.docsCount;
                                     if (target.fotoPerfil) localList[idx].fotoPerfil = target.fotoPerfil;
                                     localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(localList));
@@ -1698,24 +1722,73 @@
                             } catch(e) {}
 
                             renderDriversTable();
-                            if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
-                                const activeDni = String(activeReviewDriver.dni || '').replace(/\D/g, '');
-                                if (activeReviewDriver.id === target.id || (activeDni && cleanDni && activeDni === cleanDni) || activeReviewDriver.nombre === target.nombre) {
-                                    openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
-                                }
+                            if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver && activeReviewDriver.id === target.id) {
+                                activeReviewDriver.docsImages = Object.assign({}, activeReviewDriver.docsImages || {}, target.docsImages);
+                                openDocReviewModal(activeReviewDriver.id);
                             }
                         }
                     }
                 });
             }
 
+            // Función de saneamiento de cuentas heredadas: garantiza independencia total por correo
+            function sanitizeLegacyDriverAccounts() {
+                try {
+                    localStorage.removeItem('rutaprivada_driver_docs_v1');
+
+                    ['rutaprivada_drivers_v1', 'rutaprivada_registered_drivers_v1'].forEach(key => {
+                        const raw = localStorage.getItem(key);
+                        if (!raw) return;
+                        let list = JSON.parse(raw);
+                        if (!Array.isArray(list)) return;
+                        let modified = false;
+
+                        list = list.map(d => {
+                            if (!d) return d;
+                            const email = (d.email || '').toLowerCase().trim();
+                            const expectedId = email ? ('drv_' + email.replace(/[^a-z0-9]/gi, '_')) : d.id;
+
+                            // Asegurar ID único derivado del email
+                            if (email && d.id !== expectedId) {
+                                d.id = expectedId;
+                                modified = true;
+                            }
+
+                            // Comprobar si existe almacenamiento documental específico para esta cuenta
+                            const specificRaw = localStorage.getItem(`rutaprivada_driver_docs_${d.id}`);
+                            if (specificRaw) {
+                                try {
+                                    const parsedDocs = JSON.parse(specificRaw);
+                                    if (parsedDocs) {
+                                        d.estadoVerificacion = parsedDocs.estadoVerificacion || d.estadoVerificacion || 'pendiente';
+                                        d.observaciones = parsedDocs.observaciones || d.observaciones || '';
+                                        d.docsImages = parsedDocs.docsImages || {};
+                                        d.docsCount = Object.keys(d.docsImages).filter(k => d.docsImages[k] && d.docsImages[k].length > 20).length;
+                                        modified = true;
+                                    }
+                                } catch(e){}
+                            } else {
+                                // Si NO tiene documentos subidos en su propio almacén, no debe heredar docs de otra cuenta con mismo DNI
+                                if (d.docsCount && d.docsCount > 0 && (!d.docsImages || Object.keys(d.docsImages).length === 0)) {
+                                    d.docsCount = 0;
+                                    d.docsImages = {};
+                                    d.estadoVerificacion = 'pendiente';
+                                    modified = true;
+                                }
+                            }
+                            return d;
+                        });
+
+                        if (modified) {
+                            localStorage.setItem(key, JSON.stringify(list));
+                        }
+                    });
+                } catch(e) {}
+            }
+
             // 3. CARGA DE DATOS DE CONDUCTORES
             function loadDriversData() {
-                let activeDocs = null;
-                try {
-                    const rawDocs = localStorage.getItem('rutaprivada_driver_docs_v1');
-                    if (rawDocs) activeDocs = JSON.parse(rawDocs);
-                } catch(e) {}
+                sanitizeLegacyDriverAccounts();
 
                 let isOnlineLocal = false;
                 try {
@@ -1746,16 +1819,15 @@
                 // A. Incorporar conductores de Firestore
                 if (Array.isArray(cloudDriversList) && cloudDriversList.length > 0) {
                     cloudDriversList.forEach(c => {
-                        const cleanDni = String(c.dni || '').replace(/\D/g, '');
-                        const cleanTel = String(c.telefono || '').replace(/\D/g, '');
-                        const stableId = c.id || (cleanDni ? 'drv_' + cleanDni : (cleanTel ? 'drv_' + cleanTel : ('drv_' + (c.nombre || 'chofer').replace(/\s+/g, '_').toLowerCase())));
+                        const email = (c.email || '').toLowerCase().trim();
+                        const stableId = c.id || (email ? 'drv_' + email.replace(/[^a-z0-9]/gi, '_') : ('drv_' + Date.now().toString(36)));
 
                         drivers.push({
                             id: stableId,
                             nombre: c.nombre || 'Conductor Registrado',
                             dni: c.dni || 'S/D',
                             telefono: c.telefono || 'Sin teléfono',
-                            email: c.email || '',
+                            email: email,
                             aceptaComunicaciones: c.aceptaComunicaciones !== false,
                             autoMarcaModelo: c.autoMarcaModelo || 'Vehículo',
                             patente: c.patente || 'S/P',
@@ -1776,104 +1848,57 @@
                     });
                 }
 
-                // B. Incorporar el Conductor Local Activo
-                if (activeDocs && (activeDocs.nombre || activeDocs.dni || (activeDocs.docsImages && Object.keys(activeDocs.docsImages).length > 0))) {
-                    const localStableId = activeDocs.id || (activeDocs.email ? 'drv_' + String(activeDocs.email).replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'drv_local_active');
-
-                    const existingIdx = drivers.findIndex(d => {
-                        if (d.id && localStableId && d.id === localStableId) return true;
-                        if (d.email && activeDocs.email && d.email.trim().toLowerCase() === activeDocs.email.trim().toLowerCase()) return true;
-                        return false;
-                    });
-
-                    if (existingIdx >= 0) {
-                        drivers[existingIdx] = {
-                            ...drivers[existingIdx],
-                            ...activeDocs,
-                            id: drivers[existingIdx].id || localStableId,
-                            email: activeDocs.email || drivers[existingIdx].email || '',
-                            aceptaComunicaciones: activeDocs.aceptaComunicaciones !== false,
-                            docsImages: Object.assign({}, drivers[existingIdx].docsImages || {}, activeDocs.docsImages || {}),
-                            docsSummary: Object.assign({}, drivers[existingIdx].docsSummary || {}, activeDocs.docsSummary || {}),
-                            isOnline: isOnlineLocal || drivers[existingIdx].isOnline
-                        };
-                    } else {
-                        drivers.unshift({
-                            id: localStableId,
-                            nombre: activeDocs.nombre || 'Conductor Registrado',
-                            dni: activeDocs.dni || 'S/D',
-                            telefono: activeDocs.telefono || 'Sin teléfono',
-                            email: activeDocs.email || '',
-                            aceptaComunicaciones: activeDocs.aceptaComunicaciones !== false,
-                            autoMarcaModelo: activeDocs.autoMarcaModelo || 'Vehículo',
-                            patente: activeDocs.patente || 'S/P',
-                            color: activeDocs.color || 'Negro',
-                            categoria: activeDocs.categoria || 'Sedán Estándar',
-                            fotoPerfil: activeDocs.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                            estadoVerificacion: activeDocs.estadoVerificacion || 'pendiente',
-                            isOnline: isOnlineLocal,
-                            banco: activeDocs.banco || '',
-                            cbu: activeDocs.cbu || '',
-                            titularCuenta: activeDocs.titularCuenta || activeDocs.nombre || '',
-                            docsImages: activeDocs.docsImages || {},
-                            docsSummary: activeDocs.docsSummary || {},
-                            docsCount: activeDocs.docsCount || (activeDocs.docsSummary ? Object.values(activeDocs.docsSummary).filter(Boolean).length : 0),
-                            observaciones: activeDocs.observaciones || '',
-                            updatedAt: activeDocs.updatedAt || Date.now()
-                        });
-                    }
-                }
-
-                // C. Incorporar otros conductores registrados (y sincronizados desde móvil)
+                // B. Incorporar conductores almacenados localmente de forma estrictamente individualizada por email
                 if (Array.isArray(storedDrivers) && storedDrivers.length > 0) {
                     storedDrivers.forEach(d => {
-                        const driverName = d.nombre || d.name;
-                        const cleanDni = String(d.dni || '').replace(/\D/g, '');
-                        const cleanPhone = String(d.telefono || d.phone || '').replace(/\D/g, '');
-                        const targetId = d.id || (cleanDni ? 'drv_' + cleanDni : (cleanPhone ? 'drv_' + cleanPhone : ''));
+                        const driverName = d.nombre || d.name || 'Conductor';
+                        const email = (d.email || '').toLowerCase().trim();
+                        const targetId = email ? ('drv_' + email.replace(/[^a-z0-9]/gi, '_')) : (d.id || ('drv_' + Date.now().toString(36)));
 
-                        const existingIdx = drivers.findIndex(ex => {
-                            if (ex.id && targetId && ex.id === targetId) return true;
-                            if (ex.dni && cleanDni && String(ex.dni).replace(/\D/g, '') === cleanDni) return true;
-                            if (ex.telefono && cleanPhone && String(ex.telefono).replace(/\D/g, '') === cleanPhone) return true;
-                            if (ex.nombre && driverName && ex.nombre.trim().toLowerCase() === driverName.trim().toLowerCase()) return true;
-                            return false;
-                        });
+                        let specificDocs = null;
+                        try {
+                            const rawSpecific = localStorage.getItem(`rutaprivada_driver_docs_${targetId}`);
+                            if (rawSpecific) specificDocs = JSON.parse(rawSpecific);
+                        } catch(e) {}
+
+                        const existingIdx = drivers.findIndex(ex => (ex.id && ex.id === targetId) || (ex.email && email && ex.email.toLowerCase() === email));
+
+                        const mergedDocsImages = (specificDocs && specificDocs.docsImages) ? specificDocs.docsImages : (d.docsImages || {});
+                        const actualDocsCount = Object.keys(mergedDocsImages).filter(k => mergedDocsImages[k] && mergedDocsImages[k].length > 20).length;
+
+                        const driverDataObj = {
+                            id: targetId,
+                            nombre: (specificDocs && specificDocs.nombre) || driverName,
+                            dni: (specificDocs && specificDocs.dni) || d.dni || 'S/D',
+                            telefono: (specificDocs && specificDocs.telefono) || d.telefono || d.phone || 'Sin teléfono',
+                            email: email || (specificDocs && specificDocs.email) || '',
+                            aceptaComunicaciones: (specificDocs && specificDocs.aceptaComunicaciones !== false) || d.aceptaComunicaciones !== false,
+                            autoMarcaModelo: (specificDocs && specificDocs.autoMarcaModelo) || d.autoMarcaModelo || d.carModel || 'Vehículo',
+                            patente: (specificDocs && specificDocs.patente) || d.patente || d.plate || 'S/P',
+                            color: (specificDocs && specificDocs.color) || d.color || 'Negro',
+                            categoria: (specificDocs && specificDocs.categoria) || d.categoria || 'Sedán Estándar',
+                            fotoPerfil: (specificDocs && specificDocs.fotoPerfil) || d.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                            estadoVerificacion: (specificDocs && specificDocs.estadoVerificacion) || d.estadoVerificacion || 'pendiente',
+                            isOnline: !!d.isOnline,
+                            banco: (specificDocs && specificDocs.banco) || d.banco || '',
+                            cbu: (specificDocs && specificDocs.cbu) || d.cbu || '',
+                            titularCuenta: (specificDocs && specificDocs.titularCuenta) || d.titularCuenta || driverName,
+                            docsImages: mergedDocsImages,
+                            docsSummary: (specificDocs && specificDocs.docsSummary) || d.docsSummary || {},
+                            docsCount: actualDocsCount,
+                            observaciones: (specificDocs && specificDocs.observaciones) || d.observaciones || '',
+                            updatedAt: (specificDocs && specificDocs.updatedAt) || d.updatedAt || Date.now()
+                        };
 
                         if (existingIdx >= 0) {
-                            // Fusión completa de datos actualizados
                             drivers[existingIdx] = {
                                 ...drivers[existingIdx],
-                                ...d,
-                                id: drivers[existingIdx].id || targetId,
-                                docsImages: Object.assign({}, drivers[existingIdx].docsImages || {}, d.docsImages || {}),
-                                docsSummary: Object.assign({}, drivers[existingIdx].docsSummary || {}, d.docsSummary || {}),
-                                docsCount: d.docsCount || drivers[existingIdx].docsCount || (d.docsSummary ? Object.values(d.docsSummary).filter(Boolean).length : 0)
+                                ...driverDataObj,
+                                docsImages: Object.assign({}, drivers[existingIdx].docsImages || {}, mergedDocsImages),
+                                docsCount: Math.max(drivers[existingIdx].docsCount || 0, actualDocsCount)
                             };
-                        } else if (driverName || cleanDni) {
-                            drivers.push({
-                                id: targetId || ('drv_' + (driverName || 'chofer').replace(/\s+/g, '_').toLowerCase()),
-                                nombre: driverName || 'Conductor',
-                                dni: d.dni || 'S/D',
-                                telefono: d.telefono || d.phone || 'S/T',
-                                email: d.email || '',
-                                aceptaComunicaciones: d.aceptaComunicaciones !== false,
-                                autoMarcaModelo: d.autoMarcaModelo || d.vehicle || 'Vehículo',
-                                patente: d.patente || d.plate || 'S/P',
-                                color: d.color || 'Negro',
-                                categoria: d.categoria || 'Sedán Estándar',
-                                fotoPerfil: d.fotoPerfil || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-                                estadoVerificacion: d.estadoVerificacion || 'pendiente',
-                                isOnline: !!d.isOnline,
-                                banco: d.banco || '',
-                                cbu: d.cbu || '',
-                                titularCuenta: d.titularCuenta || driverName,
-                                docsImages: d.docsImages || {},
-                                docsSummary: d.docsSummary || {},
-                                docsCount: d.docsCount || (d.docsSummary ? Object.values(d.docsSummary).filter(Boolean).length : 0),
-                                observaciones: d.observaciones || '',
-                                updatedAt: d.updatedAt || Date.now()
-                            });
+                        } else {
+                            drivers.push(driverDataObj);
                         }
                     });
                 }
@@ -2018,16 +2043,20 @@
                     loadDriversData();
                 }
 
-                // Búsqueda inteligente y exacta por ID, DNI o Nombre
-                const cleanInput = String(driverIdentifier || '').replace(/\D/g, '');
-                let driver = currentDrivers.find(d => {
-                    if (String(d.id) === String(driverIdentifier)) return true;
-                    if (d.dni && String(d.dni) === String(driverIdentifier)) return true;
-                    const cleanDni = String(d.dni || '').replace(/\D/g, '');
-                    if (cleanInput && cleanDni && cleanInput === cleanDni) return true;
-                    if (d.nombre && driverIdentifier && d.nombre.trim().toLowerCase() === String(driverIdentifier).trim().toLowerCase()) return true;
-                    return false;
-                });
+                // Búsqueda estricta por ID único de cuenta para evitar colisiones entre cuentas
+                let driver = currentDrivers.find(d => String(d.id) === String(driverIdentifier));
+                if (!driver) {
+                    driver = currentDrivers.find(d => (d.email && String(d.email).toLowerCase() === String(driverIdentifier).toLowerCase()));
+                }
+                if (!driver) {
+                    const cleanInput = String(driverIdentifier || '').replace(/\D/g, '');
+                    driver = currentDrivers.find(d => {
+                        if (d.dni && String(d.dni) === String(driverIdentifier)) return true;
+                        const cleanDni = String(d.dni || '').replace(/\D/g, '');
+                        if (cleanInput && cleanDni && cleanInput === cleanDni) return true;
+                        return false;
+                    });
+                }
 
                 if (!driver) {
                     driver = currentDrivers[0] || {};
@@ -2277,11 +2306,31 @@
                     }
                 }
 
-                renderGrid();
+                const targetId = driver.id || '';
 
-                const cleanDni = String(driver.dni || '').replace(/\D/g, '');
-                const cleanPhone = String(driver.telefono || '').replace(/\D/g, '');
-                const targetId = driver.id || (cleanDni ? 'drv_' + cleanDni : (cleanPhone ? 'drv_' + cleanPhone : ''));
+                // Carga inmediata desde almacenamiento local si está en este dispositivo
+                if (targetId) {
+                    try {
+                        const localRaw = localStorage.getItem(`rutaprivada_driver_docs_${targetId}`);
+                        if (localRaw) {
+                            const parsedLocal = JSON.parse(localRaw);
+                            if (parsedLocal && parsedLocal.docsImages) {
+                                if (!driver.docsImages) driver.docsImages = {};
+                                Object.assign(driver.docsImages, parsedLocal.docsImages);
+                            }
+                            if (parsedLocal && parsedLocal.fotoPerfil && !driver.fotoPerfil) {
+                                driver.fotoPerfil = parsedLocal.fotoPerfil;
+                                if (revDriverAvatar) revDriverAvatar.src = parsedLocal.fotoPerfil;
+                            }
+                            if (parsedLocal && parsedLocal.email && !driver.email) {
+                                driver.email = parsedLocal.email;
+                                if (revDriverEmail) revDriverEmail.innerHTML = `<i class="fa-solid fa-envelope"></i> ${driver.email}`;
+                            }
+                        }
+                    } catch(e) {}
+                }
+
+                renderGrid();
 
                 // Carga directa mediante Firestore REST API de la subcolección
                 if (targetId) {
@@ -2300,18 +2349,47 @@
                                         hasRestNew = true;
                                     }
                                 });
-                                if (hasRestNew && activeReviewDriver) {
+                                if (hasRestNew && activeReviewDriver && activeReviewDriver.id === targetId) {
                                     renderGrid();
                                 }
                             }
                         }).catch(() => {});
                 }
 
-                // Carga y escucha en tiempo real de los documentos desde Firestore subcolección 'documents'
+                // Carga y escucha en tiempo real de los documentos desde Firestore (raíz y subcolección)
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
                         const db = firebase.firestore();
                         if (targetId) {
+                            // 1. Escucha en tiempo real del documento principal (fotos, email y docsImages)
+                            db.collection('drivers').doc(targetId).onSnapshot(docSnap => {
+                                if (docSnap.exists) {
+                                    const snapData = docSnap.data();
+                                    if (snapData) {
+                                        let updatedAny = false;
+                                        if (snapData.fotoPerfil && snapData.fotoPerfil !== driver.fotoPerfil) {
+                                            driver.fotoPerfil = snapData.fotoPerfil;
+                                            if (revDriverAvatar) revDriverAvatar.src = snapData.fotoPerfil;
+                                            updatedAny = true;
+                                        }
+                                        if (snapData.email && snapData.email !== driver.email) {
+                                            driver.email = snapData.email;
+                                            if (revDriverEmail) revDriverEmail.innerHTML = `<i class="fa-solid fa-envelope"></i> ${driver.email}`;
+                                            updatedAny = true;
+                                        }
+                                        if (snapData.docsImages && typeof snapData.docsImages === 'object') {
+                                            if (!driver.docsImages) driver.docsImages = {};
+                                            Object.assign(driver.docsImages, snapData.docsImages);
+                                            updatedAny = true;
+                                        }
+                                        if (updatedAny && activeReviewDriver && activeReviewDriver.id === targetId) {
+                                            renderGrid();
+                                        }
+                                    }
+                                }
+                            }, err => console.warn('Firestore driver doc realtime warning:', err));
+
+                            // 2. Escucha en tiempo real de la subcolección 'documents'
                             db.collection('drivers').doc(targetId).collection('documents').onSnapshot(subSnap => {
                                 if (subSnap && !subSnap.empty) {
                                     if (!driver.docsImages) driver.docsImages = {};
@@ -2323,7 +2401,7 @@
                                             hasNewData = true;
                                         }
                                     });
-                                    if (hasNewData && activeReviewDriver) {
+                                    if (hasNewData && activeReviewDriver && activeReviewDriver.id === targetId) {
                                         renderGrid();
                                     }
                                 }
@@ -2411,31 +2489,54 @@
                 }
 
                 const notesVal = revAdminNotes ? revAdminNotes.value.trim() : '';
+                const targetEmail = (activeReviewDriver.email || '').toLowerCase().trim();
+                const driverDocId = String(activeReviewDriver.id || (targetEmail ? 'drv_' + targetEmail.replace(/[^a-z0-9]/gi, '_') : 'driver_local'));
+
+                activeReviewDriver.id = driverDocId;
                 activeReviewDriver.estadoVerificacion = newStatus;
                 activeReviewDriver.observaciones = notesVal;
                 activeReviewDriver.updatedAt = Date.now();
 
-                // Actualizar lista en memoria y localStorage
+                // Actualizar ÚNICAMENTE este conductor en la lista de conductores (cero colisiones con otras cuentas del mismo DNI)
+                currentDrivers = currentDrivers.map(d => {
+                    const dEmail = (d.email || '').toLowerCase().trim();
+                    if ((d.id && d.id === driverDocId) || (dEmail && targetEmail && dEmail === targetEmail)) {
+                        return {
+                            ...d,
+                            id: driverDocId,
+                            estadoVerificacion: newStatus,
+                            observaciones: notesVal,
+                            updatedAt: Date.now()
+                        };
+                    }
+                    return d;
+                });
+
+                // Actualizar lista en localStorage
                 try {
                     localStorage.setItem('rutaprivada_drivers_v1', JSON.stringify(currentDrivers));
                 } catch(e) {}
 
-                const driverDocId = String(activeReviewDriver.id || (activeReviewDriver.email ? 'drv_' + String(activeReviewDriver.email).replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'driver_local'));
+                // Guardar en almacenamiento documental exclusivo de este chofer
+                try {
+                    const rawSpecific = localStorage.getItem(`rutaprivada_driver_docs_${driverDocId}`);
+                    const specificObj = rawSpecific ? JSON.parse(rawSpecific) : { ...activeReviewDriver };
+                    specificObj.id = driverDocId;
+                    specificObj.estadoVerificacion = newStatus;
+                    specificObj.observaciones = notesVal;
+                    specificObj.updatedAt = Date.now();
+                    localStorage.setItem(`rutaprivada_driver_docs_${driverDocId}`, JSON.stringify(specificObj));
+                } catch(e) {}
 
-                // Si es el conductor local activo en este navegador, actualizar su almacenamiento individual
+                // Si la sesión activa en este navegador es este chofer específico, actualizar auth
                 try {
                     const rawAuth = localStorage.getItem('rutaprivada_driver_auth_v1');
                     if (rawAuth) {
                         const sess = JSON.parse(rawAuth);
-                        if (sess && (sess.id === driverDocId || (sess.email && activeReviewDriver.email && sess.email.toLowerCase() === activeReviewDriver.email.toLowerCase()))) {
-                            const updatedDocsObj = {
-                                ...activeReviewDriver,
-                                estadoVerificacion: newStatus,
-                                observaciones: notesVal,
-                                updatedAt: Date.now()
-                            };
-                            localStorage.setItem(`rutaprivada_driver_docs_${driverDocId}`, JSON.stringify(updatedDocsObj));
-                            localStorage.setItem('rutaprivada_driver_docs_v1', JSON.stringify(updatedDocsObj));
+                        const sEmail = (sess.email || '').toLowerCase().trim();
+                        if (sess && ((sess.id && sess.id === driverDocId) || (sEmail && targetEmail && sEmail === targetEmail))) {
+                            sess.estadoVerificacion = newStatus;
+                            localStorage.setItem('rutaprivada_driver_auth_v1', JSON.stringify(sess));
                         }
                     }
                 } catch(e) {}
@@ -2444,9 +2545,9 @@
                 const driverPayload = {
                     ...activeReviewDriver,
                     id: driverDocId,
+                    email: targetEmail,
                     nombre: activeReviewDriver.nombre,
                     dni: activeReviewDriver.dni,
-                    email: activeReviewDriver.email || '',
                     estadoVerificacion: newStatus,
                     observaciones: notesVal,
                     updatedAt: Date.now()
@@ -2476,13 +2577,9 @@
                 } catch(e) {}
 
                 if (window.RutaSync) {
-                    if (typeof window.RutaSync.guardarDocumentosConductor === 'function') {
-                        window.RutaSync.guardarDocumentosConductor(driverPayload);
-                    }
                     window.RutaSync.emit('ESTADO_CONDUCTOR_ACTUALIZADO', driverPayload);
                 }
 
-                window.dispatchEvent(new Event('storage'));
                 closeDocReviewModal();
                 renderMetrics();
                 renderDriversTable();
@@ -2710,14 +2807,14 @@
                 loadRechargesData();
             }
 
-            // Evento de storage para sincronización entre pestañas
+            // Evento de storage para sincronización instantánea entre pestañas
             window.addEventListener('storage', (e) => {
                 if (sessionStorage.getItem('rutaprivada_admin_authed') === 'true') {
                     loadDriversData();
                     loadRechargesData();
-                    if (e && (e.key === 'rutaprivada_driver_docs_v1' || e.key === 'rutaprivada_drivers_v1')) {
+                    if (e && e.key && (e.key.startsWith('rutaprivada_driver_docs_') || e.key === 'rutaprivada_drivers_v1')) {
                         if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver) {
-                            openDocReviewModal(activeReviewDriver.id || activeReviewDriver.dni || activeReviewDriver.nombre);
+                            openDocReviewModal(activeReviewDriver.id || activeReviewDriver.email);
                         }
                     }
                 }
