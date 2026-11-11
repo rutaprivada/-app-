@@ -9540,7 +9540,41 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+
+    // Sincronización automática de tickets locales con Firestore y el panel de administración
+    function syncLocalTicketsToCloud() {
+        let localTickets = [];
+        try {
+            const raw = localStorage.getItem('rutaprivada_driver_tickets_v1');
+            if (raw) localTickets = JSON.parse(raw);
+        } catch(e) {}
+        if (!Array.isArray(localTickets) || localTickets.length === 0) return;
+
+        if (typeof firebase !== 'undefined') {
+            try {
+                if (!firebase.apps || !firebase.apps.length) {
+                    firebase.initializeApp(FIREBASE_CONFIG_CONDUCTOR);
+                }
+                const db = firebase.firestore();
+                localTickets.forEach(t => {
+                    if (t && t.ticketId) {
+                        db.collection('tickets_soporte').doc(t.ticketId).set(t, { merge: true }).catch(() => {});
+                    }
+                });
+            } catch(e) {}
+        }
+
+        if (window.RutaSync) {
+            localTickets.forEach(t => {
+                if (t && t.ticketId) {
+                    window.RutaSync.emit('NUEVO_TICKET_SOPORTE', t);
+                }
+            });
+        }
+    }
+
     initDriverTicketsRealtimeListener();
+    syncLocalTicketsToCloud();
     renderDriverTicketsList();
 
     // ==========================================

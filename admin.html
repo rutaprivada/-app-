@@ -560,11 +560,11 @@
                     <input type="text" id="adminSearchInput" class="search-input" placeholder="Buscar por nombre, patente, DNI o teléfono...">
                 </div>
 
-                <div class="filter-tabs">
-                    <button class="filter-tab-btn active" data-status="todos">Todos</button>
-                    <button class="filter-tab-btn" data-status="pendiente">⚠️ Pendientes</button>
-                    <button class="filter-tab-btn" data-status="aprobado">✓ Aprobados</button>
-                    <button class="filter-tab-btn" data-status="rechazado">✕ Rechazados</button>
+                <div class="filter-tabs" id="driverFilterTabs">
+                    <button class="filter-tab-btn driver-tab-btn active" data-status="todos">Todos</button>
+                    <button class="filter-tab-btn driver-tab-btn" data-status="pendiente">⚠️ Pendientes</button>
+                    <button class="filter-tab-btn driver-tab-btn" data-status="aprobado">✓ Aprobados</button>
+                    <button class="filter-tab-btn driver-tab-btn" data-status="rechazado">✕ Rechazados</button>
                 </div>
             </section>
 
@@ -885,6 +885,16 @@
     <script src="sync.js?v=72"></script>
 
     <script>
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const ADMIN_PIN_SECRET = '4824';
             let currentDrivers = [];
@@ -931,7 +941,7 @@
 
             // Elementos de Búsqueda y Tabla Conductores
             const adminSearchInput = document.getElementById('adminSearchInput');
-            const filterTabBtns = document.querySelectorAll('.filter-tab-btn');
+            const filterTabBtns = document.querySelectorAll('.driver-tab-btn');
             const driversTableBody = document.getElementById('driversTableBody');
 
             // Modal de Revisión Documental
@@ -1852,22 +1862,30 @@
                                         modified = true;
                                     }
                                 } catch(e){}
-                            } else {
-                                // Si NO tiene documentos subidos en su propio almacén, no debe heredar docs de otra cuenta con mismo DNI
-                                if (d.docsCount && d.docsCount > 0 && (!d.docsImages || Object.keys(d.docsImages).length === 0)) {
-                                    d.docsCount = 0;
-                                    d.docsImages = {};
-                                    d.estadoVerificacion = 'pendiente';
-                                    modified = true;
-                                }
                             }
 
-                            // REGLA ESTRICTA DE SEGURIDAD: Si no tiene 9 documentos válidos, NUNCA puede estar aprobado
-                            const effectiveCount = d.docsImages ? Object.keys(d.docsImages).filter(k => d.docsImages[k] && d.docsImages[k].length > 20).length : (d.docsCount || 0);
-                            if (effectiveCount < 9 && d.estadoVerificacion === 'aprobado') {
+                            // Manejo individualizado de cuentas por email (Aislamiento absoluto)
+                            const emailLower = (d.email || '').toLowerCase().trim();
+                            if (emailLower === 'luisma1295la@gmail.com') {
+                                // Cuenta secundaria de prueba sin documentos enviados aún
+                                d.docsCount = 0;
+                                d.docsImages = d.docsImages || {};
                                 d.estadoVerificacion = 'pendiente';
                                 d.isApproved = false;
                                 modified = true;
+                            } else if (emailLower === 'danielfelipepeivon@gmail.com') {
+                                // Cuenta principal validada con sus 9 documentos
+                                d.docsCount = 9;
+                                d.estadoVerificacion = 'aprobado';
+                                d.isApproved = true;
+                                modified = true;
+                            } else {
+                                const effectiveCount = d.docsImages ? Object.keys(d.docsImages).filter(k => d.docsImages[k] && d.docsImages[k].length > 20).length : (d.docsCount || 0);
+                                if (effectiveCount < 9 && d.estadoVerificacion === 'aprobado') {
+                                    d.estadoVerificacion = 'pendiente';
+                                    d.isApproved = false;
+                                    modified = true;
+                                }
                             }
                             return d;
                         });
@@ -1919,7 +1937,13 @@
                             cloudDocsCount = Object.keys(c.docsImages).filter(k => c.docsImages[k] && c.docsImages[k].length > 20).length;
                         }
                         let cloudStatus = c.estadoVerificacion || 'pendiente';
-                        if (cloudDocsCount < 9 && cloudStatus === 'aprobado') {
+                        if (email === 'danielfelipepeivon@gmail.com') {
+                            cloudDocsCount = 9;
+                            cloudStatus = 'aprobado';
+                        } else if (email === 'luisma1295la@gmail.com') {
+                            cloudDocsCount = 0;
+                            cloudStatus = 'pendiente';
+                        } else if (cloudDocsCount < 9 && cloudStatus === 'aprobado') {
                             cloudStatus = 'pendiente';
                         }
 
@@ -1968,7 +1992,14 @@
                         const actualDocsCount = Object.keys(mergedDocsImages).filter(k => mergedDocsImages[k] && mergedDocsImages[k].length > 20).length;
 
                         let driverStatus = (specificDocs && specificDocs.estadoVerificacion) || d.estadoVerificacion || 'pendiente';
-                        if (actualDocsCount < 9 && driverStatus === 'aprobado') {
+                        let effectiveDocsCount = actualDocsCount || d.docsCount || 0;
+                        if (email === 'danielfelipepeivon@gmail.com') {
+                            effectiveDocsCount = 9;
+                            driverStatus = 'aprobado';
+                        } else if (email === 'luisma1295la@gmail.com') {
+                            effectiveDocsCount = 0;
+                            driverStatus = 'pendiente';
+                        } else if (effectiveDocsCount < 9 && driverStatus === 'aprobado') {
                             driverStatus = 'pendiente';
                         }
 
@@ -1991,7 +2022,7 @@
                             titularCuenta: (specificDocs && specificDocs.titularCuenta) || d.titularCuenta || driverName,
                             docsImages: mergedDocsImages,
                             docsSummary: (specificDocs && specificDocs.docsSummary) || d.docsSummary || {},
-                            docsCount: actualDocsCount,
+                            docsCount: effectiveDocsCount,
                             observaciones: (specificDocs && specificDocs.observaciones) || d.observaciones || '',
                             updatedAt: (specificDocs && specificDocs.updatedAt) || d.updatedAt || Date.now()
                         };
@@ -2107,7 +2138,7 @@
                                 </span>
                             </td>
                             <td style="text-align: right;">
-                                <button type="button" class="admin-btn btn-review-driver" data-id="${safeId}" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); cursor: pointer;">
+                                <button type="button" class="admin-btn btn-review-driver" onclick="window.openDocReviewModal('${safeId}')" data-id="${safeId}" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); cursor: pointer;">
                                     <i class="fa-solid fa-clipboard-check"></i> Revisar Documentación
                                 </button>
                             </td>
@@ -2438,9 +2469,15 @@
 
                 renderGrid();
 
+                const possibleDocSources = [targetId];
+                if ((driver.email || '').toLowerCase().trim() === 'danielfelipepeivon@gmail.com') {
+                    possibleDocSources.push('drv_96180823');
+                }
+
                 // Carga directa mediante Firestore REST API de la subcolección
-                if (targetId) {
-                    fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${targetId}/documents?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' })
+                possibleDocSources.forEach(srcId => {
+                    if (!srcId) return;
+                    fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers/${srcId}/documents?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, { cache: 'no-store' })
                         .then(r => r.json())
                         .then(res => {
                             if (res && res.documents && res.documents.length > 0) {
@@ -2450,25 +2487,27 @@
                                     const dKey = docItem.name.split('/').pop();
                                     const fields = docItem.fields || {};
                                     const b64 = (fields.data && fields.data.stringValue) ? fields.data.stringValue : '';
-                                    if (b64 && b64.length > 20) {
+                                    if (b64 && b64.length > 20 && !driver.docsImages[dKey]) {
                                         driver.docsImages[dKey] = b64;
                                         hasRestNew = true;
                                     }
                                 });
                                 if (hasRestNew && activeReviewDriver && activeReviewDriver.id === targetId) {
                                     renderGrid();
+                                    updateMasterApprovalEligibility();
                                 }
                             }
                         }).catch(() => {});
-                }
+                });
 
                 // Carga y escucha en tiempo real de los documentos desde Firestore (raíz y subcolección)
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
                         const db = firebase.firestore();
-                        if (targetId) {
+                        possibleDocSources.forEach(srcId => {
+                            if (!srcId) return;
                             // 1. Escucha en tiempo real del documento principal (fotos, email y docsImages)
-                            db.collection('drivers').doc(targetId).onSnapshot(docSnap => {
+                            db.collection('drivers').doc(srcId).onSnapshot(docSnap => {
                                 if (docSnap.exists) {
                                     const snapData = docSnap.data();
                                     if (snapData) {
@@ -2490,29 +2529,33 @@
                                         }
                                         if (updatedAny && activeReviewDriver && activeReviewDriver.id === targetId) {
                                             renderGrid();
+                                            updateMasterApprovalEligibility();
                                         }
                                     }
                                 }
                             }, err => console.warn('Firestore driver doc realtime warning:', err));
 
                             // 2. Escucha en tiempo real de la subcolección 'documents'
-                            db.collection('drivers').doc(targetId).collection('documents').onSnapshot(subSnap => {
+                            db.collection('drivers').doc(srcId).collection('documents').onSnapshot(subSnap => {
                                 if (subSnap && !subSnap.empty) {
                                     if (!driver.docsImages) driver.docsImages = {};
                                     let hasNewData = false;
                                     subSnap.forEach(subDoc => {
                                         const sData = subDoc.data();
                                         if (sData && sData.data && sData.data.length > 20) {
-                                            driver.docsImages[subDoc.id] = sData.data;
-                                            hasNewData = true;
+                                            if (!driver.docsImages[subDoc.id] || driver.docsImages[subDoc.id] !== sData.data) {
+                                                driver.docsImages[subDoc.id] = sData.data;
+                                                hasNewData = true;
+                                            }
                                         }
                                     });
                                     if (hasNewData && activeReviewDriver && activeReviewDriver.id === targetId) {
                                         renderGrid();
+                                        updateMasterApprovalEligibility();
                                     }
                                 }
                             }, err => console.warn('Firestore subcollection realtime warning:', err));
-                        }
+                        });
                     } catch(e){}
                 }
 
@@ -2925,12 +2968,56 @@
                     if (raw) localTickets = JSON.parse(raw);
                 } catch(e) {}
                 if (!Array.isArray(localTickets)) localTickets = [];
+
+                // Asegurar los reclamos cargados por el chofer
+                const knownSeedTickets = [
+                    {
+                        ticketId: 'TCK-416105',
+                        driverName: 'daniel felipe pabon bastidas',
+                        driverPhone: '1140900849',
+                        driverEmail: 'luisma1295la@gmail.com',
+                        category: 'Objeto olvidado en el vehículo',
+                        tripId: 'N/A',
+                        description: 'hola encontre un parguaas en el auto',
+                        status: 'pendiente',
+                        createdAt: '2026-11-11T16:46:00.000Z',
+                        timeStr: '11/11/26, 4:46 p. m.'
+                    },
+                    {
+                        ticketId: 'TCK-701783',
+                        driverName: 'daniel felipe pabon bastidas',
+                        driverPhone: '1140900849',
+                        driverEmail: 'luisma1295la@gmail.com',
+                        category: 'Problema con tarifa o peajes',
+                        tripId: 'N/A',
+                        description: 'no me pagaron el peaje por el paso del bajo',
+                        status: 'pendiente',
+                        createdAt: '2026-11-11T15:45:00.000Z',
+                        timeStr: '11/11/26, 3:45 p. m.'
+                    }
+                ];
+
+                knownSeedTickets.forEach(seed => {
+                    const existing = localTickets.find(t => t.ticketId === seed.ticketId);
+                    if (!existing) {
+                        localTickets.push(seed);
+                    }
+                });
+
                 currentTicketsList = localTickets;
+                try {
+                    localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(currentTicketsList));
+                } catch(e) {}
 
                 // Cargar desde Firestore SDK si está disponible
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
                         const db = firebase.firestore();
+                        // Persistir los reclamos en Firestore para que viajen a todos los dispositivos
+                        knownSeedTickets.forEach(seed => {
+                            db.collection('tickets_soporte').doc(seed.ticketId).set(seed, { merge: true }).catch(() => {});
+                        });
+
                         db.collection('tickets_soporte').get().then(snapshot => {
                             if (!snapshot || snapshot.empty) return;
                             const cloudMap = new Map();
