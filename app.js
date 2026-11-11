@@ -64,6 +64,23 @@ window.hashPassword = async function(str) {
   return 'h_' + Math.abs(h);
 };
 
+window.showToast = function(text) {
+  if (!text) return;
+  const toast = document.getElementById('toast');
+  if (toast) {
+    toast.textContent = text;
+    toast.classList.remove('hidden');
+    toast.style.display = 'block';
+    clearTimeout(window._toastTimeout);
+    window._toastTimeout = setTimeout(() => {
+      toast.classList.add('hidden');
+      toast.style.display = 'none';
+    }, 3500);
+  } else {
+    console.log('[Toast]', text);
+  }
+};
+
 window.handlePassengerLoginSubmit = async function(event) {
   if (event) {
     if (typeof event.preventDefault === 'function') event.preventDefault();
@@ -708,6 +725,8 @@ window.closePassengerPasswordResetModal = function() {
     modal.classList.add('hidden');
     modal.style.display = 'none';
   }
+  window._passengerResetState = null;
+  try { localStorage.removeItem('rutaprivada_pending_pass_reset'); } catch(e) {}
 };
 
 window.handleSendPassengerResetCode = async function() {
@@ -717,22 +736,20 @@ window.handleSendPassengerResetCode = async function() {
   const email = (resetEmailInput ? resetEmailInput.value : '').trim().toLowerCase();
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    if (typeof showToast === 'function') showToast('⚠️ Por favor ingresa un correo electrónico válido.');
-    else alert('⚠️ Por favor ingresa un correo electrónico válido.');
+    if (typeof window.showToast === 'function') window.showToast('⚠️ Por favor ingresa un correo electrónico válido.');
     if (resetEmailInput) resetEmailInput.focus();
     return;
   }
 
   window._isSendingResetCode = true;
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-  const resetState = {
-    email: email,
+  window._passengerResetState = {
+    email,
     code: otpCode,
     expiresAt: Date.now() + 15 * 60 * 1000
   };
-  window._passengerResetState = resetState;
   try {
-    localStorage.setItem('rutaprivada_pending_pass_reset', JSON.stringify(resetState));
+    localStorage.setItem('rutaprivada_pending_pass_reset', JSON.stringify(window._passengerResetState));
   } catch(e) {}
 
   if (btn) {
@@ -740,7 +757,7 @@ window.handleSendPassengerResetCode = async function() {
     btn.style.opacity = '0.7';
     btn.textContent = 'Enviando...';
   }
-  if (typeof showToast === 'function') showToast(`⏳ Enviando código de seguridad a ${email}...`);
+  if (typeof window.showToast === 'function') window.showToast(`⏳ Enviando código de seguridad a ${email}...`);
 
   // Mostrar de inmediato la sección para ingresar el código recibido
   const sectionOtp = document.getElementById('sectionPassengerResetOtp');
@@ -774,13 +791,13 @@ window.handleSendPassengerResetCode = async function() {
       body: JSON.stringify(payload)
     });
     if (resp.ok) {
-      if (typeof showToast === 'function') showToast(`📨 ¡Código enviado con éxito a ${email}! Revisa tu buzón.`);
+      if (typeof window.showToast === 'function') window.showToast(`📨 ¡Código enviado con éxito a ${email}! Revisa tu buzón.`);
     } else {
-      if (typeof showToast === 'function') showToast(`📨 Código generado para ${email}. Revisa spam si no lo ves.`);
+      if (typeof window.showToast === 'function') window.showToast(`📨 Código generado para ${email}. Revisa spam si no lo ves.`);
     }
   } catch(err) {
-    console.warn('Error sending reset email:', err);
-    if (typeof showToast === 'function') showToast(`📨 Código generado para ${email}.`);
+    console.warn('Error al enviar email reset:', err);
+    if (typeof window.showToast === 'function') window.showToast(`📨 Código generado para ${email}.`);
   } finally {
     window._isSendingResetCode = false;
     if (btn) {
@@ -793,7 +810,7 @@ window.handleSendPassengerResetCode = async function() {
 
 window.handlePassengerPasswordResetSubmit = async function(e) {
   if (e && e.preventDefault) e.preventDefault();
-  if (window._isSubmittingPassReset) return false;
+  if (e && e.stopPropagation) e.stopPropagation();
 
   let state = window._passengerResetState;
   if (!state) {
@@ -803,17 +820,22 @@ window.handlePassengerPasswordResetSubmit = async function(e) {
     } catch(err) {}
   }
   if (!state || !state.code) {
-    if (typeof showToast === 'function') showToast('⚠️ Primero debes presionar "Enviar Código".');
-    else alert('⚠️ Primero debes presionar "Enviar Código".');
+    if (typeof window.showToast === 'function') window.showToast('⚠️ Primero debes presionar "Enviar Código".');
+    return false;
+  }
+
+  if (Date.now() > (state.expiresAt || 0)) {
+    if (typeof window.showToast === 'function') window.showToast('⌛ El código ha expirado. Por favor solicita uno nuevo.');
     return false;
   }
 
   const codeInput = document.getElementById('inputPassengerResetCode');
   const enteredCode = (codeInput ? codeInput.value : '').replace(/\D/g, '').trim();
 
-  if (enteredCode !== state.code) {
-    if (typeof showToast === 'function') showToast('❌ Código incorrecto. Revisa los 6 dígitos recibidos por correo.');
-    else alert('❌ Código incorrecto. Revisa los 6 dígitos recibidos por correo.');
+  if (!enteredCode || enteredCode !== state.code) {
+    if (typeof window.showToast === 'function') {
+      window.showToast('❌ Código incorrecto. Revisa los 6 dígitos recibidos en tu correo.');
+    }
     if (codeInput) codeInput.focus();
     return false;
   }
@@ -824,135 +846,120 @@ window.handlePassengerPasswordResetSubmit = async function(e) {
   const newPassConfirm = (newPassConfirmInput ? newPassConfirmInput.value : '').trim();
 
   if (!newPass || newPass.length < 8 || !/\d/.test(newPass)) {
-    if (typeof showToast === 'function') showToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
-    else alert('⚠️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
+    if (typeof window.showToast === 'function') {
+      window.showToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
+    }
     if (newPassInput) newPassInput.focus();
     return false;
   }
 
   if (newPass !== newPassConfirm) {
-    if (typeof showToast === 'function') showToast('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
-    else alert('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
+    if (typeof window.showToast === 'function') {
+      window.showToast('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
+    }
     if (newPassConfirmInput) newPassConfirmInput.focus();
     return false;
   }
 
-  window._isSubmittingPassReset = true;
-  const submitBtn = document.querySelector('#formPassengerPasswordReset button[type="submit"]');
-  const originalBtnText = submitBtn ? submitBtn.innerHTML : '✨ Guardar Nueva Contraseña';
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '⏳ Guardando cambios...';
+  const newHash = (typeof window.hashPassword === 'function') 
+    ? await window.hashPassword(newPass) 
+    : 'h_' + Date.now();
+  const email = (state.email || '').toLowerCase();
+
+  // 1. Actualizar lista de pasajeros registrados
+  let registered = [];
+  try {
+    registered = JSON.parse(localStorage.getItem('rutaprivada_registered_passengers_v1') || '[]');
+  } catch(err) {}
+
+  let userIdx = registered.findIndex(u => u.email && u.email.toLowerCase() === email);
+  let updatedUser = null;
+
+  if (userIdx >= 0) {
+    delete registered[userIdx].password;
+    registered[userIdx].passwordHash = newHash;
+    registered[userIdx].updatedAt = Date.now();
+    updatedUser = registered[userIdx];
+  } else {
+    // Si no existía localmente, crear el registro de usuario
+    updatedUser = {
+      id: 'pass_' + Date.now(),
+      nombre: email.split('@')[0],
+      telefono: '',
+      email: email,
+      passwordHash: newHash,
+      rating: '5.00',
+      medioPago: 'efectivo',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    registered.push(updatedUser);
   }
 
   try {
-    let newHash = '';
-    try {
-      const msgBuffer = new TextEncoder().encode(newPass);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-      newHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-    } catch(e) {
-      let h = 0;
-      for (let i = 0; i < newPass.length; i++) h = Math.imul(31, h) + newPass.charCodeAt(i) | 0;
-      newHash = 'h_' + Math.abs(h);
-    }
+    localStorage.setItem('rutaprivada_registered_passengers_v1', JSON.stringify(registered));
+  } catch(err) {}
 
-    const email = (state.email || '').toLowerCase().trim();
-    let registered = [];
+  // 2. Actualizar sesiones locales si coinciden
+  ['rutaprivada_passenger_session_v1', 'rutaprivada_passenger_auth_v1', 'rutaprivada_passenger_profile', 'rutaprivada_user_session'].forEach(k => {
     try {
-      registered = JSON.parse(localStorage.getItem('rutaprivada_registered_passengers_v1') || '[]');
-    } catch(err) {}
-
-    let userIdx = registered.findIndex(u => u.email && u.email.toLowerCase() === email);
-    let user = null;
-    if (userIdx >= 0) {
-      delete registered[userIdx].password;
-      registered[userIdx].passwordHash = newHash;
-      registered[userIdx].updatedAt = Date.now();
-      user = registered[userIdx];
-    } else {
-      user = {
-        id: 'pass_' + Date.now(),
-        nombre: email.split('@')[0],
-        telefono: '',
-        email: email,
-        passwordHash: newHash,
-        rating: '5.00',
-        medioPago: 'efectivo',
-        avatar: window.DEFAULT_PASSENGER_AVATAR || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-        createdAt: Date.now()
-      };
-      registered.push(user);
-    }
-
-    try {
-      localStorage.setItem('rutaprivada_registered_passengers_v1', JSON.stringify(registered));
-    } catch(err) {}
-
-    // Actualizar sesión activa si corresponde
-    try {
-      const sess = (typeof window.getPassengerSession === 'function') ? window.getPassengerSession() : null;
-      if (sess && sess.email && sess.email.toLowerCase() === email) {
-        sess.passwordHash = newHash;
-        delete sess.password;
-        if (typeof window.savePassengerSession === 'function') {
-          window.savePassengerSession(sess);
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.email && parsed.email.toLowerCase() === email) {
+          delete parsed.password;
+          parsed.passwordHash = newHash;
+          localStorage.setItem(k, JSON.stringify(parsed));
         }
       }
-    } catch(err) {}
-
-    // Sincronizar en Firestore sin bloquear la UI
-    try {
-      if (typeof firebase !== 'undefined' && firebase.firestore) {
-        const db = firebase.firestore();
-        const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
-        db.collection('pasajeros').doc(emailDocId).set({
-          email: email,
-          passwordHash: newHash,
-          updatedAt: new Date().toISOString()
-        }, { merge: true }).catch(err => console.warn('Firestore pass update warning:', err));
-      }
     } catch(e) {}
+  });
 
-    // Limpiar estado de reseteo
-    window._passengerResetState = null;
-    try {
-      localStorage.removeItem('rutaprivada_pending_pass_reset');
-    } catch(e) {}
+  // 3. Actualizar en Firestore si está disponible (asíncrono protegido contra cuelgues)
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const db = firebase.firestore();
+      const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
+      db.collection('pasajeros').doc(emailDocId).set({
+        email,
+        passwordHash: newHash,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(() => {});
+    }
+  } catch(e) {}
 
-    // Cerrar modal de recuperación
-    if (typeof window.closePassengerPasswordResetModal === 'function') {
-      window.closePassengerPasswordResetModal();
-    }
+  // 4. Limpiar estado temporal de reseteo
+  window._passengerResetState = null;
+  try {
+    localStorage.removeItem('rutaprivada_pending_pass_reset');
+  } catch(e) {}
 
-    // Pre-llenar en formulario de inicio de sesión
-    const loginIdInput = document.getElementById('loginPassengerIdentifier');
-    const loginPassInput = document.getElementById('loginPassengerPassword');
-    if (loginIdInput) loginIdInput.value = email;
-    if (loginPassInput) loginPassInput.value = newPass;
+  // 5. Cerrar modal de recuperación
+  window.closePassengerPasswordResetModal();
 
-    if (typeof showToast === 'function') {
-      showToast('✅ ¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
-    } else {
-      alert('✅ ¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
-    }
+  // 6. Pre-llenar en formulario de login para ingreso fluido
+  const loginIdInput = document.getElementById('loginPassengerIdentifier');
+  const loginPassInput = document.getElementById('loginPassengerPassword');
+  if (loginIdInput) loginIdInput.value = email;
+  if (loginPassInput) loginPassInput.value = newPass;
 
-    if (typeof window.openPassengerAuthModal === 'function') {
-      window.openPassengerAuthModal('login');
-    }
-  } catch(err) {
-    console.error('Error al guardar nueva contraseña:', err);
-    if (typeof showToast === 'function') {
-      showToast('⚠️ Ocurrió un error al guardar la contraseña.');
-    } else {
-      alert('⚠️ Ocurrió un error al guardar la contraseña.');
-    }
-  } finally {
-    window._isSubmittingPassReset = false;
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = originalBtnText;
-    }
+  // 7. Notificar al usuario y abrir modal de login
+  if (typeof window.showToast === 'function') {
+    window.showToast('✅ ¡Contraseña restablecida con éxito! Ya puedes iniciar sesión.');
+  }
+
+  const statusMsg = document.getElementById('loginPassengerStatusMsg');
+  if (statusMsg) {
+    statusMsg.style.display = 'block';
+    statusMsg.style.background = 'rgba(16, 185, 129, 0.25)';
+    statusMsg.style.border = '1px solid rgba(16, 185, 129, 0.5)';
+    statusMsg.style.color = '#6ee7b7';
+    statusMsg.textContent = '✅ Contraseña actualizada correctamente. Inicia sesión con tu nueva clave.';
+  }
+
+  if (typeof window.openPassengerAuthModal === 'function') {
+    window.openPassengerAuthModal('login');
   }
 
   return false;
@@ -9026,7 +9033,7 @@ function initPwa() {
   // 1. Registro unificado del Service Worker (v107)
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=107')
+      navigator.serviceWorker.register('sw.js?v=128')
         .then((reg) => {
           reg.update().catch(() => {});
         })
@@ -12264,24 +12271,178 @@ if (btnRecenterPassengerMap) {
       }
     }
 
-    // Delegación limpia a los handlers unificados globales
+    let passengerResetState = null;
+
+    window.closePassengerPasswordResetModal = function() {
+      const modal = document.getElementById('modalPassengerPasswordReset');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+      }
+      passengerResetState = null;
+    };
+
+    window.handleForgotPassengerPassword = function() {
+      const modal = document.getElementById('modalPassengerPasswordReset');
+      if (!modal) return;
+      const idInput = document.getElementById('loginPassengerIdentifier');
+      const resetEmailInput = document.getElementById('resetPassengerEmail');
+      const sectionOtp = document.getElementById('sectionPassengerResetOtp');
+      const codeInput = document.getElementById('inputPassengerResetCode');
+      const newPassInput = document.getElementById('resetPassengerNewPass');
+      const newPassConfirmInput = document.getElementById('resetPassengerNewPassConfirm');
+
+      if (sectionOtp) sectionOtp.style.display = 'none';
+      if (codeInput) codeInput.value = '';
+      if (newPassInput) newPassInput.value = '';
+      if (newPassConfirmInput) newPassConfirmInput.value = '';
+
+      if (resetEmailInput && idInput) {
+        const val = idInput.value.trim();
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+          resetEmailInput.value = val;
+        }
+      }
+
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    };
+
     const btnSendPassengerResetCode = document.getElementById('btnSendPassengerResetCode');
     if (btnSendPassengerResetCode) {
-      btnSendPassengerResetCode.addEventListener('click', (e) => {
-        if (e && e.preventDefault) e.preventDefault();
-        if (typeof window.handleSendPassengerResetCode === 'function') {
-          window.handleSendPassengerResetCode();
+      btnSendPassengerResetCode.addEventListener('click', async () => {
+        const resetEmailInput = document.getElementById('resetPassengerEmail');
+        const email = (resetEmailInput ? resetEmailInput.value : '').trim().toLowerCase();
+
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          if (typeof showToast === 'function') showToast('⚠️ Por favor ingresa un correo electrónico válido.');
+          if (resetEmailInput) resetEmailInput.focus();
+          return;
+        }
+
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        passengerResetState = {
+          email,
+          code: otpCode,
+          expiresAt: Date.now() + 15 * 60 * 1000
+        };
+
+        btnSendPassengerResetCode.disabled = true;
+        btnSendPassengerResetCode.style.opacity = '0.7';
+        btnSendPassengerResetCode.textContent = 'Enviando...';
+        if (typeof showToast === 'function') showToast(`⏳ Enviando código de seguridad a ${email}...`);
+
+        const res = await sendPassengerEmailVerification(email, otpCode);
+        btnSendPassengerResetCode.disabled = false;
+        btnSendPassengerResetCode.style.opacity = '1';
+        btnSendPassengerResetCode.textContent = 'Reenviar Código';
+
+        const sectionOtp = document.getElementById('sectionPassengerResetOtp');
+        if (sectionOtp) sectionOtp.style.display = 'flex';
+        const codeInput = document.getElementById('inputPassengerResetCode');
+        if (codeInput) {
+          codeInput.value = '';
+          setTimeout(() => codeInput.focus(), 250);
+        }
+
+        if (res.success) {
+          if (typeof showToast === 'function') showToast(`📨 ¡Código enviado a ${email}! Revisa tu buzón.`);
+        } else {
+          if (typeof showToast === 'function') showToast(`📨 Código generado para ${email}. Revisa spam si no lo ves.`);
         }
       });
     }
 
     const formPassengerPasswordReset = document.getElementById('formPassengerPasswordReset');
     if (formPassengerPasswordReset) {
-      formPassengerPasswordReset.addEventListener('submit', (e) => {
-        if (e && e.preventDefault) e.preventDefault();
-        if (typeof window.handlePassengerPasswordResetSubmit === 'function') {
-          window.handlePassengerPasswordResetSubmit(e);
+      formPassengerPasswordReset.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!passengerResetState) {
+          if (typeof showToast === 'function') showToast('⚠️ Primero debes solicitar el código de recuperación.');
+          return;
         }
+
+        const codeInput = document.getElementById('inputPassengerResetCode');
+        const enteredCode = (codeInput ? codeInput.value : '').replace(/\D/g, '').trim();
+
+        if (enteredCode !== passengerResetState.code) {
+          if (typeof showToast === 'function') showToast('❌ Código de verificación incorrecto. Revisa el correo recibido.');
+          if (codeInput) codeInput.focus();
+          return;
+        }
+
+        const newPassInput = document.getElementById('resetPassengerNewPass');
+        const newPassConfirmInput = document.getElementById('resetPassengerNewPassConfirm');
+        const newPass = (newPassInput ? newPassInput.value : '').trim();
+        const newPassConfirm = (newPassConfirmInput ? newPassConfirmInput.value : '').trim();
+
+        if (!newPass || newPass.length < 8 || !/\d/.test(newPass)) {
+          if (typeof showToast === 'function') showToast('⚠️ La contraseña debe tener al menos 8 caracteres y contener como mínimo 1 número.');
+          if (newPassInput) newPassInput.focus();
+          return;
+        }
+
+        if (newPass !== newPassConfirm) {
+          if (typeof showToast === 'function') showToast('⚠️ Las contraseñas no coinciden. Por favor verifícalas.');
+          if (newPassConfirmInput) newPassConfirmInput.focus();
+          return;
+        }
+
+        const newHash = await hashPassword(newPass);
+        const email = passengerResetState.email;
+
+        // Actualizar en localStorage sin almacenar password en texto plano
+        const users = getRegisteredPassengers();
+        let user = users.find(u => u.email && u.email.toLowerCase() === email);
+        if (user) {
+          delete user.password;
+          user.passwordHash = newHash;
+        } else {
+          const s = window.getPassengerSession();
+          if (s && s.email && s.email.toLowerCase() === email) {
+            user = s;
+            delete user.password;
+            user.passwordHash = newHash;
+          } else {
+            user = {
+              id: 'pass_' + Date.now(),
+              nombre: email.split('@')[0],
+              telefono: '',
+              email: email,
+              passwordHash: newHash,
+              rating: '5.00',
+              medioPago: 'efectivo',
+              avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
+            };
+          }
+          users.push(user);
+        }
+        saveRegisteredPassengers(users);
+        savePassengerSession(user);
+
+        // Actualizar en Firestore si está disponible (únicamente passwordHash)
+        try {
+          if (typeof firebase !== 'undefined' && firebase.firestore) {
+            const db = firebase.firestore();
+            const emailDocId = email.replace(/[^a-z0-9_]/g, '_');
+            await db.collection('pasajeros').doc(emailDocId).set({
+              email,
+              passwordHash: newHash,
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+          }
+        } catch(e) {}
+
+        window.closePassengerPasswordResetModal();
+
+        // Pre-llenar en login
+        const loginId = document.getElementById('loginPassengerIdentifier');
+        const loginPass = document.getElementById('loginPassengerPassword');
+        if (loginId) loginId.value = email;
+        if (loginPass) loginPass.value = newPass;
+
+        if (typeof window.syncPassengerSessionUI === 'function') window.syncPassengerSessionUI(user);
+        if (typeof showToast === 'function') showToast('✅ ¡Contraseña actualizada con éxito!');
       });
     }
 
