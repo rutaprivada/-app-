@@ -146,7 +146,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=138" />
+  <link rel="stylesheet" href="styles.css?v=139" />
 </head>
 
 <body>
@@ -2555,8 +2555,7 @@
             <i class="fa-solid fa-headset" style="font-size: 1.2rem; color: #38bdf8;"></i>
             <div>
               <strong style="color: #fff; font-size: 0.92rem; display: block;">Central de Soporte Oficial</strong>
-              <span style="color: #94a3b8; font-size: 0.75rem;">Atención y resolución por correo:
-                rutaprivadasoporte@gmail.com</span>
+              <span style="color: #94a3b8; font-size: 0.75rem;">Canal de atención y asistencia prioritaria 24/7</span>
             </div>
           </div>
           <button type="button"
@@ -2597,7 +2596,7 @@
             <span style="font-size: 1.5rem;">🎧</span>
             <div>
               <h3 style="color: #fff; margin: 0; font-size: 1.12rem; font-weight: 700;">Centro de Ayuda y Soporte</h3>
-              <p style="color: #94a3b8; margin: 0; font-size: 0.74rem;">Canal oficial de atención: <strong style="color: #38bdf8;">rutaprivadasoporte@gmail.com</strong></p>
+              <p style="color: #94a3b8; margin: 0; font-size: 0.74rem;">Preguntas frecuentes y atención oficial de incidencias 24/7</p>
             </div>
           </div>
           <button type="button" onclick="window.closePassengerHelpModal()" class="modal-close"
@@ -2778,19 +2777,19 @@
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 1.15rem;">📅</span>
                         <div>
-                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Con cuánta anticipación puedo programar mi viaje?</strong>
-                          <small style="color: #94a3b8; font-size: 0.7rem;">Inmediatos o agendados hasta con 30 días de antelación</small>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Con cuánta anticipación puedo hacer una reserva?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">Mínimo 50 minutos de antelación</small>
                         </div>
                       </div>
                       <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
                     </div>
                     <div class="passenger-help-body"
                       style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                      <p style="margin: 0;">Puedes solicitar viajes en vivo inmediatos o reservar con antelación seleccionando fecha y hora en el paso de cotización.</p>
+                      <p style="margin: 0;">Las reservas pueden solicitarse con un mínimo de <strong>50 minutos de anticipación</strong> respecto al momento de la búsqueda. Esto permite que un chofer ejecutivo confirme la solicitud y se desplace puntualmente a tu punto de partida.</p>
                     </div>
                   </div>
 
-                  <!-- 4. Aeropuertos y seguimiento de vuelos -->
+                  <!-- 4. Aeropuertos y terminales de micros -->
                   <div class="passenger-help-card" data-help-cat="reservas"
                     style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
                     <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
@@ -2798,15 +2797,15 @@
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 1.15rem;">✈️</span>
                         <div>
-                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Hacen seguimiento de vuelos en Ezeiza o Aeroparque?</strong>
-                          <small style="color: #94a3b8; font-size: 0.7rem;">Monitoreo satelital y tiempo de espera de cortesía</small>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Se pueden hacer reservas desde aeropuertos o terminales de micros?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">Solo viajes en vivo desde estas ubicaciones</small>
                         </div>
                       </div>
                       <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
                     </div>
                     <div class="passenger-help-body"
                       style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                      <p style="margin: 0;"><strong>Sí.</strong> En traslados desde aeropuertos el chofer monitorea el estado del vuelo y cuentas con hasta 45 minutos de cortesía en arribos internacionales y 30 minutos en nacionales.</p>
+                      <p style="margin: 0;"><strong>No se aceptan reservas programadas con salida desde aeropuertos (Ezeiza, Aeroparque, El Palomar) ni terminales de ómnibus (Retiro, Liniers, Dellepiane)</strong> debido a las frecuentes demoras e imprevistos en vuelos y arribos. Desde estos puntos debes solicitar un <strong>Viaje en Vivo</strong> una vez que hayas aterrizado o llegado y tengas tu equipaje en mano.<br><br><em>(Nota: Sí puedes programar reservas con destino HACIA aeropuertos o terminales sin inconveniente).</em></p>
                     </div>
                   </div>
 
@@ -2870,7 +2869,7 @@
                     </div>
                   </div>
 
-                  <!-- 8. Cancelaciones y reprogramaciones -->
+                  <!-- 8. Cancelaciones y modificaciones -->
                   <div class="passenger-help-card" data-help-cat="reservas"
                     style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
                     <div class="passenger-help-header-toggle" onclick="window.togglePassengerHelpAccordion(this)"
@@ -2878,15 +2877,15 @@
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 1.15rem;">🔄</span>
                         <div>
-                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Puedo cancelar o reprogramar mi reserva?</strong>
-                          <small style="color: #94a3b8; font-size: 0.7rem;">Políticas sin costo con aviso previo</small>
+                          <strong style="color: #fff; font-size: 0.85rem; display: block;">¿Puedo cancelar o modificar mi reserva?</strong>
+                          <small style="color: #94a3b8; font-size: 0.7rem;">Hasta 2 horas antes del horario programado</small>
                         </div>
                       </div>
                       <i class="fa-solid fa-chevron-down toggle-icon" style="color: #38bdf8; font-size: 0.8rem; transition: transform 0.25s;"></i>
                     </div>
                     <div class="passenger-help-body"
                       style="display: none; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; background: rgba(0,0,0,0.2);">
-                      <p style="margin: 0;">Puedes cancelar o reprogramar tu viaje con hasta 2 horas de anticipación sin ningún tipo de penalidad ni recargo.</p>
+                      <p style="margin: 0;">Puedes cancelar o modificar el recorrido de tu reserva directamente desde la sección <strong>Mis Reservas</strong> con hasta <strong>2 horas de anticipación</strong> sin costo ni penalidad. Si modificas origen, destino o agregas una parada intermedia, la tarifa se re-evaluará automáticamente en el momento según el nuevo itinerario.</p>
                     </div>
                   </div>
 
@@ -2929,7 +2928,7 @@
             <span style="font-size: 1.4rem;">📝</span>
             <div>
               <h3 style="color: #fff; margin: 0; font-size: 1.1rem; font-weight: 700;">Radicar Reclamo a Soporte</h3>
-              <p style="color: #94a3b8; margin: 0; font-size: 0.74rem;">Resolución oficial: <strong style="color: #38bdf8;">rutaprivadasoporte@gmail.com</strong></p>
+              <p style="color: #94a3b8; margin: 0; font-size: 0.74rem;">Atención oficial y seguimiento directo de tu caso</p>
             </div>
           </div>
           <button type="button" onclick="window.closePassengerTicketModal()" class="modal-close"
@@ -3042,10 +3041,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Sync & Realtime -->
-  <script src="sync.js?v=138"></script>
+  <script src="sync.js?v=139"></script>
 
   <!-- App JS -->
-  <script src="app.js?v=138"></script>
+  <script src="app.js?v=139"></script>
 
   <!-- Inicializador Directo de Autocompletado de Direcciones & Auto-Purga de Caché -->
   <script>

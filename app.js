@@ -1,3 +1,47 @@
+
+// ==========================================
+// REGLAS Y RESTRICCIONES DE RESERVAS
+// ==========================================
+function isAirportOrBusTerminal(locationText) {
+  if (!locationText || typeof locationText !== 'string') return false;
+  const s = locationText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  
+  // Aeropuertos
+  if (s.includes('aeroparque') || s.includes('ezeiza') || s.includes('aeropuerto') || s.includes('el palomar') || s.includes('san fernando')) {
+    return { isAirport: true, isTerminal: false, name: 'Aeropuertos' };
+  }
+  
+  // Terminales de micros / ómnibus
+  if (s.includes('terminal retiro') || s.includes('terminal de retiro') || 
+      s.includes('terminal dellepiane') || s.includes('terminal de dellepiane') ||
+      s.includes('terminal liniers') || s.includes('terminal de liniers') ||
+      s.includes('terminal de omnibus') || s.includes('terminal de micros') || 
+      s.includes('terminal de buses') || s.includes('terminal de colectivos') ||
+      (s.includes('terminal') && (s.includes('micro') || s.includes('bus') || s.includes('omnibus') || s.includes('colectivo') || s.includes('long distance')))) {
+    return { isAirport: false, isTerminal: true, name: 'Terminales de Ómnibus' };
+  }
+  
+  return false;
+}
+window.isAirportOrBusTerminal = isAirportOrBusTerminal;
+
+function getReservationScheduledTimestamp(fechaStr, horaStr) {
+  if (!fechaStr) return 0;
+  let y = 0, m = 0, d = 0;
+  if (fechaStr.includes('-')) {
+    const parts = fechaStr.split('-').map(Number);
+    y = parts[0]; m = parts[1]; d = parts[2];
+  } else if (fechaStr.includes('/')) {
+    const parts = fechaStr.split('/').map(Number);
+    d = parts[0]; m = parts[1]; y = parts[2];
+    if (y < 100) y += 2000;
+  }
+  const [h, min] = (horaStr || '12:00').split(':').map(Number);
+  const dt = new Date(y, m - 1, d, h || 0, min || 0, 0);
+  return dt.getTime();
+}
+window.getReservationScheduledTimestamp = getReservationScheduledTimestamp;
+
 /**
  * RutaPrivada - Motor de Cotización de Traslados Ejecutivos en Argentina
  * Incluye:
@@ -2737,7 +2781,11 @@ function updateStep5ActionButton() {
   const btnSubtitle = document.getElementById('btn-request-inapp-subtitle');
   const btnIcon = document.getElementById('btn-request-inapp-icon');
 
-  if (state.tripType === 'schedule') {
+  if (state.modifyingReservationId) {
+    if (btnTitle) btnTitle.textContent = 'GUARDAR CAMBIO DE RESERVA';
+    if (btnSubtitle) btnSubtitle.textContent = 'Actualizar itinerario y re-evaluar tarifa del viaje';
+    if (btnIcon) btnIcon.textContent = '💾';
+  } else if (state.tripType === 'schedule') {
     if (btnTitle) btnTitle.textContent = 'SOLICITAR RESERVA';
     if (btnSubtitle) {
       const dateFmt = (typeof formatDateWithWeekday === 'function' && state.date) ? formatDateWithWeekday(state.date) : 'la fecha elegida';
@@ -2753,6 +2801,16 @@ function updateStep5ActionButton() {
 window.updateStep5ActionButton = updateStep5ActionButton;
 
 function selectTripMode(mode) {
+  if (mode === 'schedule') {
+    const originVal = document.getElementById('origin-input')?.value || (state.origin && (state.origin.address || state.origin.name)) || '';
+    const blockedLoc = isAirportOrBusTerminal(originVal);
+    if (blockedLoc) {
+      alert(`✈️ RESERVAS DESDE ${blockedLoc.name.toUpperCase()}\n\nPor políticas operativas y demoras imprevistas en arribos, NO se permiten reservas programadas con salida desde aeropuertos o terminales de micros.\n\n✅ Podrás solicitar un "Viaje en Vivo" de manera inmediata una vez que hayas arribado y retirado tu equipaje.\n\nℹ️ Sí está permitido hacer reservas con destino HACIA estos lugares.`);
+      if (typeof showToast === 'function') showToast(`⚠️ No se admiten reservas desde ${blockedLoc.name}. Solicita Viaje en Vivo.`);
+      selectTripMode('live');
+      return;
+    }
+  }
   state.tripType = mode;
   const btnLive = document.getElementById('btn-mode-live');
   const btnSchedule = document.getElementById('btn-mode-schedule');
@@ -2797,6 +2855,16 @@ async function handleStep1Next() {
       setTimeout(() => { if (destInput) destInput.style.borderColor = ''; }, 2000);
     }
     return;
+  }
+
+  // Validación estricta: No permitir reservas con salida desde aeropuertos o terminales
+  if (state.tripType === 'schedule') {
+    const blockedLoc = isAirportOrBusTerminal(originVal);
+    if (blockedLoc) {
+      alert(`✈️ RESERVAS DESDE ${blockedLoc.name.toUpperCase()}\n\nPor políticas de puntualidad y frecuentes demoras en arribos o retiro de equipaje, NO se permiten reservas programadas con salida desde aeropuertos o terminales de micros.\n\n✅ Podrás solicitar un "Viaje en Vivo" cuando hayas llegado y tengas tu equipaje en mano.\n\nℹ️ Sí está permitido hacer reservas con destino HACIA aeropuertos o terminales.`);
+      if (typeof showToast === 'function') showToast(`⚠️ No se admiten reservas desde ${blockedLoc.name}. Solicita Viaje en Vivo.`);
+      return;
+    }
   }
 
   if (btnNext) {
@@ -10303,6 +10371,15 @@ if (btnRequestInapp) {
     const isReservation = (state.tripType === 'schedule');
     const curTodayStr = formatDateToString(new Date());
 
+    // Si es reserva, validar bloqueo estricto desde aeropuertos o terminales
+    if (isReservation && isAirportOrBusTerminal(originAddress)) {
+      const blockedLoc = isAirportOrBusTerminal(originAddress);
+      alert(`✈️ RESERVAS DESDE ${blockedLoc.name.toUpperCase()}\n\nNo se permiten reservas con salida desde aeropuertos o terminales de micros por posibles demoras en arribos.\n\n✅ Por favor solicita un "Viaje en Vivo" al llegar con tu equipaje en mano.`);
+      if (typeof showToast === 'function') showToast(`⚠️ No se admiten reservas desde ${blockedLoc.name}. Solicita Viaje en Vivo.`);
+      goToWizardStep(1);
+      return;
+    }
+
     // Si es reserva para hoy, verificar regla estricta de 50 minutos
     if (isReservation && state.date === curTodayStr && typeof getMinAllowedTimeForDate === 'function') {
       const minAllowed = getMinAllowedTimeForDate(curTodayStr);
@@ -10379,15 +10456,34 @@ if (btnRequestInapp) {
         stopCoords: (hasIntermediateStop && state.stop && state.stop.lat) ? { lat: state.stop.lat, lng: state.stop.lng } : null
       };
 
+      const isModifying = !!state.modifyingReservationId;
+      const targetId = isModifying ? state.modifyingReservationId : ('res_' + Date.now());
+      reservaData.id = targetId;
+      if (isModifying) {
+        reservaData.modificadoEn = Date.now();
+        reservaData.fueModificada = true;
+      }
+
       if (window.RutaSync) {
-        window.RutaSync.guardarReservaEnAgenda(reservaData);
-        window.RutaSync.emit('RESERVA_CREADA', reservaData);
+        if (isModifying) {
+          window.RutaSync.actualizarReservaLocal(targetId, reservaData);
+          window.RutaSync.emit('RESERVA_ACTUALIZADA', reservaData);
+        } else {
+          window.RutaSync.guardarReservaEnAgenda(reservaData);
+          window.RutaSync.emit('RESERVA_CREADA', reservaData);
+        }
       }
 
       // Guardar en reservas de pasajero
       try {
         let pResList = JSON.parse(localStorage.getItem('rutaprivada_passenger_reservations') || '[]');
-        pResList.unshift(reservaData);
+        if (isModifying) {
+          const mIdx = pResList.findIndex(r => r.id === targetId);
+          if (mIdx >= 0) pResList[mIdx] = { ...pResList[mIdx], ...reservaData };
+          else pResList.unshift(reservaData);
+        } else {
+          pResList.unshift(reservaData);
+        }
         localStorage.setItem('rutaprivada_passenger_reservations', JSON.stringify(pResList));
         if (typeof updatePassengerReservationsBadge === 'function') updatePassengerReservationsBadge();
       } catch(e){}
@@ -10395,25 +10491,51 @@ if (btnRequestInapp) {
       // Guardar en el historial local del perfil de pasajero
       try {
         let historyList = JSON.parse(localStorage.getItem('rutaprivada_passenger_history') || '[]');
-        historyList.unshift({
-          id: reservaData.id,
-          date: reservaData.fecha,
-          time: reservaData.hora,
-          origin: reservaData.origen,
-          destination: reservaData.destino,
-          hasStop: reservaData.hasStop,
-          stopAddress: reservaData.parada,
-          fare: reservaData.precioEstimado,
-          distance: reservaData.distancia,
-          duration: reservaData.duracion,
-          status: 'Agendada (Reserva)',
-          rating: 5,
-          paymentMethod: 'Efectivo / Transferencia',
-          driver: { name: 'Por asignar', car: 'Sedán Ejecutivo', plate: '--' }
-        });
+        if (isModifying) {
+          const hIdx = historyList.findIndex(h => h.id === targetId);
+          if (hIdx >= 0) {
+            historyList[hIdx] = {
+              ...historyList[hIdx],
+              origin: reservaData.origen,
+              destination: reservaData.destino,
+              fare: reservaData.precioEstimado,
+              distance: reservaData.distancia,
+              duration: reservaData.duracion
+            };
+          }
+        } else {
+          historyList.unshift({
+            id: reservaData.id,
+            date: reservaData.fecha,
+            time: reservaData.hora,
+            origin: reservaData.origen,
+            destination: reservaData.destino,
+            hasStop: reservaData.hasStop,
+            stopAddress: reservaData.parada,
+            fare: reservaData.precioEstimado,
+            distance: reservaData.distancia,
+            duration: reservaData.duracion,
+            status: 'Agendada (Reserva)',
+            rating: 5,
+            paymentMethod: 'Efectivo / Transferencia',
+            driver: { name: 'Por asignar', car: 'Sedán Ejecutivo', plate: '--' }
+          });
+        }
         localStorage.setItem('rutaprivada_passenger_history', JSON.stringify(historyList));
         if (typeof loadPassengerTripHistory === 'function') loadPassengerTripHistory();
       } catch(e){}
+
+      // Sincronizar en Firestore
+      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+        try {
+          firebase.firestore().collection('bookings').doc(String(targetId)).set(reservaData, { merge: true }).catch(() => {});
+        } catch(e) {}
+      }
+
+      // Quitar banner de modificación
+      const bannerMod = document.getElementById('modifying-reservation-banner');
+      if (bannerMod) bannerMod.remove();
+      state.modifyingReservationId = null;
 
       // Disparar conversión Google Ads
       if (typeof window.trackGoogleAdsConversion === 'function') {
@@ -10421,9 +10543,15 @@ if (btnRequestInapp) {
       }
 
       try { playPassengerTone('confirmed'); } catch(e){}
-      showToast('📅 ¡Reserva agendada con éxito!');
-      alert(`📅 ¡SOLICITUD DE RESERVA CONFIRMADA!\n\nTu traslado para el ${formatDateWithWeekday(reservaData.fecha)} a las ${reservaData.hora} hs ha sido agendado exitosamente.\n\nLa reserva fue cargada en el sistema para que los conductores disponibles la tomen.\n\n¡Muchas gracias por elegir RutaPrivada!`);
-      goToWizardStep(1);
+      if (isModifying) {
+        showToast('✅ ¡Reserva modificada y re-evaluada con éxito!');
+        alert(`✅ ¡RESERVA MODIFICADA Y RE-EVALUADA!\n\nSe ha actualizado tu itinerario y la tarifa fue recalculada a ${Number(calculatedFare).toLocaleString('es-AR')}.\n\nLos detalles actualizados ya se encuentran disponibles en "Mis Reservas".`);
+        if (typeof openPassengerReservationsModal === 'function') openPassengerReservationsModal();
+      } else {
+        showToast('📅 ¡Reserva agendada con éxito!');
+        alert(`📅 ¡SOLICITUD DE RESERVA CONFIRMADA!\n\nTu traslado para el ${formatDateWithWeekday(reservaData.fecha)} a las ${reservaData.hora} hs ha sido agendado exitosamente.\n\nLa reserva fue cargada en el sistema para que los conductores disponibles la tomen.\n\n¡Muchas gracias por elegir RutaPrivada!`);
+        goToWizardStep(1);
+      }
       return;
     }
 
@@ -12106,9 +12234,12 @@ if (btnRecenterPassengerMap) {
           </div>
 
           ${(!isCancelled && !isCompleted) ? `
-          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; flex-wrap: wrap;">
+            <button type="button" class="btn-modify-passenger-res" data-id="${res.id}" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-pen-to-square"></i> Modificar
+            </button>
             <button type="button" class="btn-passenger-support-res" data-id="${res.id}" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-              <i class="fa-solid fa-headset"></i> Soporte Central
+              <i class="fa-solid fa-headset"></i> Soporte
             </button>
             <button type="button" class="btn-cancel-passenger-res" data-id="${res.id}" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; padding: 6px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">
               ✕ Cancelar
@@ -12117,6 +12248,23 @@ if (btnRecenterPassengerMap) {
         </div>
       `;
     }).join('');
+
+    reservationsListContainer.querySelectorAll('.btn-modify-passenger-res').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        window.startModifyPassengerReservation(id);
+      });
+    });
+
+    reservationsListContainer.querySelectorAll('.btn-passenger-support-res').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        closePassengerReservationsModal();
+        if (typeof window.openPassengerTicketModal === 'function') {
+          window.openPassengerTicketModal('general', `Consulta sobre mi reserva #${String(id).slice(-6)}`);
+        }
+      });
+    });
 
     reservationsListContainer.querySelectorAll('.btn-cancel-passenger-res').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -12127,49 +12275,129 @@ if (btnRecenterPassengerMap) {
   }
 
   function cancelPassengerReservation(resId) {
-    if (!confirm('¿Estás seguro de que deseas cancelar esta reserva programada?')) return;
     let list = loadPassengerReservations();
     const item = list.find(r => r.id === resId);
-    if (item) {
-      item.estado = 'cancelada';
-      item.status = 'cancelada';
-      savePassengerReservations(list);
+    if (!item) return;
 
-      const cancelPayload = {
-        id: resId,
-        reservaId: resId,
-        estado: 'cancelada',
-        status: 'cancelada',
-        fecha: item.fecha || item.date || '',
-        hora: item.hora || item.time || '',
-        origen: item.origen || item.pickupAddress || '',
-        destino: item.destino || item.dropoffAddress || '',
-        driverAssigned: item.driverAssigned || (item.conductor ? item.conductor.nombre : null),
-        canceladoPor: 'pasajero',
-        canceladoEn: Date.now()
-      };
+    const schedTime = getReservationScheduledTimestamp(item.fecha || item.date, item.hora || item.time);
+    const diffHours = (schedTime - Date.now()) / (1000 * 60 * 60);
 
-      if (window.RutaSync) {
-        window.RutaSync.actualizarReservaLocal(resId, { estado: 'cancelada', status: 'cancelada' });
-        window.RutaSync.emit('RESERVA_CANCELADA', cancelPayload);
-      }
-
-      // Sincronizar en Firestore
-      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
-        try {
-          firebase.firestore().collection('bookings').doc(String(resId)).set({
-            estado: 'cancelada',
-            status: 'cancelada',
-            canceladoPor: 'pasajero',
-            canceladoEn: Date.now()
-          }, { merge: true }).catch(() => {});
-        } catch(e) {}
-      }
-
-      renderPassengerReservationsList();
-      showToast('❌ Reserva cancelada correctamente.');
+    if (diffHours < 2) {
+      alert(`⚠️ POLÍTICA DE CANCELACIÓN (2 HORAS)\n\nEsta reserva está agendada para el ${item.fecha || ''} a las ${item.hora || ''} hs (a menos de 2 horas de su inicio).\n\nNo es posible cancelarla desde la aplicación con menos de 2 horas de anticipación.\n\nPara asistencia, comunícate con el Centro de Ayuda.`);
+      if (typeof showToast === 'function') showToast('⚠️ Cancelaciones solo hasta 2 horas antes.');
+      return;
     }
+
+    if (!confirm(`¿Estás seguro de que deseas cancelar la reserva del ${item.fecha || ''} a las ${item.hora || ''} hs?`)) return;
+
+    item.estado = 'cancelada';
+    item.status = 'cancelada';
+    savePassengerReservations(list);
+
+    const cancelPayload = {
+      id: resId,
+      reservaId: resId,
+      estado: 'cancelada',
+      status: 'cancelada',
+      fecha: item.fecha || item.date || '',
+      hora: item.hora || item.time || '',
+      origen: item.origen || item.pickupAddress || '',
+      destino: item.destino || item.dropoffAddress || '',
+      driverAssigned: item.driverAssigned || (item.conductor ? item.conductor.nombre : null),
+      canceladoPor: 'pasajero',
+      canceladoEn: Date.now()
+    };
+
+    if (window.RutaSync) {
+      window.RutaSync.actualizarReservaLocal(resId, { estado: 'cancelada', status: 'cancelada' });
+      window.RutaSync.emit('RESERVA_CANCELADA', cancelPayload);
+    }
+
+    // Sincronizar en Firestore
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      try {
+        firebase.firestore().collection('bookings').doc(String(resId)).set({
+          estado: 'cancelada',
+          status: 'cancelada',
+          canceladoPor: 'pasajero',
+          canceladoEn: Date.now()
+        }, { merge: true }).catch(() => {});
+      } catch(e) {}
+    }
+
+    renderPassengerReservationsList();
+    showToast('❌ Reserva cancelada correctamente.');
   }
+
+  window.startModifyPassengerReservation = function(resId) {
+    const list = loadPassengerReservations();
+    const item = list.find(r => r.id === resId);
+    if (!item) return;
+
+    const schedTime = getReservationScheduledTimestamp(item.fecha || item.date, item.hora || item.time);
+    const diffHours = (schedTime - Date.now()) / (1000 * 60 * 60);
+
+    if (diffHours < 2) {
+      alert(`⚠️ POLÍTICA DE MODIFICACIÓN (2 HORAS)\n\nLas modificaciones de itinerario o fecha solo se permiten con hasta 2 horas de anticipación a su inicio (${item.hora || ''} hs).\n\nPara asistencia urgente, comunícate con el Centro de Ayuda.`);
+      if (typeof showToast === 'function') showToast('⚠️ Modificaciones solo hasta 2 horas antes.');
+      return;
+    }
+
+    state.modifyingReservationId = resId;
+    state.tripType = 'schedule';
+    state.date = item.fecha || item.date;
+    state.time = item.hora || item.time;
+
+    const originInput = document.getElementById('origin-input');
+    const destInput = document.getElementById('destination-input');
+    const stopInput = document.getElementById('stop-input');
+
+    if (originInput) originInput.value = item.origen || item.pickupAddress || '';
+    if (destInput) destInput.value = item.destino || item.dropoffAddress || '';
+    state.origin = { address: item.origen || item.pickupAddress || '', name: item.origen || item.pickupAddress || '', ...(item.originCoords || {}) };
+    state.destination = { address: item.destino || item.dropoffAddress || '', name: item.destino || item.dropoffAddress || '', ...(item.destinationCoords || {}) };
+
+    if (item.parada) {
+      state.hasIntermediateStop = true;
+      if (typeof enableIntermediateStop === 'function') enableIntermediateStop();
+      if (stopInput) stopInput.value = item.parada;
+      state.stop = { address: item.parada, name: item.parada, ...(item.stopCoords || {}) };
+    } else {
+      state.hasIntermediateStop = false;
+      if (typeof removeIntermediateStop === 'function') removeIntermediateStop();
+    }
+
+    closePassengerReservationsModal();
+
+    let banner = document.getElementById('modifying-reservation-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'modifying-reservation-banner';
+      banner.style.cssText = 'background: rgba(2, 132, 199, 0.95); border-bottom: 1.5px solid #38bdf8; color: #fff; padding: 10px 16px; font-size: 0.82rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.5); position: sticky; top: 0;';
+      document.body.prepend(banner);
+    }
+    banner.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-pen-to-square" style="color: #fbbf24;"></i>
+        <span>Modificando Reserva #${String(resId).slice(-6)} (${item.fecha} ${item.hora} hs). La tarifa se re-evaluará con el nuevo trayecto.</span>
+      </div>
+      <button type="button" onclick="window.cancelModifyReservation()" style="background: rgba(239,68,68,0.25); border: 1px solid #f87171; color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 0.74rem; cursor: pointer;">
+        ✕ Descartar
+      </button>
+    `;
+
+    goToWizardStep(1);
+    updateStep5ActionButton();
+    showToast('✏️ Modificando itinerario: puedes cambiar origen, destino o paradas.');
+  };
+
+  window.cancelModifyReservation = function() {
+    state.modifyingReservationId = null;
+    const banner = document.getElementById('modifying-reservation-banner');
+    if (banner) banner.remove();
+    updateStep5ActionButton();
+    showToast('Modificación descartada.');
+  };
 
   const btnOpenReservationsEl = document.getElementById('btnOpenReservations');
   const btnCloseReservationsEl = document.getElementById('btnCloseReservations');
@@ -14501,7 +14729,7 @@ if (btnRecenterPassengerMap) {
         if (typeof window.openPassengerSosModal === 'function') {
           window.openPassengerSosModal();
         } else {
-          alert('🛡️ CENTRO DE SEGURIDAD RUTAPRIVADA\n\nSoporte Oficial 24/7:\nrutaprivadasoporte@gmail.com\nEmergencias Policiales: 911');
+          alert('🛡️ CENTRO DE SEGURIDAD RUTAPRIVADA\n\nAtención y Asistencia Oficial 24/7 disponible desde el Centro de Ayuda.\nEmergencias Policiales: 911');
         }
       });
     }
