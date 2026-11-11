@@ -4281,9 +4281,28 @@ async function checkAndRoute() {
     statusEl.style.color = '#38bdf8';
   }
 
-  const o = state.origin;
-  const d = state.destination;
-  const s = (state.hasIntermediateStop && state.intermediateStop) ? state.intermediateStop : null;
+  // Calibración de acceso vehicular oficial a aeropuertos (garantiza acceso exclusivo por Av. Costanera en Aeroparque)
+  function calibrateAirportPoint(p) {
+    if (!p) return p;
+    const txt = ((p.address || '') + ' ' + (p.name || '')).toLowerCase();
+    if (/aeroparque|jorge\s*newbery|\baep\b/i.test(txt)) {
+      return {
+        ...p,
+        lat: -34.5565,
+        lng: -58.4120,
+        lon: -58.4120,
+        address: (p.address && p.address.includes('Costanera')) ? p.address : 'Aeroparque Internacional Jorge Newbery (AEP), Av. Costanera Rafael Obligado, Palermo, CABA'
+      };
+    }
+    return p;
+  }
+
+  const o = calibrateAirportPoint(state.origin);
+  const d = calibrateAirportPoint(state.destination);
+  const s = (state.hasIntermediateStop && state.intermediateStop) ? calibrateAirportPoint(state.intermediateStop) : null;
+  state.origin = o;
+  state.destination = d;
+  if (s) state.intermediateStop = s;
 
   // Detectar si es un viaje entre Norte/Oeste (Belgrano, Núñez, Palermo, Saavedra, Zona Norte/Oeste) y Ezeiza / Canning / Zona Sur
   const isNorthOrWestToEzeiza = !s && (
@@ -5176,9 +5195,9 @@ const BUE_LANDMARKS = {
   'aeropuerto internacional de ezeiza': { lat: -34.8222, lng: -58.5358, address: 'Aeropuerto Internacional Ezeiza (EZE)' },
   'aeropuerto ezeiza': { lat: -34.8222, lng: -58.5358, address: 'Aeropuerto Ezeiza (EZE)' },
   'pistarini': { lat: -34.8222, lng: -58.5358, address: 'Aeropuerto Pistarini (Ezeiza)' },
-  'aeroparque': { lat: -34.5580, lng: -58.4170, address: 'Aeroparque Internacional Jorge Newbery (AEP)' },
-  'aeroparque jorge newbery': { lat: -34.5580, lng: -58.4170, address: 'Aeroparque Jorge Newbery (AEP)' },
-  'jorge newbery': { lat: -34.5580, lng: -58.4170, address: 'Aeroparque Jorge Newbery (AEP)' },
+  'aeroparque': { lat: -34.5565, lng: -58.4120, address: 'Aeroparque Internacional Jorge Newbery (AEP), Av. Costanera Rafael Obligado, Palermo, CABA' },
+  'aeroparque jorge newbery': { lat: -34.5565, lng: -58.4120, address: 'Aeroparque Internacional Jorge Newbery (AEP), Av. Costanera Rafael Obligado, Palermo, CABA' },
+  'jorge newbery': { lat: -34.5565, lng: -58.4120, address: 'Aeroparque Internacional Jorge Newbery (AEP), Av. Costanera Rafael Obligado, Palermo, CABA' },
   'buquebus': { lat: -34.5975, lng: -58.3685, address: 'Terminal Buquebus Puerto Madero, CABA' },
   'terminal de retiro': { lat: -34.5888, lng: -58.3750, address: 'Terminal de Ómnibus de Retiro, CABA' },
   'estacion retiro': { lat: -34.5912, lng: -58.3745, address: 'Estación Retiro Mitre / Belgrano / San Martín' },
@@ -5692,7 +5711,7 @@ function resolveAddressCoords(addressStr, defaultFallback) {
     return { lat: -34.5085, lng: -58.5235, address: 'Unicenter Shopping, Paraná 3745, Martínez, PBA' };
   }
   if (/aeroparque|jorge newbery|\baep\b/.test(norm)) {
-    return { lat: -34.5580, lng: -58.4170, address: 'Aeroparque Internacional Jorge Newbery (AEP), Palermo, CABA' };
+    return { lat: -34.5565, lng: -58.4120, address: 'Aeroparque Internacional Jorge Newbery (AEP), Av. Costanera Rafael Obligado, Palermo, CABA' };
   }
   if (/ezeiza|pistarini|\beze\b/.test(norm)) {
     return { lat: -34.8222, lng: -58.5358, address: 'Aeropuerto Internacional Ministro Pistarini (Ezeiza), PBA' };
@@ -6631,8 +6650,8 @@ function cleanAddressQuery(raw) {
 function getDefaultPopularDestinations() {
   return [
     {
-      lat: '-34.5580', lon: '-58.4170',
-      display_name: 'Aeroparque Internacional Jorge Newbery (AEP), CABA',
+      lat: '-34.5565', lon: '-58.4120',
+      display_name: 'Aeroparque Internacional Jorge Newbery (AEP), Av. Costanera Rafael Obligado, Palermo, CABA',
       _isPoi: true, _poiBadge: 'Aeropuerto Principal', _icon: '✈️',
       _mainTitle: 'Aeroparque Jorge Newbery (AEP)', _subTitle: 'Av. Costanera Rafael Obligado s/n, Palermo, CABA'
     },
@@ -6712,7 +6731,7 @@ function getInstantLocalSuggestions(rawQuery) {
   const QUICK_POIS = [
     {
       keywords: ['aeroparque', 'jorge newbery', 'newbery', 'aep'],
-      lat: -34.5580, lon: -58.4170,
+      lat: -34.5565, lon: -58.4120,
       mainTitle: 'Aeroparque Internacional Jorge Newbery (AEP)',
       subTitle: 'Av. Costanera Rafael Obligado s/n, Palermo, CABA',
       badge: 'Aeropuerto', icon: '✈️'
@@ -7320,7 +7339,7 @@ async function searchLocations(rawQuery, signal) {
     }, true);
   } else if (/aeroparque|jorge newbery|aep/i.test(queryLower)) {
     addResult({
-      lat: '-34.5580', lon: '-58.4170',
+      lat: '-34.5565', lon: '-58.4120',
       display_name: 'Aeroparque Internacional Jorge Newbery (AEP), Avenida Costanera Rafael Obligado, Buenos Aires, Argentina',
       _mainTitle: 'Aeroparque Jorge Newbery (AEP)',
       _subTitle: 'Av. Costanera Rafael Obligado s/n, Palermo, CABA',
@@ -10155,9 +10174,9 @@ const PASSENGER_BUE_LANDMARKS = {
   'aeropuerto internacional de ezeiza': { lat: -34.8150, lng: -58.5348 },
   'aeropuerto de ezeiza': { lat: -34.8150, lng: -58.5348 },
   'eze': { lat: -34.8150, lng: -58.5348 },
-  'aeroparque': { lat: -34.5580, lng: -58.4173 },
-  'aeroparque jorge newbery': { lat: -34.5580, lng: -58.4173 },
-  'aep': { lat: -34.5580, lng: -58.4173 },
+  'aeroparque': { lat: -34.5565, lng: -58.4120 },
+  'aeroparque jorge newbery': { lat: -34.5565, lng: -58.4120 },
+  'aep': { lat: -34.5565, lng: -58.4120 },
   'obelisco': { lat: -34.6037, lng: -58.3816 },
   'plaza de la republica': { lat: -34.6037, lng: -58.3816 },
   '9 de julio': { lat: -34.6037, lng: -58.3816 },
@@ -13652,7 +13671,7 @@ if (btnRecenterPassengerMap) {
     // 4. Quick Shortcuts Chips (Ezeiza, Aeroparque, Puerto Madero, Palermo, Pilar)
     const CHIP_COORDINATES = {
       'ezeiza': [-34.8222, -58.5358],
-      'aeroparque': [-34.5580, -58.4170],
+      'aeroparque': [-34.5565, -58.4120],
       'puerto madero': [-34.6025, -58.3645],
       'palermo': [-34.5880, -58.4280],
       'pilar': [-34.4587, -58.9142]
