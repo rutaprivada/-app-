@@ -487,19 +487,6 @@ window.closeDriverReportTicketModal = function() {
 };
 window.closeDriverTicketModal = window.closeDriverReportTicketModal;
 
-const TICKET_CATEGORIES_MAP = {
-    'tarifa': '🚗 Problema con tarifa o peajes',
-    'pasajero': '👤 Pasajero no se presentó (No-show)',
-    'pago': '💵 Problema con el cobro o transferencia',
-    'objeto': '🧳 Objeto olvidado en el vehículo',
-    'app': '📡 Error en la app o radar GPS',
-    'documentos': '📄 Dudas sobre vehículo / documentación',
-    'otro': '💬 Otra consulta general'
-};
-window.TICKET_CATEGORIES_MAP = TICKET_CATEGORIES_MAP;
-window.driverTicketDraftsByCategory = window.driverTicketDraftsByCategory || {};
-window.currentActiveTicketCategory = 'tarifa';
-
 window.openDriverTicketModal = function(preselectedCategory, defaultDescription) {
     const modal = document.getElementById('modalDriverReportTicket');
     if (modal) {
@@ -537,40 +524,34 @@ window.openDriverTicketModal = function(preselectedCategory, defaultDescription)
         const inputName = document.getElementById('ticketDriverName');
         const inputPhone = document.getElementById('ticketDriverPhone');
         const inputEmail = document.getElementById('ticketDriverEmail');
-        const hiddenCat = document.getElementById('ticketCategory');
-        const displayCat = document.getElementById('ticketCategoryDisplayText');
+        const selectCat = document.getElementById('ticketCategory');
         const inputDesc = document.getElementById('ticketDescription');
         const inputTripId = document.getElementById('ticketTripId');
 
-        // Determinar categoría fija
-        const catKey = (preselectedCategory && TICKET_CATEGORIES_MAP[preselectedCategory]) ? preselectedCategory : 'tarifa';
-        window.currentActiveTicketCategory = catKey;
-
-        if (hiddenCat) hiddenCat.value = catKey;
-        if (displayCat) displayCat.textContent = TICKET_CATEGORIES_MAP[catKey] || 'Consulta General';
-
-        // Cargar datos verificados no editables
-        if (inputName) inputName.value = currentName || '';
-        if (inputPhone) inputPhone.value = currentPhone || '';
-        if (inputEmail) inputEmail.value = currentEmail || '';
-
-        // Aislamiento del mensaje por sección/categoría
+        if (inputName) {
+            inputName.value = currentName || '';
+            inputName.readOnly = true;
+        }
+        if (inputPhone) {
+            inputPhone.value = currentPhone || '';
+            inputPhone.readOnly = true;
+        }
+        if (inputEmail) {
+            inputEmail.value = currentEmail || '';
+            inputEmail.readOnly = true;
+        }
+        if (selectCat && preselectedCategory) {
+            selectCat.value = preselectedCategory;
+        }
+        
+        // Limpiar SIEMPRE la descripción para que cada sección sea independiente y no retenga textos anteriores
         if (inputDesc) {
-            inputDesc.value = window.driverTicketDraftsByCategory[catKey] || defaultDescription || '';
-            if (!inputDesc._draftHandlerAttached) {
-                inputDesc._draftHandlerAttached = true;
-                inputDesc.addEventListener('input', () => {
-                    if (window.currentActiveTicketCategory) {
-                        window.driverTicketDraftsByCategory[window.currentActiveTicketCategory] = inputDesc.value;
-                    }
-                });
-            }
+            inputDesc.value = defaultDescription || '';
         }
 
-        // Auto-completar ID de viaje activo si lo hay
         const activeTripObj = window.currentActiveTrip || (typeof driverState !== 'undefined' ? driverState.activeTrip : null);
-        if (inputTripId && !inputTripId.value && activeTripObj) {
-            inputTripId.value = 'Viaje #' + (activeTripObj.id || activeTripObj.reservaId || 'En Curso');
+        if (inputTripId && !inputTripId.value) {
+            inputTripId.value = activeTripObj ? ('Viaje #' + (activeTripObj.id || activeTripObj.reservaId || 'En Curso')) : '';
         }
 
         modal.style.display = 'flex';
@@ -8641,44 +8622,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const inputName = document.getElementById('ticketDriverName');
             const inputPhone = document.getElementById('ticketDriverPhone');
             const inputEmail = document.getElementById('ticketDriverEmail');
-            const hiddenCat = document.getElementById('ticketCategory');
-            const displayCat = document.getElementById('ticketCategoryDisplayText');
+            const selectCat = document.getElementById('ticketCategory');
             const inputDesc = document.getElementById('ticketDescription');
             const inputTripId = document.getElementById('ticketTripId');
 
-            // Determinar categoría fija
-            const catMap = window.TICKET_CATEGORIES_MAP || {
-                'tarifa': '🚗 Problema con tarifa o peajes',
-                'pasajero': '👤 Pasajero no se presentó (No-show)',
-                'pago': '💵 Problema con el cobro o transferencia',
-                'objeto': '🧳 Objeto olvidado en el vehículo',
-                'app': '📡 Error en la app o radar GPS',
-                'documentos': '📄 Dudas sobre vehículo / documentación',
-                'otro': '💬 Otra consulta general'
-            };
-            const catKey = (preselectedCategory && catMap[preselectedCategory]) ? preselectedCategory : 'tarifa';
-            window.currentActiveTicketCategory = catKey;
-
-            if (hiddenCat) hiddenCat.value = catKey;
-            if (displayCat) displayCat.textContent = catMap[catKey] || 'Consulta General';
-
-            // Cargar datos verificados no editables
             if (inputName) inputName.value = driverName || '';
             if (inputPhone) inputPhone.value = driverPhone || '';
             if (inputEmail) inputEmail.value = driverEmail || '';
-
-            // Aislamiento estricto del mensaje por categoría
-            window.driverTicketDraftsByCategory = window.driverTicketDraftsByCategory || {};
+            if (selectCat && preselectedCategory) selectCat.value = preselectedCategory;
             if (inputDesc) {
-                inputDesc.value = window.driverTicketDraftsByCategory[catKey] || defaultDescription || '';
-                if (!inputDesc._draftHandlerAttached) {
-                    inputDesc._draftHandlerAttached = true;
-                    inputDesc.addEventListener('input', () => {
-                        if (window.currentActiveTicketCategory) {
-                            window.driverTicketDraftsByCategory[window.currentActiveTicketCategory] = inputDesc.value;
-                        }
-                    });
-                }
+                if (defaultDescription) inputDesc.value = defaultDescription;
             }
 
             // Auto-completar ID de viaje activo si lo hay
@@ -8814,12 +8767,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const supportChatUnreadBadge = document.getElementById('supportChatUnreadBadge');
     let supportChatUnsub = null;
 
+    const DRIVER_SUPPORT_EMAIL = 'rutaprivadadrivers@gmail.com';
+
     // Helper unificado para envío de correo real vía EmailJS (Chofer y Soporte)
     async function sendSupportEmailDispatch(targetEmail, subjectText, messageText, extraParams = {}) {
         const timeStr = new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
         const { driverName, driverPhone, driverEmail } = getDriverContactInfo();
         const effectiveDriverEmail = extraParams.driverEmail || driverEmail || localStorage.getItem('rutaprivada_driver_email') || targetEmail;
-        const computedReplyTo = extraParams.replyTo || (targetEmail === 'soporte@rutaprivada.com' ? effectiveDriverEmail : 'soporte@rutaprivada.com');
+        const computedReplyTo = extraParams.replyTo || (targetEmail === DRIVER_SUPPORT_EMAIL ? effectiveDriverEmail : DRIVER_SUPPORT_EMAIL);
 
         const payload = {
             service_id: 'service_ri00bk4',
@@ -9301,7 +9256,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveLocalSupportMessages(chatMessages);
             } catch(e) {}
 
-            // 4. Envío de Copia de Respaldo por Correo al Conductor y a Soporte
+            // 4. Envío de Copia de Respaldo por Correo al Conductor y a Soporte Central
             const emailBody = `CENTRAL DE ASISTENCIA Y SOPORTE RUTAPRIVADA (24/7)\n` +
                 `=====================================================\n` +
                 `COMPROBANTE DE RECLAMO / REGISTRO OFICIAL\n` +
@@ -9318,24 +9273,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 `${description}\n\n` +
                 `-----------------------------------------------------\n` +
                 `Hola ${driverName},\n` +
-                `Hemos recibido tu reclamo en la Central. Este correo es tu constancia oficial.\n` +
-                `Puedes consultar el seguimiento o continuar la conversación desde el Chat de Soporte dentro de la App Conductor.\n` +
-                `Guardia Central 24/7: 11 7373-8790 · soporte@rutaprivada.com`;
+                `Hemos recibido tu reclamo en la Central. Este correo es tu constancia y registro oficial.\n` +
+                `El equipo de soporte te responderá directamente a este correo electrónico.\n` +
+                `Casilla oficial de soporte: ${DRIVER_SUPPORT_EMAIL}`;
 
-            // Copia al Conductor (Registro personal)
+            // Copia al Conductor (Registro personal con reply-to hacia soporte)
             await sendSupportEmailDispatch(
                 driverEmail,
                 `[Comprobante #${ticketId}] Reclamo Registrado - RutaPrivada Soporte`,
                 emailBody,
-                { ticketId, category: categoryText, tripId }
+                { ticketId, category: categoryText, tripId, replyTo: DRIVER_SUPPORT_EMAIL, driverEmail }
             );
 
-            // Copia a Soporte Central
+            // Copia a Soporte Central (con reply-to hacia el conductor para respuesta directa)
             await sendSupportEmailDispatch(
-                'soporte@rutaprivada.com',
+                DRIVER_SUPPORT_EMAIL,
                 `[Reclamo #${ticketId}] ${categoryText} - ${driverName}`,
                 emailBody,
-                { ticketId, category: categoryText, tripId }
+                { ticketId, category: categoryText, tripId, replyTo: driverEmail, driverEmail }
             );
 
             // Restaurar estado del botón
@@ -9347,20 +9302,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 txtBtnSubmitTicket.textContent = 'Enviar Reclamo a Soporte';
             }
 
-            // Cerrar formulario y abrir directamente el Chat de Soporte con la consulta ya visible
+            // Cerrar formulario y limpiar completamente para nuevos reclamos
             closeDriverTicketModal();
             closeDriverHelpModal();
             formDriverReportTicket.reset();
+            const descField = document.getElementById('ticketDescription');
+            if (descField) descField.value = '';
 
-            // Notificación al chofer y transición sin salir de la app
+            // Notificación al chofer
             if (typeof showDriverToast === 'function') {
-                showDriverToast(`✅ Reclamo #${ticketId} registrado. Copia enviada a ${driverEmail}`, 'success');
+                showDriverToast(`✅ Reclamo #${ticketId} enviado. Copia despachada a tu correo (${driverEmail})`, 'success');
             }
-
-            // Abrir automáticamente el Chat de Soporte para continuar el hilo
-            setTimeout(() => {
-                openDriverSupportChatModal();
-            }, 300);
+            alert(`✅ RECLAMO REGISTRADO CON ÉXITO\n\nTicket #${ticketId}\nTema: ${categoryText}\n\nHemos enviado una copia de respaldo a tu correo (${driverEmail}) y al equipo de soporte (${DRIVER_SUPPORT_EMAIL}).\n\nEl equipo de soporte te responderá directamente por correo electrónico.`);
         });
     }
 
