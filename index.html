@@ -174,7 +174,7 @@
       <div class="passenger-header-actions">
         <!-- Botón Centro de Ayuda y Soporte Pasajero -->
         <button type="button" class="btn-header-reservations clickable-header-profile" id="btnOpenPassengerHelpHeader"
-          onclick="openPassengerHelpModal()" title="Centro de Ayuda y Soporte 24/7"
+          onclick="window.openPassengerHelpModal()" title="Centro de Ayuda y Soporte 24/7"
           style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8;">
           <i class="fa-solid fa-circle-question" style="font-size: 1.05rem; color: #38bdf8;"></i>
           <span class="header-reservas-label">Ayuda</span>
@@ -277,7 +277,7 @@
           onclick="openPassengerReservationsModal()" title="Mis Reservas">
           <i class="fa-solid fa-calendar-days" style="color: #fbbf24; font-size: 1.1rem;"></i>
         </button>
-        <button type="button" class="top-bar-pill-btn" id="btnUberHelp" onclick="openPassengerHelpModal()"
+        <button type="button" class="top-bar-pill-btn" id="btnUberHelp" onclick="window.openPassengerHelpModal()"
           title="Ayuda y Soporte">
           <i class="fa-solid fa-circle-question" style="color: #38bdf8; font-size: 1.15rem;"></i>
         </button>
@@ -2584,6 +2584,7 @@
         </div>
       </div>
     </div>
+  </div>
     <!-- =========================================================
        MODAL: CENTRO DE AYUDA Y SOPORTE PASAJERO (24/7)
        ========================================================= -->
@@ -3078,10 +3079,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- Sync & Realtime -->
-    <script src="sync.js?v=136"></script>
+    <script src="sync.js?v=137"></script>
 
     <!-- App JS -->
-    <script src="app.js?v=136"></script>
+    <script src="app.js?v=137"></script>
 
     <!-- Inicializador Directo de Autocompletado de Direcciones & Auto-Purga de Caché -->
     <script>
@@ -3090,7 +3091,7 @@
         if ('serviceWorker' in navigator && window.caches) {
           caches.keys().then(function (keys) {
             keys.forEach(function (k) {
-              if (k !== 'rutaprivada-pwa-v136') {
+              if (k !== 'rutaprivada-pwa-v137') {
                 caches.delete(k);
               }
             });
@@ -3138,7 +3139,7 @@
     <!-- PWA Service Worker Auto-Update -->
     <script>
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js?v=136').then(function (reg) {
+        navigator.serviceWorker.register('sw.js?v=137').then(function (reg) {
           reg.update();
         }).catch(function () { });
         navigator.serviceWorker.getRegistrations().then(function (registrations) {

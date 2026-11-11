@@ -9313,7 +9313,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeof showDriverToast === 'function') {
                 showDriverToast(`✅ Reclamo #${ticketId} enviado. Copia despachada a tu correo (${driverEmail})`, 'success');
             }
-            alert(`✅ RECLAMO REGISTRADO CON ÉXITO\n\nTicket #${ticketId}\nTema: ${categoryText}\n\nHemos enviado una copia de respaldo a tu correo (${driverEmail}) y al equipo de soporte (${DRIVER_SUPPORT_EMAIL}).\n\nEl equipo de soporte te responderá directamente por correo electrónico.`);
+            alert(`✅ RECLAMO REGISTRADO CON ÉXITO\n\nTicket #${ticketId}\nTema: ${categoryText}\n\nHemos enviado una copia de respaldo a tu correo (${driverEmail}) y a la Central de Choferes.\n\nEl equipo de soporte te responderá directamente por correo electrónico.`);
         });
     }
 

@@ -470,6 +470,13 @@ window.openPassengerHelpModal = function() {
 };
 window.openHelpModal = window.openPassengerHelpModal;
 
+function openPassengerHelpModal() {
+  if (typeof window.openPassengerHelpModal === 'function') {
+    window.openPassengerHelpModal();
+  }
+}
+window.openPassengerHelp = openPassengerHelpModal;
+
 window.closePassengerHelpModal = function() {
   const modal = document.getElementById('modalPassengerHelp');
   if (modal) {
@@ -4420,7 +4427,9 @@ function updateRouteBreadcrumb() {
     bOrig.textContent = state.origin ? (state.origin.address ? state.origin.address.split(',')[0].trim() : 'Partida') : 'Partida';
   }
   if (bDest) {
-    bDest.textContent = state.destination ? (state.destination.address ? state.destination.address.split(',')[0].trim() : 'Destino') : 'Destino';
+    const isRound = Boolean(state.extras && state.extras.roundtrip);
+    const destName = state.destination ? (state.destination.address ? state.destination.address.split(',')[0].trim() : 'Destino') : 'Destino';
+    bDest.textContent = isRound ? `${destName} ➔ Retorno a Origen (Ida y Vuelta)` : destName;
   }
   if (bStopSep && bStop) {
     if (state.hasIntermediateStop && state.intermediateStop && state.intermediateStop.address) {
@@ -4600,8 +4609,17 @@ async function checkAndRoute() {
     ((d.lat > -34.615 || d.lng < -58.43) && o.lat < -34.70)
   );
 
+  const isRoundtrip = Boolean(state.extras && state.extras.roundtrip);
+
   let waypoints = '';
-  if (isNorthOrWestToEzeiza) {
+  if (isRoundtrip) {
+    if (isNorthOrWestToEzeiza) {
+      const gralPazConnector = getGeneralPazConnector(o, d);
+      waypoints = `${o.lng},${o.lat};${gralPazConnector};${d.lng},${d.lat};${gralPazConnector};${o.lng},${o.lat}`;
+    } else {
+      waypoints = `${o.lng},${o.lat};${d.lng},${d.lat};${o.lng},${o.lat}`;
+    }
+  } else if (isNorthOrWestToEzeiza) {
     const gralPazConnector = getGeneralPazConnector(o, d);
     waypoints = `${o.lng},${o.lat};${gralPazConnector};${d.lng},${d.lat}`;
   } else {
@@ -4619,10 +4637,17 @@ async function checkAndRoute() {
   const googleKey = (state.config.googleMapsApiKey || '').trim();
   if (googleKey) {
     try {
-      const gWp = isNorthOrWestToEzeiza 
-        ? `&waypoints=${getGeneralPazConnector(o, d).split(',')[1]},${getGeneralPazConnector(o, d).split(',')[0]}`
-        : (s ? `&waypoints=${s.lat},${s.lng}` : '');
-      const googleUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${o.lat},${o.lng}&destination=${d.lat},${d.lng}${gWp}&alternatives=true&mode=driving&departure_time=now&key=${encodeURIComponent(googleKey)}`;
+      let gWp = '';
+      let gDest = `${d.lat},${d.lng}`;
+      if (isRoundtrip) {
+        gWp = `&waypoints=${d.lat},${d.lng}`;
+        gDest = `${o.lat},${o.lng}`;
+      } else if (isNorthOrWestToEzeiza) {
+        gWp = `&waypoints=${getGeneralPazConnector(o, d).split(',')[1]},${getGeneralPazConnector(o, d).split(',')[0]}`;
+      } else if (s) {
+        gWp = `&waypoints=${s.lat},${s.lng}`;
+      }
+      const googleUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${o.lat},${o.lng}&destination=${gDest}${gWp}&alternatives=true&mode=driving&departure_time=now&key=${encodeURIComponent(googleKey)}`;
       
       const gRes = await fetchWithTimeout(googleUrl, {}, 2500);
       if (gRes.ok) {
@@ -4748,7 +4773,9 @@ async function checkAndRoute() {
     // Si es trayecto entre Belgrano/Norte/LMC y Aeroparque, consultar también el corredor norte directo por Cantilo / Güiraldes
     if (isNorthToAep) {
       try {
-        const cantiloWp = `${o.lng},${o.lat};-58.4450,-34.5450;${d.lng},${d.lat}`;
+        const cantiloWp = isRoundtrip
+          ? `${o.lng},${o.lat};-58.4450,-34.5450;${d.lng},${d.lat};-58.4100,-34.5650;${o.lng},${o.lat}`
+          : `${o.lng},${o.lat};-58.4450,-34.5450;${d.lng},${d.lat}`;
         const cantiloUrl = `https://router.project-osrm.org/route/v1/driving/${cantiloWp}?overview=full&geometries=geojson&steps=true`;
         const cRes = await fetchWithTimeout(cantiloUrl, {}, 2000);
         const cData = await cRes.json();
@@ -4866,7 +4893,11 @@ async function checkAndRoute() {
     if (statusEl) {
       const tollText = state.routeHasTolls ? '(Con peaje oficial)' : '(Sin peaje)';
       const sourceText = state.trafficEngine === 'mapbox' ? 'Tráfico en vivo ✓' : 'Ruta rápida calculada ✓';
-      statusEl.textContent = `${sourceText} ${tollText}`;
+      if (isRoundtrip) {
+        statusEl.textContent = `🔄 Circuito Ida y Vuelta (-15% Vuelta) • ${sourceText} ${tollText}`;
+      } else {
+        statusEl.textContent = `${sourceText} ${tollText}`;
+      }
       statusEl.style.color = state.routeHasTolls ? '#fbbf24' : '#34d399';
     }
   } else {
@@ -4890,6 +4921,9 @@ async function checkAndRoute() {
         state.stopFee = state.config.stopFeeEnCamino || 500;
       }
     }
+    if (isRoundtrip) {
+      rawKm = rawKm * 2;
+    }
     const roadCurvature = 1.35;
     state.distanceKm = Math.round(rawKm * roadCurvature * 10) / 10;
     state.baseDurationMin = Math.max(8, Math.round((state.distanceKm / 32) * 60));
@@ -4898,7 +4932,9 @@ async function checkAndRoute() {
     state.tollDetails = state.routeHasTolls ? [{ name: 'Peaje Troncal Nacional', fee: 2200 }] : [];
     state.tollRoadNames = state.routeHasTolls ? ['Autopista / Vía rápida'] : [];
 
-    const linePoints = s ? [[o.lat, o.lng], [s.lat, s.lng], [d.lat, d.lng]] : [[o.lat, o.lng], [d.lat, d.lng]];
+    const linePoints = isRoundtrip
+      ? (s ? [[o.lat, o.lng], [s.lat, s.lng], [d.lat, d.lng], [o.lat, o.lng]] : [[o.lat, o.lng], [d.lat, d.lng], [o.lat, o.lng]])
+      : (s ? [[o.lat, o.lng], [s.lat, s.lng], [d.lat, d.lng]] : [[o.lat, o.lng], [d.lat, d.lng]]);
     state.currentRouteCoords = linePoints;
     if (map) {
       drawRouteOnMap();
@@ -6209,7 +6245,9 @@ function updateCalculation() {
     state.baseDurationMin = Math.max(5, Math.round((state.distanceKm / 28) * 60));
   }
 
+  const isRound = Boolean(state.extras && state.extras.roundtrip);
   const km = Math.max(0, state.distanceKm || 0);
+  const kmCalc = isRound ? Math.max(1, Math.round((km / 2) * 10) / 10) : km;
 
   // Duración según el tráfico predictivo y alertas de cortes viales
   const traffic = trafficFactorForTime(state.time, state.date);
@@ -6223,23 +6261,24 @@ function updateCalculation() {
     ? Math.max(1, Math.round(state.baseDurationMin * effectiveTrafficFactor))
     : (km > 0 ? Math.max(1, Math.round((km / 28) * 60 * effectiveTrafficFactor)) : 0);
   const min = Math.max(0, state.durationMin || 0);
+  const minCalc = isRound ? Math.max(1, Math.round(min / 2)) : min;
 
-  // Resolver matriz de tarifas exacta por día, franja, distancia y duración
-  const resolved = resolveTariffRates(state.date, state.time, km, min);
+  // Resolver matriz de tarifas exacta por día, franja, distancia y duración para el tramo base
+  const resolved = resolveTariffRates(state.date, state.time, kmCalc, minCalc);
   state.tariffResolved = resolved;
 
   // Factor de horario / clima
-  evaluateTimeRate(state.time, state.date, km, min);
+  evaluateTimeRate(state.time, state.date, kmCalc, minCalc);
 
   // 1. Tarifa Base
   const isEzeiza = isTripToEzeiza();
   let baseFare = resolved.baseFare;
   let baseFareLabel = `${resolved.slot.shortLabel} (${resolved.distBracketLabel})`;
 
-  if (isEzeiza && km > 30) {
+  if (isEzeiza && kmCalc > 30) {
     baseFare = 0;
     baseFareLabel = 'Bonificada $0 (Viaje a Ezeiza >30 km)';
-  } else if (state.hasIntermediateStop && km <= 15) {
+  } else if (state.hasIntermediateStop && kmCalc <= 15) {
     const stopBase = state.config.baseFareStopUnder15 !== undefined ? state.config.baseFareStopUnder15 : 2500;
     baseFare = stopBase;
     baseFareLabel = 'Tarifa base con parada intermedia (≤15 km)';
@@ -6247,11 +6286,11 @@ function updateCalculation() {
 
   // 2. Precio por Kilómetro
   const kmRate = resolved.kmRate;
-  const distanceCost = Math.round(km * kmRate);
+  const distanceCost = Math.round(kmCalc * kmRate);
 
   // 3. Precio por Minuto
   const minRate = resolved.minRate;
-  const durationCost = Math.round(min * minRate);
+  const durationCost = Math.round(minCalc * minRate);
 
   // 4. Peajes oficiales calculados
   let tollCost = 0;
@@ -6273,7 +6312,7 @@ function updateCalculation() {
   let oneWayFull = oneWaySubtotal + tollCost + extrasCost;
 
   // Descuento automático por Larga Distancia (>200 km: 40% de descuento)
-  const isLongDistance = km > 200;
+  const isLongDistance = kmCalc > 200;
   let longDistanceDiscount = 0;
   if (isLongDistance) {
     longDistanceDiscount = Math.round((baseFare + distanceCost + durationCost) * 0.40);
@@ -6330,6 +6369,10 @@ function updateCalculation() {
     tollDescription,
     extrasCost,
     oneWayFull,
+    oneWayKm: kmCalc,
+    oneWayMin: minCalc,
+    totalKm: km,
+    totalMin: min,
     isLongDistance,
     longDistanceDiscount,
     isRoundtrip: state.extras.roundtrip,
@@ -6519,7 +6562,10 @@ function renderQuote() {
 
   // Desglose: Distancia
   const distRateLabel = formatMoney(b.kmRate || 0);
-  const distLabelText = `Distancia (${(state.distanceKm || 0).toFixed(1)} km x ${distRateLabel}/km • ${b.distBracketLabel || '0-5 km'}):`;
+  const displayKm = b.isRoundtrip ? (b.oneWayKm || (Math.round((state.distanceKm / 2) * 10) / 10)) : (state.distanceKm || 0);
+  const distLabelText = b.isRoundtrip
+    ? `Distancia Ida (${displayKm.toFixed(1)} km x ${distRateLabel}/km • ${b.distBracketLabel || '0-5 km'}):`
+    : `Distancia (${(state.distanceKm || 0).toFixed(1)} km x ${distRateLabel}/km • ${b.distBracketLabel || '0-5 km'}):`;
   const rowDistLabel = document.getElementById('row-distance-label');
   const rowDistFare = document.getElementById('row-distance-fare');
   if (rowDistLabel) rowDistLabel.textContent = distLabelText;
@@ -6527,7 +6573,10 @@ function renderQuote() {
 
   // Desglose: Tiempo
   const durationRateLabel = formatMoney(b.minRate || 0);
-  const durLabelText = `Tiempo de viaje (${state.durationMin || 0} min x ${durationRateLabel}/min • ${b.durBracketLabel || '0-15 min'}):`;
+  const displayMin = b.isRoundtrip ? (b.oneWayMin || Math.round((state.durationMin || 0) / 2)) : (state.durationMin || 0);
+  const durLabelText = b.isRoundtrip
+    ? `Tiempo Ida (${displayMin} min x ${durationRateLabel}/min • ${b.durBracketLabel || '0-15 min'}):`
+    : `Tiempo de viaje (${state.durationMin || 0} min x ${durationRateLabel}/min • ${b.durBracketLabel || '0-15 min'}):`;
   const rowDurLabel = document.getElementById('row-duration-label');
   const rowDurFare = document.getElementById('row-duration-fare');
   if (rowDurLabel) rowDurLabel.textContent = durLabelText;
@@ -8541,6 +8590,9 @@ function initEventListeners() {
       state.extras.roundtrip = e.target.checked;
       if (typeof window.syncRouteOptionsUI === 'function') {
         window.syncRouteOptionsUI();
+      }
+      if (typeof checkAndRoute === 'function') {
+        checkAndRoute();
       }
       updateCalculation();
     });
@@ -13500,6 +13552,22 @@ if (btnRecenterPassengerMap) {
     if (modalHelp) {
       modalHelp.addEventListener('click', (e) => {
         if (e.target === modalHelp) window.closePassengerHelpModal();
+      });
+    }
+
+    const btnHeaderHelp = document.getElementById('btnOpenPassengerHelpHeader');
+    if (btnHeaderHelp) {
+      btnHeaderHelp.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.openPassengerHelpModal();
+      });
+    }
+
+    const btnUberHelp = document.getElementById('btnUberHelp');
+    if (btnUberHelp) {
+      btnUberHelp.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.openPassengerHelpModal();
       });
     }
 
