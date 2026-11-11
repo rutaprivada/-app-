@@ -3453,32 +3453,36 @@ document.addEventListener('DOMContentLoaded', () => {
         closeIncomingModal();
         playAlertSound('success');
 
+        const myDrvId = (typeof getActiveDriverId === 'function') ? getActiveDriverId() : 'driver_local';
+        const mySession = (typeof getDriverSession === 'function') ? getDriverSession() : null;
+        const myEmail = (mySession && mySession.email) || '';
+
+        const conductorInfo = {
+            id: myDrvId,
+            email: myEmail,
+            nombre: driverState.info.nombre,
+            auto: driverState.info.auto,
+            patente: driverState.info.patente,
+            calificacion: driverState.info.calificacion,
+            telefono: driverState.info.telefono,
+            banco: driverState.info.banco || '',
+            alias: driverState.info.alias || '',
+            cbu: driverState.info.cbu || '',
+            titularCuenta: driverState.info.titularCuenta || driverState.info.nombre || '',
+            fotoPerfil: driverState.info.fotoPerfil || ''
+        };
+
         if (window.RutaSync) {
-            window.RutaSync.aceptarViaje(trip.id, {
-                nombre: driverState.info.nombre,
-                auto: driverState.info.auto,
-                patente: driverState.info.patente,
-                calificacion: driverState.info.calificacion,
-                telefono: driverState.info.telefono
-            });
+            window.RutaSync.aceptarViaje(trip.id, conductorInfo);
         }
 
         const tripRecord = {
             ...trip,
+            conductorId: myDrvId,
             etapa: 'en_camino',
             estado: 'en_camino',
             horaAceptado: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            conductor: {
-                nombre: driverState.info.nombre,
-                auto: driverState.info.auto,
-                patente: driverState.info.patente,
-                calificacion: driverState.info.calificacion,
-                telefono: driverState.info.telefono,
-                banco: driverState.info.banco || '',
-                alias: driverState.info.alias || '',
-                cbu: driverState.info.cbu || '',
-                titularCuenta: driverState.info.titularCuenta || driverState.info.nombre || ''
-            }
+            conductor: conductorInfo
         };
 
         driverState.activeTrip = tripRecord;
@@ -3804,7 +3808,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Sincronizar con la app de Pasajero (Uber / Cabify style)
+        const myActiveDrvId = (typeof getActiveDriverId === 'function') ? getActiveDriverId() : 'driver_local';
+        const myActiveSession = (typeof getDriverSession === 'function') ? getDriverSession() : null;
+        const myActiveEmail = (myActiveSession && myActiveSession.email) || '';
+
         const conductorProfile = {
+            id: myActiveDrvId,
+            email: myActiveEmail,
             nombre: driverState.info.nombre || 'Daniel Pabon',
             auto: driverState.info.auto || 'Fiat Cronos Negro',
             patente: driverState.info.patente || 'AE927CN',
@@ -3812,6 +3822,9 @@ document.addEventListener('DOMContentLoaded', () => {
             telefono: driverState.info.telefono || '+5491122558226',
             fotoPerfil: driverState.info.fotoPerfil || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
         };
+
+        driverState.activeTrip.conductorId = myActiveDrvId;
+        driverState.activeTrip.conductor = conductorProfile;
 
         if (window.RutaSync) {
             window.RutaSync.aceptarViaje(driverState.activeTrip, conductorProfile);
@@ -3825,6 +3838,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const patchPayload = {
                 ...driverState.activeTrip,
+                conductorId: myActiveDrvId,
                 estado: 'aceptado',
                 etapa: driverState.activeTrip.etapa || 'en_camino',
                 conductor: conductorProfile,
@@ -3832,10 +3846,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 ultimoEstadoEn: Date.now()
             };
             if (typeof window.objectToFirestoreFields === 'function') {
+                const patchFields = window.objectToFirestoreFields(patchPayload);
+                const targetTripId = driverState.activeTrip.id || 'current_active_trip';
+                
+                // Actualizar documento de viaje individual
+                if (targetTripId && targetTripId !== 'current_active_trip') {
+                    fetch(`https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/${targetTripId}?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fields: patchFields })
+                    }).catch(() => {});
+                }
+
+                // Compatibilidad con documento singular
                 fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/live_trips/current_active_trip?key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fields: window.objectToFirestoreFields(patchPayload) })
+                    body: JSON.stringify({ fields: patchFields })
                 }).catch(() => {});
             }
         } catch(e) {}
@@ -5066,10 +5093,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     if (window.RutaSync) {
         window.RutaSync.on('NUEVO_VIAJE_SOLICITADO', (viaje) => {
+            // Solo los conductores conectados en línea y sin viaje activo reciben alertas de viaje
+            if (!driverState.isOnline) return;
             if (!driverState.activeTrip && viaje && viaje.id) {
-                if (!driverState.isOnline) {
-                    setOnlineStatus(true);
-                }
                 switchTab('viewLive');
                 enqueueIncomingTrip(viaje);
                 showIncomingTrip(viaje);
@@ -5186,9 +5212,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         // Si el viaje fue tomado por otro chofer
                         else if (['aceptado', 'en_camino', 'en_origen', 'hacia_parada', 'en_parada', 'en_viaje'].includes(cloudStatus)) {
-                            const myDriverName = (driverState.info && driverState.info.nombre) || 'Daniel Pabon';
+                            const myDrvId = (typeof getActiveDriverId === 'function') ? getActiveDriverId() : '';
+                            const myDriverName = (driverState.info && driverState.info.nombre) || '';
+                            const assignedDriverId = tripObj.conductorId || (tripObj.conductor ? (tripObj.conductor.id || tripObj.conductor.email) : '');
                             const assignedDriverName = tripObj.conductor ? tripObj.conductor.nombre : '';
-                            if (assignedDriverName && assignedDriverName !== myDriverName) {
+
+                            const isTakenByOther = (assignedDriverId && myDrvId && assignedDriverId !== myDrvId) ||
+                                                   (!assignedDriverId && assignedDriverName && myDriverName && assignedDriverName !== myDriverName);
+
+                            if (isTakenByOther) {
                                 if (driverState.incomingTrip && driverState.incomingTrip.id === tripObj.id) {
                                     closeIncomingModal();
                                     showDriverToast('ℹ️ El viaje fue tomado por otro chofer.');
@@ -7045,21 +7077,90 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const cleanPhone = phone.replace(/\D/g, '');
+            if (cleanPhone.length < 8) {
+                showDriverToast('⚠️ Por favor ingresa un número de teléfono válido (mínimo 8 dígitos).');
+                const phoneInput = document.getElementById('regDriverPhone');
+                if (phoneInput) phoneInput.focus();
+                return;
+            }
+
+            const isSamePhone = (p1, p2) => {
+                if (!p1 || !p2) return false;
+                const c1 = String(p1).replace(/\D/g, '');
+                const c2 = String(p2).replace(/\D/g, '');
+                if (!c1 || !c2) return false;
+                if (c1 === c2) return true;
+                if (c1.length >= 8 && c2.length >= 8) {
+                    return c1.slice(-8) === c2.slice(-8);
+                }
+                return false;
+            };
+
+            // Recopilar conductores locales y remotos para validación entre dispositivos
+            const localRegistered = getRegisteredDriversList();
+            let adminList = [];
+            try {
+                adminList = JSON.parse(localStorage.getItem('rutaprivada_drivers_v1') || '[]');
+            } catch(e) {}
+
+            let cloudDrivers = [];
+            if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+                try {
+                    const snap = await firebase.firestore().collection('drivers').get();
+                    snap.forEach(docSnap => {
+                        const dData = docSnap.data();
+                        if (dData) cloudDrivers.push(dData);
+                    });
+                } catch(e) {}
+            }
+            if (cloudDrivers.length === 0) {
+                try {
+                    const resp = await fetch('https://firestore.googleapis.com/v1/projects/rutaprivada-app/databases/(default)/documents/drivers?pageSize=100&key=AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4', { cache: 'no-store' });
+                    if (resp.ok) {
+                        const jData = await resp.json();
+                        if (jData && jData.documents) {
+                            jData.documents.forEach(d => {
+                                const f = d.fields || {};
+                                cloudDrivers.push({
+                                    email: (f.email && f.email.stringValue) || '',
+                                    telefono: (f.telefono && f.telefono.stringValue) || (f.phone && f.phone.stringValue) || ''
+                                });
+                            });
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            const allKnownDrivers = [...localRegistered, ...adminList, ...cloudDrivers];
+
             // 1. Validar que no exista otra cuenta con el mismo correo electrónico
-            const list = getRegisteredDriversList();
-            const alreadyExists = list.some(d => (d.email && d.email.toLowerCase() === email));
-            if (alreadyExists) {
-                showDriverToast(`⚠️ Ya existe una cuenta de chofer registrada con este correo (${email}). Por favor inicia sesión.`);
+            const emailInUse = allKnownDrivers.some(d => d.email && d.email.toLowerCase().trim() === email);
+            if (emailInUse) {
+                showDriverToast(`⚠️ El correo (${email}) ya está en uso por otro conductor. Por favor inicia sesión o intenta con otro correo.`);
                 switchDriverAuthTab('login');
                 const loginEmail = document.getElementById('loginDriverEmail');
                 if (loginEmail) loginEmail.value = email;
                 return;
             }
 
+            // 2. Validar que no exista otra cuenta con el mismo número de teléfono
+            const phoneInUse = allKnownDrivers.some(d => isSamePhone(d.telefono || d.phone, phone));
+            if (phoneInUse) {
+                showDriverToast(`⚠️ El número de teléfono (${phone}) ya está en uso por otro conductor. Por favor intenta con otro número.`);
+                const phoneInput = document.getElementById('regDriverPhone');
+                if (phoneInput) {
+                    phoneInput.focus();
+                    phoneInput.style.borderColor = '#ef4444';
+                    setTimeout(() => { if (phoneInput) phoneInput.style.borderColor = ''; }, 3500);
+                }
+                return;
+            }
+
             // Generar código de verificación de 6 dígitos
             const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
             const passwordHash = await hashDriverPassword(password);
-            const uniqueDriverId = 'drv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+            const uniqueDriverId = 'drv_' + email.replace(/[^a-z0-9]/gi, '_');
 
             // Inicia estrictamente en estado PENDIENTE de aprobación y con ID único de cuenta
             pendingDriverRegistration = {
