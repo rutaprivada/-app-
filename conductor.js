@@ -5309,6 +5309,50 @@ document.addEventListener('DOMContentLoaded', () => {
             playAlertSound('incoming');
         });
 
+        window.RutaSync.on('MENSAJE_TICKET_SOPORTE', (data) => {
+            if (!data || !data.ticketId) return;
+            let tickets = getDriverTicketsList();
+            const idx = tickets.findIndex(t => t.ticketId === data.ticketId);
+            if (idx >= 0) {
+                if (Array.isArray(data.mensajes)) {
+                    tickets[idx].mensajes = data.mensajes;
+                } else if (data.mensaje) {
+                    if (!Array.isArray(tickets[idx].mensajes)) tickets[idx].mensajes = [];
+                    tickets[idx].mensajes.push({
+                        id: 'msg_' + Date.now(),
+                        sender: data.role || 'admin',
+                        senderName: data.remitente || 'Soporte RutaPrivada',
+                        text: data.mensaje,
+                        timeStr: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs',
+                        timestamp: Date.now()
+                    });
+                }
+                if (data.status) tickets[idx].status = data.status;
+                tickets[idx].updatedAt = Date.now();
+                localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(tickets));
+                renderDriverTicketsList();
+
+                if (data.role === 'admin' || data.role === 'soporte') {
+                    showDriverToast('🔔 Nueva respuesta de la Central en tu reclamo #' + data.ticketId);
+                    try { playAlertSound('incoming'); } catch(e){}
+                }
+            }
+        });
+
+        window.RutaSync.on('ESTADO_TICKET_ACTUALIZADO', (data) => {
+            if (!data || !data.ticketId) return;
+            let tickets = getDriverTicketsList();
+            const idx = tickets.findIndex(t => t.ticketId === data.ticketId);
+            if (idx >= 0) {
+                tickets[idx].status = data.status || tickets[idx].status;
+                if (data.respuestaAdmin) tickets[idx].respuestaAdmin = data.respuestaAdmin;
+                tickets[idx].updatedAt = Date.now();
+                localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(tickets));
+                renderDriverTicketsList();
+                showDriverToast('ℹ️ Reclamo #' + data.ticketId + ' actualizado a ' + (data.status || ''));
+            }
+        });
+
         window.RutaSync.on('RESERVA_ACTUALIZADA', (reserva) => {
             if (!reserva || !reserva.id) return;
             let bookings = getStoredBookings();
@@ -9449,9 +9493,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const badgeCount = document.getElementById('badgeDriverTicketsCount');
         const tickets = getDriverTicketsList();
 
+        const activeCount = tickets.filter(t => !['finalizado', 'resuelto'].includes((t.status || 'pendiente').toLowerCase())).length;
+
         if (badgeCount) {
-            if (tickets.length > 0) {
-                badgeCount.textContent = tickets.length;
+            if (activeCount > 0) {
+                badgeCount.textContent = activeCount;
                 badgeCount.style.display = 'inline-block';
             } else {
                 badgeCount.style.display = 'none';
@@ -9475,7 +9521,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const status = (t.status || 'pendiente').toLowerCase();
             let statusBadge = '';
             if (status === 'finalizado' || status === 'resuelto') {
-                statusBadge = '<span style="background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> Finalizado / Resuelto</span>';
+                statusBadge = '<span style="background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> Finalizado</span>';
             } else if (status === 'en_proceso') {
                 statusBadge = '<span style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;"><i class="fa-solid fa-gears"></i> En Proceso</span>';
             } else if (status === 'en_revision') {
@@ -9484,17 +9530,60 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusBadge = '<span style="background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700;"><i class="fa-regular fa-clock"></i> Pendiente</span>';
             }
 
-            const adminResponseHtml = t.respuestaAdmin ? `
-                <div style="margin-top: 8px; padding: 8px 10px; background: rgba(30, 41, 59, 0.8); border-left: 3px solid #38bdf8; border-radius: 6px; font-size: 0.76rem; color: #e2e8f0;">
-                    <div style="font-weight: 700; color: #38bdf8; margin-bottom: 2px;"><i class="fa-solid fa-reply"></i> Respuesta de Soporte:</div>
-                    ${escapeHtml(t.respuestaAdmin)}
-                </div>
-            ` : '';
+            // Normalizar mensajes del chat
+            let msgs = Array.isArray(t.mensajes) ? [...t.mensajes] : [];
+            if (msgs.length === 0) {
+                if (t.description) {
+                    msgs.push({
+                        id: 'msg_0',
+                        sender: 'conductor',
+                        senderName: t.driverName || 'Tú (Chofer)',
+                        text: t.description,
+                        timeStr: t.timeStr || 'Inicio'
+                    });
+                }
+                if (t.respuestaAdmin) {
+                    msgs.push({
+                        id: 'msg_admin_0',
+                        sender: 'admin',
+                        senderName: 'Central de Soporte Choferes',
+                        text: t.respuestaAdmin,
+                        timeStr: 'Respuesta'
+                    });
+                }
+            }
+
+            const messagesListHtml = msgs.map(m => {
+                const isAdmin = (m.sender === 'admin' || m.sender === 'soporte');
+                if (isAdmin) {
+                    return `
+                        <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 8px;">
+                            <div style="font-size: 0.7rem; color: #fbbf24; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; gap: 4px;">
+                                <i class="fa-solid fa-shield-halved"></i> ${escapeHtml(m.senderName || 'Soporte RutaPrivada')} ${m.timeStr ? `<span style="color:#64748b; font-weight:normal;">• ${escapeHtml(m.timeStr)}</span>` : ''}
+                            </div>
+                            <div style="background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.35); color: #fef3c7; border-radius: 10px 10px 10px 2px; padding: 8px 12px; font-size: 0.8rem; line-height: 1.45; max-width: 90%; word-break: break-word; white-space: pre-wrap;">
+                                ${escapeHtml(m.text || m.mensaje || '')}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; margin-bottom: 8px;">
+                            <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">
+                                ${escapeHtml(m.senderName || 'Tú')} ${m.timeStr ? `• ${escapeHtml(m.timeStr)}` : ''}
+                            </div>
+                            <div style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(255, 255, 255, 0.12); color: #e2e8f0; border-radius: 10px 10px 2px 10px; padding: 8px 12px; font-size: 0.8rem; line-height: 1.45; max-width: 90%; word-break: break-word; white-space: pre-wrap;">
+                                ${escapeHtml(m.text || m.mensaje || '')}
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
 
             return `
-                <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
-                        <span style="font-size: 0.78rem; font-weight: 800; color: #fbbf24; letter-spacing: 0.5px;">#${escapeHtml(t.ticketId || '')}</span>
+                <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px;">
+                        <span style="font-size: 0.82rem; font-weight: 800; color: #fbbf24; letter-spacing: 0.5px;">#${escapeHtml(t.ticketId || '')}</span>
                         ${statusBadge}
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: baseline;">
@@ -9502,12 +9591,107 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span style="color: #64748b; font-size: 0.7rem;">${escapeHtml(t.timeStr || '')}</span>
                     </div>
                     ${t.tripId && t.tripId !== 'N/A' ? `<div style="font-size: 0.72rem; color: #94a3b8;"><i class="fa-solid fa-car-side"></i> Viaje: ${escapeHtml(t.tripId)}</div>` : ''}
-                    <div style="font-size: 0.8rem; color: #cbd5e1; background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 8px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;">${escapeHtml(t.description || '')}</div>
-                    ${adminResponseHtml}
+                    
+                    <!-- HILO DE CONVERSACIÓN / CHAT -->
+                    <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 12px 10px; max-height: 250px; overflow-y: auto;">
+                        <div style="font-size: 0.72rem; color: #fbbf24; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">
+                            <i class="fa-solid fa-comments"></i> Conversación y Respuestas de la Central
+                        </div>
+                        ${messagesListHtml}
+                    </div>
+
+                    <!-- INPUT PARA RESPONDER / AÑADIR INFORMACIÓN -->
+                    ${status !== 'finalizado' && status !== 'resuelto' ? `
+                    <div style="display: flex; gap: 8px; margin-top: 4px;">
+                        <input type="text" id="inputChatDriverTicket_${t.ticketId}" placeholder="Escribe un mensaje o añade más datos..." style="flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(251, 191, 36, 0.3); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 0.8rem; outline: none;" onkeydown="if(event.key === 'Enter') window.sendDriverTicketChatMessage('${t.ticketId}')">
+                        <button type="button" onclick="window.sendDriverTicketChatMessage('${t.ticketId}')" style="background: #eab308; border: none; color: #000; font-weight: 800; padding: 8px 14px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+                            <i class="fa-solid fa-paper-plane"></i> Enviar
+                        </button>
+                    </div>` : `
+                    <div style="font-size: 0.74rem; color: #94a3b8; text-align: center; padding: 6px; background: rgba(255,255,255,0.03); border-radius: 6px;">
+                        <i class="fa-solid fa-lock"></i> Reclamo finalizado. Si requieres nueva asistencia, abre un nuevo reclamo en el Centro de Ayuda.
+                    </div>`}
                 </div>
             `;
         }).join('');
     }
+
+    window.sendDriverTicketChatMessage = async function(ticketId) {
+        const inputEl = document.getElementById('inputChatDriverTicket_' + ticketId);
+        if (!inputEl) return;
+        const text = (inputEl.value || '').trim();
+        if (!text) return;
+
+        let tickets = getDriverTicketsList();
+        const ticket = tickets.find(t => t.ticketId === ticketId);
+        if (!ticket) return;
+
+        const now = new Date();
+        const timeStr = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) + ' ' + 
+                        now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+
+        if (!Array.isArray(ticket.mensajes)) {
+            ticket.mensajes = [];
+            if (ticket.description) {
+                ticket.mensajes.push({
+                    id: 'msg_0',
+                    sender: 'conductor',
+                    senderName: ticket.driverName || 'Tú (Chofer)',
+                    text: ticket.description,
+                    timeStr: ticket.timeStr || 'Inicio'
+                });
+            }
+        }
+
+        const newMsg = {
+            id: 'msg_' + Date.now(),
+            sender: 'conductor',
+            senderName: ticket.driverName || 'Conductor',
+            text: text,
+            timeStr: timeStr,
+            timestamp: Date.now()
+        };
+
+        ticket.mensajes.push(newMsg);
+        ticket.updatedAt = Date.now();
+        ticket.status = (ticket.status === 'finalizado' || ticket.status === 'resuelto') ? 'en_revision' : (ticket.status || 'pendiente');
+
+        // Guardar local
+        try {
+            localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(tickets));
+        } catch(e) {}
+
+        inputEl.value = '';
+        renderDriverTicketsList();
+        showDriverToast('✉️ Mensaje enviado a soporte de choferes.');
+
+        // Sincronizar Firestore
+        try {
+            if (typeof firebase !== 'undefined' && firebase.firestore) {
+                const db = firebase.firestore();
+                await db.collection('tickets_soporte').doc(ticketId).set({
+                    mensajes: ticket.mensajes,
+                    ultimoMensaje: text,
+                    ultimoMensajePor: 'conductor',
+                    status: ticket.status,
+                    updatedAt: Date.now()
+                }, { merge: true });
+            }
+        } catch(e) {}
+
+        // Emitir vía RutaSync
+        try {
+            if (window.RutaSync && typeof window.RutaSync.emit === 'function') {
+                window.RutaSync.emit('MENSAJE_TICKET_SOPORTE', {
+                    ticketId: ticketId,
+                    mensaje: text,
+                    remitente: ticket.driverName || 'Conductor',
+                    role: 'conductor',
+                    mensajes: ticket.mensajes
+                });
+            }
+        } catch(e) {}
+    };
 
     function openDriverTicketsListModal() {
         renderDriverTicketsList();

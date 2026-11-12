@@ -695,9 +695,11 @@ window.renderPassengerTicketsList = function() {
     list = JSON.parse(localStorage.getItem('rutaprivada_passenger_tickets_v1') || '[]');
   } catch(e) { list = []; }
 
+  // Calcular reclamos con respuestas o activos
+  const activeCount = list.filter(t => (t.status || 'pendiente').toLowerCase() !== 'finalizado').length;
   if (badge) {
-    badge.textContent = list.length;
-    badge.style.display = list.length > 0 ? 'inline-block' : 'none';
+    badge.textContent = activeCount;
+    badge.style.display = activeCount > 0 ? 'inline-block' : 'none';
   }
 
   if (!container) return;
@@ -731,31 +733,65 @@ window.renderPassengerTicketsList = function() {
       statusBadge = '<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:700; background:rgba(245,158,11,0.2); color:#fbbf24; border:1px solid rgba(245,158,11,0.4);"><i class="fa-regular fa-clock"></i> Pendiente</span>';
     }
 
-    const adminResponseHtml = t.respuestaAdmin ? `
-      <div style="margin-top: 10px; padding: 10px 12px; background: rgba(2, 132, 199, 0.15); border-left: 3px solid #38bdf8; border-radius: 8px;">
-        <div style="font-size: 0.78rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-          <i class="fa-solid fa-shield-halved"></i> Respuesta Oficial de Administración:
-        </div>
-        <p style="margin: 0; font-size: 0.82rem; color: #f1f5f9; line-height: 1.45; white-space: pre-wrap;">${t.respuestaAdmin}</p>
-        <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">
-          <i class="fa-solid fa-envelope"></i> Copia enviada a tu correo registrado (${t.passengerEmail || 'registrado'}).
-        </div>
-      </div>
-    ` : `
-      <div style="margin-top: 8px; font-size: 0.73rem; color: #94a3b8; display: flex; align-items: center; gap: 5px;">
-        <i class="fa-solid fa-hourglass-half" style="color: #fbbf24;"></i> Un asesor de soporte responderá este reclamo a tu correo <strong>${t.passengerEmail || 'registrado'}</strong>.
-      </div>
-    `;
+    // Normalizar mensajes del chat
+    let msgs = Array.isArray(t.mensajes) ? [...t.mensajes] : [];
+    if (msgs.length === 0) {
+      if (t.description) {
+        msgs.push({
+          id: 'msg_0',
+          sender: 'pasajero',
+          senderName: t.passengerName || 'Tú (Pasajero)',
+          text: t.description,
+          timeStr: t.timeStr || t.createdAt || 'Inicio'
+        });
+      }
+      if (t.respuestaAdmin) {
+        msgs.push({
+          id: 'msg_admin_0',
+          sender: 'admin',
+          senderName: 'Central de Soporte RutaPrivada',
+          text: t.respuestaAdmin,
+          timeStr: 'Respuesta'
+        });
+      }
+    }
+
+    const messagesListHtml = msgs.map(m => {
+      const isAdmin = (m.sender === 'admin' || m.sender === 'soporte');
+      if (isAdmin) {
+        return `
+          <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 8px;">
+            <div style="font-size: 0.7rem; color: #38bdf8; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; gap: 4px;">
+              <i class="fa-solid fa-shield-halved"></i> ${m.senderName || 'Soporte RutaPrivada'} ${m.timeStr ? `<span style="color:#64748b; font-weight:normal;">• ${m.timeStr}</span>` : ''}
+            </div>
+            <div style="background: rgba(2, 132, 199, 0.2); border: 1px solid rgba(56, 189, 248, 0.35); color: #f8fafc; border-radius: 10px 10px 10px 2px; padding: 8px 12px; font-size: 0.8rem; line-height: 1.45; max-width: 90%; word-break: break-word; white-space: pre-wrap;">
+              ${m.text || m.mensaje || ''}
+            </div>
+          </div>
+        `;
+      } else {
+        return `
+          <div style="display: flex; flex-direction: column; align-items: flex-end; margin-bottom: 8px;">
+            <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">
+              ${m.senderName || 'Tú'} ${m.timeStr ? `• ${m.timeStr}` : ''}
+            </div>
+            <div style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(255, 255, 255, 0.12); color: #e2e8f0; border-radius: 10px 10px 2px 10px; padding: 8px 12px; font-size: 0.8rem; line-height: 1.45; max-width: 90%; word-break: break-word; white-space: pre-wrap;">
+              ${m.text || m.mensaje || ''}
+            </div>
+          </div>
+        `;
+      }
+    }).join('');
 
     return `
-      <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+      <div class="passenger-ticket-card" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px;">
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-weight: 800; color: #38bdf8; font-size: 0.95rem;">#${t.ticketId || ''}</span>
-              <span style="background: rgba(255,255,255,0.08); color: #cbd5e1; font-size: 0.75rem; padding: 2px 7px; border-radius: 6px;">${t.category || 'General'}</span>
+              <span style="background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 0.74rem; font-weight:700; padding: 2px 8px; border-radius: 6px;">${t.category || 'Consulta General'}</span>
             </div>
-            <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">
+            <div style="font-size: 0.72rem; color: #64748b; margin-top: 3px;">
               <i class="fa-regular fa-calendar"></i> ${t.timeStr || t.createdAt || ''}
               ${t.tripId && t.tripId !== 'N/A' ? ` · <i class="fa-solid fa-car"></i> ${t.tripId}` : ''}
             </div>
@@ -763,14 +799,114 @@ window.renderPassengerTicketsList = function() {
           <div>${statusBadge}</div>
         </div>
 
-        <div style="background: rgba(0, 0, 0, 0.25); border-radius: 8px; padding: 10px; font-size: 0.82rem; color: #e2e8f0; line-height: 1.45; white-space: pre-wrap;">
-          ${t.description || ''}
+        <!-- HILO DE CHAT / MENSAJES -->
+        <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 12px 10px; max-height: 260px; overflow-y: auto;">
+          <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">
+            <i class="fa-solid fa-comments" style="color: #38bdf8;"></i> Chat e Historial con Soporte
+          </div>
+          ${messagesListHtml}
         </div>
 
-        ${adminResponseHtml}
+        <!-- FORMULARIO DE RESPUESTA / AÑADIR INFORMACIÓN AL RECLAMO -->
+        ${status !== 'finalizado' ? `
+        <div style="display: flex; gap: 8px; margin-top: 2px;">
+          <input type="text" id="inputChatPassengerTicket_${t.ticketId}" placeholder="Escribe más información o responde al soporte..." style="flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(56, 189, 248, 0.3); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 0.8rem; outline: none;" onkeydown="if(event.key === 'Enter') window.sendPassengerTicketChatMessage('${t.ticketId}')">
+          <button type="button" onclick="window.sendPassengerTicketChatMessage('${t.ticketId}')" style="background: #0284c7; border: none; color: #fff; font-weight: 700; padding: 8px 14px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+            <i class="fa-solid fa-paper-plane"></i> Enviar
+          </button>
+        </div>` : `
+        <div style="font-size: 0.75rem; color: #94a3b8; text-align: center; padding: 6px; background: rgba(255,255,255,0.03); border-radius: 6px;">
+          <i class="fa-solid fa-lock"></i> Reclamo finalizado. Si requieres nueva asistencia, abre un nuevo reclamo en el Centro de Ayuda.
+        </div>`}
+
+        <div style="font-size: 0.69rem; color: #64748b; display: flex; align-items: center; gap: 5px;">
+          <i class="fa-solid fa-shield-halved" style="color: #38bdf8;"></i> Las respuestas de administración se sincronizan en vivo y se respaldan en tu correo registrado.
+        </div>
       </div>
     `;
   }).join('');
+};
+
+window.sendPassengerTicketChatMessage = async function(ticketId) {
+  const inputEl = document.getElementById('inputChatPassengerTicket_' + ticketId);
+  if (!inputEl) return;
+  const text = (inputEl.value || '').trim();
+  if (!text) return;
+
+  let list = [];
+  try {
+    list = JSON.parse(localStorage.getItem('rutaprivada_passenger_tickets_v1') || '[]');
+  } catch(e) { list = []; }
+
+  const ticket = list.find(t => t.ticketId === ticketId);
+  if (!ticket) return;
+
+  const now = new Date();
+  const timeStr = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) + ' ' + 
+                  now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+
+  if (!Array.isArray(ticket.mensajes)) {
+    ticket.mensajes = [];
+    if (ticket.description) {
+      ticket.mensajes.push({
+        id: 'msg_0',
+        sender: 'pasajero',
+        senderName: ticket.passengerName || 'Tú (Pasajero)',
+        text: ticket.description,
+        timeStr: ticket.timeStr || ticket.createdAt || 'Inicio'
+      });
+    }
+  }
+
+  const newMsg = {
+    id: 'msg_' + Date.now(),
+    sender: 'pasajero',
+    senderName: ticket.passengerName || 'Pasajero',
+    text: text,
+    timeStr: timeStr,
+    timestamp: Date.now()
+  };
+
+  ticket.mensajes.push(newMsg);
+  ticket.updatedAt = Date.now();
+  ticket.status = (ticket.status === 'finalizado') ? 'en_revision' : (ticket.status || 'pendiente');
+
+  // Guardar local
+  try {
+    localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(list));
+  } catch(e) {}
+
+  // Limpiar input y renderizar inmediatamente
+  inputEl.value = '';
+  window.renderPassengerTicketsList();
+  if (typeof showToast === 'function') showToast('✉️ Mensaje enviado a soporte.');
+
+  // Sincronizar Firestore
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const db = firebase.firestore();
+      await db.collection('tickets_soporte').doc(ticketId).set({
+        mensajes: ticket.mensajes,
+        ultimoMensaje: text,
+        ultimoMensajePor: 'pasajero',
+        status: ticket.status,
+        updatedAt: Date.now()
+      }, { merge: true });
+    }
+  } catch(e) {}
+
+  // Emitir por RutaSync
+  try {
+    if (window.RutaSync && typeof window.RutaSync.emit === 'function') {
+      window.RutaSync.emit('MENSAJE_TICKET_SOPORTE', {
+        ticketId: ticketId,
+        mensaje: text,
+        remitente: ticket.passengerName || 'Pasajero',
+        role: 'pasajero',
+        mensajes: ticket.mensajes
+      });
+    }
+  } catch(e) {}
 };
 
 window.openPassengerHelpModal = function() {
@@ -9309,6 +9445,56 @@ function recordConfirmedReservation() {
 
       // Notificar a la App de Conductores en tiempo real
       if (window.RutaSync) {
+    window.RutaSync.on('MENSAJE_TICKET_SOPORTE', (data) => {
+      if (!data || !data.ticketId) return;
+      let list = [];
+      try {
+        list = JSON.parse(localStorage.getItem('rutaprivada_passenger_tickets_v1') || '[]');
+      } catch(e) { list = []; }
+      const idx = list.findIndex(t => t.ticketId === data.ticketId);
+      if (idx >= 0) {
+        if (Array.isArray(data.mensajes)) {
+          list[idx].mensajes = data.mensajes;
+        } else if (data.mensaje) {
+          if (!Array.isArray(list[idx].mensajes)) list[idx].mensajes = [];
+          list[idx].mensajes.push({
+            id: 'msg_' + Date.now(),
+            sender: data.role || 'admin',
+            senderName: data.remitente || 'Soporte RutaPrivada',
+            text: data.mensaje,
+            timeStr: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs',
+            timestamp: Date.now()
+          });
+        }
+        if (data.status) list[idx].status = data.status;
+        list[idx].updatedAt = Date.now();
+        localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(list));
+        if (typeof window.renderPassengerTicketsList === 'function') window.renderPassengerTicketsList();
+
+        if (data.role === 'admin' || data.role === 'soporte') {
+          if (typeof showToast === 'function') showToast('🔔 Nueva respuesta del Soporte en tu reclamo #' + data.ticketId);
+          try { if (navigator.vibrate) navigator.vibrate([150, 80, 150]); } catch(e){}
+        }
+      }
+    });
+
+    window.RutaSync.on('ESTADO_TICKET_ACTUALIZADO', (data) => {
+      if (!data || !data.ticketId) return;
+      let list = [];
+      try {
+        list = JSON.parse(localStorage.getItem('rutaprivada_passenger_tickets_v1') || '[]');
+      } catch(e) { list = []; }
+      const idx = list.findIndex(t => t.ticketId === data.ticketId);
+      if (idx >= 0) {
+        list[idx].status = data.status || list[idx].status;
+        if (data.respuestaAdmin) list[idx].respuestaAdmin = data.respuestaAdmin;
+        list[idx].updatedAt = Date.now();
+        localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(list));
+        if (typeof window.renderPassengerTicketsList === 'function') window.renderPassengerTicketsList();
+        if (typeof showToast === 'function') showToast('ℹ️ Estado de tu reclamo #' + data.ticketId + ' actualizado a ' + (data.status || ''));
+      }
+    });
+
         window.RutaSync.emit('RESERVA_CREADA', newBooking);
       }
     }
@@ -10577,6 +10763,9 @@ if (btnRequestInapp) {
 
       if (window.RutaSync) {
         if (isModifying) {
+          if (typeof window.RutaSync.guardarOActualizarReserva === 'function') {
+            window.RutaSync.guardarOActualizarReserva(reservaData);
+          }
           window.RutaSync.actualizarReservaLocal(targetId, reservaData);
           window.RutaSync.emit('RESERVA_ACTUALIZADA', reservaData);
         } else {
@@ -12208,7 +12397,6 @@ if (btnRecenterPassengerMap) {
   function loadPassengerReservations() {
     try {
       let list = JSON.parse(localStorage.getItem('rutaprivada_passenger_reservations') || '[]');
-      // También sincronizar si hay reservas en agenda global creadas recientemente
       const rawGlobal = localStorage.getItem('rutaprivada_bookings_v1');
       if (rawGlobal) {
         const globalList = JSON.parse(rawGlobal);
@@ -12216,7 +12404,14 @@ if (btnRecenterPassengerMap) {
           if (gb && gb.id && gb.isSchedule) {
             const idx = list.findIndex(r => r.id === gb.id);
             if (idx >= 0) {
-              list[idx] = { ...list[idx], ...gb };
+              const localTs = list[idx].modificadoEn || list[idx].timestamp || list[idx].creadoEn || 0;
+              const globalTs = gb.modificadoEn || gb.timestamp || gb.creadoEn || 0;
+              if (globalTs >= localTs) {
+                list[idx] = { ...list[idx], ...gb };
+              } else {
+                // La versión local del pasajero es más reciente (fue modificada)
+                list[idx] = { ...gb, ...list[idx] };
+              }
             }
           }
         });

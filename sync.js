@@ -402,12 +402,13 @@ class RutaSyncManager {
                                 if (data) {
                                     data.id = data.id || change.doc.id;
                                     if (data.senderId !== this.deviceId) {
-                                        this.guardarReservaEnAgenda(data);
-                                        const eventType = data.estado === 'aceptada' ? 'RESERVA_ACEPTADA' : 
-                                                         (data.estado === 'cancelada' ? 'RESERVA_LIBERADA' : 
-                                                         (data.estado === 'completada' ? 'RESERVA_COMPLETADA' : 'RESERVA_CREADA'));
+                                        this.guardarOActualizarReserva(data);
+                                        const eventType = (data.estado === 'aceptada' || data.status === 'aceptada') ? 'RESERVA_ACEPTADA' : 
+                                                         ((data.estado === 'cancelada' || data.status === 'cancelada') ? 'RESERVA_CANCELADA' : 
+                                                         ((data.estado === 'completada' || data.status === 'completada') ? 'RESERVA_COMPLETADA' : 
+                                                         ((data.fueModificada || data.modificadoEn) ? 'RESERVA_ACTUALIZADA' : 'RESERVA_CREADA')));
                                         this.handleIncoming({
-                                            id: 'fs_bk_' + data.id + '_' + (data.timestamp || Date.now()) + '_' + change.type,
+                                            id: 'fs_bk_' + data.id + '_' + (data.modificadoEn || data.timestamp || Date.now()) + '_' + change.type,
                                             type: eventType,
                                             payload: data,
                                             senderId: data.senderId,
@@ -709,6 +710,15 @@ class RutaSyncManager {
                         respuestaAdmin: safePayload.respuestaAdmin || '',
                         updatedAt: now
                     }, { merge: true }).catch(() => {});
+                } else if (type === 'MENSAJE_TICKET_SOPORTE' && safePayload && safePayload.ticketId) {
+                    const tDocId = String(safePayload.ticketId);
+                    this.firestore.collection('tickets_soporte').doc(tDocId).set({
+                        ultimoMensaje: safePayload.mensaje || safePayload.texto || '',
+                        mensajes: safePayload.mensajes || [],
+                        status: safePayload.status || 'en_revision',
+                        updatedAt: now,
+                        senderId: this.deviceId
+                    }, { merge: true }).catch(() => {});
                 } else if (type === 'SOLICITUD_RECARGA_SALDO' && safePayload && (safePayload.id || safePayload.comprobante)) {
                     const recId = String(safePayload.id || ('rec_' + now));
                     this.firestore.collection('wallet_recharges').doc(recId).set({
@@ -722,12 +732,19 @@ class RutaSyncManager {
                         estado: safePayload.estado || 'aprobado',
                         timestampAprobacion: now
                     }, { merge: true }).catch(() => {});
-                } else if (type === 'RESERVA_CREADA' && safePayload && safePayload.id) {
-                    this.firestore.collection('bookings').doc(String(safePayload.id)).set({
+                } else if ((type === 'RESERVA_CREADA' || type === 'RESERVA_ACTUALIZADA' || type === 'RESERVA_MODIFICADA') && safePayload && safePayload.id) {
+                    const resDocId = String(safePayload.id);
+                    const enrichedRes = {
                         ...safePayload,
+                        id: resDocId,
                         senderId: this.deviceId,
-                        timestamp: now
-                    }).catch(() => {});
+                        timestamp: now,
+                        modificadoEn: safePayload.modificadoEn || now
+                    };
+                    this.firestore.collection('bookings').doc(resDocId).set(enrichedRes, { merge: true }).catch(() => {});
+                    this.firestore.collection('fleet_bookings').doc(resDocId).set(enrichedRes, { merge: true }).catch(() => {});
+                    this.postFirestoreDocREST('bookings', resDocId, enrichedRes);
+                    this.postFirestoreDocREST('fleet_bookings', resDocId, enrichedRes);
                 } else if ((type === 'RESERVA_ACEPTADA' || type === 'RESERVA_LIBERADA' || type === 'RESERVA_COMPLETADA' || type === 'RESERVA_CANCELADA') && safePayload && (safePayload.reservaId || safePayload.id)) {
                     const bkId = String(safePayload.reservaId || safePayload.id);
                     this.firestore.collection('bookings').doc(bkId).set({
@@ -1171,6 +1188,7 @@ class RutaSyncManager {
 
     guardarOActualizarReserva(reserva) {
         try {
+            if (!reserva || !reserva.id) return;
             let distanceKm = Number(reserva.distanceKm) || 0;
             if (!distanceKm && reserva.distancia) {
                 const match = String(reserva.distancia).replace(',', '.').match(/([\d\.]+)/);
@@ -1179,44 +1197,79 @@ class RutaSyncManager {
             const tollFare = Number(reserva.tollFare || reserva.peajes || 0) || 0;
             const fuelCostEst = Number(reserva.fuelCostEst) || Math.round(distanceKm * 210);
 
-            const enriched = {
-                ...reserva,
-                distanceKm: distanceKm,
-                tollFare: tollFare,
-                peajes: tollFare,
-                fuelCostEst: fuelCostEst,
-                modificadoEn: reserva.modificadoEn || Date.now(),
-                fueModificada: true
-            };
+            const incomingTs = reserva.modificadoEn || reserva.timestamp || reserva.creadoEn || Date.now();
 
-            // Actualizar en bookings de chofer / agenda
+            // 1. Actualizar en bookings de chofer / agenda
             let bookings = [];
             try {
                 const raw = localStorage.getItem('rutaprivada_bookings_v1');
                 if (raw) bookings = JSON.parse(raw);
             } catch(e) {}
 
-            const idx = bookings.findIndex(b => b.id === enriched.id);
+            const idx = bookings.findIndex(b => b.id === reserva.id);
             if (idx >= 0) {
-                bookings[idx] = { ...bookings[idx], ...enriched };
+                const existingTs = bookings[idx].modificadoEn || bookings[idx].timestamp || bookings[idx].creadoEn || 0;
+                if (incomingTs >= existingTs) {
+                    bookings[idx] = {
+                        ...bookings[idx],
+                        ...reserva,
+                        distanceKm: distanceKm || bookings[idx].distanceKm,
+                        tollFare: tollFare !== undefined ? tollFare : bookings[idx].tollFare,
+                        peajes: tollFare !== undefined ? tollFare : bookings[idx].peajes,
+                        fuelCostEst: fuelCostEst || bookings[idx].fuelCostEst,
+                        modificadoEn: incomingTs
+                    };
+                }
             } else {
-                bookings.unshift(enriched);
+                bookings.unshift({
+                    ...reserva,
+                    distanceKm: distanceKm,
+                    tollFare: tollFare,
+                    peajes: tollFare,
+                    fuelCostEst: fuelCostEst,
+                    modificadoEn: incomingTs
+                });
             }
             localStorage.setItem('rutaprivada_bookings_v1', JSON.stringify(bookings));
 
-            // Actualizar en reservas de pasajero
+            // 2. Actualizar en reservas de pasajero
             try {
                 let pResList = JSON.parse(localStorage.getItem('rutaprivada_passenger_reservations') || '[]');
-                const pIdx = pResList.findIndex(r => r.id === enriched.id);
+                const pIdx = pResList.findIndex(r => r.id === reserva.id);
                 if (pIdx >= 0) {
-                    pResList[pIdx] = { ...pResList[pIdx], ...enriched };
+                    const existingPassTs = pResList[pIdx].modificadoEn || pResList[pIdx].timestamp || pResList[pIdx].creadoEn || 0;
+                    if (incomingTs >= existingPassTs) {
+                        pResList[pIdx] = {
+                            ...pResList[pIdx],
+                            ...reserva,
+                            distanceKm: distanceKm || pResList[pIdx].distanceKm,
+                            tollFare: tollFare !== undefined ? tollFare : pResList[pIdx].tollFare,
+                            peajes: tollFare !== undefined ? tollFare : pResList[pIdx].peajes,
+                            modificadoEn: incomingTs
+                        };
+                    }
                 } else {
-                    pResList.unshift(enriched);
+                    pResList.unshift({
+                        ...reserva,
+                        distanceKm: distanceKm,
+                        tollFare: tollFare,
+                        peajes: tollFare,
+                        modificadoEn: incomingTs
+                    });
                 }
                 localStorage.setItem('rutaprivada_passenger_reservations', JSON.stringify(pResList));
+                if (typeof window.updatePassengerReservationsBadge === 'function') window.updatePassengerReservationsBadge();
             } catch(e) {}
 
-            // Firestore
+            // 3. Firestore
+            const enriched = {
+                ...reserva,
+                distanceKm: distanceKm,
+                tollFare: tollFare,
+                peajes: tollFare,
+                fuelCostEst: fuelCostEst,
+                modificadoEn: incomingTs
+            };
             if (this.firestore) {
                 this.firestore.collection('bookings').doc(enriched.id).set(enriched, { merge: true }).catch(() => {});
                 this.firestore.collection('fleet_bookings').doc(enriched.id).set(enriched, { merge: true }).catch(() => {});

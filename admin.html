@@ -496,6 +496,23 @@
         #docReviewModalOverlay {
             z-index: 99999 !important;
         }
+    
+        /* ESTILOS DE PILLS DE ESTADO Y CHAT DE SOPORTE ADMIN */
+        .ticket-status-pills button {
+            transition: all 0.2s ease;
+        }
+        .ticket-status-pills button:hover {
+            filter: brightness(1.2);
+            transform: translateY(-1px);
+        }
+        @keyframes adminPulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .admin-badge-pulse {
+            animation: adminPulse 2s infinite;
+        }
     </style>
 </head>
 <body>
@@ -511,6 +528,73 @@
         </a>
 
         <div class="admin-nav-actions">
+            <!-- BOTÓN DE NOTIFICACIONES / ALERTAS -->
+            <div style="position: relative;">
+                <button id="btnAdminNotifications" type="button" class="admin-btn" style="position: relative; background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.18); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-bell" style="color: #fbbf24; font-size: 1rem;"></i>
+                    <span style="font-weight: 700;">Alertas</span>
+                    <span id="badgeTotalNotifications" style="display:none; background: #ef4444; color: #fff; font-size: 0.72rem; font-weight: 800; padding: 2px 7px; border-radius: 12px; box-shadow: 0 0 10px rgba(239, 68, 68, 0.7); animation: pulse 1.8s infinite;">0</span>
+                </button>
+                <!-- DROPDOWN FLOTANTE DE NOTIFICACIONES -->
+                <div id="dropdownAdminNotifications" style="display: none; position: absolute; right: 0; top: calc(100% + 10px); width: 330px; background: #0b1329; border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; box-shadow: 0 18px 45px rgba(0,0,0,0.7); padding: 12px; z-index: 10000; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
+                        <strong style="color: #fff; font-size: 0.88rem;"><i class="fa-solid fa-bell" style="color:#fbbf24;"></i> Centro de Alertas</strong>
+                        <span id="lblTotalAlertsNotice" style="font-size: 0.72rem; color: #94a3b8;">0 pendientes</span>
+                    </div>
+                    <!-- Choferes pendientes -->
+                    <div id="notifItemDrivers" onclick="window.adminNavigateTab('drivers', 'pendiente')" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 9px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 30px; height: 30px; border-radius: 8px; background: rgba(245, 158, 11, 0.2); color: #fbbf24; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;">
+                                <i class="fa-solid fa-id-card"></i>
+                            </div>
+                            <div>
+                                <div style="color: #fff; font-size: 0.82rem; font-weight: 700;">Validación de Documentos</div>
+                                <div style="color: #94a3b8; font-size: 0.7rem;">Conductores esperando revisión</div>
+                            </div>
+                        </div>
+                        <span id="notifBadgeDrivers" style="background: rgba(245, 158, 11, 0.25); color: #fbbf24; font-size: 0.74rem; font-weight: 800; padding: 2px 7px; border-radius: 6px;">0</span>
+                    </div>
+                    <!-- Recargas pendientes -->
+                    <div id="notifItemRecharges" onclick="window.adminNavigateTab('recharges', 'pendiente')" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 9px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 30px; height: 30px; border-radius: 8px; background: rgba(239, 68, 68, 0.2); color: #f87171; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;">
+                                <i class="fa-solid fa-wallet"></i>
+                            </div>
+                            <div>
+                                <div style="color: #fff; font-size: 0.82rem; font-weight: 700;">Conciliación de Recargas</div>
+                                <div style="color: #94a3b8; font-size: 0.7rem;">Transferencias por acreditar</div>
+                            </div>
+                        </div>
+                        <span id="notifBadgeRecharges" style="background: rgba(239, 68, 68, 0.25); color: #f87171; font-size: 0.74rem; font-weight: 800; padding: 2px 7px; border-radius: 6px;">0</span>
+                    </div>
+                    <!-- Soporte Choferes -->
+                    <div id="notifItemDriverTickets" onclick="window.adminNavigateTab('driverTickets', 'pendiente')" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 9px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 30px; height: 30px; border-radius: 8px; background: rgba(251, 191, 36, 0.2); color: #fbbf24; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;">
+                                <i class="fa-solid fa-headset"></i>
+                            </div>
+                            <div>
+                                <div style="color: #fff; font-size: 0.82rem; font-weight: 700;">Soporte Conductores</div>
+                                <div style="color: #94a3b8; font-size: 0.7rem;">Reclamos / mensajes choferes</div>
+                            </div>
+                        </div>
+                        <span id="notifBadgeDriverTickets" style="background: rgba(251, 191, 36, 0.25); color: #fbbf24; font-size: 0.74rem; font-weight: 800; padding: 2px 7px; border-radius: 6px;">0</span>
+                    </div>
+                    <!-- Soporte Pasajeros -->
+                    <div id="notifItemPassengerTickets" onclick="window.adminNavigateTab('passengerTickets', 'pendiente')" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 9px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 30px; height: 30px; border-radius: 8px; background: rgba(56, 189, 248, 0.2); color: #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;">
+                                <i class="fa-solid fa-users"></i>
+                            </div>
+                            <div>
+                                <div style="color: #fff; font-size: 0.82rem; font-weight: 700;">Soporte Pasajeros</div>
+                                <div style="color: #94a3b8; font-size: 0.7rem;">Reclamos / mensajes pasajeros</div>
+                            </div>
+                        </div>
+                        <span id="notifBadgePassengerTickets" style="background: rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 0.74rem; font-weight: 800; padding: 2px 7px; border-radius: 6px;">0</span>
+                    </div>
+                </div>
+            </div>
             <button id="btnOpenManualDriverModal" class="admin-btn admin-btn-primary">
                 <i class="fa-solid fa-user-plus"></i> + Alta Manual Chofer
             </button>
@@ -584,8 +668,9 @@
 
         <!-- SECCIONES / PESTAÑAS PRINCIPALES DEL PANEL -->
         <div style="display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--admin-border); padding-bottom: 12px; flex-wrap: wrap;">
-            <button id="tabNavDrivers" class="admin-btn admin-btn-primary" style="padding: 10px 18px;">
+            <button id="tabNavDrivers" class="admin-btn admin-btn-primary" style="padding: 10px 18px; position: relative;">
                 <i class="fa-solid fa-id-card"></i> Validación de Documentos y Choferes
+                <span id="badgePendingDriversCount" style="display:none; margin-left: 6px; background: #eab308; color: #000; font-size: 0.7rem; padding: 2px 7px; border-radius: 10px; font-weight: 800;">0</span>
             </button>
             <button id="tabNavRecharges" class="admin-btn" style="padding: 10px 18px; position: relative;">
                 <i class="fa-solid fa-wallet"></i> Conciliación de Recargas y Saldo
@@ -790,7 +875,57 @@
             </section>
         </div>
 
-    </main>
+        <!-- MODAL DE CHAT Y RESPUESTA OFICIAL DE TICKETS / RECLAMOS -->
+    <div id="modalAdminTicketChat" class="modal-overlay" style="display: none; align-items: center; justify-content: center; z-index: 10001;">
+        <div class="modal-content" style="max-width: 600px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 16px;">
+            <!-- Cabecera del modal -->
+            <div style="padding: 16px 20px; background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div id="chatModalRoleIcon" style="width: 36px; height: 36px; border-radius: 10px; background: rgba(251, 191, 36, 0.2); color: #fbbf24; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                        <i class="fa-solid fa-comments"></i>
+                    </div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <strong id="chatModalTicketId" style="color: #fff; font-size: 1.05rem;">#TICKET</strong>
+                            <span id="chatModalCategory" style="background: rgba(255,255,255,0.08); color: #cbd5e1; font-size: 0.75rem; padding: 2px 8px; border-radius: 6px;">Categoría</span>
+                        </div>
+                        <div id="chatModalSubtitle" style="font-size: 0.74rem; color: #94a3b8; margin-top: 2px;">Usuario · Correo · Teléfono</div>
+                    </div>
+                </div>
+                <button type="button" onclick="window.adminCloseTicketChatModal()" style="background: transparent; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer;">✕</button>
+            </div>
+
+            <!-- Barra de estado rápido dentro del chat modal -->
+            <div style="padding: 10px 20px; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">ESTADO DEL RECLAMO:</span>
+                <div id="chatModalStatusPills" class="ticket-status-pills" style="display: inline-flex; gap: 4px;">
+                    <!-- Botones dinámicos de estado -->
+                </div>
+            </div>
+
+            <!-- Hilo de mensajes -->
+            <div id="chatModalMessagesContainer" style="flex: 1; padding: 16px 20px; overflow-y: auto; max-height: 340px; display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.2);">
+                <!-- Se llena dinámicamente -->
+            </div>
+
+            <!-- Formulario de respuesta de admin -->
+            <div style="padding: 16px 20px; background: rgba(15, 23, 42, 0.95); border-top: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 10px;">
+                <textarea id="chatModalAdminReplyText" placeholder="Escribe la respuesta oficial de la Central para enviar a la aplicación del usuario..." rows="3" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; padding: 10px 12px; font-size: 0.84rem; outline: none; resize: none;"></textarea>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #cbd5e1; cursor: pointer;">
+                        <input type="checkbox" id="chatModalSendEmailCopy" checked style="accent-color: #fbbf24;">
+                        <span>Enviar copia también por correo electrónico</span>
+                    </label>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" onclick="window.adminSubmitTicketChatReply()" class="admin-btn admin-btn-primary" style="padding: 8px 16px; font-size: 0.84rem;">
+                            <i class="fa-solid fa-paper-plane"></i> Enviar Respuesta
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
 
     <!-- MODAL DE ALTA MANUAL DE CONDUCTOR -->
     <div class="admin-modal-overlay" id="manualDriverModalOverlay" style="display: none;">
@@ -1256,7 +1391,7 @@
 
                 window.dispatchEvent(new Event('storage'));
                 renderMetrics();
-                renderDriversTable();
+                renderDriversTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
             }
 
             // Función para actualizar estado de elegibilidad para aprobación
@@ -1418,7 +1553,7 @@
                 } else {
                     if (sectionDriversView) sectionDriversView.style.display = 'block';
                     if (tabNavDrivers) tabNavDrivers.classList.add('admin-btn-primary');
-                    renderDriversTable();
+                    renderDriversTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                 }
             }
 
@@ -1447,7 +1582,7 @@
                     driverTicketFilterTabs.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     activeDriverTicketFilter = btn.getAttribute('data-status') || 'todos';
-                    renderDriverTicketsTable();
+                    renderDriverTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                 });
             });
 
@@ -1457,7 +1592,7 @@
                     passengerTicketFilterTabs.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     activePassengerTicketFilter = btn.getAttribute('data-status') || 'todos';
-                    renderPassengerTicketsTable();
+                    renderPassengerTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                 });
             });
 
@@ -1893,13 +2028,13 @@
                                         try {
                                             localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(currentDriverTickets));
                                         } catch(e) {}
-                                        renderDriverTicketsTable();
+                                        renderDriverTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                                     }
                                     if (passengerUpdated) {
                                         try {
                                             localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(currentPassengerTickets));
                                         } catch(e) {}
-                                        renderPassengerTicketsTable();
+                                        renderPassengerTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                                     }
                                 }, (err) => console.warn('Firestore tickets_soporte listener warning:', err));
                             };
@@ -2037,7 +2172,7 @@
                                 }
                             } catch(e) {}
 
-                            renderDriversTable();
+                            renderDriversTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                             if (docReviewModalOverlay && docReviewModalOverlay.classList.contains('active') && activeReviewDriver && activeReviewDriver.id === target.id) {
                                 activeReviewDriver.docsImages = Object.assign({}, activeReviewDriver.docsImages || {}, target.docsImages);
                                 openDocReviewModal(activeReviewDriver.id);
@@ -2263,7 +2398,7 @@
 
                 currentDrivers = drivers;
                 renderMetrics();
-                renderDriversTable();
+                renderDriversTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
             }
 
             // 4. RENDERIZAR MÉTRICAS
@@ -2382,7 +2517,7 @@
                     document.querySelectorAll('.driver-tab-btn').forEach(b => b.classList.remove('active'));
                     filterBtn.classList.add('active');
                     activeFilter = filterBtn.getAttribute('data-status') || 'todos';
-                    renderDriversTable();
+                    renderDriversTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                 }
             });
 
@@ -2396,7 +2531,7 @@
                     filterTabBtns.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     activeFilter = btn.getAttribute('data-status') || 'todos';
-                    renderDriversTable();
+                    renderDriversTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                 });
             });
 
@@ -2972,7 +3107,7 @@
 
                 closeDocReviewModal();
                 renderMetrics();
-                renderDriversTable();
+                renderDriversTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
 
                 const msg = newStatus === 'aprobado' ? 
                     '✅ ¡CONDUCTOR APROBADO EXITOSAMENTE!\nEl chofer ha sido habilitado para operar y ha recibido la confirmación en vivo en su aplicación.' :
@@ -3287,12 +3422,12 @@
                                     }
                                 }
                             });
-                            renderDriverTicketsTable();
+                            renderDriverTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                         }).catch(() => {});
                     } catch(e) {}
                 }
 
-                renderDriverTicketsTable();
+                renderDriverTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
             }
 
             function renderDriverTicketsTable() {
@@ -3411,14 +3546,14 @@
                             </td>
                             <td style="text-align: right;">
                                 <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-                                    <select onchange="window.adminChangeDriverTicketStatus('${safeTicketId}', this.value)" style="background: #0f172a; border: 1px solid rgba(251,191,36,0.4); color: #fff; padding: 6px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
-                                        <option value="pendiente" ${status === 'pendiente' ? 'selected' : ''}>⏳ Pendiente</option>
-                                        <option value="en_revision" ${status === 'en_revision' ? 'selected' : ''}>🔍 En Revisión</option>
-                                        <option value="en_proceso" ${status === 'en_proceso' ? 'selected' : ''}>⚙️ En Proceso</option>
-                                        <option value="finalizado" ${status === 'finalizado' ? 'selected' : ''}>✅ Finalizado</option>
-                                    </select>
-                                    <button type="button" onclick="window.adminReplyDriverTicketPrompt('${safeTicketId}')" class="admin-btn" style="padding: 4px 8px; font-size: 0.72rem; background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.4); color: #fbbf24;">
-                                        <i class="fa-solid fa-reply"></i> Responder Chofer
+                                    <div class="ticket-status-pills" style="display: inline-flex; background: rgba(0,0,0,0.4); border: 1px solid rgba(251,191,36,0.3); border-radius: 8px; padding: 3px; gap: 3px; flex-wrap: wrap; justify-content: flex-end;">
+                                        <button type="button" onclick="window.adminChangeDriverTicketStatus('${safeTicketId}', 'pendiente')" style="background: ${status === 'pendiente' ? '#f59e0b' : 'transparent'}; color: ${status === 'pendiente' ? '#000' : '#94a3b8'}; border: none; font-size: 0.68rem; font-weight: 700; padding: 3px 6px; border-radius: 5px; cursor: pointer;" title="Cambiar a Pendiente">⏳ Pendiente</button>
+                                        <button type="button" onclick="window.adminChangeDriverTicketStatus('${safeTicketId}', 'en_revision')" style="background: ${status === 'en_revision' ? '#38bdf8' : 'transparent'}; color: ${status === 'en_revision' ? '#000' : '#94a3b8'}; border: none; font-size: 0.68rem; font-weight: 700; padding: 3px 6px; border-radius: 5px; cursor: pointer;" title="Cambiar a En Revisión">🔍 Revisión</button>
+                                        <button type="button" onclick="window.adminChangeDriverTicketStatus('${safeTicketId}', 'en_proceso')" style="background: ${status === 'en_proceso' ? '#a855f7' : 'transparent'}; color: ${status === 'en_proceso' ? '#fff' : '#94a3b8'}; border: none; font-size: 0.68rem; font-weight: 700; padding: 3px 6px; border-radius: 5px; cursor: pointer;" title="Cambiar a En Proceso">⚙️ Proceso</button>
+                                        <button type="button" onclick="window.adminChangeDriverTicketStatus('${safeTicketId}', 'finalizado')" style="background: ${status === 'finalizado' ? '#22c55e' : 'transparent'}; color: ${status === 'finalizado' ? '#000' : '#94a3b8'}; border: none; font-size: 0.68rem; font-weight: 700; padding: 3px 6px; border-radius: 5px; cursor: pointer;" title="Cambiar a Finalizado">✅ Finalizar</button>
+                                    </div>
+                                    <button type="button" onclick="window.adminOpenTicketChatModal('${safeTicketId}', 'conductor')" class="admin-btn" style="padding: 5px 10px; font-size: 0.74rem; background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.4); color: #fbbf24; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-comments"></i> Chat / Responder Chofer
                                     </button>
                                 </div>
                             </td>
@@ -3487,12 +3622,12 @@
                                     }
                                 }
                             });
-                            renderPassengerTicketsTable();
+                            renderPassengerTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                         }).catch(() => {});
                     } catch(e) {}
                 }
 
-                renderPassengerTicketsTable();
+                renderPassengerTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
             }
 
             function renderPassengerTicketsTable() {
@@ -3611,14 +3746,14 @@
                             </td>
                             <td style="text-align: right;">
                                 <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
-                                    <select onchange="window.adminChangePassengerTicketStatus('${safeTicketId}', this.value)" style="background: #0f172a; border: 1px solid rgba(56,189,248,0.4); color: #fff; padding: 6px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
-                                        <option value="pendiente" ${status === 'pendiente' ? 'selected' : ''}>⏳ Pendiente</option>
-                                        <option value="en_revision" ${status === 'en_revision' ? 'selected' : ''}>🔍 En Revisión</option>
-                                        <option value="en_proceso" ${status === 'en_proceso' ? 'selected' : ''}>⚙️ En Proceso</option>
-                                        <option value="finalizado" ${status === 'finalizado' ? 'selected' : ''}>✅ Finalizado</option>
-                                    </select>
-                                    <button type="button" onclick="window.adminReplyPassengerTicketPrompt('${safeTicketId}')" class="admin-btn" style="padding: 4px 8px; font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8;">
-                                        <i class="fa-solid fa-reply"></i> Responder Pasajero
+                                    <div class="ticket-status-pills" style="display: inline-flex; background: rgba(0,0,0,0.4); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 3px; gap: 3px; flex-wrap: wrap; justify-content: flex-end;">
+                                        <button type="button" onclick="window.adminChangePassengerTicketStatus('${safeTicketId}', 'pendiente')" style="background: ${status === 'pendiente' ? '#f59e0b' : 'transparent'}; color: ${status === 'pendiente' ? '#000' : '#94a3b8'}; border: none; font-size: 0.68rem; font-weight: 700; padding: 3px 6px; border-radius: 5px; cursor: pointer;" title="Cambiar a Pendiente">⏳ Pendiente</button>
+                                        <button type="button" onclick="window.adminChangePassengerTicketStatus('${safeTicketId}', 'en_revision')" style="background: ${status === 'en_revision' ? '#38bdf8' : 'transparent'}; color: ${status === 'en_revision' ? '#000' : '#94a3b8'}; border: none; font-size: 0.68rem; font-weight: 700; padding: 3px 6px; border-radius: 5px; cursor: pointer;" title="Cambiar a En Revisión">🔍 Revisión</button>
+                                        <button type="button" onclick="window.adminChangePassengerTicketStatus('${safeTicketId}', 'en_proceso')" style="background: ${status === 'en_proceso' ? '#a855f7' : 'transparent'}; color: ${status === 'en_proceso' ? '#fff' : '#94a3b8'}; border: none; font-size: 0.68rem; font-weight: 700; padding: 3px 6px; border-radius: 5px; cursor: pointer;" title="Cambiar a En Proceso">⚙️ Proceso</button>
+                                        <button type="button" onclick="window.adminChangePassengerTicketStatus('${safeTicketId}', 'finalizado')" style="background: ${status === 'finalizado' ? '#22c55e' : 'transparent'}; color: ${status === 'finalizado' ? '#000' : '#94a3b8'}; border: none; font-size: 0.68rem; font-weight: 700; padding: 3px 6px; border-radius: 5px; cursor: pointer;" title="Cambiar a Finalizado">✅ Finalizar</button>
+                                    </div>
+                                    <button type="button" onclick="window.adminOpenTicketChatModal('${safeTicketId}', 'pasajero')" class="admin-btn" style="padding: 5px 10px; font-size: 0.74rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-comments"></i> Chat / Responder Pasajero
                                     </button>
                                 </div>
                             </td>
@@ -3657,7 +3792,7 @@
                     });
                 }
 
-                renderDriverTicketsTable();
+                renderDriverTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
             };
 
             window.adminReplyDriverTicketPrompt = function(ticketId) {
@@ -3710,7 +3845,7 @@
                     });
                 }
 
-                renderPassengerTicketsTable();
+                renderPassengerTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
             };
 
             window.adminReplyPassengerTicketPrompt = function(ticketId) {
@@ -3733,8 +3868,430 @@
                 }
             };
 
+            // ==========================================
+            // CENTRO DE NOTIFICACIONES Y ALERTAS EN VIVO
+            // ==========================================
+            function updateAllAdminNotificationBadges() {
+                try {
+                    const pendingDrivers = (currentDrivers || []).filter(d => (d.estado || d.status || 'pendiente').toLowerCase() === 'pendiente').length;
+                    const pendingRecharges = (currentRecharges || []).filter(r => (r.estado || r.status || 'pendiente').toLowerCase() === 'pendiente').length;
+                    const pendingDriverTickets = (currentDriverTickets || []).filter(t => (t.status || 'pendiente').toLowerCase() === 'pendiente').length;
+                    const pendingPassengerTickets = (currentPassengerTickets || []).filter(t => (t.status || 'pendiente').toLowerCase() === 'pendiente').length;
+
+                    const totalAlerts = pendingDrivers + pendingRecharges + pendingDriverTickets + pendingPassengerTickets;
+
+                    // Header Bell Badge
+                    const badgeTotal = document.getElementById('badgeTotalNotifications');
+                    const lblNotice = document.getElementById('lblTotalAlertsNotice');
+                    if (badgeTotal) {
+                        badgeTotal.textContent = totalAlerts;
+                        badgeTotal.style.display = totalAlerts > 0 ? 'inline-block' : 'none';
+                    }
+                    if (lblNotice) {
+                        lblNotice.textContent = totalAlerts + ' alertas pendientes';
+                    }
+
+                    // Dropdown Badges
+                    const bDr = document.getElementById('notifBadgeDrivers');
+                    const bRc = document.getElementById('notifBadgeRecharges');
+                    const bDt = document.getElementById('notifBadgeDriverTickets');
+                    const bPt = document.getElementById('notifBadgePassengerTickets');
+                    if (bDr) bDr.textContent = pendingDrivers;
+                    if (bRc) bRc.textContent = pendingRecharges;
+                    if (bDt) bDt.textContent = pendingDriverTickets;
+                    if (bPt) bPt.textContent = pendingPassengerTickets;
+
+                    // Pestañas Principales
+                    const tabDriversBadge = document.getElementById('badgePendingDriversCount');
+                    if (tabDriversBadge) {
+                        tabDriversBadge.textContent = pendingDrivers;
+                        tabDriversBadge.style.display = pendingDrivers > 0 ? 'inline-block' : 'none';
+                    }
+
+                    const tabRechargeBadge = document.getElementById('badgePendingRechargesCount');
+                    if (tabRechargeBadge) {
+                        tabRechargeBadge.textContent = pendingRecharges;
+                        tabRechargeBadge.style.display = pendingRecharges > 0 ? 'inline-block' : 'none';
+                    }
+
+                    const tabDriverTicketsBadge = document.getElementById('badgePendingDriverTicketsCount');
+                    if (tabDriverTicketsBadge) {
+                        tabDriverTicketsBadge.textContent = pendingDriverTickets;
+                        tabDriverTicketsBadge.style.display = pendingDriverTickets > 0 ? 'inline-block' : 'none';
+                    }
+
+                    const tabPassengerTicketsBadge = document.getElementById('badgePendingPassengerTicketsCount');
+                    if (tabPassengerTicketsBadge) {
+                        tabPassengerTicketsBadge.textContent = pendingPassengerTickets;
+                        tabPassengerTicketsBadge.style.display = pendingPassengerTickets > 0 ? 'inline-block' : 'none';
+                    }
+                } catch(e) {}
+            }
+            window.updateAllAdminNotificationBadges = updateAllAdminNotificationBadges;
+
+            // Navegación rápida entre pestañas desde notificaciones
+            window.adminNavigateTab = function(tabName, filterVal) {
+                const drop = document.getElementById('dropdownAdminNotifications');
+                if (drop) drop.style.display = 'none';
+
+                if (tabName === 'drivers') {
+                    if (tabNavDrivers) tabNavDrivers.click();
+                    if (filterVal) {
+                        const btn = document.querySelector('.driver-tab-btn[data-status="' + filterVal + '"]');
+                        if (btn) btn.click();
+                    }
+                } else if (tabName === 'recharges') {
+                    if (tabNavRecharges) tabNavRecharges.click();
+                    if (filterVal) {
+                        const btn = document.querySelector('.recharge-tab-btn[data-status="' + filterVal + '"]');
+                        if (btn) btn.click();
+                    }
+                } else if (tabName === 'driverTickets') {
+                    if (tabNavDriverTickets) tabNavDriverTickets.click();
+                    if (filterVal) {
+                        const btn = document.querySelector('.driver-ticket-tab-btn[data-status="' + filterVal + '"]');
+                        if (btn) btn.click();
+                    }
+                } else if (tabName === 'passengerTickets') {
+                    if (tabNavPassengerTickets) tabNavPassengerTickets.click();
+                    if (filterVal) {
+                        const btn = document.querySelector('.passenger-ticket-tab-btn[data-status="' + filterVal + '"]');
+                        if (btn) btn.click();
+                    }
+                }
+            };
+
+            // Toggle botón de notificaciones
+            const btnNotif = document.getElementById('btnAdminNotifications');
+            const dropNotif = document.getElementById('dropdownAdminNotifications');
+            if (btnNotif && dropNotif) {
+                btnNotif.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isVisible = dropNotif.style.display === 'flex' || dropNotif.style.display === 'block';
+                    dropNotif.style.display = isVisible ? 'none' : 'flex';
+                });
+                document.addEventListener('click', (e) => {
+                    if (!dropNotif.contains(e.target) && e.target !== btnNotif) {
+                        dropNotif.style.display = 'none';
+                    }
+                });
+            }
+
+            // ==========================================
+            // MODAL PROFESIONAL DE CHAT Y RESPUESTAS
+            // ==========================================
+            let activeChatTicketId = null;
+            let activeChatTicketRole = null; // 'conductor' o 'pasajero'
+
+            window.adminOpenTicketChatModal = function(ticketId, role = 'conductor') {
+                activeChatTicketId = ticketId;
+                activeChatTicketRole = role;
+
+                const ticket = (role === 'conductor') ? 
+                    currentDriverTickets.find(t => t.ticketId === ticketId) : 
+                    currentPassengerTickets.find(t => t.ticketId === ticketId);
+
+                if (!ticket) return;
+
+                const modal = document.getElementById('modalAdminTicketChat');
+                if (!modal) return;
+
+                const idEl = document.getElementById('chatModalTicketId');
+                const catEl = document.getElementById('chatModalCategory');
+                const subEl = document.getElementById('chatModalSubtitle');
+                const roleIcon = document.getElementById('chatModalRoleIcon');
+                const replyInput = document.getElementById('chatModalAdminReplyText');
+
+                if (idEl) idEl.textContent = '#' + ticketId;
+                if (catEl) catEl.textContent = ticket.category || 'Consulta General';
+
+                const userName = (role === 'conductor') ? (ticket.driverName || 'Conductor') : (ticket.passengerName || 'Pasajero');
+                const userEmail = (role === 'conductor') ? (ticket.driverEmail || '') : (ticket.passengerEmail || '');
+                const userPhone = (role === 'conductor') ? (ticket.driverPhone || '') : (ticket.passengerPhone || '');
+
+                if (subEl) {
+                    subEl.innerHTML = `<strong style="color:#fff;">${escapeHtml(userName)}</strong> · ${escapeHtml(userEmail)} · ${escapeHtml(userPhone)} ${ticket.tripId && ticket.tripId !== 'N/A' ? ' · Viaje: ' + escapeHtml(ticket.tripId) : ''}`;
+                }
+
+                if (roleIcon) {
+                    if (role === 'conductor') {
+                        roleIcon.style.background = 'rgba(251, 191, 36, 0.2)';
+                        roleIcon.style.color = '#fbbf24';
+                        roleIcon.innerHTML = '<i class="fa-solid fa-car"></i>';
+                    } else {
+                        roleIcon.style.background = 'rgba(56, 189, 248, 0.2)';
+                        roleIcon.style.color = '#38bdf8';
+                        roleIcon.innerHTML = '<i class="fa-solid fa-user"></i>';
+                    }
+                }
+
+                if (replyInput) replyInput.value = '';
+
+                renderChatModalStatusPills(ticket.status || 'pendiente');
+                renderChatModalMessages();
+
+                modal.style.display = 'flex';
+                if (replyInput) replyInput.focus();
+            };
+
+            function renderChatModalStatusPills(currentStatus) {
+                const container = document.getElementById('chatModalStatusPills');
+                if (!container) return;
+                const status = (currentStatus || 'pendiente').toLowerCase();
+
+                container.innerHTML = `
+                    <button type="button" onclick="adminSetChatTicketStatus('pendiente')" style="background: ${status === 'pendiente' ? '#f59e0b' : 'rgba(255,255,255,0.08)'}; color: ${status === 'pendiente' ? '#000' : '#cbd5e1'}; border: none; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; cursor: pointer;">⏳ Pendiente</button>
+                    <button type="button" onclick="adminSetChatTicketStatus('en_revision')" style="background: ${status === 'en_revision' ? '#38bdf8' : 'rgba(255,255,255,0.08)'}; color: ${status === 'en_revision' ? '#000' : '#cbd5e1'}; border: none; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; cursor: pointer;">🔍 En Revisión</button>
+                    <button type="button" onclick="adminSetChatTicketStatus('en_proceso')" style="background: ${status === 'en_proceso' ? '#a855f7' : 'rgba(255,255,255,0.08)'}; color: ${status === 'en_proceso' ? '#fff' : '#cbd5e1'}; border: none; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; cursor: pointer;">⚙️ En Proceso</button>
+                    <button type="button" onclick="adminSetChatTicketStatus('finalizado')" style="background: ${status === 'finalizado' ? '#22c55e' : 'rgba(255,255,255,0.08)'}; color: ${status === 'finalizado' ? '#000' : '#cbd5e1'}; border: none; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; cursor: pointer;">✅ Finalizado</button>
+                `;
+            }
+
+            window.adminSetChatTicketStatus = function(newStatus) {
+                if (!activeChatTicketId || !activeChatTicketRole) return;
+                if (activeChatTicketRole === 'conductor') {
+                    window.adminChangeDriverTicketStatus(activeChatTicketId, newStatus);
+                } else {
+                    window.adminChangePassengerTicketStatus(activeChatTicketId, newStatus);
+                }
+                renderChatModalStatusPills(newStatus);
+            };
+
+            function renderChatModalMessages() {
+                const container = document.getElementById('chatModalMessagesContainer');
+                if (!container || !activeChatTicketId) return;
+
+                const ticket = (activeChatTicketRole === 'conductor') ? 
+                    currentDriverTickets.find(t => t.ticketId === activeChatTicketId) : 
+                    currentPassengerTickets.find(t => t.ticketId === activeChatTicketId);
+
+                if (!ticket) return;
+
+                let msgs = Array.isArray(ticket.mensajes) ? [...ticket.mensajes] : [];
+                if (msgs.length === 0) {
+                    if (ticket.description) {
+                        msgs.push({
+                            id: 'msg_0',
+                            sender: activeChatTicketRole,
+                            senderName: (activeChatTicketRole === 'conductor') ? (ticket.driverName || 'Conductor') : (ticket.passengerName || 'Pasajero'),
+                            text: ticket.description,
+                            timeStr: ticket.timeStr || ticket.createdAt || 'Inicio'
+                        });
+                    }
+                    if (ticket.respuestaAdmin) {
+                        msgs.push({
+                            id: 'msg_admin_0',
+                            sender: 'admin',
+                            senderName: 'Central de RutaPrivada',
+                            text: ticket.respuestaAdmin,
+                            timeStr: 'Respuesta'
+                        });
+                    }
+                }
+
+                container.innerHTML = msgs.map(m => {
+                    const isAdmin = (m.sender === 'admin' || m.sender === 'soporte');
+                    if (isAdmin) {
+                        return `
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; margin-bottom: 6px;">
+                                <div style="font-size: 0.7rem; color: #38bdf8; font-weight: 700; margin-bottom: 2px;">
+                                    <i class="fa-solid fa-shield-halved"></i> Central de Soporte ${m.timeStr ? '• ' + escapeHtml(m.timeStr) : ''}
+                                </div>
+                                <div style="background: rgba(2, 132, 199, 0.25); border: 1px solid rgba(56, 189, 248, 0.4); color: #fff; padding: 10px 14px; border-radius: 12px 12px 2px 12px; font-size: 0.83rem; line-height: 1.45; max-width: 85%; white-space: pre-wrap; word-break: break-word;">
+                                    ${escapeHtml(m.text || m.mensaje || '')}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div style="display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 6px;">
+                                <div style="font-size: 0.7rem; color: #fbbf24; font-weight: 700; margin-bottom: 2px;">
+                                    ${escapeHtml(m.senderName || 'Usuario')} ${m.timeStr ? '• ' + escapeHtml(m.timeStr) : ''}
+                                </div>
+                                <div style="background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); color: #e2e8f0; padding: 10px 14px; border-radius: 12px 12px 12px 2px; font-size: 0.83rem; line-height: 1.45; max-width: 85%; white-space: pre-wrap; word-break: break-word;">
+                                    ${escapeHtml(m.text || m.mensaje || '')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }).join('');
+
+                container.scrollTop = container.scrollHeight;
+            }
+
+            window.adminCloseTicketChatModal = function() {
+                const modal = document.getElementById('modalAdminTicketChat');
+                if (modal) modal.style.display = 'none';
+                activeChatTicketId = null;
+                activeChatTicketRole = null;
+            };
+
+            window.adminSubmitTicketChatReply = function() {
+                if (!activeChatTicketId || !activeChatTicketRole) return;
+                const replyInput = document.getElementById('chatModalAdminReplyText');
+                if (!replyInput) return;
+                const text = (replyInput.value || '').trim();
+                if (!text) {
+                    alert('Por favor escribe un mensaje para responder.');
+                    return;
+                }
+
+                const sendEmailCopy = document.getElementById('chatModalSendEmailCopy')?.checked ?? true;
+
+                const ticket = (activeChatTicketRole === 'conductor') ? 
+                    currentDriverTickets.find(t => t.ticketId === activeChatTicketId) : 
+                    currentPassengerTickets.find(t => t.ticketId === activeChatTicketId);
+
+                if (!ticket) return;
+
+                const now = new Date();
+                const timeStr = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) + ' ' + 
+                                now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + ' hs';
+
+                if (!Array.isArray(ticket.mensajes)) {
+                    ticket.mensajes = [];
+                    if (ticket.description) {
+                        ticket.mensajes.push({
+                            id: 'msg_0',
+                            sender: activeChatTicketRole,
+                            senderName: (activeChatTicketRole === 'conductor') ? (ticket.driverName || 'Conductor') : (ticket.passengerName || 'Pasajero'),
+                            text: ticket.description,
+                            timeStr: ticket.timeStr || ticket.createdAt || 'Inicio'
+                        });
+                    }
+                }
+
+                const newMsg = {
+                    id: 'msg_' + Date.now(),
+                    sender: 'admin',
+                    senderName: 'Central de RutaPrivada',
+                    text: text,
+                    timeStr: timeStr,
+                    timestamp: Date.now()
+                };
+
+                ticket.mensajes.push(newMsg);
+                ticket.respuestaAdmin = text;
+                ticket.updatedAt = Date.now();
+                if (ticket.status === 'pendiente') ticket.status = 'en_proceso';
+
+                // Guardar y sincronizar
+                if (activeChatTicketRole === 'conductor') {
+                    window.adminChangeDriverTicketStatus(activeChatTicketId, ticket.status, text);
+                } else {
+                    window.adminChangePassengerTicketStatus(activeChatTicketId, ticket.status, text);
+                }
+
+                // Sincronizar mensaje en Firestore
+                if (typeof firebase !== 'undefined' && firebase.firestore) {
+                    try {
+                        firebase.firestore().collection('tickets_soporte').doc(activeChatTicketId).set({
+                            mensajes: ticket.mensajes,
+                            ultimoMensaje: text,
+                            ultimoMensajePor: 'admin',
+                            respuestaAdmin: text,
+                            status: ticket.status,
+                            updatedAt: Date.now()
+                        }, { merge: true }).catch(() => {});
+                    } catch(e) {}
+                }
+
+                // Emitir por RutaSync
+                if (window.RutaSync && typeof window.RutaSync.emit === 'function') {
+                    window.RutaSync.emit('MENSAJE_TICKET_SOPORTE', {
+                        ticketId: activeChatTicketId,
+                        mensaje: text,
+                        remitente: 'Central de RutaPrivada',
+                        role: 'admin',
+                        mensajes: ticket.mensajes,
+                        status: ticket.status
+                    });
+                }
+
+                // Copia por correo si está seleccionado
+                if (sendEmailCopy) {
+                    const userEmail = (activeChatTicketRole === 'conductor') ? ticket.driverEmail : ticket.passengerEmail;
+                    const userName = (activeChatTicketRole === 'conductor') ? ticket.driverName : ticket.passengerName;
+                    const supportEmail = (activeChatTicketRole === 'conductor') ? 'rutaprivadadrivers@gmail.com' : 'rutaprivadasoporte@gmail.com';
+                    if (userEmail) {
+                        const mailSubject = encodeURIComponent(`[Resolución Reclamo #${activeChatTicketId}] ${ticket.category || 'Atención RutaPrivada'}`);
+                        const mailBody = encodeURIComponent(`Hola ${userName || 'Usuario'},
+
+Te escribimos desde la Central Oficial de RutaPrivada respecto a tu consulta/reclamo #${activeChatTicketId} (${ticket.category || 'Soporte'}).
+
+RESPUESTA OFICIAL DE LA ADMINISTRACIÓN:
+${text}
+
+Ante cualquier duda puedes responder directamente a este correo o continuar la conversación desde la aplicación.
+
+Atentamente,
+Equipo de Soporte y Operaciones RutaPrivada
+${supportEmail}`);
+                        window.open(`mailto:${userEmail}?subject=${mailSubject}&body=${mailBody}`, '_blank');
+                    }
+                }
+
+                replyInput.value = '';
+                renderChatModalMessages();
+                renderChatModalStatusPills(ticket.status);
+                showToastNotification('✅ Respuesta enviada a la app con éxito.');
+            };
+
+            function showToastNotification(msg) {
+                let toast = document.getElementById('adminLiveToast');
+                if (!toast) {
+                    toast = document.createElement('div');
+                    toast.id = 'adminLiveToast';
+                    toast.style.cssText = 'position: fixed; bottom: 24px; right: 24px; background: #0f172a; border: 1.5px solid #38bdf8; color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 0.85rem; font-weight: 700; box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 99999; display: flex; align-items: center; gap: 8px; transition: all 0.3s;';
+                    document.body.appendChild(toast);
+                }
+                toast.innerHTML = msg;
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0)';
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateY(10px)';
+                }, 3500);
+            }
+
+
             // Sincronización en tiempo real vía RutaSync
             if (window.RutaSync) {
+                window.RutaSync.on('MENSAJE_TICKET_SOPORTE', (data) => {
+                    if (!data || !data.ticketId) return;
+                    const dIdx = currentDriverTickets.findIndex(t => t.ticketId === data.ticketId);
+                    if (dIdx >= 0) {
+                        if (Array.isArray(data.mensajes)) currentDriverTickets[dIdx].mensajes = data.mensajes;
+                        if (data.status) currentDriverTickets[dIdx].status = data.status;
+                        renderDriverTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
+                    }
+                    const pIdx = currentPassengerTickets.findIndex(t => t.ticketId === data.ticketId);
+                    if (pIdx >= 0) {
+                        if (Array.isArray(data.mensajes)) currentPassengerTickets[pIdx].mensajes = data.mensajes;
+                        if (data.status) currentPassengerTickets[pIdx].status = data.status;
+                        renderPassengerTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
+                    }
+                    if (activeChatTicketId === data.ticketId) {
+                        renderChatModalMessages();
+                    }
+                    if (data.role !== 'admin') {
+                        showToastNotification('🔔 Nuevo mensaje en reclamo #' + data.ticketId + ' (' + (data.remitente || 'Usuario') + ')');
+                        updateAllAdminNotificationBadges();
+                    }
+                });
+
+                window.RutaSync.on('SOLICITUD_RECARGA_SALDO', () => {
+                    loadRechargesData();
+                    showToastNotification('💳 ¡Nueva solicitud de recarga de saldo recibida!');
+                    updateAllAdminNotificationBadges();
+                });
+
+                window.RutaSync.on('DOCUMENTOS_CONDUCTOR_ACTUALIZADOS', () => {
+                    loadDriversData();
+                    showToastNotification('🚗 ¡Nuevo conductor o documentación recibida para validar!');
+                    updateAllAdminNotificationBadges();
+                });
+
                 window.RutaSync.on('NUEVO_TICKET_SOPORTE', (ticket) => {
                     if (!ticket || !ticket.ticketId) return;
                     const isPas = (ticket.role === 'pasajero') || String(ticket.ticketId).startsWith('PAS-');
@@ -3744,7 +4301,7 @@
                             try {
                                 localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(currentPassengerTickets));
                             } catch(e) {}
-                            renderPassengerTicketsTable();
+                            renderPassengerTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                         }
                     } else {
                         if (!currentDriverTickets.some(t => t.ticketId === ticket.ticketId)) {
@@ -3752,7 +4309,7 @@
                             try {
                                 localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(currentDriverTickets));
                             } catch(e) {}
-                            renderDriverTicketsTable();
+                            renderDriverTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                         }
                     }
                 });
@@ -3763,13 +4320,13 @@
                     if (dIdx >= 0) {
                         currentDriverTickets[dIdx].status = data.status || currentDriverTickets[dIdx].status;
                         if (data.respuestaAdmin !== undefined) currentDriverTickets[dIdx].respuestaAdmin = data.respuestaAdmin;
-                        renderDriverTicketsTable();
+                        renderDriverTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                     }
                     const pIdx = currentPassengerTickets.findIndex(t => t.ticketId === data.ticketId);
                     if (pIdx >= 0) {
                         currentPassengerTickets[pIdx].status = data.status || currentPassengerTickets[pIdx].status;
                         if (data.respuestaAdmin !== undefined) currentPassengerTickets[pIdx].respuestaAdmin = data.respuestaAdmin;
-                        renderPassengerTicketsTable();
+                        renderPassengerTicketsTable(); if(typeof updateAllAdminNotificationBadges==="function") updateAllAdminNotificationBadges();
                     }
                 });
             }
