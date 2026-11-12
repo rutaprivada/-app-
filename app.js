@@ -14086,6 +14086,26 @@ if (btnRecenterPassengerMap) {
       }
     } catch(err) {}
 
+    // Escucha de cambios de estado vía bus RutaSync
+    if (window.RutaSync) {
+      window.RutaSync.on('ESTADO_TICKET_ACTUALIZADO', (data) => {
+        if (!data || !data.ticketId) return;
+        try {
+          const currentList = JSON.parse(localStorage.getItem('rutaprivada_passenger_tickets_v1') || '[]');
+          const idx = currentList.findIndex(t => t.ticketId === data.ticketId);
+          if (idx >= 0) {
+            currentList[idx].status = data.status || currentList[idx].status;
+            if (data.respuestaAdmin !== undefined) currentList[idx].respuestaAdmin = data.respuestaAdmin;
+            currentList[idx].updatedAt = Date.now();
+            localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(currentList));
+            if (typeof window.renderPassengerTicketsList === 'function') {
+              window.renderPassengerTicketsList();
+            }
+          }
+        } catch(e) {}
+      });
+    }
+
     const btnUberHelp = document.getElementById('btnUberHelp');
     if (btnUberHelp) {
       btnUberHelp.addEventListener('click', (e) => {
@@ -14154,10 +14174,21 @@ if (btnRecenterPassengerMap) {
           localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(list));
         } catch(err) {}
 
-        // 2. Guardar en Firestore
+        // 2. Guardar en Firestore con inicialización garantizada
         try {
-          if (typeof firebase !== 'undefined' && firebase.firestore) {
-            await firebase.firestore().collection('tickets_soporte').doc(ticketId).set(payload);
+          if (typeof firebase !== 'undefined') {
+            if (!firebase.apps || !firebase.apps.length) {
+              firebase.initializeApp({
+                apiKey: "AIzaSyA_1WzDPVMhZ4UBkfXKTNo4O6T9ICU0fc4",
+                authDomain: "rutaprivada-app.firebaseapp.com",
+                projectId: "rutaprivada-app",
+                storageBucket: "rutaprivada-app.appspot.com",
+                messagingSenderId: "1035848825829",
+                appId: "1:1035848825829:web:53177d6118d6174a74a123"
+              });
+            }
+            const db = firebase.firestore();
+            await db.collection('tickets_soporte').doc(ticketId).set(payload, { merge: true });
           }
         } catch(err) {
           console.warn('Firestore ticket err:', err);
@@ -14170,10 +14201,11 @@ if (btnRecenterPassengerMap) {
           }
         } catch(err) {}
 
-        // 4. Envío EmailJS
+        // 4. Envío EmailJS garantizado (Copia a Central y al Pasajero)
         try {
+          const fullFormattedMessage = `📌 [Reclamo Pasajero #${ticketId}] ${catText}\n\n${description}\n\nPasajero: ${name} (${phone})\nViaje: ${tripId || 'N/A'}\nFecha: ${timeStr}\nCentral: ${PASSENGER_SUPPORT_EMAIL}`;
           const emailParams = {
-            service_id: 'service_rutaprivada',
+            service_id: 'service_ri00bk4',
             template_id: 'template_y849ceg',
             user_id: 'ai6WOsUzJaXx1st1E',
             template_params: {
@@ -14187,16 +14219,38 @@ if (btnRecenterPassengerMap) {
               category: catText,
               trip_id: tripId || 'N/A',
               message: description,
-              email: email,
-              passcode: `Ticket #${ticketId}`,
+              email: PASSENGER_SUPPORT_EMAIL,
+              passcode: fullFormattedMessage,
               time: timeStr
             }
           };
-          await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+
+          const resSend = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(emailParams)
-          }).catch(() => {});
+          }).catch(() => null);
+
+          if (!resSend || !resSend.ok) {
+            emailParams.service_id = 'service_rutaprivada';
+            await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(emailParams)
+            }).catch(() => null);
+          }
+
+          // Despachar copia al pasajero
+          if (email && email !== PASSENGER_SUPPORT_EMAIL) {
+            emailParams.template_params.to_email = email;
+            emailParams.template_params.email = email;
+            emailParams.template_params.reply_to = PASSENGER_SUPPORT_EMAIL;
+            await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(emailParams)
+            }).catch(() => null);
+          }
         } catch(err) {}
 
         // 5. Redirección a cliente de correo oficial con respaldo a Central y al Pasajero

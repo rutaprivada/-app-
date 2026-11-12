@@ -331,22 +331,6 @@
             font-weight: 700;
         }
 
-        .badge-tab-count {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 18px;
-            height: 18px;
-            padding: 0 5px;
-            border-radius: 9px;
-            font-size: 0.68rem;
-            font-weight: 800;
-            background: rgba(255, 255, 255, 0.15);
-            color: #fff;
-            margin-left: 6px;
-            vertical-align: middle;
-        }
-
         .badge-status.pendiente {
             background: rgba(245, 158, 11, 0.15);
             color: #fbbf24;
@@ -465,6 +449,52 @@
             border-radius: 12px;
             margin: 20px 0;
             font-family: monospace;
+        }
+
+        /* Badges de filtros e indicadores de notificación en soporte */
+        .tab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.12);
+            color: #cbd5e1;
+            font-size: 0.68rem;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 10px;
+            margin-left: 6px;
+            min-width: 18px;
+            line-height: 1;
+        }
+
+        .tab-badge.has-items {
+            background: rgba(255, 255, 255, 0.25);
+            color: #fff;
+        }
+
+        .badge-pending-driver.has-pending {
+            background: #eab308 !important;
+            color: #000 !important;
+            font-weight: 900;
+            box-shadow: 0 0 10px rgba(234, 179, 8, 0.6);
+            animation: pulse-badge 2s infinite ease-in-out;
+        }
+
+        .badge-pending-passenger.has-pending {
+            background: #38bdf8 !important;
+            color: #000 !important;
+            font-weight: 900;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+            animation: pulse-badge 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-badge {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.08); opacity: 0.85; }
+        }
+
+        #docReviewModalOverlay {
+            z-index: 99999 !important;
         }
     </style>
 </head>
@@ -664,11 +694,21 @@
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <div class="filter-tabs" id="driverTicketFilterTabs">
-                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="todos">Todos <span class="badge-tab-count" id="badgeDriverCount_todos">0</span></button>
-                        <button class="filter-tab-btn driver-ticket-tab-btn active" data-status="pendiente">⏳ Pendientes <span class="badge-tab-count" id="badgeDriverCount_pendiente" style="background:#eab308; color:#000;">0</span></button>
-                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="en_revision">🔍 En Revisión <span class="badge-tab-count" id="badgeDriverCount_en_revision">0</span></button>
-                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="en_proceso">⚙️ En Proceso <span class="badge-tab-count" id="badgeDriverCount_en_proceso">0</span></button>
-                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="finalizado">✅ Finalizados <span class="badge-tab-count" id="badgeDriverCount_finalizado">0</span></button>
+                        <button class="filter-tab-btn driver-ticket-tab-btn active" data-status="pendiente">
+                            ⏳ Pendientes <span class="tab-badge badge-pending-driver" id="tabBadgeDriverPending">0</span>
+                        </button>
+                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="en_revision">
+                            🔍 En Revisión <span class="tab-badge" id="tabBadgeDriverReview">0</span>
+                        </button>
+                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="en_proceso">
+                            ⚙️ En Proceso <span class="tab-badge" id="tabBadgeDriverProcess">0</span>
+                        </button>
+                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="finalizado">
+                            ✅ Finalizados <span class="tab-badge" id="tabBadgeDriverDone">0</span>
+                        </button>
+                        <button class="filter-tab-btn driver-ticket-tab-btn" data-status="todos">
+                            Todos <span class="tab-badge" id="tabBadgeDriverAll">0</span>
+                        </button>
                     </div>
                     <button id="btnRefreshDriverTickets" class="admin-btn">
                         <i class="fa-solid fa-rotate"></i> Actualizar
@@ -709,11 +749,21 @@
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <div class="filter-tabs" id="passengerTicketFilterTabs">
-                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="todos">Todos <span class="badge-tab-count" id="badgePassengerCount_todos">0</span></button>
-                        <button class="filter-tab-btn passenger-ticket-tab-btn active" data-status="pendiente">⏳ Pendientes <span class="badge-tab-count" id="badgePassengerCount_pendiente" style="background:#38bdf8; color:#000;">0</span></button>
-                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="en_revision">🔍 En Revisión <span class="badge-tab-count" id="badgePassengerCount_en_revision">0</span></button>
-                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="en_proceso">⚙️ En Proceso <span class="badge-tab-count" id="badgePassengerCount_en_proceso">0</span></button>
-                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="finalizado">✅ Finalizados <span class="badge-tab-count" id="badgePassengerCount_finalizado">0</span></button>
+                        <button class="filter-tab-btn passenger-ticket-tab-btn active" data-status="pendiente">
+                            ⏳ Pendientes <span class="tab-badge badge-pending-passenger" id="tabBadgePassengerPending">0</span>
+                        </button>
+                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="en_revision">
+                            🔍 En Revisión <span class="tab-badge" id="tabBadgePassengerReview">0</span>
+                        </button>
+                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="en_proceso">
+                            ⚙️ En Proceso <span class="tab-badge" id="tabBadgePassengerProcess">0</span>
+                        </button>
+                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="finalizado">
+                            ✅ Finalizados <span class="tab-badge" id="tabBadgePassengerDone">0</span>
+                        </button>
+                        <button class="filter-tab-btn passenger-ticket-tab-btn" data-status="todos">
+                            Todos <span class="tab-badge" id="tabBadgePassengerAll">0</span>
+                        </button>
                     </div>
                     <button id="btnRefreshPassengerTickets" class="admin-btn">
                         <i class="fa-solid fa-rotate"></i> Actualizar
@@ -962,19 +1012,41 @@
                 .replace(/'/g, '&#39;');
         }
 
+        // Definición global anticipada para apertura y cierre garantizado del modal de revisión documental
+        window.openDocReviewModal = function(driverIdentifier) {
+            const overlay = document.getElementById('docReviewModalOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                overlay.classList.add('active');
+            }
+            if (typeof window._internalOpenDocReviewModal === 'function') {
+                window._internalOpenDocReviewModal(driverIdentifier);
+            }
+        };
+
+        window.closeDocReviewModal = function() {
+            const overlay = document.getElementById('docReviewModalOverlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                overlay.style.display = 'none';
+            }
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
             const ADMIN_PIN_SECRET = '4824';
             let currentDrivers = [];
-            let currentDriverTickets = [];
-            let currentPassengerTickets = [];
             let activeReviewDriver = null;
             let cloudRechargesList = [];
             let cloudDriversList = [];
             let activeFilter = 'todos';
             let activeRechargeFilter = 'todos';
+            let docValidationState = [];
+
+            // Listas y estados activos de reclamos y soporte (Top-level para evitar Temporal Dead Zone)
+            let currentDriverTickets = [];
+            let currentPassengerTickets = [];
             let activeDriverTicketFilter = 'pendiente';
             let activePassengerTicketFilter = 'pendiente';
-            let docValidationState = [];
 
             // Elementos DOM Principales
             const authModalOverlay = document.getElementById('authModalOverlay');
@@ -1785,6 +1857,53 @@
                             }, (err) => console.warn('Firestore recharges listener warning:', err));
 
                             // 4. Escuchar Reclamos de Soporte en tiempo real
+                            const initAdminTicketsRealtimeListener = (database) => {
+                                if (!database) return;
+                                database.collection('tickets_soporte').onSnapshot((snapshot) => {
+                                    if (!snapshot || snapshot.empty) return;
+                                    let driverUpdated = false;
+                                    let passengerUpdated = false;
+
+                                    snapshot.forEach(doc => {
+                                        if (!doc.exists) return;
+                                        const d = doc.data();
+                                        const tId = d.ticketId || doc.id;
+                                        const isPas = (d.role === 'pasajero') || String(tId).startsWith('PAS-');
+
+                                        if (isPas) {
+                                            const idx = currentPassengerTickets.findIndex(t => t.ticketId === tId);
+                                            if (idx >= 0) {
+                                                currentPassengerTickets[idx] = { ...currentPassengerTickets[idx], ...d, ticketId: tId };
+                                            } else {
+                                                currentPassengerTickets.unshift({ ...d, ticketId: tId });
+                                            }
+                                            passengerUpdated = true;
+                                        } else {
+                                            const idx = currentDriverTickets.findIndex(t => t.ticketId === tId);
+                                            if (idx >= 0) {
+                                                currentDriverTickets[idx] = { ...currentDriverTickets[idx], ...d, ticketId: tId };
+                                            } else {
+                                                currentDriverTickets.unshift({ ...d, ticketId: tId });
+                                            }
+                                            driverUpdated = true;
+                                        }
+                                    });
+
+                                    if (driverUpdated) {
+                                        try {
+                                            localStorage.setItem('rutaprivada_driver_tickets_v1', JSON.stringify(currentDriverTickets));
+                                        } catch(e) {}
+                                        renderDriverTicketsTable();
+                                    }
+                                    if (passengerUpdated) {
+                                        try {
+                                            localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(currentPassengerTickets));
+                                        } catch(e) {}
+                                        renderPassengerTicketsTable();
+                                    }
+                                }, (err) => console.warn('Firestore tickets_soporte listener warning:', err));
+                            };
+
                             initAdminTicketsRealtimeListener(db);
 
                         } catch(e) {
@@ -2163,17 +2282,17 @@
             // 5. RENDERIZAR TABLA DE CONDUCTORES
             function renderDriversTable() {
                 if (!driversTableBody) return;
-                const searchTerm = (adminSearchInput && adminSearchInput.value) ? String(adminSearchInput.value).toLowerCase().trim() : '';
+                const searchTerm = adminSearchInput ? adminSearchInput.value.toLowerCase().trim() : '';
 
                 const filtered = currentDrivers.filter(d => {
-                    const status = String(d.estadoVerificacion || 'pendiente').toLowerCase();
+                    const status = (d.estadoVerificacion || 'pendiente').toLowerCase();
                     const matchesFilter = (activeFilter === 'todos') || (status === activeFilter);
                     
-                    const name = String(d.nombre || '').toLowerCase();
-                    const plate = String(d.patente || '').toLowerCase();
-                    const phone = String(d.telefono || '').toLowerCase();
-                    const dni = String(d.dni || '').toLowerCase();
-                    const email = String(d.email || '').toLowerCase();
+                    const name = (d.nombre || '').toLowerCase();
+                    const plate = (d.patente || '').toLowerCase();
+                    const phone = (d.telefono || '').toLowerCase();
+                    const dni = (d.dni || '').toLowerCase();
+                    const email = (d.email || '').toLowerCase();
 
                     const matchesSearch = !searchTerm || name.includes(searchTerm) || plate.includes(searchTerm) || phone.includes(searchTerm) || dni.includes(searchTerm) || email.includes(searchTerm);
 
@@ -2193,13 +2312,11 @@
                 }
 
                 driversTableBody.innerHTML = filtered.map(d => {
-                    const status = String(d.estadoVerificacion || 'pendiente').toLowerCase();
+                    const status = (d.estadoVerificacion || 'pendiente').toLowerCase();
                     const statusLabel = status === 'aprobado' ? '✓ Aprobado' : (status === 'rechazado' ? '✕ Rechazado' : '⏱️ Pendiente');
                     const bankName = d.banco || 'Mercado Pago';
                     const cbuShort = d.cbu ? (d.cbu.substring(0, 10) + '...') : 'Sin CBU';
-                    const holderName = String(d.titularCuenta || '').toLowerCase().trim();
-                    const dName = String(d.nombre || '').toLowerCase().trim();
-                    const holderMatch = Boolean(holderName && dName && (holderName === dName || holderName.includes(dName) || dName.includes(holderName)));
+                    const holderMatch = Boolean(d.titularCuenta && d.nombre && (d.titularCuenta.toLowerCase().trim() === d.nombre.toLowerCase().trim() || d.titularCuenta.toLowerCase().includes(d.nombre.toLowerCase()) || d.nombre.toLowerCase().includes(d.titularCuenta.toLowerCase())));
                     const safeId = String(d.id || d.dni || d.nombre);
                     const docsCount = d.docsCount || (d.docsSummary ? Object.values(d.docsSummary).filter(Boolean).length : (d.docsImages ? Object.keys(d.docsImages).filter(k => d.docsImages[k] && d.docsImages[k].length > 20).length : 0));
 
@@ -2251,18 +2368,23 @@
                 }).join('');
             }
 
-            // Delegación de eventos en la tabla para clic garantizado en "Revisar Documentación"
-            if (driversTableBody) {
-                driversTableBody.addEventListener('click', (e) => {
-                    const btn = e.target.closest('.btn-review-driver');
-                    if (btn) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const id = btn.getAttribute('data-id');
-                        openDocReviewModal(id);
-                    }
-                });
-            }
+            // Delegación global en document para clic garantizado en "Revisar Documentación" y Pestañas de Conductores
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-review-driver');
+                if (btn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const id = btn.getAttribute('data-id');
+                    window.openDocReviewModal(id);
+                }
+                const filterBtn = e.target.closest('.driver-tab-btn');
+                if (filterBtn) {
+                    document.querySelectorAll('.driver-tab-btn').forEach(b => b.classList.remove('active'));
+                    filterBtn.classList.add('active');
+                    activeFilter = filterBtn.getAttribute('data-status') || 'todos';
+                    renderDriversTable();
+                }
+            });
 
             // Listeners de búsqueda y pestañas
             if (adminSearchInput) {
@@ -2280,6 +2402,9 @@
 
             // 6. MODAL DE REVISIÓN DOCUMENTAL DETALLADA CON AISLAMIENTO ESTRICTO Y CARGA EN TIEMPO REAL
             function openDocReviewModal(driverIdentifier) {
+                window._internalOpenDocReviewModal = openDocReviewModal;
+                window.openDocReviewModal = openDocReviewModal;
+
                 // Apertura visual inmediata del modal
                 if (docReviewModalOverlay) {
                     docReviewModalOverlay.style.display = 'flex';
@@ -3075,8 +3200,6 @@
             // ==========================================
             // 10. GESTIÓN INDEPENDIENTE DE RECLAMOS: CONDUCTORES Y PASAJEROS
             // ==========================================
-            let currentDriverTickets = [];
-            let currentPassengerTickets = [];
 
             // A. SOPORTE CONDUCTORES
             function loadDriverTicketsData() {
@@ -3176,12 +3299,50 @@
                 if (!driverTicketsTableBody) return;
 
                 const pendingCount = currentDriverTickets.filter(t => (t.status || 'pendiente').toLowerCase() === 'pendiente').length;
+                const reviewCount = currentDriverTickets.filter(t => (t.status || '').toLowerCase() === 'en_revision').length;
+                const processCount = currentDriverTickets.filter(t => (t.status || '').toLowerCase() === 'en_proceso').length;
+                const doneCount = currentDriverTickets.filter(t => (t.status || '').toLowerCase() === 'finalizado').length;
+                const totalCount = currentDriverTickets.length;
+
+                const tabPending = document.getElementById('tabBadgeDriverPending');
+                const tabReview = document.getElementById('tabBadgeDriverReview');
+                const tabProcess = document.getElementById('tabBadgeDriverProcess');
+                const tabDone = document.getElementById('tabBadgeDriverDone');
+                const tabAll = document.getElementById('tabBadgeDriverAll');
+
+                if (tabPending) {
+                    tabPending.textContent = pendingCount;
+                    if (pendingCount > 0) {
+                        tabPending.classList.add('has-pending');
+                    } else {
+                        tabPending.classList.remove('has-pending');
+                    }
+                }
+                if (tabReview) {
+                    tabReview.textContent = reviewCount;
+                    tabReview.classList.toggle('has-items', reviewCount > 0);
+                }
+                if (tabProcess) {
+                    tabProcess.textContent = processCount;
+                    tabProcess.classList.toggle('has-items', processCount > 0);
+                }
+                if (tabDone) {
+                    tabDone.textContent = doneCount;
+                    tabDone.classList.toggle('has-items', doneCount > 0);
+                }
+                if (tabAll) {
+                    tabAll.textContent = totalCount;
+                    tabAll.classList.toggle('has-items', totalCount > 0);
+                }
+
                 if (badgePendingDriverTicketsCount) {
                     if (pendingCount > 0) {
                         badgePendingDriverTicketsCount.textContent = pendingCount;
-                        badgePendingDriverTicketsCount.style.display = 'inline-block';
+                        badgePendingDriverTicketsCount.style.display = 'inline-flex';
+                        badgePendingDriverTicketsCount.classList.add('has-pending');
                     } else {
                         badgePendingDriverTicketsCount.style.display = 'none';
+                        badgePendingDriverTicketsCount.classList.remove('has-pending');
                     }
                 }
 
@@ -3275,11 +3436,42 @@
                 } catch(e) {}
                 if (!Array.isArray(tickets)) tickets = [];
 
+                // Reclamos de pasajeros (Semilla base sincronizada y persistente)
+                const knownPassengerSeeds = [
+                    {
+                        ticketId: 'PAS-853849',
+                        passengerName: 'daniel felipe pabon bastidas',
+                        passengerPhone: '1140900849',
+                        passengerEmail: 'danielfelipepeivon@gmail.com',
+                        category: 'Problemas con el Chofer',
+                        tripId: 'trip_1794399948175',
+                        description: 'el conductor tenia el auto sucion, no podia bajar las ventanas del auto',
+                        status: 'pendiente',
+                        role: 'pasajero',
+                        supportEmail: 'rutaprivadasoporte@gmail.com',
+                        createdAt: '2026-11-11T19:50:00.000Z',
+                        timeStr: '11/11/26, 7:50 p. m.'
+                    }
+                ];
+
+                knownPassengerSeeds.forEach(seed => {
+                    const existing = tickets.find(t => t.ticketId === seed.ticketId);
+                    if (!existing) {
+                        tickets.push(seed);
+                    }
+                });
+
                 currentPassengerTickets = tickets;
+                try {
+                    localStorage.setItem('rutaprivada_passenger_tickets_v1', JSON.stringify(tickets));
+                } catch(e) {}
 
                 if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
                     try {
                         const db = firebase.firestore();
+                        knownPassengerSeeds.forEach(s => {
+                            db.collection('tickets_soporte').doc(s.ticketId).set(s, { merge: true }).catch(() => {});
+                        });
                         db.collection('tickets_soporte').get().then(snap => {
                             if (!snap || snap.empty) return;
                             snap.forEach(doc => {
@@ -3307,12 +3499,50 @@
                 if (!passengerTicketsTableBody) return;
 
                 const pendingCount = currentPassengerTickets.filter(t => (t.status || 'pendiente').toLowerCase() === 'pendiente').length;
+                const reviewCount = currentPassengerTickets.filter(t => (t.status || '').toLowerCase() === 'en_revision').length;
+                const processCount = currentPassengerTickets.filter(t => (t.status || '').toLowerCase() === 'en_proceso').length;
+                const doneCount = currentPassengerTickets.filter(t => (t.status || '').toLowerCase() === 'finalizado').length;
+                const totalCount = currentPassengerTickets.length;
+
+                const tabPending = document.getElementById('tabBadgePassengerPending');
+                const tabReview = document.getElementById('tabBadgePassengerReview');
+                const tabProcess = document.getElementById('tabBadgePassengerProcess');
+                const tabDone = document.getElementById('tabBadgePassengerDone');
+                const tabAll = document.getElementById('tabBadgePassengerAll');
+
+                if (tabPending) {
+                    tabPending.textContent = pendingCount;
+                    if (pendingCount > 0) {
+                        tabPending.classList.add('has-pending');
+                    } else {
+                        tabPending.classList.remove('has-pending');
+                    }
+                }
+                if (tabReview) {
+                    tabReview.textContent = reviewCount;
+                    tabReview.classList.toggle('has-items', reviewCount > 0);
+                }
+                if (tabProcess) {
+                    tabProcess.textContent = processCount;
+                    tabProcess.classList.toggle('has-items', processCount > 0);
+                }
+                if (tabDone) {
+                    tabDone.textContent = doneCount;
+                    tabDone.classList.toggle('has-items', doneCount > 0);
+                }
+                if (tabAll) {
+                    tabAll.textContent = totalCount;
+                    tabAll.classList.toggle('has-items', totalCount > 0);
+                }
+
                 if (badgePendingPassengerTicketsCount) {
                     if (pendingCount > 0) {
                         badgePendingPassengerTicketsCount.textContent = pendingCount;
-                        badgePendingPassengerTicketsCount.style.display = 'inline-block';
+                        badgePendingPassengerTicketsCount.style.display = 'inline-flex';
+                        badgePendingPassengerTicketsCount.classList.add('has-pending');
                     } else {
                         badgePendingPassengerTicketsCount.style.display = 'none';
+                        badgePendingPassengerTicketsCount.classList.remove('has-pending');
                     }
                 }
 
